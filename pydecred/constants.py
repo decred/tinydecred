@@ -9,3 +9,6 @@ MINUTE = 60
 DAY = 86400
 HOUR = 3600
 SYMBOL = "DCR"
+
+MinSeedBytes = 16 # 128 bits
+MaxSeedBytes = 64 # 512 bits

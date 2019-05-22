@@ -1,1 +1,1 @@
-from wallet import *
+from app import *

@@ -6,7 +6,7 @@ import pydecred.constants as C
 
 Name = "mainnet"
 DefaultPort = "9108"
-DNSSeeds: [
+DNSSeeds = [
 	("mainnet-seed.decred.mindcry.org", True),
 	("mainnet-seed.decred.netpurgatory.com", True),
 	("mainnet-seed.decred.org", True)

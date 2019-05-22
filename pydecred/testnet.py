@@ -2,7 +2,7 @@ import pydecred.constants as C
 
 Name = "testnet3"
 DefaultPort = "19108"
-DNSSeeds: [
+DNSSeeds = [
 	("testnet-seed.decred.mindcry.org", True),
 	("testnet-seed.decred.netpurgatory.com", True),
 	("testnet-seed.decred.org", True)
@@ -57,16 +57,16 @@ AcceptNonStdTxs = True
 
 # Address encoding magics
 NetworkAddressPrefix = "T"
-PubKeyAddrID:         (0x28f7).to_bytes(2, byteorder="big") # starts with Tk
-PubKeyHashAddrID:     (0x0f21).to_bytes(2, byteorder="big") # starts with Ts
-PKHEdwardsAddrID:     (0x0f01).to_bytes(2, byteorder="big") # starts with Te
-PKHSchnorrAddrID:     (0x0ee3).to_bytes(2, byteorder="big") # starts with TS
-ScriptHashAddrID:     (0x0efc).to_bytes(2, byteorder="big") # starts with Tc
-PrivateKeyID:         (0x230e).to_bytes(2, byteorder="big") # starts with Pt
+PubKeyAddrID = (0x28f7).to_bytes(2, byteorder="big") # starts with Tk
+PubKeyHashAddrID = (0x0f21).to_bytes(2, byteorder="big") # starts with Ts
+PKHEdwardsAddrID = (0x0f01).to_bytes(2, byteorder="big") # starts with Te
+PKHSchnorrAddrID = (0x0ee3).to_bytes(2, byteorder="big") # starts with TS
+ScriptHashAddrID = (0x0efc).to_bytes(2, byteorder="big") # starts with Tc
+PrivateKeyID = (0x230e).to_bytes(2, byteorder="big") # starts with Pt
 
 # BIP32 hierarchical deterministic extended key magics
-HDPrivateKeyID: (0x04358397).to_bytes(4, byteorder="big") # starts with tprv
-HDPublicKeyID:  (0x043587d1).to_bytes(4, byteorder="big") # starts with tpub
+HDPrivateKeyID = (0x04358397).to_bytes(4, byteorder="big") # starts with tprv
+HDPublicKeyID = (0x043587d1).to_bytes(4, byteorder="big") # starts with tpub
 
 # BIP44 coin type used in the hierarchical deterministic path for
 # address generation.

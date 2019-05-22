@@ -12,6 +12,10 @@ ALIGN_CENTER = QtCore.Qt.AlignCenter
 ALIGN_RIGHT = QtCore.Qt.AlignRight
 ALIGN_TOP = QtCore.Qt.AlignTop
 
+HORIZONTAL = "horizontal"
+VERTICAL = "vertical"
+GRID = "grid"
+
 logger = helpers.ConsoleLogger
 
 
@@ -305,7 +309,7 @@ class QToggle(QtWidgets.QAbstractButton):
         self.slotBrush = QtGui.QBrush(QtGui.QColor(slotColor)) if slotColor else QtGui.QBrush(QtGui.QColor("#999999"))
         self.switchBrush = self.slotBrush # QtGui.QBrush(QtGui.QColor(switchColor)) if switchColor else QtGui.QBrush(QtGui.QColor("#d5d5d5"))
         self.disabledBrush = QtGui.QBrush(QtGui.QColor(disabledColor)) if disabledColor else QtGui.QBrush(QtGui.QColor("#666666"))
-        self.switch = False
+        self.state = False
         self.opacity = 0
         self.xPos = 8
         self.yPos = 8
@@ -326,7 +330,7 @@ class QToggle(QtWidgets.QAbstractButton):
         painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
         if self.isEnabled():
             painter.setBrush(self.switchBrush)
-            painter.setOpacity(0.6 if self.switch else 0.4)
+            painter.setOpacity(0.6 if self.state else 0.4)
             painter.drawRoundedRect(QtCore.QRect(self.slotMargin, self.slotMargin, self.slotWidth-2*self.slotMargin, self.height()-2*self.slotMargin), 8.0, 8.0)
             # painter.setBrush(self.switchBrush)
             painter.setOpacity(1.0)
@@ -344,9 +348,9 @@ class QToggle(QtWidgets.QAbstractButton):
     
         """
         if e.button() == QtCore.Qt.LeftButton:
-            self.switch = False if self.switch else True
-            self.switchBrush = self.onBrush if self.switch else self.slotBrush
-            if self.switch:
+            self.state = False if self.state else True
+            self.switchBrush = self.onBrush if self.state else self.slotBrush
+            if self.state:
                 self.animation.setStartValue(self.slotHeight/2)
                 self.animation.setEndValue(self.width() - self.slotHeight)
                 self.animation.setDuration(120)
@@ -357,9 +361,9 @@ class QToggle(QtWidgets.QAbstractButton):
                 self.animation.setDuration(120)
                 self.animation.start()
             if self.linkedSetting and self.linkedDict:
-                self.linkedDict[self.linkedSetting] = self.switch
+                self.linkedDict[self.linkedSetting] = self.state
             if self.callback:
-                self.callback(self.switch, self)
+                self.callback(self.state, self)
         super().mouseReleaseEvent(e)
 
     def sizeHint(self):
@@ -417,11 +421,11 @@ def makeWidget(widgetClass, layoutDirection="vertical", parent=None):
     """
     widget = widgetClass(parent)
     widget.setContentsMargins(0, 0, 0, 0)
-    if layoutDirection == "horizontal":
+    if layoutDirection == HORIZONTAL:
         layout = QtWidgets.QHBoxLayout(widget)
-    elif layoutDirection == "grid":
+    elif layoutDirection == GRID:
         layout = QtWidgets.QGridLayout(widget)
-    elif layoutDirection == "vertical":
+    elif layoutDirection == VERTICAL:
         layout = QtWidgets.QVBoxLayout(widget)
     else:
         return widget
