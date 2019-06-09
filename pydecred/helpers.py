@@ -3,9 +3,10 @@ import platform
 import sys
 import time
 import calendar
-import json
 import configparser
+from tempfile import TemporaryDirectory
 from pydecred import constants as C
+from pydecred import json
 # import traceback
 import urllib.request as urlrequest
 
@@ -234,35 +235,27 @@ def makeDevice(model=None, price=None, hashrate=None, power=None, release=None, 
         device["release"] = mktime(*[int(x) for x in device["release"].split("-")])
     return device
 
-
 def fetchSettingsFile(filepath):
     """
     Fetches the JSON settings file, creating an empty json object if necessary
     """
     if not os.path.isfile(filepath):
-        try:
-            with open(filepath, 'w+') as file:
-                file.write("{}")
-        except IOError:
-            print("Unable to create a settings file. Settings will not be saved across sessions.")
-            return False
-    if os.path.isfile(filepath):
-        with open(filepath) as file:
-            return json.loads(file.read())
-    return False
+        with open(filepath, 'w+') as file:
+            file.write("{}")
+    return json.loadFile(filepath)
 
 
-def saveFile(directory, name, contents):
+def saveFile(path, contents, binary=False):
     """
     Atomic file save.
     """
-    filepath = os.path.join(directory, name)
-    tmpPath = filepath + ".tmp"
-    with open(tmpPath, 'w') as f:
-        f.write(contents)
-        f.flush()
-        os.fsync(f.fileno())
-    os.replace(tmpPath, filepath)
+    with TemporaryDirectory() as tempDir:
+        tmpPath = os.path.join(tempDir, "tmp.tmp")
+        with open(tmpPath, 'wb' if binary else 'w') as f:
+            f.write(contents)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmpPath, path)
 
 
 def getUriAsJson(uri):
@@ -270,10 +263,10 @@ def getUriAsJson(uri):
     GET request parsed as JSON
     """
     req = urlrequest.Request(uri,
-                             headers={'Content-Type': 'application/json'},
-                             method="GET"
-                             )
-    return json.loads(urlrequest.urlopen(req).read().decode())
+     headers={'Content-Type': 'application/json'},
+     method="GET"
+    )
+    return json.load(urlrequest.urlopen(req).read().decode())
 
 
 def appDataDir(appName):

@@ -16,6 +16,9 @@ HORIZONTAL = "horizontal"
 VERTICAL = "vertical"
 GRID = "grid"
 
+LIGHT_THEME = "light"
+DARK_THEME = "dark"
+
 logger = helpers.ConsoleLogger
 
 
@@ -34,9 +37,7 @@ class ThreadUtilities:
         self.qRunning = False
         self.qKilla = False
         self.inQ = queue.Queue()
-        self.scheduleTimer = QtCore.QTimer()
-        self.scheduleTimer.setTimerType(QtCore.Qt.PreciseTimer)
-        self.scheduleTimer.timeout.connect(self.scheduledFunctionTick)
+        self.scheduleTimer = makeTimer(self.scheduledFunctionTick)
 
         self.threadSafeReturnValues = {}
         self.threadSafeFunctionSignal.connect(self.runRegisteredFunction)
@@ -144,6 +145,9 @@ class ThreadUtilities:
         return lambda *a, fk=functionKey, **k: self.threadSafeFunctionSignal.emit(fk, a, k)
 
     def _scheduleFunction(self, functionKey, function, expiration, *args, repeatEvery=None, noForce=False, **kwargs):
+        """
+        expiration should be a timestamp in the future, not the amount of time from now.
+        """
         if noForce and functionKey in self.scheduledFuncs:
             return True
         expiration = expiration*1000.
@@ -410,6 +414,12 @@ def qLabeledToggle(label, parent, *args, **kwargs):
     lyt.addWidget(toggle)
     return wgt, toggle
 
+def makeTimer(callback):
+    timer = QtCore.QTimer()
+    timer.setTimerType(QtCore.Qt.PreciseTimer)
+    timer.timeout.connect(callback)
+    return timer
+
 
 def makeWidget(widgetClass, layoutDirection="vertical", parent=None):
     """
@@ -485,6 +495,15 @@ def makeLabel(s, y, a=ALIGN_CENTER):
     lbl.setFont(font)
     lbl.setAlignment(a)
     return lbl
+
+def pad(wgt, t, r, b, l):
+    """
+    Add padding around the widget by wrapping it in another widget. 
+    """
+    w, lyt = makeWidget(QtWidgets.QWidget, HORIZONTAL)
+    lyt.addWidget(wgt)
+    w.setContentsMargins(l, t, r, b)
+    return w
 
 
 class QSimpleTable(QtWidgets.QTableWidget):
@@ -625,7 +644,7 @@ def clearLayout(layout, delete=False):
 
 def layoutWidgets(layout):
     """
-    Clears all items from the given layout. Optionally deletes the parent widget
+    generator to iterate the widgets in a layout
 
     :param QAbstractLayout layout: Layout to clear
     :param bool delete: Default False. Whether or not to delete the widget as well
@@ -633,10 +652,26 @@ def layoutWidgets(layout):
     for i in range(layout.count()): 
         yield layout.itemAt(i).widget()
 
+lightThemePalette = QtGui.QPalette()
+lightThemePalette.setColor(QtGui.QPalette.Window, QtGui.QColor("#ffffff"))
+lightThemePalette.setColor(QtGui.QPalette.WindowText, QtGui.QColor("#555555"))
+lightThemePalette.setColor(QtGui.QPalette.Base, QtGui.QColor("#ffffff"))
+lightThemePalette.setColor(QtGui.QPalette.Text, QtGui.QColor("#555555"))
+
+darkThemePalette = QtGui.QPalette()
+darkThemePalette.setColor(QtGui.QPalette.Window, QtGui.QColor("#3f3f3f"))
+darkThemePalette.setColor(QtGui.QPalette.WindowText, QtGui.QColor("#ededed"))
+darkThemePalette.setColor(QtGui.QPalette.Base, QtGui.QColor("#3f3f3f"))
+darkThemePalette.setColor(QtGui.QPalette.Text, QtGui.QColor("#ededed"))
+darkThemePalette.setColor(QtGui.QPalette.Button, QtGui.QColor("#666666"))
+darkThemePalette.setColor(QtGui.QPalette.ButtonText, QtGui.QColor("#efd7ec"))
+darkThemePalette.hoverColor = QtGui.QColor("#5d5d5d")
+
+
 
 QUTILITY_STYLE = """
 QPushButton[button-style-class=light]{
-    background-color:#90caf9;
+    background-color:white;
     border-radius:3px;
     border-color:#bbbbbb;
     border-width:1px;

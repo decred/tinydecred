@@ -1,10 +1,9 @@
 from pydecred import helpers
 from appdirs import AppDirs
 import os
-from pydecred import mainnet, testnet
-import json
+from pydecred import mainnet, testnet, json
 
-_ad = AppDirs("TinyWallet", "SciCo", version="0.0")
+_ad = AppDirs("TinyDecred", "SciCo")
 DATA_DIR = _ad.user_data_dir
 helpers.mkdir(DATA_DIR)
 CONFIG_NAME = "tinywallet.conf"
@@ -24,30 +23,37 @@ TestnetConfig = {
 	]
 }
 
-class WalletConfig:
+class TinyConfig:
 	def __init__(self):
 		fileCfg = helpers.fetchSettingsFile(CONFIG_PATH)
 		self.file = fileCfg
+		self.normalize()
+	def set(self, k, v):
+		self.file[k] = v
+	def get(self, *keys):
+		d = self.file
+		rVal = None
+		for k in keys:
+			if k not in d:
+				return None
+			rVal = d[k]
+			d = rVal
+		return rVal
+	def normalize(self):
 		self.net = None
-		if "network" in fileCfg:
-			netName = fileCfg["network"]
+		cfg = self.file
+		if "network" in cfg:
+			netName = cfg["network"]
 			if netName == MAINNET:
 				self.net = mainnet
 			elif netName == TESTNET:
 				self.net = testnet
-		self.dcrdata = None
-	def set(self, k, v):
-		self.file[k] = v
-	def get(self, k):
-		if k in self.file:
-			return self.file[k]
-		return None
 	def save(self):
-		helpers.saveFile(DATA_DIR, CONFIG_NAME, json.dumps(self.file))
+		json.save(CONFIG_PATH, self.file)
 
 	
 def load():
-	return WalletConfig()
+	return TinyConfig()
 
 
 
