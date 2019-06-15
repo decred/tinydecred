@@ -1,4 +1,4 @@
-import pydecred.constants as C
+import tinydecred.pydecred.constants as C
 
 Name = "testnet3"
 DefaultPort = "19108"

@@ -1,3 +1,0 @@
-import curve
-
-Curve = curve

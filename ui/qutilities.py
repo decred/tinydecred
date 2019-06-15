@@ -11,6 +11,7 @@ ALIGN_LEFT = QtCore.Qt.AlignLeft
 ALIGN_CENTER = QtCore.Qt.AlignCenter
 ALIGN_RIGHT = QtCore.Qt.AlignRight
 ALIGN_TOP = QtCore.Qt.AlignTop
+ALIGN_BOTTOM = QtCore.Qt.AlignBottom
 
 HORIZONTAL = "horizontal"
 VERTICAL = "vertical"
@@ -488,16 +489,16 @@ def horizontalRule(l=0, t=0, r=0, b=0, color="#aaaaaa", height=2, parent=None):
     return wdgt
 
 
-def makeLabel(s, y, a=ALIGN_CENTER, font=None, color=None):
+def makeLabel(s, y, a=ALIGN_CENTER, fontFamily=None, color=None):
     lbl = QtWidgets.QLabel(s)
     font = lbl.font()
     font.setPixelSize(y)
+    if fontFamily: 
+        font.setFamily(fontFamily)
     lbl.setFont(font)
     lbl.setAlignment(a)
     if color:
         setLabelColor(lbl, color)
-    if font:
-        lbl.setFont(QtGui.QFont(font))
     return lbl
 
 def setLabelColor(lbl, color):
@@ -506,6 +507,11 @@ def setLabelColor(lbl, color):
     palette.setColor(lbl.backgroundRole(), c)
     palette.setColor(lbl.foregroundRole(), c)
     lbl.setPalette(palette)
+
+def setLabelFontSize(lbl, size):
+    font = lbl.font()
+    font.setPixelSize(size)
+    lbl.setFont(font)
 
 def pad(wgt, t, r, b, l):
     """
@@ -753,5 +759,16 @@ QComboBox::down-arrow {
     background-color:white;
     position:relative;
     top:3px;
+}
+QLineEdit {
+    padding: 7px;
+    font-size: 16px;
+    line-height: 34px;
+    border: 1px solid #777777;
+    border-radius: 2px;
+}
+QLineEdit:focus {
+    border: 1px solid #333333;
+    outline: none;
 }
 """

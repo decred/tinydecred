@@ -1,17 +1,14 @@
-from tinydecred.pydecred import json
-from rando import generateSeed
+from tinydecred.pydecred import dcrjson as json
+from tinydecred.crypto.secp256k1.curve import curve as Curve, PublicKey, PrivateKey
+from tinydecred.crypto.rando import generateSeed
+from tinydecred.crypto.bytearray import ByteArray, decodeBA
 from blake256.blake256 import blake_hash
-from bytearray import ByteArray, decodeBA
 from base58 import b58encode, b58decode
-from two1.crypto import ecdsa
-import secp256k1
 import hashlib
 import pyaes
 import base64
 import hmac
 import unittest
-
-Curve = ecdsa.secp256k1()
 
 KEY_SIZE = 32
 SERIALIZED_KEY_LENGTH = 4 + 1 + 4 + 4 + 32 + 33 # 78 bytes
@@ -20,6 +17,18 @@ MAX_COIN_TYPE = HARDENED_KEY_START - 1
 MAX_ACCOUNT_NUM = HARDENED_KEY_START - 2
 RADIX = 58
 ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+SHA256_SIZE = 32
+BLAKE256_SIZE = 32
+
+# ExternalBranch is the child number to use when performing BIP0044
+# style hierarchical deterministic key derivation for the external
+# branch.
+EXTERNAL_BRANCH = 0
+
+# InternalBranch is the child number to use when performing BIP0044
+# style hierarchical deterministic key derivation for the internal
+# branch.
+INTERNAL_BRANCH = 1
 
 # DEFAULT_SCRYPT_OPTIONS is the default options used with scrypt.
 DEFAULT_SCRYPT_OPTIONS = {
@@ -27,6 +36,23 @@ DEFAULT_SCRYPT_OPTIONS = {
 	"R": 8,
 	"P": 1,
 }
+
+# STEcdsaSecp256k1 specifies that the signature is an ECDSA signature
+# over the secp256k1 elliptic curve.
+STEcdsaSecp256k1 = 0
+
+# STEd25519 specifies that the signature is an ECDSA signature over the
+# edwards25519 twisted Edwards curve.
+STEd25519 = 1
+
+# STSchnorrSecp256k1 specifies that the signature is a Schnorr
+# signature over the secp256k1 elliptic curve.
+STSchnorrSecp256k1 = 2
+
+class Signature:
+	def __init__(self, r, s):
+		self.r = r
+		self.s = s
 
 class ParameterRangeError(Exception):
 	pass
@@ -39,13 +65,217 @@ def defaultScryptParams():
 	d = DEFAULT_SCRYPT_OPTIONS
 	return d["N"], d["R"], d["P"]
 
+def egcd(a, b):
+    if a == 0:
+        return (b, 0, 1)
+    else:
+        g, y, x = egcd(b % a, a)
+        return (g, x - (b // a) * y, y)
+
+def modInv(a, m):
+    g, x, y = egcd(a, m)
+    if g != 1:
+        raise Exception('modular inverse does not exist')
+    else:
+        return x % m
+
+def mac(key, msg):
+	return ByteArray(hmac.digest(key.bytes(), msg=msg.bytes(), digest=hashlib.sha512))
+
 def hash160(b):
 	h = hashlib.new("ripemd160")
 	h.update(blake_hash(b))
-	return h.digest()
+	return ByteArray(h.digest())
+
+def hashH(b):
+	return ByteArray(blake_hash(b), length=BLAKE256_SIZE)
 
 def checksum(input):
-	return blake_hash(blake_hash(input))
+	return blake_hash(blake_hash(input))[:4]
+
+def sha256ChecksumByte(input):
+	v = hashlib.sha256(input).digest()
+	return hashlib.sha256(v).digest()[0]
+
+def hashToInt(h): # []byte) *big.Int {
+	"""
+	hashToInt converts a hash value to an integer. There is some disagreement
+	about how this is done. [NSA] suggests that this is done in the obvious
+	manner, but [SECG] truncates the hash to the bit-length of the curve order
+	first. We follow [SECG] because that's what OpenSSL does. Additionally,
+	OpenSSL right shifts excess bits from the number if the hash is too large
+	and we mirror that too.
+	This is borrowed from crypto/ecdsa.
+	"""
+	orderBits = Curve.N.bit_length()
+	orderBytes = (orderBits + 7) // 8
+	if len(h) > orderBytes:
+		h = h[:orderBytes]
+
+	ret = int.from_bytes(h, byteorder="big")
+	excess = len(h)*8 - orderBits
+	if excess > 0:
+		ret = ret >> excess
+	return ret
+
+def int2octets(v, rolen): #v *big.Int, rolen int) []byte {
+	""" https://tools.ietf.org/html/rfc6979#section-2.3.3"""
+	out = ByteArray(v)
+
+	# left pad with zeros if it's too short
+	if len(out) < rolen:
+		out2 = ByteArray(0, length=rolen)
+		out2[rolen-len(out)] = out
+		return out2
+
+	# drop most significant bytes if it's too long
+	if len(out) > rolen:
+		out2 = ByteArray(0, length=rolen)
+		out2[0] = out[len(out)-rolen:]
+		return out2
+	return out
+
+def bits2octets(bits, rolen): # in []byte, rolen int) []byte {
+	""" https://tools.ietf.org/html/rfc6979#section-2.3.4"""
+	z1 = hashToInt(bits)
+	z2 = z1 - Curve.N
+	if z2 < 0:
+		return int2octets(z1, rolen)
+	return int2octets(z2, rolen)
+
+def nonceRFC6979(privKey, inHash, extra, version): #privkey *big.Int, hash []byte, extra []byte, version []byte) *big.Int {
+	"""
+	NonceRFC6979 generates an ECDSA nonce (`k`) deterministically according to
+	RFC 6979. It takes a 32-byte hash as an input and returns 32-byte nonce to
+	be used in ECDSA algorithm.
+	"""
+	q = Curve.N
+	x = privKey
+
+	qlen = q.bit_length()
+	holen = SHA256_SIZE
+	rolen = (qlen + 7) >> 3
+	bx = int2octets(x, rolen) + bits2octets(inHash, rolen)
+	if len(extra) == 32:
+		bx += extra
+	if len(version) == 16 and len(extra) == 32:
+		bx += extra
+	if len(version) == 16 and len(extra) != 32:
+		bx += ByteArray(0, length=32)
+		bx += version 
+
+	# Step B
+	v = ByteArray(bytearray([1]*holen))
+
+	# Step C (Go zeroes the all allocated memory)
+	k = ByteArray(0, length=holen)
+
+	# Step D
+	k = mac(k, v + 0x00 + bx)
+
+	# Step E
+	v = mac(k, v)
+
+	# Step F
+	k = mac(k, v + 0x01 + bx)
+
+	# Step G
+	v = mac(k, v)
+
+	# Step H
+	while True:
+		# Step H1
+		t = ByteArray(b'')
+
+		# Step H2
+		while len(t)*8 < qlen:
+			v = mac(k, v)
+			t += v
+
+		# Step H3
+		secret = hashToInt(t)
+		if secret >= 1 and secret < q:
+			return secret
+
+		k = mac(k, v + 0x00)
+		v = mac(k, v)
+
+
+def verifySig(pub, inHash, r, s):
+	"""
+	Verify verifies the signature in r, s of hash using the public key, pub. Its
+	return value records whether the signature is valid.
+	"""
+	# See [NSA] 3.4.2
+	N = Curve.N
+
+	if r <= 0 or s <= 0:
+		return False
+
+	if r >= N or s >= N:
+		return False
+
+	e = hashToInt(inHash)
+
+	w = modInv(s, N)
+
+	u1 = (e * w) % N
+	u2 = (r * w) % N
+
+
+	x1, y1 = Curve.scalarBaseMult(u1)
+	x2, y2 = Curve.scalarMult(pub.x, pub.y, u2)
+	x, y = Curve.add(x1, y1, x2, y2)
+
+	if x == 0 and y == 0:
+		return False
+	x = x % N
+	return x == r
+
+def signRFC6979(privateKey, inHash): # privateKey *PrivateKey, hash []byte) (*Signature, error) {
+	"""
+	signRFC6979 generates a deterministic ECDSA signature according to RFC 6979
+	and BIP 62.
+	"""
+	N = Curve.N
+	k = nonceRFC6979(privateKey, inHash, ByteArray(b''), ByteArray(b''))
+	inv = modInv(k, N)
+	r = Curve.scalarBaseMult(k)[0] % N
+
+	if r == 0:
+		raise Exception("calculated R is zero")
+
+	e = hashToInt(inHash)
+	s = privateKey.int() * r
+	s += e
+	s *= inv
+	s = s % N
+
+	if (N >> 1) > 1:
+		s = N - s
+	if s == 0:
+		raise Exception("calculated S is zero")
+
+	return Signature(r, s)
+
+def privKeyFromBytes(pk):
+	"""
+	PrivKeyFromBytes returns a private and public key for `curve' based on the
+	private key passed as an argument as a byte slice.
+	"""
+	x, y = Curve.scalarBaseMult(pk.int())
+	return PrivateKey(Curve, pk, x, y)
+
+def b58CheckDecode(s):
+	decoded = b58decode(s)
+	if len(decoded) < 6:
+		raise Exception("decoded lacking version/checksum")
+	version = decoded[:2]
+	cksum =decoded[len(decoded)-4:]
+	if checksum(decoded[:len(decoded)-4]) != cksum:
+		raise("checksum error")
+	payload = decoded[2 : len(decoded)-4]
+	return payload, version
 
 class ExtendedKey:
 	def __init__(self, privVer, pubVer, key, pubKey, chainCode, parentFP, depth, childNum, isPrivate):
@@ -60,7 +290,7 @@ class ExtendedKey:
 		self.pubKey = ByteArray(pubKey)
 		if self.pubKey.iszero():
 			if isPrivate:
-				self.pubKey = ByteArray(Curve.public_key(self.key.int()).to_affine().compressed_bytes)
+				self.pubKey = Curve.publicKey(self.key.int()).serializedCompressed()
 			else:
 				self.pubKey = self.key
 		self.chainCode = ByteArray(chainCode)
@@ -207,31 +437,23 @@ class ExtendedKey:
 			# Case #3.
 			# Calculate the corresponding intermediate public key for
 			# intermediate private key.
-			print("--il: %s" % il.hex())
 
-			pt = Curve.base_point * il.int() # Curve.G as ECPointJacobian
-			if pt.x == 0 or pt.y == 0:
+			x, y = Curve.scalarBaseMult(il.int()) # Curve.G as ECPointJacobian
+			if x == 0 or y == 0:
 				raise ParameterRangeError("ExtendedKey.child: generated pt outside valid range")
-
-			print("--ilx: %i" % pt.x)
-			print("--ily: %i" % pt.y)
-
 			# Convert the serialized compressed parent public key into X
 			# and Y coordinates so it can be added to the intermediate
 			# public key.
-			pubKey = Curve.public_key(self.key.int()).to_jacobian()
-
+			pubKey = Curve.parsePubKey(self.key)
 			# Add the intermediate public key to the parent public key to
 			# derive the final child key.
 			#
 			# childKey = serP(point(parse256(Il)) + parentKey)
 			# childX, childY := curve.Add(pt.x, pt.y, pubKey.X, pubKey.Y)
-			childPt = pt + pubKey
-
+			childX, childY = Curve.add(x, y, pubKey.x, pubKey.y)
 			# pk := secp256k1.PublicKey{Curve: secp256k1.S256(), X: childX, Y: childY}
 			# childKey = pk.SerializeCompressed()
-			print("--a.1: %r" % childPt.x)
-			childKey = ByteArray(childPt.to_affine().compressed_bytes)
+			childKey = PublicKey(Curve, childX, childY).serializedCompressed()
 
 		# The fingerprint of the parent for the derived child is the first 4
 		# bytes of the RIPEMD160(BLAKE256(parentPubKey)).
@@ -314,9 +536,9 @@ class ExtendedKey:
 		#   child num (4) || chain code (32) || key data (33) || checksum (4)
 		serializedBytes = ByteArray(bytearray(0)) # length serializedKeyLen + 4 after appending
 		if self.isPrivate:
-			serializedBytes += self.privVer.b
+			serializedBytes += self.privVer
 		else:
-			serializedBytes += self.pubVer.b
+			serializedBytes += self.pubVer
 
 		serializedBytes += depthByte
 		serializedBytes += self.parentFP
@@ -330,15 +552,14 @@ class ExtendedKey:
 
 		checkSum = checksum(serializedBytes.b)[:4]
 		serializedBytes += checkSum
+
 		return b58encode(serializedBytes.bytes()).decode("ascii")
 
 	def deriveChildAddress(self, i, net):
 		child = self.child(i)
 
-		print("--parent: %s" % self.string())
-		print("--pubkey: %s" % child.string())
-
 		pkHash = hash160(child.pubKey.b)
+
 		addrID = net.PubKeyHashAddrID
 
 		b = ByteArray(addrID)
@@ -358,49 +579,6 @@ class ExtendedKey:
 
 		# reverse
 		return answer[::-1]
-
-
-
-		# answer := make([]byte, 0, len(b)*136/100)
-		# for x.Cmp(bigZero) > 0 {
-		# 	mod := new(big.Int)
-		# 	x.DivMod(x, bigRadix, mod)
-		# 	answer = append(answer, alphabet[mod.Int64()])
-		# }
-
-		# // leading zero bytes
-		# for _, i := range b {
-		# 	if i != 0 {
-		# 		break
-		# 	}
-		# 	answer = append(answer, alphabetIdx0)
-		# }
-
-		# // reverse
-		# alen := len(answer)
-		# for i := 0; i < alen/2; i++ {
-		# 	answer[i], answer[alen-1-i] = answer[alen-1-i], answer[i]
-		# }
-
-		# return string(answer)
-
-
-
-		# b := make([]byte, 0, 2+len(input)+4)
-		# b = append(b, version[:]...)
-		# b = append(b, input...)
-		# cksum := checksum(b)
-		# b = append(b, cksum[:]...)
-		# return Encode(b)
-
-		# if len(pkHash) != ripemd160.Size {
-		# 	return nil, errors.New("pkHash must be 20 bytes")
-		# }
-		# addr := &AddressPubKeyHash{netID: netID}
-		# copy(addr.hash[:], pkHash)
-		# return addr, nil
-
-		# apkh, err := newAddressPubKeyHash(pkHash, addrID)
 
 json.register(ExtendedKey)
 
@@ -448,7 +626,7 @@ def decodeExtendedKey(net, pw, key):
 			raise Exception("unusable key")
 		# Ensure the public key parses correctly and is actually on the
 		# secp256k1 curve.
-		Curve.public_key(keyData.int())
+		Curve.publicKey(keyData.int())
 
 	return ExtendedKey(
 		privVer = privVersion, 
@@ -468,13 +646,13 @@ class AESCipher(object):
 	def __init__(self): 
 		self.bs = 32
 	def encrypt(self, password, raw):
-		key = hashlib.sha256(password.encode()).digest()
+		key = hashlib.sha256(password).digest()
 		raw = self._pad(raw)
 		cipher =  pyaes.AESModeOfOperationCTR(key)
 		return base64.b64encode(cipher.encrypt(raw)).decode('utf-8')
 	def decrypt(self, password, enc):
 		enc = base64.b64decode(enc)
-		key = hashlib.sha256(password.encode()).digest()
+		key = hashlib.sha256(password).digest()
 		cipher = pyaes.AESModeOfOperationCTR(key)
 		return self._unpad(cipher.decrypt(enc)).decode('utf-8')
 	def _pad(self, s):
@@ -503,6 +681,8 @@ class ScryptParams:
 	@staticmethod
 	def __fromjson__(obj):
 		return ScryptParams(obj["salt"], obj["digest"], obj["n"], obj["r"], obj["p"])
+	def __repr__(self):
+		return repr(self.__tojson__())
 
 json.register(ScryptParams)
 
@@ -524,7 +704,7 @@ class SecretKey:
 	def rekey(password, kp):
 		sk = SecretKey(b"")
 		sk.keyParams = kp
-		sk.key = ByteArray(hashlib.scrypt(password, salt=kp.salt.b, n=kp.n, r=kp.r, p=kp.p, maxmem=32*1024*10224, dklen=KEY_SIZE))
+		sk.key = ByteArray(hashlib.scrypt(decodeBA(password), salt=kp.salt.b, n=kp.n, r=kp.r, p=kp.p, maxmem=32*1024*10224, dklen=KEY_SIZE))
 		checkDigest = ByteArray(hashlib.sha256(sk.key.b).digest())
 		if checkDigest != kp.digest:
 			raise PasswordError("rekey digest check failed")
@@ -538,16 +718,13 @@ class TestCrypto(unittest.TestCase):
 		aUnenc = b.decrypt(aEnc.bytes())
 		self.assertTrue(a, aUnenc)
 	def test_curve(self):
+		pass
+	def test_priv_keys(self):
+		key = ByteArray("eaf02ca348c524e6392655ba4d29603cd1a7347d9d65cfe93ce1ebffdca22694")
+		pk = privKeyFromBytes(key)
 
-		
+		inHash = ByteArray("00010203040506070809")
+		sig = signRFC6979(pk.key, inHash)
 
+		self.assertTrue(verifySig(pk.pub, inHash, sig.r, sig.s))
 
-
-
-
-		# # il = 1
-		# i = ByteArray("02")
-		# print("-- i: %i" % i.int())
-		# pt = Curve.base_point * i.int() # Curve.G as ECPointJacobian
-		# print("--ilx: %i" % pt.x)
-		# print("--ily: %i" % pt.y)

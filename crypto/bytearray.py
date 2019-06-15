@@ -1,4 +1,4 @@
-from tinydecred.pydecred import json
+from tinydecred.pydecred import dcrjson as json
 from tinydecred.crypto.rando import generateSeed
 import nacl.secret
 import unittest
@@ -17,6 +17,8 @@ def decodeBA(b, copy=False):
 		return bytearray(b.to_bytes((b.bit_length() + 7) // 8, byteorder="big"))
 	if isinstance(b, str):
 		return bytearray.fromhex(b)
+	if hasattr(b, '__iter__'):
+		return bytearray(b)
 	raise TypeError("decodeBA: unknown type %s" % type(b))
 
 class ByteArray:
@@ -91,6 +93,8 @@ class ByteArray:
 		for i in range(bLen):
 			b[bLen-i-1] |= a[aLen-i-1] if i < aLen else 0
 		return self
+	def __add__(self, a):
+		return self.__iadd__(a)
 	def __iadd__(self, a):
 		"""append the bytes and return a new ByteArray"""
 		a = decodeBA(a)
@@ -104,6 +108,8 @@ class ByteArray:
 		assert i + len(v) <= len(self.b), "source bytes too long"
 		for j in range(len(v)):
 			self.b[i+j] = v[j]
+	def __reversed__(self):
+		return ByteArray(bytearray(reversed(self.b)))
 	def hex(self):
 		return self.b.hex()
 	def zero(self):
@@ -111,6 +117,9 @@ class ByteArray:
 			self.b[i] = 0
 	def iszero(self):
 		return all([v==0 for v in self.b])
+	def iseven(self):
+		l = len(self.b)
+		return l == 0 or self.b[l-1] == 0
 	def int(self):
 		return int.from_bytes(self.b, "big")
 	def bytes(self):
@@ -131,6 +140,17 @@ class ByteArray:
 		return encrypted
 	def decrypt(self, thing):
 		return nacl.secret.SecretBox(self.bytes()).decrypt(thing)
+	def unLittle(self):
+		return self.littleEndian()
+	def littleEndian(self):
+		return ByteArray(reversed(self.b))
+	def copy(self):
+		return ByteArray(self.b)
+	def pop(self, n):
+		""" Remove n bytes from the beginning of the ByteArray, returning the bytes."""
+		b = self[:n]
+		self.b = self.b[n:]
+		return b
 
 # register the ByteArray class with the json encoder/decoder.
 json.register(ByteArray)

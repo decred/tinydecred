@@ -2,7 +2,104 @@ from tinydecred.crypto.secp256k1.field import FieldVal, BytePoints
 from tinydecred.crypto.bytearray import ByteArray
 import unittest
 
+COORDINATE_LEN = 32
+PUBKEY_COMPRESSED_LEN = COORDINATE_LEN + 1
+PUBKEY_LEN = 65
+PUBKEY_COMPRESSED  = 0x02 # 0x02 y_bit + x coord
+PUBKEY_UNCOMPRESSED = 0x04 # 0x04 x coord + y coord
+
 fieldOne = FieldVal.fromInt(1)
+
+def isEven(i):
+	return i % 2 == 0
+
+def NAF(k):
+	"""
+	NAF takes a positive integer k and returns the Non-Adjacent Form (NAF) as two
+	byte slices.  The first is where 1s will be.  The second is where -1s will
+	be.  NAF is convenient in that on average, only 1/3rd of its values are
+	non-zero.  This is algorithm 3.30 from [GECC].
+	
+	Essentially, this makes it possible to minimize the number of operations
+	since the resulting ints returned will be at least 50% 0s.
+	The essence of this algorithm is that whenever we have consecutive 1s
+	in the binary, we want to put a -1 in the lowest bit and get a bunch
+	of 0s up to the highest bit of consecutive 1s.  This is due to this
+	identity:
+	2^n + 2^(n-1) + 2^(n-2) + ... + 2^(n-k) = 2^(n+1) - 2^(n-k)
+	
+	The algorithm thus may need to go 1 more bit than the length of the
+	bits we actually have, hence bits being 1 bit longer than was
+	necessary.  Since we need to know whether adding will cause a carry,
+	we go from right-to-left in this addition.
+	"""
+	carry, curIsOne, nextIsOne = False, False, False
+	# these default to zero
+	retPos  = ByteArray(0, length=len(k)+1)
+	retNeg  = ByteArray(0, length=len(k)+1)
+	for i in range(len(k)-1, -1, -1):
+		curByte = k[i]
+		for j in range(8):
+			curIsOne = curByte&1 == 1
+			if j == 7:
+				if i == 0:
+					nextIsOne = False
+				else:
+					nextIsOne = k[i-1]&1 == 1
+			else:
+				nextIsOne = curByte&2 == 2
+			if carry:
+				if curIsOne:
+					# This bit is 1, so continue to carry
+					# and don't need to do anything.
+					pass
+				else:
+					# We've hit a 0 after some number of 1s.
+					if nextIsOne:
+						# Start carrying again since
+						# a new sequence of 1s is
+						# starting.
+						retNeg[i+1] += 1 << j
+					else:
+						# Stop carrying since 1s have
+						# stopped.
+						carry = False
+						retPos[i+1] += 1 << j
+			elif curIsOne:
+				if nextIsOne:
+					# If this is the start of at least 2
+					# consecutive 1s, set the current one
+					# to -1 and start carrying.
+					retNeg[i+1] += 1 << j
+					carry = True
+				else:
+					# This is a singleton, not consecutive
+					# 1s.
+					retPos[i+1] += 1 << j
+			curByte >>= 1
+	if carry:
+		retPos[0] = 1
+		return retPos, retNeg
+	return retPos[1:], retNeg[1:]
+
+class PublicKey:
+	def __init__(self, curve, x, y):
+		self.curve = curve
+		self.x = x
+		self.y = y
+	def serializedCompressed(self):
+		fmt = PUBKEY_COMPRESSED
+		if not isEven(self.y):
+			fmt |= 0x1
+		b = ByteArray(fmt)
+		b += ByteArray(self.x, length=COORDINATE_LEN)
+		assert len(b) == PUBKEY_COMPRESSED_LEN
+		return b
+
+class PrivateKey:
+	def __init__(self, curve, k, x, y):
+		self.key = k
+		self.pub = PublicKey(curve, x, y)
 
 class KoblitzCurve:
 
@@ -48,6 +145,197 @@ class KoblitzCurve:
 			p = BytePoints[diff+i][bidx]
 			self.addJacobian(qx, qy, qz, p[0], p[1], p[2], qx, qy, qz)
 		return self.fieldJacobianToBigAffine(qx, qy, qz)
+	def splitK(self, k):
+		"""
+		splitK returns a balanced length-two representation of k and their signs.
+		This is algorithm 3.74 from [GECC].
+		
+		One thing of note about this algorithm is that no matter what c1 and c2 are,
+		the final equation of k = k1 + k2 * lambda (mod n) will hold.  This is
+		provable mathematically due to how a1/b1/a2/b2 are computed.
+		c1 and c2 are chosen to minimize the max(k1,k2).
+		"""
+		# At some point, it might be useful to write something similar to
+		# fieldVal but for N instead of P as the prime field if this ends up
+		# being a bottleneck.
+		# c1 = round(b2 * k / n) from step 4.
+		# Rounding isn't really necessary and costs too much, hence skipped
+		c1 = (self.b2 + k) // self.N
+		# c2 = round(b1 * k / n) from step 4 (sign reversed to optimize one step)
+		# Rounding isn't really necessary and costs too much, hence skipped
+		c2 = (self.b1 + k) // self.N
+		# k1 = k - c1 * a1 - c2 * a2 from step 5 (note c2's sign is reversed)
+		tmp1 = c1 * self.a1
+		tmp2 = c2 * self.a2
+		k1 = k - tmp1 + tmp2
+		# k2 = - c1 * b1 - c2 * b2 from step 5 (note c2's sign is reversed)
+		tmp1 = c1 * self.b1
+		tmp2 = c2 * self.b2
+		k2 = tmp2 - tmp1
+
+		# Note Bytes() throws out the sign of k1 and k2. This matters
+		# since k1 and/or k2 can be negative. Hence, we pass that
+		# back separately.
+		return k1, k2
+	def scalarMult(self, Bx, By, k): #(Bx, By *big.Int, k []byte) (*big.Int, *big.Int) {
+		"""
+		ScalarMult returns k*(Bx, By) where k is a big endian integer.
+		Part of the elliptic.Curve interface.
+		"""
+		# Point Q = ∞ (point at infinity).
+		fv = FieldVal
+		qx, qy, qz = fv(), fv(), fv()
+
+		# Decompose K into k1 and k2 in order to halve the number of EC ops.
+		# See Algorithm 3.74 in [GECC].
+		k1, k2 = self.splitK(k % self.N)
+
+		# The main equation here to remember is:
+		#   k * P = k1 * P + k2 * ϕ(P)
+		#
+		# P1 below is P in the equation, P2 below is ϕ(P) in the equation
+		p1x, p1y = curve.bigAffineToField(Bx, By)
+		p1yNeg = fv().negateVal(p1y, 1)
+		p1z = fv().setInt(1)
+
+		# NOTE: ϕ(x,y) = (βx,y).  The Jacobian z coordinate is 1, so this math
+		# goes through.
+		p2x = fv().mul2(p1x, curve.beta)
+		p2y = fv().set(p1y)
+		p2yNeg = fv().negateVal(p2y, 1)
+		p2z = fv().setInt(1)
+
+		# Flip the positive and negative values of the points as needed
+		# depending on the signs of k1 and k2.  As mentioned in the equation
+		# above, each of k1 and k2 are multiplied by the respective point.
+		# Since -k * P is the same thing as k * -P, and the group law for
+		# elliptic curves states that P(x, y) = -P(x, -y), it's faster and
+		# simplifies the code to just make the point negative.
+		if k1 < 0:
+			p1y, p1yNeg = p1yNeg, p1y
+		if k2 < 1:
+			p2y, p2yNeg = p2yNeg, p2y
+
+		# NAF versions of k1 and k2 should have a lot more zeros.
+		#
+		# The Pos version of the bytes contain the +1s and the Neg versions
+		# contain the -1s.
+		k1PosNAF, k1NegNAF = NAF(ByteArray(k1))
+		k2PosNAF, k2NegNAF = NAF(ByteArray(k2))
+		k1Len = len(k1PosNAF)
+		k2Len = len(k2PosNAF)
+
+		m = k1Len
+		if m < k2Len:
+			m = k2Len
+
+		# Add left-to-right using the NAF optimization.  See algorithm 3.77
+		# from [GECC].  This should be faster overall since there will be a lot
+		# more instances of 0, hence reducing the number of Jacobian additions
+		# at the cost of 1 possible extra doubling.
+		for i in range(m):
+			# Since we're going left-to-right, pad the front with 0s.
+			if i < m-k1Len:
+				k1BytePos = 0
+				k1ByteNeg = 0
+			else:
+				k1BytePos = k1PosNAF[i-(m-k1Len)]
+				k1ByteNeg = k1NegNAF[i-(m-k1Len)]
+			if i < m-k2Len:
+				k2BytePos = 0
+				k2ByteNeg = 0
+			else:
+				k2BytePos = k2PosNAF[i-(m-k2Len)]
+				k2ByteNeg = k2NegNAF[i-(m-k2Len)]
+
+			for j in range(7, -1, -1):
+				# Q = 2 * Q
+				curve.doubleJacobian(qx, qy, qz, qx, qy, qz)
+
+				if k1BytePos&0x80 == 0x80:
+					curve.addJacobian(qx, qy, qz, p1x, p1y, p1z, qx, qy, qz)
+				elif k1ByteNeg&0x80 == 0x80:
+					curve.addJacobian(qx, qy, qz, p1x, p1yNeg, p1z, qx, qy, qz)
+
+				if k2BytePos&0x80 == 0x80:
+					curve.addJacobian(qx, qy, qz, p2x, p2y, p2z, qx, qy, qz)
+				elif k2ByteNeg&0x80 == 0x80:
+					curve.addJacobian(qx, qy, qz, p2x, p2yNeg, p2z, qx, qy, qz)
+				k1BytePos = k1BytePos << 1
+				k1ByteNeg = k1ByteNeg << 1
+				k2BytePos = k2BytePos << 1
+				k2ByteNeg = k2ByteNeg << 1
+
+		# Convert the Jacobian coordinate field values back to affine big.Ints.
+		return curve.fieldJacobianToBigAffine(qx, qy, qz)
+	def publicKey(self, k):
+		"""
+		Create a public key from integer private key k.
+		"""
+		x, y = self.scalarBaseMult(k)
+		return PublicKey(self, x, y)
+	def parsePubKey(self, pubKeyStr):
+		"""
+		# ParsePubKey parses a public key for a koblitz curve from a bytestring into a
+		# ecdsa.Publickey, verifying that it is valid. It supports compressed and
+		# uncompressed signature formats, but not the hybrid format.
+		"""
+		if len(pubKeyStr) == 0:
+			raise Exception("empty pubkey string")
+
+		fmt = pubKeyStr[0]
+		ybit = (fmt & 0x1) == 0x1
+		fmt &= 0xff^0x01
+
+		ifunc = lambda b: int.from_bytes(b, byteorder="big")
+
+		pkLen = len(pubKeyStr)
+		if pkLen == PUBKEY_LEN:
+			if PUBKEY_UNCOMPRESSED != fmt:
+				raise Exception("invalid magic in pubkey str: %d" % pubKeyStr[0])
+			x = ifunc(pubKeyStr[1:33])
+			y = ifunc(pubKeyStr[33:])
+
+		elif pkLen == PUBKEY_COMPRESSED_LEN:
+			# format is 0x2 | solution, <X coordinate>
+			# solution determines which solution of the curve we use.
+			#/ y^2 = x^3 + Curve.B
+			if PUBKEY_COMPRESSED != fmt: 
+				raise Exception("invalid magic in compressed pubkey string: %d" % pubKeyStr[0])
+			x = ifunc(pubKeyStr[1:33])
+			y = self.decompressPoint(x, ybit)
+		else: # wrong!
+			raise Exception("invalid pub key length %d" % len(pubKeyStr))
+
+		if x > self.P:
+			raise Exception("pubkey X parameter is >= to P")
+		if y > self.P:
+			raise Exception("pubkey Y parameter is >= to P")
+		if not self.isAffineOnCurve(x, y):
+			raise Exception("pubkey [%d, %d] isn't on secp256k1 curve" % (x, y))
+		return PublicKey(self, x, y)
+	def decompressPoint(self, x, ybit):
+		"""
+		decompressPoint decompresses a point on the given curve given the X point and
+		the solution to use.
+		"""
+		# TODO(oga) This will probably only work for secp256k1 due to
+		# optimizations.
+		# Y = +-sqrt(x^3 + B)
+		x3 = x**3 + self.B
+
+		# now calculate sqrt mod p of x2 + B
+		# This code used to do a full sqrt based on tonelli/shanks,
+		# but this was replaced by the algorithms referenced in
+		# https://bitcointalk.org/index.php?topic=162805.msg1712294#msg1712294
+		y = pow(x3, self.q, self.P) #(x3**self.q) % self.P
+
+		if ybit == isEven(y):
+			y = self.P - y
+		if ybit == isEven(y):
+			raise Exception("ybit doesn't match oddnes")
+		return y
+
 	def addJacobian(self, x1, y1, z1, x2, y2, z2, x3, y3, z3): # *fieldVal) {
 		"""
 		addJacobian adds the passed Jacobian points (x1, y1, z1) and (x2, y2, z2)
@@ -86,6 +374,30 @@ class KoblitzCurve:
 		# None of the above assumptions are true, so fall back to generic
 		# point addition.
 		self.addGeneric(x1, y1, z1, x2, y2, z2, x3, y3, z3)
+	def add(self, x1, y1, x2, y2):
+		"""
+		Add returns the sum of (x1,y1) and (x2,y2). Part of the elliptic.Curve
+		interface.
+		"""
+		# A point at infinity is the identity according to the group law for
+		# elliptic curve cryptography.  Thus, ∞ + P = P and P + ∞ = P.
+		if x1 == 0 and y1 == 0:
+			return x2, y2
+		if x2 == 0 == 0 and y2 == 0:
+			return x1, y1
+
+		# Convert the affine coordinates from big integers to field values
+		# and do the point addition in Jacobian projective space.
+		fx1, fy1 = curve.bigAffineToField(x1, y1)
+		fx2, fy2 = curve.bigAffineToField(x2, y2)
+		fv = FieldVal
+		fx3, fy3, fz3, fOne = fv(), fv(), fv(), fv()
+		fOne.setInt(1)
+		self.addJacobian(fx1, fy1, fOne, fx2, fy2, fOne, fx3, fy3, fz3)
+
+		# Convert the Jacobian coordinate field values back to affine big
+		# integers.
+		return self.fieldJacobianToBigAffine(fx3, fy3, fz3)
 
 	def addZ1AndZ2EqualsOne(self, x1, y1, z1, x2, y2, x3, y3, z3):
 		"""
@@ -499,7 +811,29 @@ class KoblitzCurve:
 		# Normalize the field values back to a magnitude of 1.
 		x3.normalize()
 		y3.normalize()
-		z3.normalize()	
+		z3.normalize()
+	def fieldJacobianToBigAffine(self, x, y, z):
+		"""
+		fieldJacobianToBigAffine takes a Jacobian point (x, y, z) as field values and
+		converts it to an affine point as big integers.
+		"""
+		# Inversions are expensive and both point addition and point doubling
+		# are faster when working with points that have a z value of one.  So,
+		# if the point needs to be converted to affine, go ahead and normalize
+		# the point itself at the same time as the calculation is the same.
+		zInv, tempZ = FieldVal(), FieldVal()
+		zInv.set(z).inverse()   # zInv = Z^-1
+		tempZ.squareVal(zInv)   # tempZ = Z^-2
+		x.mul(tempZ)            # X = X/Z^2 (mag: 1)
+		y.mul(tempZ.mul(zInv))  # Y = Y/Z^3 (mag: 1)
+		z.setInt(1)             # Z = 1 (mag: 1)
+
+		# Normalize the x and y values.
+		x.normalize()
+		y.normalize()
+
+		# Convert the field values for the now affine point to big.Ints.
+		return ByteArray(x.bytes()).int(), ByteArray(y.bytes()).int()
 
 def fromHex(hx):
 	return int(hx, 16)
@@ -516,7 +850,7 @@ class Curve(KoblitzCurve):
 			Gy = fromHex("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8"),
 			BitSize = bitSize,
 			H = 1,
-			q =  (p + 1) / 4, # new(big.Int).Div(new(big.Int).Add(secp256k1.P, big.NewInt(1)), big.NewInt(4)),
+			q =  (p + 1) // 4, # new(big.Int).Div(new(big.Int).Add(secp256k1.P, big.NewInt(1)), big.NewInt(4)),
 			# Provided for convenience since this gets computed repeatedly.
 			# lambda is a reserved keyword in Python, so misspelling on purpose.
 			byteSize = bitSize / 8,
@@ -533,6 +867,27 @@ class Curve(KoblitzCurve):
 			a2 = fromHex("114CA50F7A8E2F3F657C1108D9D44CFD8"),
 			b2 = fromHex("3086D221A7D46BCDE86C90E49284EB15"),
 		)
+	def bigAffineToField(self, x, y):
+		"""
+		bigAffineToField takes an affine point (x, y) as big integers and converts
+		it to an affine point as field values.
+		"""
+		x3, y3 = FieldVal(), FieldVal()
+		x3.setBytes(ByteArray(x).bytes())
+		y3.setBytes(ByteArray(y).bytes())
+		return x3, y3
+	def isAffineOnCurve(self, x, y):
+		"""
+		isAffineOnCurve returns boolean if the point (x,y) is on the
+		secp256k1 curve.
+		"""
+		# y² = x³ + b
+		y2 = y**2 % self.P
+
+		x3 = (x**3 + self.B) % self.P
+
+		return y2 == x3
+
 curve = Curve()
 
 def isJacobianOnS256Curve(x, y, z):
@@ -833,3 +1188,109 @@ class TestCurve(unittest.TestCase):
 			self.assertTrue(rx.equals(x3), msg="x-%i" % i)
 			self.assertTrue(ry.equals(y3), msg="y-%i" % i)
 			self.assertTrue(rz.equals(z3), msg="z-%i" % i)
+	def test_base_mult(self):
+		tests = [
+			(
+				"AA5E28D6A97A2479A65527F7290311A3624D4CC0FA1578598EE3C2613BF99522",
+				"34F9460F0E4F08393D192B3C5133A6BA099AA0AD9FD54EBCCFACDFA239FF49C6",
+				"B71EA9BD730FD8923F6D25A7A91E7DD7728A960686CB5A901BB419E0F2CA232",
+			),
+			(
+				"7E2B897B8CEBC6361663AD410835639826D590F393D90A9538881735256DFAE3",
+				"D74BF844B0862475103D96A611CF2D898447E288D34B360BC885CB8CE7C00575",
+				"131C670D414C4546B88AC3FF664611B1C38CEB1C21D76369D7A7A0969D61D97D",
+			),
+			(
+				"6461E6DF0FE7DFD05329F41BF771B86578143D4DD1F7866FB4CA7E97C5FA945D",
+				"E8AECC370AEDD953483719A116711963CE201AC3EB21D3F3257BB48668C6A72F",
+				"C25CAF2F0EBA1DDB2F0F3F47866299EF907867B7D27E95B3873BF98397B24EE1",
+			),
+			(
+				"376A3A2CDCD12581EFFF13EE4AD44C4044B8A0524C42422A7E1E181E4DEECCEC",
+				"14890E61FCD4B0BD92E5B36C81372CA6FED471EF3AA60A3E415EE4FE987DABA1",
+				"297B858D9F752AB42D3BCA67EE0EB6DCD1C2B7B0DBE23397E66ADC272263F982",
+			),
+			(
+				"1B22644A7BE026548810C378D0B2994EEFA6D2B9881803CB02CEFF865287D1B9",
+				"F73C65EAD01C5126F28F442D087689BFA08E12763E0CEC1D35B01751FD735ED3",
+				"F449A8376906482A84ED01479BD18882B919C140D638307F0C0934BA12590BDE",
+			),
+		]
+
+		for i, (k, x, y) in enumerate(tests):
+			px, py = curve.scalarBaseMult(fromHex(k))
+			self.assertEqual(px, fromHex(x))
+			self.assertEqual(py, fromHex(y))
+	def test_add_affine(self):
+		""" TestAddAffine tests addition of points in affine coordinates."""
+		tests = [
+			# Addition with a point at infinity (left hand side).
+			# ∞ + P = P
+			(
+				"0",
+				"0",
+				"d74bf844b0862475103d96a611cf2d898447e288d34b360bc885cb8ce7c00575",
+				"131c670d414c4546b88ac3ff664611b1c38ceb1c21d76369d7a7a0969d61d97d",
+				"d74bf844b0862475103d96a611cf2d898447e288d34b360bc885cb8ce7c00575",
+				"131c670d414c4546b88ac3ff664611b1c38ceb1c21d76369d7a7a0969d61d97d",
+			),
+			# Addition with a point at infinity (right hand side).
+			# P + ∞ = P
+			(
+				"d74bf844b0862475103d96a611cf2d898447e288d34b360bc885cb8ce7c00575",
+				"131c670d414c4546b88ac3ff664611b1c38ceb1c21d76369d7a7a0969d61d97d",
+				"0",
+				"0",
+				"d74bf844b0862475103d96a611cf2d898447e288d34b360bc885cb8ce7c00575",
+				"131c670d414c4546b88ac3ff664611b1c38ceb1c21d76369d7a7a0969d61d97d",
+			),
+
+			# Addition with different x values.
+			(
+				"34f9460f0e4f08393d192b3c5133a6ba099aa0ad9fd54ebccfacdfa239ff49c6",
+				"0b71ea9bd730fd8923f6d25a7a91e7dd7728a960686cb5a901bb419e0f2ca232",
+				"d74bf844b0862475103d96a611cf2d898447e288d34b360bc885cb8ce7c00575",
+				"131c670d414c4546b88ac3ff664611b1c38ceb1c21d76369d7a7a0969d61d97d",
+				"fd5b88c21d3143518d522cd2796f3d726793c88b3e05636bc829448e053fed69",
+				"21cf4f6a5be5ff6380234c50424a970b1f7e718f5eb58f68198c108d642a137f",
+			),
+			# Addition with same x opposite y.
+			# P(x, y) + P(x, -y) = infinity
+			(
+				"34f9460f0e4f08393d192b3c5133a6ba099aa0ad9fd54ebccfacdfa239ff49c6",
+				"0b71ea9bd730fd8923f6d25a7a91e7dd7728a960686cb5a901bb419e0f2ca232",
+				"34f9460f0e4f08393d192b3c5133a6ba099aa0ad9fd54ebccfacdfa239ff49c6",
+				"f48e156428cf0276dc092da5856e182288d7569f97934a56fe44be60f0d359fd",
+				"0",
+				"0",
+			),
+			# Addition with same point.
+			# P(x, y) + P(x, y) = 2P
+			(
+				"34f9460f0e4f08393d192b3c5133a6ba099aa0ad9fd54ebccfacdfa239ff49c6",
+				"0b71ea9bd730fd8923f6d25a7a91e7dd7728a960686cb5a901bb419e0f2ca232",
+				"34f9460f0e4f08393d192b3c5133a6ba099aa0ad9fd54ebccfacdfa239ff49c6",
+				"0b71ea9bd730fd8923f6d25a7a91e7dd7728a960686cb5a901bb419e0f2ca232",
+				"59477d88ae64a104dbb8d31ec4ce2d91b2fe50fa628fb6a064e22582196b365b",
+				"938dc8c0f13d1e75c987cb1a220501bd614b0d3dd9eb5c639847e1240216e3b6",
+			),
+		]
+
+		for i, (x1, y1, x2, y2, x3, y3) in enumerate(tests):
+			# Convert hex to field values.
+			x1, y1 = fromHex(x1), fromHex(y1)
+			x2, y2 = fromHex(x2), fromHex(y2)
+			x3, y3 = fromHex(x3), fromHex(y3)
+
+			# Ensure the test data is using points that are actually on
+			# the curve (or the point at infinity).
+			self.assertFalse(not (x1 == 0 and y1 == 0) and  not curve.isAffineOnCurve(x1, y1), msg="xy1")
+			self.assertFalse(not (x2 == 0 and y2 == 0) and  not curve.isAffineOnCurve(x2, y2), msg="xy2")
+			self.assertFalse(not (x3 == 0 and y3 == 0) and  not curve.isAffineOnCurve(x3, y3), msg="xy3")
+
+			# Add the two points.
+			rx, ry = curve.add(x1, y1, x2, y2)
+
+			# Ensure result matches expected.
+			self.assertEqual(rx, x3)
+			self.assertEqual(ry, y3)

@@ -5,15 +5,14 @@ import time
 import calendar
 import configparser
 from tempfile import TemporaryDirectory
-from pydecred import constants as C
-from pydecred import json
+from tinydecred.pydecred import constants as C
+from tinydecred.pydecred import dcrjson as json
 # import traceback
 import urllib.request as urlrequest
 
 # For logging
 import logging
 from logging.handlers import RotatingFileHandler
-logger = logging.getLogger("pydecred")
 
 
 def mkdir(path):
@@ -176,17 +175,19 @@ def formatNumber(number, billions="B", spacer=" ", isMoney = False):
         return ("%.2e%s" % (flt, spacer)).replace("e-0", "e-")
 
 
-def prepareLogger(handle, filepath, printLvl=logging.INFO, logLevel=logging.DEBUG):
+rootLogger = logging.getLogger('')
+rootLogger.setLevel(logging.NOTSET)
+
+def prepareLogger(name, filepath=None, logLvl=logging.INFO):
     """
-    Set logger setttings appropriately
-    """
-    log = logging.getLogger(handle)
+    Set logger settings appropriately
+    """ 
     log_formatter = logging.Formatter('%(asctime)s %(module)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s')
-    fileHandler = RotatingFileHandler(filepath, mode='a', maxBytes=5*1024*1024, backupCount=2, encoding=None, delay=0)
-    fileHandler.setFormatter(log_formatter)
-    fileHandler.setLevel(logLevel)
-    log.setLevel(logLevel)
-    log.addHandler(fileHandler)
+    if filepath:
+        fileHandler = RotatingFileHandler(filepath, mode='a', maxBytes=5*1024*1024, backupCount=2, encoding=None, delay=0)
+        fileHandler.setFormatter(log_formatter)
+        # fileHandler.setLevel(logLvl)
+        rootLogger.addHandler(fileHandler)
     if sys.executable and os.path.split(sys.executable)[1] == "pythonw.exe":
         # disabling stdout printing for pythonw
         pass
@@ -194,10 +195,14 @@ def prepareLogger(handle, filepath, printLvl=logging.INFO, logLevel=logging.DEBU
         # skip adding the stdout handler for pythonw in windows
         printHandler = logging.StreamHandler()
         printHandler.setFormatter(log_formatter)
-        printHandler.setLevel(printLvl)
-        log.addHandler(printHandler)
-    return log
+        # printHandler.setLevel(1)
+        rootLogger.addHandler(printHandler)
+    return getLogger(name, logLvl)
 
+def getLogger(name, logLvl=logging.INFO):
+    l = rootLogger.getChild(name)
+    l.setLevel(logLvl)
+    return l
 
 class ConsoleLogger:
     """

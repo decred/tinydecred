@@ -1,12 +1,9 @@
-from pydecred import helpers
-from pydecred import constants as C
-from pydecred.dcrdata import DcrDataClient
-import pydecred.mainnet as mainnet
-import pydecred.testnet as testnet
-from tinydecred import config
-from tinydecred import wallet
-from tinydecred import crypto
-import qutilities as Q
+from tinydecred import keys as SK, config
+from tinydecred.pydecred import helpers, constants as C
+from tinydecred.pydecred.dcrdata import DcrDataClient
+from tinydecred.wallet import Wallet
+from tinydecred.ui import screens, ui, qutilities as Q
+from tinydecred.pydecred.database import KeyValueDatabase
 from PyQt5 import QtGui, QtCore, QtWidgets
 import os
 import sys
@@ -14,62 +11,84 @@ import traceback
 import time
 
 PASSWORD_TIMEOUT = 300 * 1000 # milliseconds
-PACKAGEDIR =  os.path.dirname(os.path.realpath(__file__))
+PACKAGEDIR = os.path.dirname(os.path.realpath(__file__))
 
-WALLET_FILE_NAME = "wallet.db"
-_walletDir = os.path.join(config.DATA_DIR, "wallets")
-helpers.mkdir(_walletDir)
-DEFAULT_WALLET_PATH = os.path.join(_walletDir, WALLET_FILE_NAME)
+TINY = ui.TINY
+SMALL = ui.SMALL
+MEDIUM = ui.MEDIUM
+LARGE = ui.LARGE
 
-BLACK = QtGui.QColor("black")
-
-TINY = "tiny"
-SMALL = "small"
-MEDIUM = "medium"
-LARGE = "large"
-
-def pixmapFromSvg(filename, w, h, color=None):
-    return QtGui.QIcon(os.path.join(PACKAGEDIR, "icons", filename)).pixmap(w, h)
+def tryExecute(f, *a, **k):
+    try:
+        return f(*a, **k)
+    except Exception as e:
+        log.error("failed to create wallet: %s \n %s" % (repr(e), traceback.print_tb(e.__traceback__)))
+    return False
 
 class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
+    qRawSignal = QtCore.pyqtSignal(tuple)
     def __init__(self, application):
         super().__init__()
         self.application = application
+        self.dbManager = KeyValueDatabase(os.path.join(self.netDirectory(), "tiny.db"))
         self.password = None
         self.passwordTimer = Q.makeTimer(self.losePassword)
+        self.wallet = None
         self.trackedCssItems = []
-
-        self.wallet = wallet.Wallet()
-
        	self.sysTray = QtWidgets.QSystemTrayIcon(QtGui.QIcon(C.FAVICON))
         ctxMenu = self.contextMenu = QtWidgets.QMenu()
-        ctxMenu.addAction("quit").triggered.connect(lambda *a: self.application.quit())
         ctxMenu.addAction("minimize").triggered.connect(self.minimizeApp)
+        ctxMenu.addAction("quit").triggered.connect(lambda *a: self.application.quit())
        	self.sysTray.setContextMenu(ctxMenu)
-        self.appWindow = TinyDialog(self)
-
-        self.homeScreen = HomeScreen(self)
-        self.appWindow.layout.addWidget(self.homeScreen)
-
-        self.pwDialog = PasswordDialog(self)
-        self.sysTray.activated.connect(self.sysTrayActivated)
-
-        self.message = PopupMessage(self)
-
-       	self.sysTray.show()
-        self.appWindow.show()
-
+        self.dcrdatas = {}
+        self.signalRegistry = {}
+        self.qRawSignal.connect(self.signal_)
         self.loadSettings()
 
-        if not os.path.isfile(self.getSetting("current.wallet")):
-            initScreen = InitializationScreen(self)
+        self.appWindow = screens.TinyDialog(self)
+
+        self.homeScreen = screens.HomeScreen(self)
+        self.appWindow.stack(self.homeScreen)
+
+        self.pwDialog = screens.PasswordDialog(self)
+        self.sysTray.activated.connect(self.sysTrayActivated)
+
+        self.message = screens.PopupMessage(self)
+
+        self.waitingScreen = screens.WaitingScreen(self)
+
+        self.sendScreen = screens.SendScreen(self)
+
+        self.sysTray.show()
+        self.appWindow.show()
+
+        if not os.path.isfile(self.getNetSetting(SK.currentWallet)):
+            initScreen = screens.InitializationScreen(self)
+            initScreen.setFadeIn(True)
             self.appWindow.stack(initScreen)
+        else:
+            def login(pw):
+                if pw is None or pw == "":
+                    self.showMessage("you must enter a password to continue")
+                else:
+                    try:
+                        path = self.getNetSetting(SK.currentWallet)
+                        wallet = Wallet.open(path, pw, cfg.net)
+                        self.setWallet(wallet)
+                        self.home()
+                    except Exception as e:
+                        log.warning("exception encountered while attempting to open wallet: %s \n %s" % (repr(e), traceback.print_tb(e.__traceback__)))
+                        self.showMessage("incorrect password")
+            self.getPassword(login)
+        self.makeThread(self.initDcrdata, self.finishDcrdata, self.getNetSetting("dcrdatas"))
+        self.startQLoop()
 
     def resetPwTimer(self):
         self.passwordTimer.start(PASSWORD_TIMEOUT)
     def getPassword(self, callback, *args, **kwargs):
         if self.password is not None:
             self.resetPwTimer()
+
             return self.password
         self.appWindow.stack(self.pwDialog.withCallback(callback, *args, **kwargs))
     def losePassword(self):
@@ -81,25 +100,117 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
     def minimizeApp(self, *a):
         self.appWindow.close()
         self.appWindow.hide()
+    def netDirectory(self):
+        return os.path.join(config.DATA_DIR, cfg.net.Name)
     def loadSettings(self):
-        self.settings = cfg.get("settings")
-        if not self.settings:
-            self.settings = {}
-            self.settings["theme"] = Q.LIGHT_THEME
-            self.settings["wallet"] = {}
-            self.settings["current.wallet"] = DEFAULT_WALLET_PATH
+        settings = self.settings = cfg.get("settings")
+        if not settings:
+            self.settings = settings = {}
             cfg.set("settings", self.settings)
-            cfg.save()
+        # initialize dict settings
+        # for k in ():
+        #     if k not in settings:
+        #         settings[k] = {}
+        # initialize key-value settings
+        for k, v in (("theme", Q.LIGHT_THEME), ):
+            if k not in settings:
+                settings[k] = v
+        netSettings = self.getNetSetting()
+        # if SK.currentWallet not in netSettings:
+        print("--uncomment this")
+        netSettings[SK.currentWallet] = self.netDirectory() # os.path.join(self.netDirectory(), WALLET_FILE_NAME)
+        helpers.mkdir(self.netDirectory())
+        cfg.save()
     def saveSettings(self):
         cfg.save()
     def getSetting(self, *keys):
         return cfg.get("settings", *keys)
+    def getNetSetting(self, *keys):
+        return cfg.get("networks", cfg.net.Name, *keys)
+    def setNetSetting(self, k, v):
+        cfg.get("networks", cfg.net.Name)[k] = v
+    def registerSignal(self, sig, cb, *a, **k):
+        """
+        The callback arguments will be preceeded with any signal-specific arguments.
+        For example, the BALANCE_SIGNAL will have `balance (float)` as its first argument.
+        """
+        if sig not in self.signalRegistry:
+            self.signalRegistry[sig] = []
+        # elements at indices 1 and 3 are set when emitted
+        self.signalRegistry[sig].append((cb, [], a, {},  k))
+    def emitSignal(self, sig, *sigA, **sigK):
+        """
+        emitSignal routes through a Qt signal.
+        """
+        sr = self.signalRegistry
+        if sig not in sr:
+            log.warning("attempted to call un-registered signal %s" % sig)
+        for s in sr[sig]:
+            sa, sk = s[1], s[3]
+            sa.clear()
+            sa.extend(sigA)
+            sk.clear()
+            sk.update(sigK)
+            self.qRawSignal.emit(s)
+    def signal_(self, s):
+        cb, sigA, a,  sigK, k = s
+        cb(*sigA, *a, **sigK, **k)
+    def setWallet(self, wallet):
+        wallet.set
+        self.wallet = wallet
+        self.emitSignal(ui.BALANCE_SIGNAL, wallet.balance)
+        self.tryInitSync()
+    def withUnlockedWallet(self, cb, *a, **k):
+        wallet = self.wallet
+        if wallet and wallet.isOpen():
+            cb(wallet, *a, **k)
+            return
+        def router(pw, cb, a, k):
+            if pw:
+                try:
+                    path = self.getNetSetting(SK.currentWallet)
+                    wallet = Wallet.open(path, pw, cfg.net)
+                    cb(wallet, *a, **k)
+                except Exception as e:
+                    log.warning("exception encountered while attempting to open wallet: %s \n %s" % (repr(e), traceback.print_tb(e.__traceback__)))
+                    self.showMessage("incorrect password")
+            else:
+                self.showMessage("password required to open wallet")
+        self.getPassword(router, cb, a, k)
+    def tryInitSync(self):
+        if len(self.dcrdatas) and self.wallet:
+            self.inQ.put(self.qEncode(self.wallet.sync, self.dcrdatas, self.dbManager, self.walletSynced))
+    @QtCore.pyqtSlot(str)
+    def walletSynced(self, balance):
+        print("--balance; %.2f" % (balance*1e-8, ))
+        self.wallet.save()
+        self.home()
+        self.emitSignal(ui.BALANCE_SIGNAL, balance)
+    def initDcrdata(self, uris):
+        dcrdatas = []
+        for uri in uris:
+            try:
+                dcrdatas.append(DcrDataClient(uri, customPaths=(
+                    "/tx/send",
+                    "/insight/api/addr/{address}/utxo",
+                    "insight/api/tx/send"
+                )))
+                log.debug("dcrdata client connected to %s" % uri)
+            except Exception:
+                log.error("unable to initialize dcrdata connection at %s" % uri)
+        return dcrdatas
+    def finishDcrdata(self, dcrdatas):
+        self.dcrdatas = dcrdatas
+        self.tryInitSync()
+    def updateBalance(self, balance):
+        print("--new balance: %f" % balance)
+    @QtCore.pyqtSlot(str)
     def showMessage(self, msg):
         self.appWindow.stack(self.message.withMessage(msg))
         self.scheduleFunction("unshow.message", self.appWindow.pop, time.time()+5)
     def initialLogin(self, pw):
         if pw is None:
-            self.showMessaage("You must create a password to use TinyDecred")
+            self.showMessage("You must create a password to use TinyDecred")
     def getButton(self, size, text, tracked=True):
         """
         Get a button of the requested size. 
@@ -126,200 +237,19 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         if tracked:
             self.trackedCssItems.append(button)
         return button
-
-
-class TinyDialog(QtWidgets.QFrame):
-    maxWidth = 450
-    maxHeight = 650
-    targetPadding = 20
-    def __init__(self, app):
-        super().__init__()
-        self.app = app
-        self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
-        screenGeo = app.application.primaryScreen().availableGeometry()
-        self.w = self.maxWidth if screenGeo.width() >= self.maxWidth else screenGeo.width()
-        self.h =  self.maxHeight if screenGeo.height() >= self.maxHeight else screenGeo.height()
-        availPadX = (screenGeo.width() - self.w) / 2
-        self.padX = self.targetPadding if availPadX >= self.targetPadding else availPadX
-        self.setGeometry(screenGeo.width() - self.w - self.padX, screenGeo.height() - self.h, self.w, self.h)
-        self.mainLayout = QtWidgets.QVBoxLayout(self)
-        self.setFrameShape(QtWidgets.QFrame.Box)
-        self.setLineWidth(1)
-
-        menuBar, menuLayout = Q.makeWidget(QtWidgets.QWidget, "horizontal")
-        self.mainLayout.addWidget(menuBar)
-        menuBar.setFixedHeight(26)
-
-        self.homeIcon = ClickyLabel(self.homeClicked)
-        self.homeIcon.setPixmap(pixmapFromSvg("home.svg", 20, 20))
-        menuLayout.addWidget(Q.pad(self.homeIcon, 3, 3, 3, 3))
-
-        self.backIcon = ClickyLabel(self.backClicked)
-        self.backIcon.setPixmap(pixmapFromSvg("back.svg", 20, 20))
-        menuLayout.addWidget(Q.pad(self.backIcon, 3, 3, 3, 3))
-
-        menuLayout.addStretch(1)
-
-        self.closeIcon = ClickyLabel(self.closeClicked)
-        self.closeIcon.setPixmap(pixmapFromSvg("x.svg", 20, 20))
-        menuLayout.addWidget(Q.pad(self.closeIcon, 3, 3, 3, 3))
-
-        w, self.layout = Q.makeWidget(QtWidgets.QWidget, "vertical", self)
-        self.mainLayout.addWidget(w)
-    def closeEvent(self, e):
-        self.hide()
-        e.ignore()
-    def stack(self, w):
-        for wgt in Q.layoutWidgets(self.layout):
-            wgt.setVisible(False)
-        self.layout.addWidget(w)
-        w.setVisible(True)
-        self.setIcons(w)
-        self.setVisible(True)
-    def pop(self):
-        widgetList = list(Q.layoutWidgets(self.layout))
-        if len(widgetList) < 2:
-            log.warning("attempted to pop an empty layout")
-            return
-        popped, top = widgetList[-1], widgetList[-2]
-        popped.setVisible(False)
-        self.layout.removeWidget(popped)
-        top.setVisible(True)
-        self.setIcons(top)
-        widgetList = list(Q.layoutWidgets(self.layout))
-    def setIcons(self, top):
-        self.backIcon.setVisible(top.isPoppable)
-        self.homeIcon.setVisible(top.canGoHome)
-    def homeClicked(self):
-        while self.layout.count() > 1:
-            self.pop()
-    def closeClicked(self):
-        self.hide()
-    def backClicked(self):
-        self.pop()
-
-class Screen(QtWidgets.QWidget):
-    def __init__(self, app):
-        super().__init__()
-        self.app = app
-        self.isPoppable = False
-        self.canGoHome = True
-        vLayout = QtWidgets.QVBoxLayout(self)
-        vLayout.addStretch(1)
-        hw, hLayout = Q.makeWidget(QtWidgets.QWidget, Q.HORIZONTAL)
-        vLayout.addWidget(hw)
-        hLayout.addStretch(1)
-        w, self.layout = Q.makeWidget(QtWidgets.QWidget, Q.VERTICAL)
-        hLayout.addWidget(w)
-        hLayout.addStretch(1)
-        vLayout.addStretch(1)
-
-class HomeScreen(Screen):
-    def __init__(self, app):
-        super().__init__(app)
-        self.app = app
-        self.layout.addWidget(Q.pad(Q.makeLabel("this is the homescreen", 16), 0, 40, 0, 40))
-
-class PasswordDialog(Screen):
-    def __init__(self, app):
-        super().__init__(app)
-        content, mainLayout = Q.makeWidget(QtWidgets.QWidget, Q.VERTICAL)
-        self.layout.addWidget(Q.pad(content, 20, 20, 20, 20))
-        self.isPoppable = True
-        self.canGoHome = False
-
-        self.label = QtWidgets.QLabel("password")
-        mainLayout.addWidget(self.label)
-        self.pwInput = QtWidgets.QLineEdit()
-        mainLayout.addWidget(self.pwInput)
-        self.pwInput.setEchoMode(QtWidgets.QLineEdit.Password)
-        self.pwInput.returnPressed.connect(self.pwSubmit)
-        self.callback = lambda p: None
-
-        row, lyt = Q.makeWidget(QtWidgets.QWidget, Q.HORIZONTAL)
-        mainLayout.addWidget(row)
-        toggle = Q.QToggle(self, callback=self.showPwToggled)
-        lyt.addWidget(QtWidgets.QLabel("show password"))
-        lyt.addWidget(toggle)
-    def showPwToggled(self, state, switch):
-        if state: 
-            self.pwInput.setEchoMode(QtWidgets.QLineEdit.Normal)
-        else:
-            self.pwInput.setEchoMode(QtWidgets.QLineEdit.Password)
-    def pwSubmit(self):
-        self.callback(self.pwInput.text())
-    def withCallback(self, callback, *args, **kwargs):
-        self.callback = lambda p, a=args, k=kwargs: callback(p, *a, **k)
-        return self
-
-class ClickyLabel(QtWidgets.QLabel):
-    def __init__(self, callback, *a):
-        super().__init__(*a)
-        self.mouseDown = False
-        self.callback = callback
-    def mousePressEvent(self, e):
-        if e.button() == QtCore.Qt.LeftButton:
-            self.mouseDown = True
-    def mouseReleaseEvent(self, e):
-        if e.button() == QtCore.Qt.LeftButton and self.mouseDown:
-            self.callback()
-    def mouseMoveEvent(self, e):
-        if self.mouseDown == False:
-            return
-        qSize = self.size()
-        ePos = e.pos()
-        x, y = ePos.x(), ePos.y()
-        if x < 0 or y < 0 or x > qSize.width() or y > qSize.height():
-            self.mouseDown = False
-
-class PopupMessage(Screen):
-    def __init__(self, app):
-        super().__init__(app)
-        self.canGoHome = False
-        self.msg = ""
-        self.lbl = QtWidgets.QLabel()
-        self.layout.addWidget(Q.pad(self.lbl, 0, 40, 0, 40))
-    def withMessage(self, msg):
-        self.lbl.setText(msg)
-        return self
-
-class InitializationScreen(Screen):
-    def __init__(self, app):
-        super().__init__(app)
-        self.canGoHome = False
-        self.layout.setSpacing(5)
-        self.initBttn = app.getButton(SMALL, "create wallet")
-        self.layout.addWidget(self.initBttn)
-        self.initBttn.clicked.connect(self.initClicked)
-
-        self.loadBttn = app.getButton(SMALL, "load wallet")
-        self.layout.addWidget(self.loadBttn)
-        self.loadBttn.clicked.connect(self.loadClicked)
-
-        self.restoreBttn = app.getButton(SMALL, "restore from seed")
-        self.layout.addWidget(self.restoreBttn)
-        self.restoreBttn.clicked.connect(self.restoreClicked)
-    def initClicked(self):
-        self.app.getPassword(self.initPasswordCallback)
-    def initPasswordCallback(self, pw):
-        # either way, pop the password window
-        app = self.app
-        app.appWindow.pop()
-        if pw is None or pw == "":
-            app.showMessage("you must enter a password to create a wallet")
-        else:
-            app.wallet.create(app.getSetting("current.wallet"), pw)
-            app.wallet.close()
-            app.settings["current.wallet"] = app.wallet.path
-            app.saveSettings()
-            app.appWindow.pop() # pop itself
-    def loadClicked(self):
-        walletpath,  = QtWidgets.QFileDialog.getOpenFileName(self, "select wallet file")
-        if walletpath == "":
-            pass
-    def restoreClicked(self):
-        print("restoring")
-
+    def home(self):
+        self.appWindow.setHomeScreen(self.homeScreen)
+    def waiting(self):
+        self.appWindow.stack(self.waitingScreen)
+    def waitThread(self, f, cb, *a, **k):
+        self.waiting()
+        def unwaiting(*cba, **cbk):
+            self.appWindow.pop()
+            cb(*cba, **cbk)
+        self.makeThread(tryExecute, unwaiting, f, *a, **k)
+    def showMnemonics(self, words):
+        screen = screens.MnemonicScreen(self, words)
+        self.appWindow.stack(screen)
 
 def loadFonts():
     # see https://github.com/google/material-design-icons/blob/master/iconfont/codepoints
@@ -344,12 +274,9 @@ def runTinyDecred():
     try:
         qApp.exec_()
     except Exception as e:
-        try:
-            log.warning("Error encountered: %s \n %s" % (repr(e), traceback.print_tb(e.__traceback__)))
-        except Exception:
-            pass
-        finally:
-            print("Error encountered: %s \n %s" % (repr(e), traceback.print_tb(e.__traceback__)))
+        print("Error encountered: %s \n %s" % (repr(e), traceback.print_tb(e.__traceback__)))            
+    finally: 
+        decred.cleanUp()
     decred.sysTray.hide()
     qApp.deleteLater()
     return
@@ -359,10 +286,7 @@ if __name__ == '__main__':
     cfg = config.load()
     logDir = os.path.join(config.DATA_DIR, "logs")
     helpers.mkdir(logDir)
-    log = helpers.prepareLogger("WLLT", os.path.join(logDir, "tinydecred.log"))
+    log = helpers.prepareLogger("APP", os.path.join(logDir, "tinydecred.log"), logLvl=0)
 
-    # runTinyDecred()
+    runTinyDecred()
 
-    seed = crypto.generateSeed()
-    hdSeed = crypto.newMaster(seed, testnet)
-    helpers.dumpJSON(hdSeed)

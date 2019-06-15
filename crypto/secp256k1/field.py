@@ -1,6 +1,6 @@
 from tinydecred.crypto.bytearray import ByteArray
+from tinydecred.crypto.secp256k1.bytepoints import secp256k1BytePoints
 from base64 import b64decode
-from bytepoints import secp256k1BytePoints
 from zlib import decompress as zdecompress
 import unittest
 
@@ -777,6 +777,117 @@ class FieldVal:
 		"""  String returns the field value as a human-readable hex string."""
 		f = FieldVal().set(self).normalize()
 		return f.bytes().hex()
+	def inverse(self):
+		"""
+		Inverse finds the modular multiplicative inverse of the field value.  The
+		existing field value is modified.
+		
+		The field value is returned to support chaining.  This enables syntax like:
+		f.Inverse().Mul(f2) so that f = f^-1 * f2.
+		"""
+		# Fermat's little theorem states that for a nonzero number a and prime
+		# prime p, a^(p-1) = 1 (mod p).  Since the multipliciative inverse is
+		# a*b = 1 (mod p), it follows that b = a*a^(p-2) = a^(p-1) = 1 (mod p).
+		# Thus, a^(p-2) is the multiplicative inverse.
+		
+		# In order to efficiently compute a^(p-2), p-2 needs to be split into
+		# a sequence of squares and multipications that minimizes the number of
+		# multiplications needed (since they are more costly than squarings).
+		# Intermediate results are saved and reused as well.
+		
+		# The secp256k1 prime - 2 is 2^256 - 4294968275.
+		
+		# This has a cost of 258 field squarings and 33 field multiplications.
+		f = self
+		fv = FieldVal
+		a2, a3, a4, a10, a11, a21, a42, a45, a63, a1019, a1023 = fv(), fv(), fv(), fv(), fv(), fv(), fv(), fv(), fv(), fv(), fv()
+		a2.squareVal(f)
+		a3.mul2(a2, f)
+		a4.squareVal(a2)
+		a10.squareVal(a4).mul(a2)
+		a11.mul2(a10, f)
+		a21.mul2(a10, a11)
+		a42.squareVal(a21)
+		a45.mul2(a42, a3)
+		a63.mul2(a42, a21)
+		a1019.squareVal(a63).square().square().square().mul(a11)
+		a1023.mul2(a1019, a4)
+		f.set(a63)                                     # f = a^(2^6 - 1)
+		f.square().square().square().square().square() # f = a^(2^11 - 32)
+		f.square().square().square().square().square() # f = a^(2^16 - 1024)
+		f.mul(a1023)                                   # f = a^(2^16 - 1)
+		f.square().square().square().square().square() # f = a^(2^21 - 32)
+		f.square().square().square().square().square() # f = a^(2^26 - 1024)
+		f.mul(a1023)                                   # f = a^(2^26 - 1)
+		f.square().square().square().square().square() # f = a^(2^31 - 32)
+		f.square().square().square().square().square() # f = a^(2^36 - 1024)
+		f.mul(a1023)                                   # f = a^(2^36 - 1)
+		f.square().square().square().square().square() # f = a^(2^41 - 32)
+		f.square().square().square().square().square() # f = a^(2^46 - 1024)
+		f.mul(a1023)                                   # f = a^(2^46 - 1)
+		f.square().square().square().square().square() # f = a^(2^51 - 32)
+		f.square().square().square().square().square() # f = a^(2^56 - 1024)
+		f.mul(a1023)                                   # f = a^(2^56 - 1)
+		f.square().square().square().square().square() # f = a^(2^61 - 32)
+		f.square().square().square().square().square() # f = a^(2^66 - 1024)
+		f.mul(a1023)                                   # f = a^(2^66 - 1)
+		f.square().square().square().square().square() # f = a^(2^71 - 32)
+		f.square().square().square().square().square() # f = a^(2^76 - 1024)
+		f.mul(a1023)                                   # f = a^(2^76 - 1)
+		f.square().square().square().square().square() # f = a^(2^81 - 32)
+		f.square().square().square().square().square() # f = a^(2^86 - 1024)
+		f.mul(a1023)                                   # f = a^(2^86 - 1)
+		f.square().square().square().square().square() # f = a^(2^91 - 32)
+		f.square().square().square().square().square() # f = a^(2^96 - 1024)
+		f.mul(a1023)                                   # f = a^(2^96 - 1)
+		f.square().square().square().square().square() # f = a^(2^101 - 32)
+		f.square().square().square().square().square() # f = a^(2^106 - 1024)
+		f.mul(a1023)                                   # f = a^(2^106 - 1)
+		f.square().square().square().square().square() # f = a^(2^111 - 32)
+		f.square().square().square().square().square() # f = a^(2^116 - 1024)
+		f.mul(a1023)                                   # f = a^(2^116 - 1)
+		f.square().square().square().square().square() # f = a^(2^121 - 32)
+		f.square().square().square().square().square() # f = a^(2^126 - 1024)
+		f.mul(a1023)                                   # f = a^(2^126 - 1)
+		f.square().square().square().square().square() # f = a^(2^131 - 32)
+		f.square().square().square().square().square() # f = a^(2^136 - 1024)
+		f.mul(a1023)                                   # f = a^(2^136 - 1)
+		f.square().square().square().square().square() # f = a^(2^141 - 32)
+		f.square().square().square().square().square() # f = a^(2^146 - 1024)
+		f.mul(a1023)                                   # f = a^(2^146 - 1)
+		f.square().square().square().square().square() # f = a^(2^151 - 32)
+		f.square().square().square().square().square() # f = a^(2^156 - 1024)
+		f.mul(a1023)                                   # f = a^(2^156 - 1)
+		f.square().square().square().square().square() # f = a^(2^161 - 32)
+		f.square().square().square().square().square() # f = a^(2^166 - 1024)
+		f.mul(a1023)                                   # f = a^(2^166 - 1)
+		f.square().square().square().square().square() # f = a^(2^171 - 32)
+		f.square().square().square().square().square() # f = a^(2^176 - 1024)
+		f.mul(a1023)                                   # f = a^(2^176 - 1)
+		f.square().square().square().square().square() # f = a^(2^181 - 32)
+		f.square().square().square().square().square() # f = a^(2^186 - 1024)
+		f.mul(a1023)                                   # f = a^(2^186 - 1)
+		f.square().square().square().square().square() # f = a^(2^191 - 32)
+		f.square().square().square().square().square() # f = a^(2^196 - 1024)
+		f.mul(a1023)                                   # f = a^(2^196 - 1)
+		f.square().square().square().square().square() # f = a^(2^201 - 32)
+		f.square().square().square().square().square() # f = a^(2^206 - 1024)
+		f.mul(a1023)                                   # f = a^(2^206 - 1)
+		f.square().square().square().square().square() # f = a^(2^211 - 32)
+		f.square().square().square().square().square() # f = a^(2^216 - 1024)
+		f.mul(a1023)                                   # f = a^(2^216 - 1)
+		f.square().square().square().square().square() # f = a^(2^221 - 32)
+		f.square().square().square().square().square() # f = a^(2^226 - 1024)
+		f.mul(a1019)                                   # f = a^(2^226 - 5)
+		f.square().square().square().square().square() # f = a^(2^231 - 160)
+		f.square().square().square().square().square() # f = a^(2^236 - 5120)
+		f.mul(a1023)                                   # f = a^(2^236 - 4097)
+		f.square().square().square().square().square() # f = a^(2^241 - 131104)
+		f.square().square().square().square().square() # f = a^(2^246 - 4195328)
+		f.mul(a1023)                                   # f = a^(2^246 - 4194305)
+		f.square().square().square().square().square() # f = a^(2^251 - 134217760)
+		f.square().square().square().square().square() # f = a^(2^256 - 4294968320)
+		return f.mul(a45)                              # f = a^(2^256 - 4294968275) = a^(p-2)
 
 BytePoints = []
 
@@ -792,6 +903,7 @@ def loadS256BytePoints():
 	# Deserialize the precomputed byte points and set the curve to them.
 	offset = 0
 	# var bytePoints [32][256][3]fieldVal
+	ifunc = lambda b: int.from_bytes(b, byteorder="big")
 	global BytePoints
 	BytePoints = []
 	for byteNum in range(32):
@@ -807,13 +919,13 @@ def loadS256BytePoints():
 			col.append(py)
 			col.append(pz)
 			for j in range(10):
-				px.n[j] = serialized[offset+3:offset-1:-1]
+				px.n[j] = ifunc(serialized[offset+3:offset-1:-1])
 				offset += 4
 			for j in range(10):
-				py.n[j] = serialized[offset+3:offset-1:-1]
+				py.n[j] = ifunc(serialized[offset+3:offset-1:-1])
 				offset += 4
 			for j in range(10):
-				pz.n[j] = serialized[offset+3:offset-1:-1]
+				pz.n[j] = ifunc(serialized[offset+3:offset-1:-1])
 				offset += 4
 
 loadS256BytePoints()
@@ -831,7 +943,6 @@ class TestField(unittest.TestCase):
 			(4294967295, [4294967295, 0, 0, 0, 0, 0, 0, 0, 0, 0]), # 2^32 - 1
 		]
 
-		print("Running %d tests" % len(tests))
 		for i, v in tests:
 			f = FieldVal()
 			f.setInt(i)
@@ -1312,3 +1423,47 @@ class TestField(unittest.TestCase):
 		for i, (a, res) in enumerate(tests):
 			f = FieldVal.fromHex(a)
 			self.assertEqual(res, f.string(), msg="test %i" % i)
+	def test_inverse(self):
+		"""
+		 TestInverse ensures that finding the multiplicative inverse via Inverse works
+		 as expected.
+		"""
+		tests = [
+			# secp256k1 prime (aka 0)
+			("0", "0"),
+			("fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f", "0"),
+			("0", "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"),
+			# secp256k1 prime-1
+			(
+				"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e",
+				"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e",
+			),
+			# secp256k1 prime-2
+			(
+				"fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2d",
+				"7fffffffffffffffffffffffffffffffffffffffffffffffffffffff7ffffe17",
+			),
+			# Random sampling
+			(
+				"16fb970147a9acc73654d4be233cc48b875ce20a2122d24f073d29bd28805aca",
+				"987aeb257b063df0c6d1334051c47092b6d8766c4bf10c463786d93f5bc54354",
+			),
+			(
+				"69d1323ce9f1f7b3bd3c7320b0d6311408e30281e273e39a0d8c7ee1c8257919",
+				"49340981fa9b8d3dad72de470b34f547ed9179c3953797d0943af67806f4bb6",
+			),
+			(
+				"e0debf988ae098ecda07d0b57713e97c6d213db19753e8c95aa12a2fc1cc5272",
+				"64f58077b68af5b656b413ea366863f7b2819f8d27375d9c4d9804135ca220c2",
+			),
+			(
+				"dcd394f91f74c2ba16aad74a22bb0ed47fe857774b8f2d6c09e28bfb14642878",
+				"fb848ec64d0be572a63c38fe83df5e7f3d032f60bf8c969ef67d36bf4ada22a9",
+			),
+		]
+
+		for i, (a, e) in enumerate(tests):
+			f = FieldVal.fromHex(a).normalize()
+			expected = FieldVal.fromHex(e).normalize()
+			result = f.inverse().normalize()
+			self.assertTrue(result.equals(expected))

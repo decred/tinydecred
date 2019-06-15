@@ -1,5 +1,7 @@
 import json
 
+JSONDecodeError = json.JSONDecodeError
+
 _types = {}
 
 def clsKey(cls):
