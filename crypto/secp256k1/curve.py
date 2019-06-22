@@ -1,5 +1,6 @@
 from tinydecred.crypto.secp256k1.field import FieldVal, BytePoints
 from tinydecred.crypto.bytearray import ByteArray
+from tinydecred.crypto.rando import generateSeed
 import unittest
 
 COORDINATE_LEN = 32
@@ -87,7 +88,7 @@ class PublicKey:
 		self.curve = curve
 		self.x = x
 		self.y = y
-	def serializedCompressed(self):
+	def serializeCompressed(self):
 		fmt = PUBKEY_COMPRESSED
 		if not isEven(self.y):
 			fmt |= 0x1
@@ -95,11 +96,38 @@ class PublicKey:
 		b += ByteArray(self.x, length=COORDINATE_LEN)
 		assert len(b) == PUBKEY_COMPRESSED_LEN
 		return b
+	def serializeUncompressed(self):
+		"""
+		SerializeUncompressed serializes a public key in a 65-byte uncompressed
+		format.
+		"""
+		b = ByteArray(PUBKEY_UNCOMPRESSED)
+		b += ByteArray(self.x, length=32)
+		b += ByteArray(self.y, length=32)
+		return b
 
 class PrivateKey:
 	def __init__(self, curve, k, x, y):
 		self.key = k
 		self.pub = PublicKey(curve, x, y)
+
+def randFieldElement(): # c elliptic.Curve, rand io.Reader) (k *big.Int, err error) {
+	"""
+	randFieldElement returns a random element of the field underlying the given
+	curve using the procedure given in [NSA] A.2.1.
+	"""
+	b = ByteArray(generateSeed(curve.BitSize//8+8))
+	n = curve.N - 1
+	k = b.int()
+	k = k % n
+	k = k + 1
+	return k
+
+def generateKey(): # (*PrivateKey, error) {
+	""" GenerateKey generates a public and private key pair."""
+	k = randFieldElement()
+	x, y = curve.scalarBaseMult(k)
+	return PrivateKey(curve, k, x, y)
 
 class KoblitzCurve:
 

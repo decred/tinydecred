@@ -11,14 +11,14 @@ import hmac
 import unittest
 
 KEY_SIZE = 32
+HASH_SIZE = 32
+BLAKE256_SIZE = 32
 SERIALIZED_KEY_LENGTH = 4 + 1 + 4 + 4 + 32 + 33 # 78 bytes
 HARDENED_KEY_START = 2**31
 MAX_COIN_TYPE = HARDENED_KEY_START - 1
 MAX_ACCOUNT_NUM = HARDENED_KEY_START - 2
 RADIX = 58
 ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-SHA256_SIZE = 32
-BLAKE256_SIZE = 32
 
 # ExternalBranch is the child number to use when performing BIP0044
 # style hierarchical deterministic key derivation for the external
@@ -49,11 +49,6 @@ STEd25519 = 1
 # signature over the secp256k1 elliptic curve.
 STSchnorrSecp256k1 = 2
 
-class Signature:
-	def __init__(self, r, s):
-		self.r = r
-		self.s = s
-
 class ParameterRangeError(Exception):
 	pass
 class ZeroBytesError(Exception):
@@ -61,9 +56,48 @@ class ZeroBytesError(Exception):
 class PasswordError(Exception):
 	pass
 
+class Address:
+    def __init__(self, netID=None, pkHash=None, net=None):
+        self.netID = netID
+        self.pkHash = pkHash
+        self.net = net
+    def string(self):
+        b = ByteArray(self.netID)
+        b += self.pkHash
+        b += checksum(b.b)
+        x = b.int()
+
+        answer = ""
+
+        while x > 0:
+            m = x%RADIX
+            x = x//RADIX
+            answer += ALPHABET[m]
+
+        while len(answer) < len(b)*136//100:
+            answer += ALPHABET[0]
+
+        # reverse
+        return answer[::-1]
+
 def defaultScryptParams():
 	d = DEFAULT_SCRYPT_OPTIONS
 	return d["N"], d["R"], d["P"]
+
+def hash160(b):
+	h = hashlib.new("ripemd160")
+	h.update(blake_hash(b))
+	return ByteArray(h.digest())
+
+def checksum(input):
+	return blake_hash(blake_hash(input))[:4]
+
+def sha256ChecksumByte(input):
+	v = hashlib.sha256(input).digest()
+	return hashlib.sha256(v).digest()[0]
+
+def mac(key, msg):
+	return ByteArray(hmac.digest(key.bytes(), msg=msg.bytes(), digest=hashlib.sha256))
 
 def egcd(a, b):
     if a == 0:
@@ -79,184 +113,8 @@ def modInv(a, m):
     else:
         return x % m
 
-def mac(key, msg):
-	return ByteArray(hmac.digest(key.bytes(), msg=msg.bytes(), digest=hashlib.sha512))
-
-def hash160(b):
-	h = hashlib.new("ripemd160")
-	h.update(blake_hash(b))
-	return ByteArray(h.digest())
-
 def hashH(b):
 	return ByteArray(blake_hash(b), length=BLAKE256_SIZE)
-
-def checksum(input):
-	return blake_hash(blake_hash(input))[:4]
-
-def sha256ChecksumByte(input):
-	v = hashlib.sha256(input).digest()
-	return hashlib.sha256(v).digest()[0]
-
-def hashToInt(h): # []byte) *big.Int {
-	"""
-	hashToInt converts a hash value to an integer. There is some disagreement
-	about how this is done. [NSA] suggests that this is done in the obvious
-	manner, but [SECG] truncates the hash to the bit-length of the curve order
-	first. We follow [SECG] because that's what OpenSSL does. Additionally,
-	OpenSSL right shifts excess bits from the number if the hash is too large
-	and we mirror that too.
-	This is borrowed from crypto/ecdsa.
-	"""
-	orderBits = Curve.N.bit_length()
-	orderBytes = (orderBits + 7) // 8
-	if len(h) > orderBytes:
-		h = h[:orderBytes]
-
-	ret = int.from_bytes(h, byteorder="big")
-	excess = len(h)*8 - orderBits
-	if excess > 0:
-		ret = ret >> excess
-	return ret
-
-def int2octets(v, rolen): #v *big.Int, rolen int) []byte {
-	""" https://tools.ietf.org/html/rfc6979#section-2.3.3"""
-	out = ByteArray(v)
-
-	# left pad with zeros if it's too short
-	if len(out) < rolen:
-		out2 = ByteArray(0, length=rolen)
-		out2[rolen-len(out)] = out
-		return out2
-
-	# drop most significant bytes if it's too long
-	if len(out) > rolen:
-		out2 = ByteArray(0, length=rolen)
-		out2[0] = out[len(out)-rolen:]
-		return out2
-	return out
-
-def bits2octets(bits, rolen): # in []byte, rolen int) []byte {
-	""" https://tools.ietf.org/html/rfc6979#section-2.3.4"""
-	z1 = hashToInt(bits)
-	z2 = z1 - Curve.N
-	if z2 < 0:
-		return int2octets(z1, rolen)
-	return int2octets(z2, rolen)
-
-def nonceRFC6979(privKey, inHash, extra, version): #privkey *big.Int, hash []byte, extra []byte, version []byte) *big.Int {
-	"""
-	NonceRFC6979 generates an ECDSA nonce (`k`) deterministically according to
-	RFC 6979. It takes a 32-byte hash as an input and returns 32-byte nonce to
-	be used in ECDSA algorithm.
-	"""
-	q = Curve.N
-	x = privKey
-
-	qlen = q.bit_length()
-	holen = SHA256_SIZE
-	rolen = (qlen + 7) >> 3
-	bx = int2octets(x, rolen) + bits2octets(inHash, rolen)
-	if len(extra) == 32:
-		bx += extra
-	if len(version) == 16 and len(extra) == 32:
-		bx += extra
-	if len(version) == 16 and len(extra) != 32:
-		bx += ByteArray(0, length=32)
-		bx += version 
-
-	# Step B
-	v = ByteArray(bytearray([1]*holen))
-
-	# Step C (Go zeroes the all allocated memory)
-	k = ByteArray(0, length=holen)
-
-	# Step D
-	k = mac(k, v + 0x00 + bx)
-
-	# Step E
-	v = mac(k, v)
-
-	# Step F
-	k = mac(k, v + 0x01 + bx)
-
-	# Step G
-	v = mac(k, v)
-
-	# Step H
-	while True:
-		# Step H1
-		t = ByteArray(b'')
-
-		# Step H2
-		while len(t)*8 < qlen:
-			v = mac(k, v)
-			t += v
-
-		# Step H3
-		secret = hashToInt(t)
-		if secret >= 1 and secret < q:
-			return secret
-
-		k = mac(k, v + 0x00)
-		v = mac(k, v)
-
-
-def verifySig(pub, inHash, r, s):
-	"""
-	Verify verifies the signature in r, s of hash using the public key, pub. Its
-	return value records whether the signature is valid.
-	"""
-	# See [NSA] 3.4.2
-	N = Curve.N
-
-	if r <= 0 or s <= 0:
-		return False
-
-	if r >= N or s >= N:
-		return False
-
-	e = hashToInt(inHash)
-
-	w = modInv(s, N)
-
-	u1 = (e * w) % N
-	u2 = (r * w) % N
-
-
-	x1, y1 = Curve.scalarBaseMult(u1)
-	x2, y2 = Curve.scalarMult(pub.x, pub.y, u2)
-	x, y = Curve.add(x1, y1, x2, y2)
-
-	if x == 0 and y == 0:
-		return False
-	x = x % N
-	return x == r
-
-def signRFC6979(privateKey, inHash): # privateKey *PrivateKey, hash []byte) (*Signature, error) {
-	"""
-	signRFC6979 generates a deterministic ECDSA signature according to RFC 6979
-	and BIP 62.
-	"""
-	N = Curve.N
-	k = nonceRFC6979(privateKey, inHash, ByteArray(b''), ByteArray(b''))
-	inv = modInv(k, N)
-	r = Curve.scalarBaseMult(k)[0] % N
-
-	if r == 0:
-		raise Exception("calculated R is zero")
-
-	e = hashToInt(inHash)
-	s = privateKey.int() * r
-	s += e
-	s *= inv
-	s = s % N
-
-	if (N >> 1) > 1:
-		s = N - s
-	if s == 0:
-		raise Exception("calculated S is zero")
-
-	return Signature(r, s)
 
 def privKeyFromBytes(pk):
 	"""
@@ -273,9 +131,21 @@ def b58CheckDecode(s):
 	version = decoded[:2]
 	cksum =decoded[len(decoded)-4:]
 	if checksum(decoded[:len(decoded)-4]) != cksum:
-		raise("checksum error")
+		raise Exception("checksum error")
 	payload = decoded[2 : len(decoded)-4]
 	return payload, version
+
+def newAddressPubKeyHash(pkHash, net, algo): # pkHash []byte, net *chaincfg.Params, algo dcrec.SignatureType) (*AddressPubKeyHash, error) {
+    """ NewAddressPubKeyHash returns a new AddressPubKeyHash.  pkHash must be 20 bytes. """
+    if algo == STEcdsaSecp256k1:
+        netID = net.PubKeyHashAddrID
+    elif algo == STEd25519:
+        netID = net.PKHEdwardsAddrID
+    elif algo == STSchnorrSecp256k1:
+        netID = net.PKHSchnorrAddrID
+    else:
+        raise Exception("unknown ECDSA algorithm")
+    return Address(netID, pkHash, net)
 
 class ExtendedKey:
 	def __init__(self, privVer, pubVer, key, pubKey, chainCode, parentFP, depth, childNum, isPrivate):
@@ -290,7 +160,7 @@ class ExtendedKey:
 		self.pubKey = ByteArray(pubKey)
 		if self.pubKey.iszero():
 			if isPrivate:
-				self.pubKey = Curve.publicKey(self.key.int()).serializedCompressed()
+				self.pubKey = Curve.publicKey(self.key.int()).serializeCompressed()
 			else:
 				self.pubKey = self.key
 		self.chainCode = ByteArray(chainCode)
@@ -453,7 +323,7 @@ class ExtendedKey:
 			childX, childY = Curve.add(x, y, pubKey.x, pubKey.y)
 			# pk := secp256k1.PublicKey{Curve: secp256k1.S256(), X: childX, Y: childY}
 			# childKey = pk.SerializeCompressed()
-			childKey = PublicKey(Curve, childX, childY).serializedCompressed()
+			childKey = PublicKey(Curve, childX, childY).serializeCompressed()
 
 		# The fingerprint of the parent for the derived child is the first 4
 		# bytes of the RIPEMD160(BLAKE256(parentPubKey)).
@@ -557,28 +427,36 @@ class ExtendedKey:
 
 	def deriveChildAddress(self, i, net):
 		child = self.child(i)
+		return newAddressPubKeyHash(hash160(child.publicKey().serializeCompressed().b), net, STEcdsaSecp256k1).string()
 
-		pkHash = hash160(child.pubKey.b)
 
-		addrID = net.PubKeyHashAddrID
 
-		b = ByteArray(addrID)
-		b += pkHash
-		b += checksum(b.b)
-		x = b.int()
 
-		answer = ""
+		# pkHash = hash160(child.pubKey.b)
 
-		while x > 0:
-			m = x%RADIX
-			x = x//RADIX
-			answer += ALPHABET[m]
+		# addrID = net.PubKeyHashAddrID
 
-		while len(answer) < len(b)*136//100:
-			answer += ALPHABET[0]
+		# b = ByteArray(addrID)
+		# b += pkHash
+		# b += checksum(b.b)
+		# x = b.int()
 
-		# reverse
-		return answer[::-1]
+		# answer = ""
+
+		# while x > 0:
+		# 	m = x%RADIX
+		# 	x = x//RADIX
+		# 	answer += ALPHABET[m]
+
+		# while len(answer) < len(b)*136//100:
+		# 	answer += ALPHABET[0]
+
+		# # reverse
+		# return answer[::-1]
+	def privateKey(self):
+		return privKeyFromBytes(self.key)
+	def publicKey(self):
+		return Curve.parsePubKey(self.pubKey)
 
 json.register(ExtendedKey)
 
@@ -724,7 +602,8 @@ class TestCrypto(unittest.TestCase):
 		pk = privKeyFromBytes(key)
 
 		inHash = ByteArray("00010203040506070809")
-		sig = signRFC6979(pk.key, inHash)
+		# sig = txscript.signRFC6979(pk.key, inHash)
 
-		self.assertTrue(verifySig(pk.pub, inHash, sig.r, sig.s))
+		# self.assertTrue(txscript.verifySig(pk.pub, inHash, sig.r, sig.s))
+
 

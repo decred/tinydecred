@@ -60,9 +60,15 @@ class ByteArray:
 	def __le__(self, a):
 		return bytearray.__le__(self.b, decodeBA(a))
 	def __eq__(self, a):
-		return bytearray.__eq__(self.b, decodeBA(a))
+		try:
+			return bytearray.__eq__(self.b, decodeBA(a))
+		except:
+			return False
 	def __ne__(self, a):
-		return bytearray.__ne__(self.b, decodeBA(a))
+		try:
+			return bytearray.__ne__(self.b, decodeBA(a))
+		except:
+			return True
 	def __ge__(self, a):
 		return bytearray.__ge__(self.b, decodeBA(a))
 	def __gt__(self, a):

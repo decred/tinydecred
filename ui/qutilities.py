@@ -51,6 +51,11 @@ class ThreadUtilities:
         Perform maintenance for shutdown
         """
         self.qKilla = True
+
+
+        print("-- cleanUp called")
+
+
         self.scheduleTimer.stop()
 
     def registerFunction(self, functionKey, func):
@@ -214,6 +219,7 @@ class SmartThread(QtCore.QThread):
         self.returns = self.func(*self.args, **self.kwargs)
 
     def callitback(self):
+        print("--SmartThread finishing with %s" % self.callback.__name__)
         self.callback(self.returns)
 
 
@@ -489,28 +495,25 @@ def horizontalRule(l=0, t=0, r=0, b=0, color="#aaaaaa", height=2, parent=None):
     return wdgt
 
 
-def makeLabel(s, y, a=ALIGN_CENTER, fontFamily=None, color=None):
+def makeLabel(s, y, a=ALIGN_CENTER, **k):
     lbl = QtWidgets.QLabel(s)
-    font = lbl.font()
-    font.setPixelSize(y)
-    if fontFamily: 
-        font.setFamily(fontFamily)
-    lbl.setFont(font)
+    setProperties(lbl, fontSize=y, **k)
     lbl.setAlignment(a)
-    if color:
-        setLabelColor(lbl, color)
     return lbl
 
-def setLabelColor(lbl, color):
-    palette =  lbl.palette()
-    c = QtGui.QColor(color)
-    palette.setColor(lbl.backgroundRole(), c)
-    palette.setColor(lbl.foregroundRole(), c)
-    lbl.setPalette(palette)
-
-def setLabelFontSize(lbl, size):
+def setProperties(lbl, color=None, fontSize=None, fontFamily=None):
+    if color:
+        palette =  lbl.palette()
+        c = QtGui.QColor(color)
+        palette.setColor(lbl.backgroundRole(), c)
+        palette.setColor(lbl.foregroundRole(), c)
+        lbl.setPalette(palette)
     font = lbl.font()
-    font.setPixelSize(size)
+    if fontSize:
+        font.setPixelSize(fontSize)
+        lbl.setFont(font)
+    if fontFamily:
+        font.setFamily(fontFamily)
     lbl.setFont(font)
 
 def pad(wgt, t, r, b, l):

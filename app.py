@@ -18,11 +18,13 @@ SMALL = ui.SMALL
 MEDIUM = ui.MEDIUM
 LARGE = ui.LARGE
 
+WALLET_FILE_NAME = "wallet.db"
+
 def tryExecute(f, *a, **k):
     try:
         return f(*a, **k)
     except Exception as e:
-        log.error("failed to create wallet: %s \n %s" % (repr(e), traceback.print_tb(e.__traceback__)))
+        log.error("tryExecute %s failed: %s \n %s" % (f.__name__, repr(e), traceback.print_tb(e.__traceback__)))
     return False
 
 class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
@@ -67,22 +69,27 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
             initScreen.setFadeIn(True)
             self.appWindow.stack(initScreen)
         else:
+            def openw(path, pw, net):
+                try:
+                    wallet = Wallet.openFile(path, pw, cfg.net)
+                    wallet.lock()
+                    return wallet
+                except Exception as e:
+                    log.warning("exception encountered while attempting to open wallet: %s \n %s" % (repr(e), traceback.print_tb(e.__traceback__)))
+                    self.showMessage("incorrect password")
             def login(pw):
                 if pw is None or pw == "":
                     self.showMessage("you must enter a password to continue")
                 else:
-                    try:
-                        path = self.getNetSetting(SK.currentWallet)
-                        wallet = Wallet.open(path, pw, cfg.net)
-                        self.setWallet(wallet)
-                        self.home()
-                    except Exception as e:
-                        log.warning("exception encountered while attempting to open wallet: %s \n %s" % (repr(e), traceback.print_tb(e.__traceback__)))
-                        self.showMessage("incorrect password")
+                    path = self.getNetSetting(SK.currentWallet)
+                    self.waitThread(openw, self.finishOpen, path, pw, cfg.net)                    
             self.getPassword(login)
         self.makeThread(self.initDcrdata, self.finishDcrdata, self.getNetSetting("dcrdatas"))
-        self.startQLoop()
-
+    def finishOpen(self, wallet):
+        if wallet == None:
+            return
+        self.setWallet(wallet)
+        self.home()
     def resetPwTimer(self):
         self.passwordTimer.start(PASSWORD_TIMEOUT)
     def getPassword(self, callback, *args, **kwargs):
@@ -117,8 +124,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
                 settings[k] = v
         netSettings = self.getNetSetting()
         # if SK.currentWallet not in netSettings:
-        print("--uncomment this")
-        netSettings[SK.currentWallet] = self.netDirectory() # os.path.join(self.netDirectory(), WALLET_FILE_NAME)
+        netSettings[SK.currentWallet] = os.path.join(self.netDirectory(), WALLET_FILE_NAME)
         helpers.mkdir(self.netDirectory())
         cfg.save()
     def saveSettings(self):
@@ -144,7 +150,8 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         """
         sr = self.signalRegistry
         if sig not in sr:
-            log.warning("attempted to call un-registered signal %s" % sig)
+            # log.warning("attempted to call un-registered signal %s" % sig)
+            return
         for s in sr[sig]:
             sa, sk = s[1], s[3]
             sa.clear()
@@ -156,33 +163,50 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         cb, sigA, a,  sigK, k = s
         cb(*sigA, *a, **sigK, **k)
     def setWallet(self, wallet):
-        wallet.set
+        wallet.setChain(cfg.net)
         self.wallet = wallet
-        self.emitSignal(ui.BALANCE_SIGNAL, wallet.balance)
+        self.emitSignal(ui.BALANCE_SIGNAL, wallet.balance())
         self.tryInitSync()
-    def withUnlockedWallet(self, cb, *a, **k):
-        wallet = self.wallet
-        if wallet and wallet.isOpen():
-            cb(wallet, *a, **k)
-            return
-        def router(pw, cb, a, k):
+    def withUnlockedWallet(self, f, cb, *a, **k):
+        def step1(pw, cb, a, k):
             if pw:
-                try:
-                    path = self.getNetSetting(SK.currentWallet)
-                    wallet = Wallet.open(path, pw, cfg.net)
-                    cb(wallet, *a, **k)
-                except Exception as e:
-                    log.warning("exception encountered while attempting to open wallet: %s \n %s" % (repr(e), traceback.print_tb(e.__traceback__)))
-                    self.showMessage("incorrect password")
+                self.waitThread(step2, cb, pw, a, k)
             else:
                 self.showMessage("password required to open wallet")
-        self.getPassword(router, cb, a, k)
+        def step2(pw, a, k):
+            try:
+                with self.wallet.open(pw.encode("utf-8")) as w:
+                    print("--running %s with open wallet" % f.__name__)
+                    r = f(w, *a, **k)
+                    print("--finished %s" % f.__name__)
+                    return r
+            except Exception as e:
+                log.warning("exception encountered while performing wallet action: %s \n %s" % (repr(e), traceback.print_tb(e.__traceback__)))
+                self.showMessage("error")
+            return False
+        self.getPassword(step1, cb, a, k)
+    def broadcast(self, txHex):
+        print("--send2")
+        try:
+            for dcrdata in self.dcrdatas:
+                print("--sending %r to dcrdata" % txHex)
+                dcrdata.insight.api.tx.send.post({
+                    "rawtx": txHex,
+                })
+                return True
+        except Exception as e:
+            log.error("broadcast error: %s" % e)
+        return False
     def tryInitSync(self):
-        if len(self.dcrdatas) and self.wallet:
-            self.inQ.put(self.qEncode(self.wallet.sync, self.dcrdatas, self.dbManager, self.walletSynced))
+        wallet = self.wallet
+        if wallet and wallet.openAccount and self.dcrdatas:
+            self.makeThread(wallet.sync, self.doneSyncing, self.dcrdatas, self.dbManager, self.balanceSync)
+    def doneSyncing(self, res):
+        self.wallet.unlock()
+        self.wallet.close()
+        self.emitSignal(ui.SYNC_SIGNAL)
     @QtCore.pyqtSlot(str)
-    def walletSynced(self, balance):
-        print("--balance; %.2f" % (balance*1e-8, ))
+    def balanceSync(self, balance):
         self.wallet.save()
         self.home()
         self.emitSignal(ui.BALANCE_SIGNAL, balance)
@@ -202,8 +226,6 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
     def finishDcrdata(self, dcrdatas):
         self.dcrdatas = dcrdatas
         self.tryInitSync()
-    def updateBalance(self, balance):
-        print("--new balance: %f" % balance)
     @QtCore.pyqtSlot(str)
     def showMessage(self, msg):
         self.appWindow.stack(self.message.withMessage(msg))
@@ -237,6 +259,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         if tracked:
             self.trackedCssItems.append(button)
         return button
+    @QtCore.pyqtSlot()
     def home(self):
         self.appWindow.setHomeScreen(self.homeScreen)
     def waiting(self):
@@ -244,7 +267,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
     def waitThread(self, f, cb, *a, **k):
         self.waiting()
         def unwaiting(*cba, **cbk):
-            self.appWindow.pop()
+            self.appWindow.pop(self.waitingScreen)
             cb(*cba, **cbk)
         self.makeThread(tryExecute, unwaiting, f, *a, **k)
     def showMnemonics(self, words):
@@ -260,7 +283,14 @@ def loadFonts():
         if filename.endswith(".ttf"):
             QtGui.QFontDatabase.addApplicationFont(os.path.join(fontDir, filename))
 
+sys._excepthook = sys.excepthook 
+def exception_hook(exctype, value, traceback):
+    print(exctype, value, traceback)
+    sys._excepthook(exctype, value, traceback) 
+    sys.exit(1) 
+
 def runTinyDecred():
+    sys.excepthook = exception_hook
     QtWidgets.QApplication.setDesktopSettingsAware(False)
     roboFont = QtGui.QFont("Roboto")
     roboFont.setPixelSize(16)

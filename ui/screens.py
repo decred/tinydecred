@@ -18,11 +18,13 @@ LARGE = ui.LARGE
 FADE_IN_ANIMATION = "fadeinanimation"
 UI_DIR = os.path.dirname(os.path.realpath(__file__))
 
+ACCT = 0
+
 def pixmapFromSvg(filename, w, h, color=None):
     return QtGui.QIcon(os.path.join(UI_DIR, "icons", filename)).pixmap(w, h)
 
 class TinyDialog(QtWidgets.QFrame):
-    maxWidth = 450
+    maxWidth = 550
     maxHeight = 550
     targetPadding = 20
     def __init__(self, app):
@@ -70,12 +72,15 @@ class TinyDialog(QtWidgets.QFrame):
         w.setVisible(True)
         self.setIcons(w)
         self.setVisible(True)
-    def pop(self):
+    @QtCore.pyqtSlot()
+    def pop(self, screen=None):
         widgetList = list(Q.layoutWidgets(self.layout))
         if len(widgetList) < 2:
             log.warning("attempted to pop an empty layout")
             return
         popped, top = widgetList[-1], widgetList[-2]
+        if screen and top is not screen:
+            return
         popped.setVisible(False)
         self.layout.removeWidget(popped)
         top.setVisible(True)
@@ -151,11 +156,10 @@ class HomeScreen(Screen):
         rowLyt.addStretch(1)
         self.balance = b = ClickyLabel(self.balanceClicked, "0.00")
         rowLyt.addWidget(b)
-        font = QtGui.QFont("Roboto-Heavy")
-        font.setPixelSize(55)
-        b.setFont(font)
+        Q.setProperties(b, fontFamily="Roboto-Bold", fontSize=45)
         self.unit = Q.makeLabel("DCR", 22, color="#777777")
         rowLyt.addWidget(self.unit, 0, Q.ALIGN_BOTTOM)
+        self.unit.setContentsMargins(0, 0, 0, 5)
         rowLyt.addStretch(1)
 
         # Create a row to hold an address.
@@ -166,7 +170,11 @@ class HomeScreen(Screen):
         rowLyt.addWidget(Q.makeLabel("Address", 14, color="#777777"), 0, Q.ALIGN_LEFT)
         rowLyt.addStretch(1)
         new = ClickyLabel(self.newAddressClicked, "+new")
-        Q.setLabelColor(new, "#777777")
+        Q.setProperties(new, color="#777777")
+        rowLyt.addWidget(new)
+        self.address = Q.makeLabel("", 18, fontFamily="RobotoMono-Bold")
+        colLyt.addWidget(self.address)
+        self.address.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse) # | QtCore.Qt.TextSelectableByKeyboard)
 
         # Options
         opts, optsLyt = Q.makeWidget(QtWidgets.QWidget, Q.GRID)
@@ -182,40 +190,25 @@ class HomeScreen(Screen):
         optsLyt.setColumnStretch(0, 1)
         optsLyt.setColumnStretch(1, 1)
         optsLyt.setSpacing(40)
-
-        rowLyt.addWidget(new)
-        self.address = Q.makeLabel("", 16)
-        colLyt.addWidget(self.address)
-        self.address.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse) # | QtCore.Qt.TextSelectableByKeyboard)
     def newAddressClicked(self):
         app = self.app
-        wallet = app.wallet
-        if wallet.isOpen():
-            self.getNewAddress(wallet)
-        else:
-            def pwcb(pw): # password callback
-                if not pw or pw == "":
-                    app.showMessage("incorrect password")
-                else:
-                    try:
-                        wallet.open(pw)
-                        self.getNewAddress(wallet)
-                    except Exception:
-                        app.showMessage("failed to open wallet with that password")
-            app.getPassword(pwcb)
-    def getNewAddress(self, wallet):
-        address = wallet.openAccount.getNextPaymentAddress()
+        def addr(wallet):
+            return app.wallet.getNextPaymentAddress(ACCT)
+        app.withUnlockedWallet(addr, self.setNewAddress)        
+    def setNewAddress(self, address):
         self.address.setText(address)
     def showEvent(self, e):
         app = self.app
         if app.wallet:
-            address = app.wallet.openAccount.paymentAddress()
+            address = app.wallet.paymentAddress(ACCT)
             self.address.setText(address)
     def balanceClicked(self):
         log.info("--balance clicked")
     def balanceUpdated(self, bal):
         print("--balance signal received")
-        self.balance.setText(helpers.formatNumber(bal*1e-8))
+        dcr = bal.total*1e-8
+        self.balance.setText("{0:,.2f}".format(dcr))
+        self.balance.setToolTip("%.8f" % dcr)
     def spendClicked(self, e):
         self.app.appWindow.stack(self.app.sendScreen)
     def settingsClicked(self, e):
@@ -245,6 +238,8 @@ class PasswordDialog(Screen):
         lyt.addWidget(toggle)
     def showEvent(self, e):
         self.pwInput.setFocus()
+    def hideEvent(self, e):
+        self.pwInput.setText("")
     def showPwToggled(self, state, switch):
         if state: 
             self.pwInput.setEchoMode(QtWidgets.QLineEdit.Normal)
@@ -293,7 +288,7 @@ class InitializationScreen(Screen):
         super().__init__(app)
         self.canGoHome = False
         self.layout.setSpacing(20)
-        lbl = Q.makeLabel("Welcome!", 26, font="Roboto-Medium")
+        lbl = Q.makeLabel("Welcome!", 26, fontFamily="Roboto-Medium")
         self.layout.addWidget(lbl)
         self.layout.addWidget(Q.makeLabel("How would you like to begin?", 16))
 
@@ -345,7 +340,7 @@ class InitializationScreen(Screen):
                 else:
                     try:
                         appWalletPath = app.getNetSetting(SK.currentWallet)
-                        wallet = Wallet.open(userPath, pw, cfg.net)
+                        wallet = Wallet.openFile(userPath, pw, cfg.net)
                         wallet.path = appWalletPath
                         wallet.save()
                         app.setWallet(wallet)
@@ -357,6 +352,13 @@ class InitializationScreen(Screen):
     def restoreClicked(self):
         restoreScreen = MnemonicRestorer(self.app)
         self.app.appWindow.stack(restoreScreen)
+
+def sendToAddress(wallet, val, addr, sender):
+    try:
+        return wallet.sendToAddress(round(val*1e8), addr, sender) # raw transaction
+    except Exception as e:
+        log.error("failed to send: %s \n %s" % (repr(e), traceback.print_tb(e.__traceback__)))
+    return False
 
 class SendScreen(Screen):
     def __init__(self, app):
@@ -391,23 +393,14 @@ class SendScreen(Screen):
         val = float(self.valField.text())
         address = self.addressField.text()
         log.debug("sending %f to %s" % (val, address))
-        self.app.withUnlockedWallet(self.sendWithWallet, val, address)
-    def sendWithWallet(self, wallet, val, addr):
-        log.debug("wallet unlocked for send")
-        app = self.app
-        def send(val, addr):
-            try:
-                tx = wallet.createRawSpend(int(val*1e8), addr) # raw transaction
-                for dcrdata in app.dcrdatas:
-                    print("--sending %r to dcrdata" % tx.hex().encode("ascii"))
-                    dcrdata.insight.api.tx.send.post({
-                        "rawtx": tx.hex(),
-                    })
-            except Exception as e:
-                log.error("failed to send: %s \n %s" % (repr(e), traceback.print_tb(e.__traceback__)))
-        app.waitThread(send, self.sent, val, addr)
+        self.app.withUnlockedWallet(sendToAddress, self.sent, val, address, self.app.broadcast)
     def sent(self, res):
-        print("--send res: %s" % repr(res))
+        app = self.app
+        if res:
+            app.home()
+            app.showMessage("sent")
+        else:
+            app.showMessage("transaction error")
 
 
 
@@ -506,6 +499,7 @@ class Spinner(QtWidgets.QLabel):
         self.app.scheduleFunction(Spinner.tickName, self.tick, time.time()+Spinner.tickTime, repeatEvery=Spinner.tickTime)
     def hideEvent(self, e):
         self.app.cancelFunction(Spinner.tickName)
+    @QtCore.pyqtSlot()
     def tick(self):
         matrix = QtGui.QTransform()
         rotation = (time.time() % self.period) / self.period * 360

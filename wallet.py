@@ -1,12 +1,17 @@
 from tinydecred.crypto import crypto, mnemonic, opcode, txscript
 from tinydecred.pydecred import helpers, dcrjson as json, database
-from tinydecred.tinycrypto import createNewAccountManager
+from tinydecred.tinycrypto import createNewAccountManager, UTXO
 from tinydecred.crypto.bytearray import ByteArray
-from tinydecred.wire import msgtx, msgblock
-from tinydecred import wire
+from tinydecred.wire import msgtx, msgblock, wire
+from threading import Lock as Mutex
 import os
+import unittest
+import traceback
+import time
 
 log = helpers.getLogger("WLLT", logLvl=0)
+
+ACCT = 0
 
 ID_TAG = "tinywallet"
 VERSION = "0.0.1"
@@ -57,151 +62,8 @@ generatedTxVersion = 1
 class InsufficientFundsError(Exception):
     pass
 
-def utxoKey(u):
-    return u["txid"] + "#" + str(u["vout"])
-
 def hashFromString(s):
     return reversed(ByteArray(s))
-
-
-def decodeAddress(addr, chain): #s string, params *chaincfg.Params) (dcrutil.Address, error) {
-    """
-    decodeAddress decodes the string encoding of an address and returns
-    the Address if addr is a valid encoding for a known address type
-    """
-    addrLen = len(addr)
-    if addrLen == 66 or addrLen == 130:
-        # Secp256k1 pubkey as a string, handle differently.
-        # return newAddressSecpPubKey(ByteArray(addr), chain)
-        raise Exception("decode from secp256k1 pubkey string unimplemented")
-
-    decoded, netID = crypto.b58CheckDecode(addr)
-
-    # regular tx nedID is PubKeyHashAddrID
-    if netID == chain.PubKeyHashAddrID:
-        return netID, decoded #newAddressPubKeyHash(decoded, chain, crypto.STEcdsaSecp256k1)
-    else: 
-        raise Exception("unsupported address type")
-    # switch netID {
-    #     case net.PubKeyAddrID:
-    #         return NewAddressPubKey(decoded, net)
-
-    #     case net.PubKeyHashAddrID:
-    #         return NewAddressPubKeyHash(decoded, net, dcrec.STEcdsaSecp256k1)
-
-    #     case net.PKHEdwardsAddrID:
-    #         return NewAddressPubKeyHash(decoded, net, dcrec.STEd25519)
-
-    #     case net.PKHSchnorrAddrID:
-    #         return NewAddressPubKeyHash(decoded, net, dcrec.STSchnorrSecp256k1)
-
-    #     case net.ScriptHashAddrID:
-    #         return NewAddressScriptHashFromHash(decoded, net)
-
-    #     default:
-    #         return nil, ErrUnknownAddressType
-    #     }
-    # }
-
-def addData(data):
-    dataLen = len(data)
-    b = ByteArray(b'')
-
-    # When the data consists of a single number that can be represented
-    # by one of the "small integer" opcodes, use that opcode instead of
-    # a data push opcode followed by the number.
-    if dataLen == 0 or (dataLen == 1 and data[0] == 0):
-        b += opcode.OP_0
-        return b
-    elif dataLen == 1 and data[0] <= 16:
-        b += opcode.OP_1-1+data[0]
-        return b
-    elif dataLen == 1 and data[0] == 0x81:
-        b += opcode.OP_1NEGATE
-        return b
-
-    # Use one of the OP_DATA_# opcodes if the length of the data is small
-    # enough so the data push instruction is only a single byte.
-    # Otherwise, choose the smallest possible OP_PUSHDATA# opcode that
-    # can represent the length of the data.
-    if dataLen < opcode.OP_PUSHDATA1:
-        b += (opcode.OP_DATA_1-1)+dataLen
-    elif dataLen <= 0xff:
-        b += opcode.OP_PUSHDATA1
-        b += dataLen
-    elif dataLen <= 0xffff:
-        b += opcode.OP_PUSHDATA2
-        b += ByteArray(dataLen).littleEndian()
-    else:
-        b += opcode.OP_PUSHDATA4
-        b += ByteArray(dataLen, length=4).littleEndian()
-    # Append the actual data.
-    b.script += data
-    return b
-
-
-def payToAddrScript(netID, pkHash, chain): #addr dcrutil.Address) ([]byte, error) {
-    """
-    payToAddrScript creates a new script to pay a transaction output to a the
-    specified address.
-    """
-    if netID == chain.PubKeyHashAddrID:
-        script = ByteArray(b'')
-        script += opcode.OP_DUP
-        script += opcode.OP_HASH160
-        script += addData(pkHash)
-        script += opcode.OP_EQUALVERIFY
-        script += opcode.OP_CHECKSIG
-        return script
-    raise Exception("unimplemented signature type")
-
-    # switch addr := addr.(type) {
-    # case *dcrutil.AddressPubKeyHash:
-    #     if addr == nil {
-    #         return nil, scriptError(ErrUnsupportedAddress,
-    #             nilAddrErrStr)
-    #     }
-    #     switch addr.DSA(addr.Net()) {
-    #     case dcrec.STEcdsaSecp256k1:
-    #         return payToPubKeyHashScript(addr.ScriptAddress())
-    #     case dcrec.STEd25519:
-    #         return payToPubKeyHashEdwardsScript(addr.ScriptAddress())
-    #     case dcrec.STSchnorrSecp256k1:
-    #         return payToPubKeyHashSchnorrScript(addr.ScriptAddress())
-    #     }
-
-    # case *dcrutil.AddressScriptHash:
-    #     if addr == nil {
-    #         return nil, scriptError(ErrUnsupportedAddress,
-    #             nilAddrErrStr)
-    #     }
-    #     return payToScriptHashScript(addr.ScriptAddress())
-
-    # case *dcrutil.AddressSecpPubKey:
-    #     if addr == nil {
-    #         return nil, scriptError(ErrUnsupportedAddress,
-    #             nilAddrErrStr)
-    #     }
-    #     return payToPubKeyScript(addr.ScriptAddress())
-
-    # case *dcrutil.AddressEdwardsPubKey:
-    #     if addr == nil {
-    #         return nil, scriptError(ErrUnsupportedAddress,
-    #             nilAddrErrStr)
-    #     }
-    #     return payToEdwardsPubKeyScript(addr.ScriptAddress())
-
-    # case *dcrutil.AddressSecSchnorrPubKey:
-    #     if addr == nil {
-    #         return nil, scriptError(ErrUnsupportedAddress,
-    #             nilAddrErrStr)
-    #     }
-    #     return payToSchnorrPubKeyScript(addr.ScriptAddress())
-    # }
-
-    # str := fmt.Sprintf("unable to generate payment script for unsupported "+
-    #     "address type %T", addr)
-    # return nil, scriptError(ErrUnsupportedAddress, str)
 
 def makeOutputs(pairs, chain): #pairs map[string]dcrutil.Amount, chainParams *chaincfg.Params) ([]*wire.TxOut, error) {
     """
@@ -217,18 +79,10 @@ def makeOutputs(pairs, chain): #pairs map[string]dcrutil.Amount, chainParams *ch
         # Make sure its atoms
         if not isinstance(amt, int):
             raise Exception("amt is not integral")
-        pkScript = makePayToAddrScript(addrStr, chain)        
+        print("--making  pkScript for %s" % repr(addrStr))
+        pkScript = txscript.makePayToAddrScript(addrStr, chain)
         outputs.append(msgtx.TxOut(value=amt, pkScript=pkScript))
     return outputs
-
-def makePayToAddrScript(addrStr, chain):
-    if amt < 0:
-            raise Exception("amt < 0")
-        # Make sure its atoms
-        if not isinstance(amt, int):
-            raise Exception("amt is not integral")
-        netID, pkHash = decodeAddress(addrStr, chain)
-        return payToAddrScript(netID, pkHash, chain)
 
 
 def checkOutput(output, fee): #output *wire.TxOut, relayFeePerKb dcrutil.Amount) error {
@@ -292,7 +146,14 @@ def estimateOutputSize(scriptSize):
     """
     return 8 + 2 + wire.varIntSerializeSize(scriptSize) + scriptSize
 
-
+def sumOutputSerializeSizes(outputs): # outputs []*wire.TxOut) (serializeSize int) {
+    """
+    sumOutputSerializeSizes sums up the serialized size of the supplied outputs.
+    """
+    serializeSize = 0
+    for txOut in outputs:
+        serializeSize += txOut.serializeSize()
+    return serializeSize
 
 def estimateSerializeSize(scriptSizes, txOuts, changeScriptSize):
     """
@@ -304,7 +165,7 @@ def estimateSerializeSize(scriptSizes, txOuts, changeScriptSize):
     """
     # Generate and sum up the estimated sizes of the inputs.
     txInsSize = 0
-    for size = scriptSizes {
+    for size in scriptSizes:
         txInsSize += estimateInputSize(size)
 
     inputCount = len(scriptSizes)
@@ -312,14 +173,14 @@ def estimateSerializeSize(scriptSizes, txOuts, changeScriptSize):
     changeSize = 0
     if changeScriptSize > 0:
         changeSize = estimateOutputSize(changeScriptSize)
-        outputCount++
+        outputCount += 1
 
     # 12 additional bytes are for version, locktime and expiry.
-    return 12 + (2 * wire.varIntSerializeSize(inputCount)) +
+    return (12 + (2 * wire.varIntSerializeSize(inputCount)) +
         wire.varIntSerializeSize(outputCount) +
         txInsSize +
-        h.SumOutputSerializeSizes(txOuts) +
-        changeSize
+        sumOutputSerializeSizes(txOuts) +
+        changeSize)
 
 def feeForSerializeSize(relayFeePerKb, txSerializeSize):
     """
@@ -335,6 +196,25 @@ def feeForSerializeSize(relayFeePerKb, txSerializeSize):
         fee = MaxAmount
     return fee
 
+
+def isDustAmount(amount, scriptSize, relayFeePerKb): #amount dcrutil.Amount, scriptSize int, relayFeePerKb dcrutil.Amount) bool {
+    """
+    IsDustAmount determines whether a transaction output value and script length would
+    cause the output to be considered dust.  Transactions with dust outputs are
+    not standard and are rejected by mempools with default policies.
+    """
+    # Calculate the total (estimated) cost to the network.  This is
+    # calculated using the serialize size of the output plus the serial
+    # size of a transaction input which redeems it.  The output is assumed
+    # to be compressed P2PKH as this is the most common script type.  Use
+    # the average size of a compressed P2PKH redeem input (165) rather than
+    # the largest possible (txsizes.RedeemP2PKHInputSize).
+    totalSize = 8 + 2 + wire.varIntSerializeSize(scriptSize) + scriptSize + 165
+
+    # Dust is defined as an output value where the total cost to the network
+    # (output size + input size) is greater than 1/3 of the relay fee.
+    return amount*1000/(3*totalSize) < relayFeePerKb
+
 class Wallet:
     def __init__(self, chain):
         self.path = None
@@ -343,10 +223,13 @@ class Wallet:
         self.acctManager = None
         self.openAccount = None
         self.fileKey = None
-        self.balance = 0
         self.dcrdatas = []
         self.dbManager = None
         self.db = {}
+        self.tip = None
+        self.users = 0
+        self.balanceSignal = lambda b: None
+        self.mtx = Mutex()
     def setChain(self, chain):
         self.chain = chain
         self.chainName = chain.Name if chain else None
@@ -355,7 +238,6 @@ class Wallet:
             "file": self.file,
             "accounts": self.acctManager,
             "chainName": self.chainName,
-            "balance": self.balance,
         }
     @staticmethod
     def __fromjson__(obj):
@@ -363,7 +245,6 @@ class Wallet:
         w.chainName = obj["chainName"]
         w.file = obj["file"]
         w.acctManager = obj["accounts"]
-        w.balance = obj["balance"]
         return w
     @staticmethod
     def create(path, password, chain, userSeed = None):
@@ -395,10 +276,11 @@ class Wallet:
     def save(self):
         if not self.fileKey:
             log.error("attempted to save a closed wallet")
+            return
         encrypted = crypto.AES.encrypt(self.fileKey.bytes(), json.dump(self))
         helpers.saveFile(self.path, encrypted)
     @staticmethod
-    def open(path, password, chain):
+    def openFile(path, password, chain):
         """
         open constructs the wallet from the file
         """
@@ -419,96 +301,230 @@ class Wallet:
         wallet.openAccount = wallet.acctManager.openAccount(0, chain, password.encode("ascii"))
         wallet.save()
         return wallet
+    def open(self, pw):
+        """
+        pw: ascii bytes user supplied password
+        """
+        self.fileKey = crypto.hash160(pw)
+        self.openAccount = self.acctManager.openAccount(0, self.chain, pw)
+        return self
+    def lock(self):
+        self.mtx.acquire()
+    def unlock(self):
+        self.mtx.release()
+    def __enter__(self):
+        # compount assignment is not thread safe, but standard assignment is.
+        u = self.users
+        self.users = u + 1
+        self.lock()
+        return self
+    def __exit__(self, xType, xVal, xTB):
+        u = self.users
+        self.users = u - 1
+        self.unlock()
+        if self.users == 0:
+            self.close()
     def isOpen(self):
         return bool(self.fileKey)
     def close(self):
         self.save()
-        self.fileKey = None
-        self.openAccount = None
+        # self.fileKey = None
+        if self.openAccount:
+            self.openAccount.close()
+            self.openAccount = None
+    def account(self, acct):
+        aMgr = self.acctManager
+        if len(aMgr.accounts) <= acct:
+            raise Exception("requested unknown account number %i" % acct)
+        return aMgr.account(acct)
+    def processNewUTXO(self, utxo):
+        """
+        Store related transactions.
+        Check for immaturity.
+        returns True if utxo has confirmations, False if not
+        """
+        acct = self.account(ACCT)
+        if not utxo.isConfirmed():
+            acct.addUTXO(utxo)
+            return False
+        tx, txIsNew = self.getTx(utxo.txid)
+        if txIsNew:
+            acct.addTx(utxo.address, utxo.txid)
+        if tx.looksLikeCoinbase():
+            # this is a coinbase transaction. reject it if it 
+            # is not old enough
+            utxo.maturity = utxo.height + self.chain.CoinbaseMaturity
+        return True
+    def getNewAddress(self, acct):
+        return self.account(acct).getNextPaymentAddress()
+    def paymentAddress(self, acct):
+        """
+        Gets the payment address at the cursor. 
+        As of now, this function does not require unlocking the wallet.
+        """
+        return self.account(acct).paymentAddress()
     def changeScript(self): # []byte, uint16, error
         if not self.openAccount:
             raise Exception("no accounts open")
         changeAddress = self.openAccount.getChangeAddress()
-        script = makePayToAddrScript(changeAddress, self.chain)
-        return script
-    def sync(self, dcrdatas, dbManager, report):
-        """
-        Run in a threaad. Report should be a Qt signal or similar thread-safe function. 
-        """
-        self.dcrdatas = dcrdatas
-        self.dbManager = dbManager
-        acctManager = self.acctManager
-        account = acctManager.account(0)
-        balance = 0
-        for utxos in account.utxos().values():
-            for utxo in utxos.values():
-                balance += utxo["satoshis"]
-            report(balance)
-        gapPolicy = 5
-        for dcrdata in dcrdatas:
-            addrIdx = 0
-            lastSeen = 0
-            dUtxos = dcrdata.insight.api.addr.utxo
-            # dTxs = dcrdata.tx.get
-            while True:
-                addr = account.getNthPaymentAddress(addrIdx)
-                print("--checking address: %s" % addr)
-                # insight/api/addr/{address}/utxo
-                knownUtxos = account.utxos(addr)
-                dcrdataUtxos = dUtxos(addr)
-                newUtxos = {}
-                dupes = {}
-                missingUtxos = {}
-                startBalance = balance
-                for utxo in dcrdataUtxos:
-                    utxoAddr = utxo["address"]
-                    if utxoAddr != addr:
-                        log.error("dcrdata utxo had wrong address %s != %s" % (utxoAddr, addr))
-                    # save a little space by deleting unneeded attributes
-                    uKey = utxoKey(utxo)
-                    if uKey not in knownUtxos:
-                        newUtxos[uKey] = utxo
-                        balance += utxo["satoshis"]
-                    else:
-                        dupes[uKey] = utxo
-                for uKey, utxo in knownUtxos.items():
-                    if uKey not in dupes:
-                        # log.error("dcrdata at %s failed to report a known utxo %s" % (dcrdata.baseUri, txid))
-                        # the transaction may have been spent by another copy of this wallet
-                        missingUtxos[uKey] = utxo
-                        knownUtxos.pop(uKey)
-                        balance -= utxo["satoshis"]
-                for uKey, utxo in missingUtxos.items():
-                    pass # should probably perform some checks here
-                for uKey, utxo in newUtxos.items():
-                    knownUtxos[uKey] = utxo
-
-                if len(knownUtxos):
-                    lastSeen = addrIdx
-                addrIdx += 1
-                if addrIdx - lastSeen > gapPolicy:
-                    break
-                if balance != startBalance:
-                    report(balance)  
-        self.balance = balance
+        script = txscript.makePayToAddrScript(changeAddress, self.chain)
+        return script, changeAddress
+    def balance(self):
+        """ Get the balance of the currently selected account """
+        return self.account(ACCT).balance
     def getUtxos(self, requested):
+        """
+        The wallet is assumed to be opened. 
+        """
         matches = []
         acct = self.openAccount
         collected = 0
-        pairs = [(u["satoshis"], u) for u in acct.utxoscan()]
+        pairs = [(u.satoshis, u) for u in acct.utxoscan()]
         for v, utxo in sorted(pairs, key=lambda p: p[0]):
-            matches.append(utxo)
+            tx, _ = self.getTx(utxo.txid)
+            if utxo.maturity and self.tip["height"] < utxo.maturity:
+                continue
+            matches.append((utxo, tx))
             collected += v
             if collected >= requested:
                 break
         return matches, collected >= requested
-    def createRawSpend(self, value, address):
-        outputs = makeOutputs((address, value), self.chain)
-        self.sendOutputs(outputs)
-    def sendOutputs(self, outputs, account=0, minconf=1):
-        tx  = self.txToOutputs("wallet.SendOutputs", outputs, account, minconf, True)
-        txHash = tx.Tx.TxHash()
-        return txHash
+    def pubsubSignal(self, sig):
+        log.debug("pubsub signal recieved: %s" % repr(sig))
+        if "done" in sig:
+            return
+        self.lock()
+        sigType = sig["event"]
+        try:
+            if sigType == "address":
+                self.addressSignal(sig)
+            elif sigType == "newblock":
+                self.blockSignal(sig)
+            elif sigType != "subscribeResp":
+                raise Exception("unknown signal")
+        except Exception as e:
+            log.error("failed to process pubsub message: %s\n%s" % (repr(e), traceback.print_tb(e.__traceback__)))
+        self.unlock()
+    def blockSignal(self, sig):
+        block = sig["message"]["block"]
+        self.tip = block
+        acct = self.account(ACCT)
+        for newTx in block["Tx"]:
+            txid = newTx["TxID"]
+            if acct.caresAboutTxid(txid):
+                tx, _ = self.getTx(txid)
+                acct.confirmTx(tx, block["height"])
+    def addressSignal(self, sig):
+        print("--processing address signal 1")
+        acct = self.account(ACCT)
+        txid = sig["message"]["transaction"]
+        tx, _ = self.getTx(txid)
+        decodedTx = self.getDecodedTx(txid)
+        block = decodedTx["block"] if "block" in decodedTx else {}
+        blockHeight = block["blockheight"] if "blockheight" in block else -1
+        blockTime = block["blocktime"] if "blocktime" in block else time.time()
+        addr = sig["message"]["address"]
+        acct.addTx(addr, txid)
+        matches = False
+        print("--processing address signal 2")
+        for txin in tx.txIn:
+            op = txin.previousOutPoint
+            match = acct.spendTxidVout(op.hashString(), op.index)
+            if match:
+                matches += 1
+        print("--processing address signal 3")
+        for vout, txout in enumerate(tx.txOut):
+            try:
+                # addrs will be Address objects. Converting to string below.
+                _, addrs, _ = txscript.extractPkScriptAddrs(0, txout.pkScript, self.chain)
+            except Exception:
+                log.debug("unsupported script %s" % txout.pkScript.hex())
+                continue
+            addrs = [a.string() for a in addrs]
+            if addr in addrs:
+                log.debug("found new utxo")
+                acct.addUTXO(UTXO(
+                    address = addr,
+                    txid = txid,
+                    vout = vout,
+                    ts = blockTime,
+                    scriptPubKey = txout.pkScript,
+                    height = blockHeight,
+                    amount = round(txout.value*1e-8),
+                    satoshis = txout.value,
+                    maturity = blockHeight + self.chain.CoinbaseMaturity if tx.looksLikeCoinbase() else None,
+                ))
+                matches += 1
+        print("--processing address signal 4")
+        if matches:
+            self.balanceSignal(acct.calcBalance(self.tip["height"]))
+        print("--done processing address signal 5")
+    def sync(self, dcrdatas, dbManager, balanceSignal):
+        """
+        Run in a QThread. Report should be a Qt signal or similar thread-safe function. 
+        """
+        self.dcrdatas = dcrdatas
+        self.dbManager = dbManager
+        self.balanceSignal = balanceSignal
+        acctManager = self.acctManager
+        acct = acctManager.account(0)
+        self.updateTip()
+        gapPolicy = 5
+        acct.generateGapAddresses(gapPolicy)
+        watchAddresses = set()
+
+        balanceSignal(acct.balance)
+        for dcrdata in dcrdatas:
+            # dTxs = dcrdata.tx.get
+            addresses = acct.allAddresses()
+            addrCount = len(addresses)
+            addrsPerRequest = 20 # dcrdata allows 25
+            for i in range(addrCount//addrsPerRequest+1):
+                start = i*addrsPerRequest
+                end = start + addrsPerRequest
+                addrs = addresses[start:end]
+                dcrdataUtxos = [UTXO.parse(u) for u in dcrdata.insight.api.addr.utxo(",".join(addrs))]
+                newUtxos = {}
+                dupes = {}
+                missingUtxos = []
+                for utxo in dcrdataUtxos:
+                    if acct.getUTXO(utxo.txid, utxo.vout):
+                        dupes[utxo.key()] = utxo
+                    else:
+                        print("--found new utxo for %s" % utxo.address)
+                        if self.processNewUTXO(utxo):
+                            newUtxos[utxo.key()] = utxo
+                for utxo in acct.utxoscan():
+                    if utxo.key() in dupes:
+                        # log.error("dcrdata at %s failed to report a known utxo %s" % (dcrdata.baseUri, txid))
+                        # the transaction may have been spent by another copy of this wallet
+                        missingUtxos.append(utxo)
+                for utxo in missingUtxos.values():
+                    # remove the UTXO
+                    acct.removeUTXO(utxo)
+                for utxo in newUtxos.values():
+                    acct.addUTXO(utxo)
+        hub = dcrdatas[0]
+        hub.emitter = self.pubsubSignal
+        hub.subscribeBlocks()
+        watchAddresses = acct.addressesOfInterest()
+        if watchAddresses:
+            hub.subscribeAddresses(watchAddresses)
+        balanceSignal(acct.calcBalance(self.tip["height"]))
+        return True
+    def updateTip(self):
+        for dcrdata in self.dcrdatas:
+            try:
+                self.tip = dcrdata.block.best()
+                return
+            except Exception as e:
+                log.error("failed to retrieve tip from dcrdata at %s: %r" % (dcrdata.baseUri, e))
+                continue
+        raise Exception("no tip data retrieved")
+    def sendToAddress(self, value, address, sender):
+        self.updateTip()
+        outputs = makeOutputs([(address, value)], self.chain)
+        return self.sendOutputs(outputs, sender)        
     def relayFee(self):
         return  DefaultRelayFeePerKb
     def txDB(self):
@@ -519,50 +535,59 @@ class Wallet:
     def headerDB(self):
         return self.dbManager.getBucket("header")
     def getTx(self, txid):
-        for dcrdata in self.dcrdatas:
-            txBucket = self.txDB()
-            hashKey = hashFromString(txid).bytes()
-            source = "database"
+        """
+        return transaction and a bool indicating whether the transaction is new to 
+        the database, or had to be imported from dcrdata
+        """
+        hashKey = hashFromString(txid).bytes()
+        with self.txDB() as txBucket:
             try:
-                encoded = txBucket[hashKey]
+                encoded = ByteArray(txBucket[hashKey])
+                return msgtx.MsgTx.deserialize(encoded), False
             except database.NoValue:
-                try:
-                    source = "dcrdata"
-                    # Grab the hex encoded transaction
-                    txHex = dcrdata.tx.hex(txid)
-                    if not txHex:
-                        raise Exception("failed to retrieve tx hex from dcrdata")
-                    encoded = ByteArray(txHex)
-                    txBucket[hashKey] = encoded.bytes()
-                except:
-                    log.warning("unable to retrieve tx data from dcrdata at %s" % dcrdata.baseUri)
-                    continue
-            msgTx = msgtx.MsgTx.decode()
-            return msgTx
-        raise Exception("failed to get transaction from %s" % source)
+                for dcrdata in self.dcrdatas:
+                    try:                            
+                        # Grab the hex encoded transaction
+                        txHex = dcrdata.tx.hex(txid)
+                        if not txHex:
+                            raise Exception("failed to retrieve tx hex from dcrdata")
+                        encoded = ByteArray(txHex)
+                        txBucket[hashKey] = encoded.bytes()
+                        return msgtx.MsgTx.deserialize(encoded), True
+                    except:
+                        log.warning("unable to retrieve tx data from dcrdata at %s" % dcrdata.baseUri)
+                        continue
+        raise Exception("failed to get transaction")
+    def getDecodedTx(self, txid):
+        """
+        return transaction and a bool indicating whether the transaction is new or not.
+        """
+        for dcrdata in self.dcrdatas:
+            return dcrdata.tx(txid)
+        raise Exception("failed to get decoded transaction")
     def getHeader(self, height):
         for dcrdata in self.dcrdatas:
-            heightMap = self.heightMap()
-            headerBucket = self.headerDB()
-            try:
-                hashKey = heightMap[height]
-                blockHash = headerBucket[hashKey]
-                return msgblock.BlockHeader.deserialize(blockHash)
-            except database.NoValue:
+            with self.heightMap() as heightMap:
+                headerBucket = self.headerDB()
                 try:
-                    hexBlock = dcrdata.block.header.raw(idx=height)
-                    blockHash = ByteArray(hexBlock)
-                    heightMap[height] = blockHash
-                    blockHeader = msgblock.BlockHeader.deserialize(blockHash)
-                    hashKey = blockHeader.blockHash()
-                    headerBucket[hashKey] = blockHash
-                    return blockHeader
-                except:
-                    # try the next dcrdata
-                    log.warning("unable to retrieve block header from dcrdata at %s" % dcrdata.baseUri)
-                    continue
+                    hashKey = heightMap[height]
+                    blockHash = headerBucket[hashKey]
+                    return msgblock.BlockHeader.deserialize(blockHash)
+                except database.NoValue:
+                    try:
+                        hexBlock = dcrdata.block.header.raw(idx=height)
+                        blockHash = ByteArray(hexBlock)
+                        heightMap[height] = blockHash
+                        blockHeader = msgblock.BlockHeader.deserialize(blockHash)
+                        hashKey = blockHeader.blockHash()
+                        headerBucket[hashKey] = blockHash
+                        return blockHeader
+                    except:
+                        # try the next dcrdata
+                        log.warning("unable to retrieve block header from dcrdata at %s" % dcrdata.baseUri)
+                        continue
         raise Exception("failed to get block header at height" % height)
-    def txToOutputs(self, outputs, account=0, minconf=1, randomizeChangeIdx=True):
+    def sendOutputs(self, outputs, sender, minconf=1, randomizeChangeIdx=True):
         """
         mostly based on:
           (dcrwallet/wallet/txauthor).NewUnsignedTransaction
@@ -570,12 +595,12 @@ class Wallet:
           (dcrwallet/wallet/txauthor).AddAllInputScripts
 
         """
-        currentTotal = 0
-        currentInputs = []
-        currentScripts = []
-        redeemScriptSizes = []
+        total = 0
+        inputs = []
+        scripts = []
+        scriptSizes = []
 
-        changeScript = self.changeScript()
+        changeScript, changeAddress = self.changeScript()
         changeScriptVersion = txscript.DefaultScriptVersion
         changeScriptSize = P2PKHPkScriptSize
 
@@ -587,56 +612,54 @@ class Wallet:
         targetFee = feeForSerializeSize(relayFeePerKb, maxSignedSize)
 
         targetAmount = sum(txo.value for txo in outputs)
+        acct = self.openAccount
 
-        while:
-            utxos, enough = self.getUtxos(targetAmount + targetFee)
+        while True:
+            txSets, enough = self.getUtxos(targetAmount + targetFee)
             if not enough:
                 raise InsufficientFundsError("insufficient funds")
-            for utxo in utxos:
-
-                txid = utxo["txid"]
-                tx = self.getTx(txid)
+            for (utxo, tx) in txSets:
                 # header = self.getHeader(utxo["height"])
-                vout = utxo["vout"]
-                txout = tx.txOut[vout]
-                # using txmined MakeIgnoredInputSource
-
-                txHash = tx.txHash()
+                txout = tx.txOut[utxo.vout]
 
                 # use this to get opcode
                 opCode = getP2PKHOpCode(txout.pkScript)
 
-                tree = wire.TxTreeRegular
-                if opCode != opNonstake:
-                    tree = wire.TxTreeStake
-                op = msgtx.Outpoint(txHash=txHash, idx=vout, tree=tree)
+                tree = wire.TxTreeRegular if opCode != opNonstake else wire.TxTreeStake
+                op = msgtx.OutPoint(
+                    txHash=tx.txHash(), 
+                    idx=utxo.vout, 
+                    tree=tree
+                )
 
                 txIn = msgtx.TxIn(previousOutPoint=op, valueIn=txout.value)
 
-                currentTotal += txout.value
-                currentInputs.append(txIn)
-                currentScripts.append(txout.pkScript)
-                redeemScriptSizes.append(len(txout.pkScript))
+                total += txout.value
+                inputs.append(txIn)
+                scripts.append(txout.pkScript)
+                scriptSizes.append(len(txout.pkScript))
 
             maxSignedSize = estimateSerializeSize(scriptSizes, outputs, changeScriptSize)
             maxRequiredFee = feeForSerializeSize(relayFeePerKb, maxSignedSize)
-            remainingAmount = currentTotal - targetAmount
+            remainingAmount = total - targetAmount
             if remainingAmount < maxRequiredFee:
                 targetFee = maxRequiredFee
                 continue
 
-            unsignedTransaction = msgTx.MsgTx(
+            newTx = msgtx.MsgTx(
                 serType =  wire.TxSerializeFull,
                 version =  generatedTxVersion,
-                txIn =     currentInputs,
+                txIn =     inputs,
                 txOut =    outputs,
                 lockTime = 0,
                 expiry =   0,
+                cachedHash = None,
             )
 
-            changeIndex = -1
-            changeAmount = currentTotal - targetAmount - maxRequiredFee
-            if changeAmount != 0 and not txrules.isDustAmount(changeAmount, changeScriptSize, relayFeePerKb):
+            change = None
+            changeVout = -1
+            changeAmount = round(total - targetAmount - maxRequiredFee)
+            if changeAmount != 0 and not isDustAmount(changeAmount, changeScriptSize, relayFeePerKb):
                 if len(changeScript) > txscript.MaxScriptElementSize:
                     raise Exception("script size exceed maximum bytes pushable to the stack")
                 change = msgtx.TxOut(
@@ -644,93 +667,56 @@ class Wallet:
                     version =  changeScriptVersion,
                     pkScript = changeScript,
                 )
-                l = len(outputs)
-                unsignedTransaction.txOut.append(change)
-                changeIndex = l
+                changeVout = len(newTx.txOut)
+                newTx.txOut.append(change)
             else:
-                maxSignedSize = estimateSerializeSize(scriptSizes, unsignedTransaction.txOut, 0)
-            
-            authoredTransaction = {
-                "tx":                           unsignedTransaction,
-                "prevScripts":                  currentScripts,
-                "totalInput":                   currentTotal,
-                "changeIndex":                  changeIndex,
-                "estimatedSignedSerializeSize": maxSignedSize,
-            }
+                maxSignedSize = estimateSerializeSize(scriptSizes, newTx.txOut, 0)
 
             # dcrwallet conditionally randomizes the change position here
-
-            inputs = unsignedTransaction.TxIn
-            chainParams = self.chain
-
-            if len(inputs) != len(currentScripts):
+            if len(newTx.txIn) != len(scripts):
                 raise Exception("tx.TxIn and prevPkScripts slices must have equal length")
 
-            for i, txin in enumerate(inputs):
-                pkScript = currentScrips[i]
-                sigScript = txin.SignatureScript
-                script = self.signTxOutput(chainParams, tx, i, pkScript, txscript.SigHashAll, secrets, secrets, sigScript, dcrec.STEcdsaSecp256k1)
-                txin.SignatureScript = script
+            # Sign the inputs
+            for i, txin in enumerate(newTx.txIn):
+                pkScript = scripts[i]
+                sigScript = txin.signatureScript
+                scriptClass, addrs, numAddrs = txscript.extractPkScriptAddrs(0, pkScript, self.chain)
+                print("--addrs: %s" % repr(addrs))
+                privKey = acct.getPrivKeyForAddress(addrs[0].string())
+                #                              privKey, chainParams, tx, idx, pkScript, hashType, previousScript, sigType
+                script = txscript.signTxOutput(privKey, self.chain, newTx, i, pkScript, txscript.SigHashAll, sigScript, crypto.STEcdsaSecp256k1)
+                txin.signatureScript = script
 
-    def signTxOutput(self, tx, idx, pkScript, hashType, kdb, sdb, previousScript, sigType):
-        """
-        SignTxOutput signs output idx of the given tx to resolve the script given in
-        pkScript with a signature type of hashType. Any keys required will be
-        looked up by calling getKey() with the string of the given address.
-        Any pay-to-script-hash signatures will be similarly looked up by calling
-        getScript. If previousScript is provided then the results in previousScript
-        will be merged in a type-dependent manner with the newly generated.
-        signature script.
-                
-        NOTE: This function is only valid for version 0 scripts.  Since the function
-        does not accept a script version, the results are undefined for other script
-        versions.
-        """
-        sigScript, class, addresses, nrequired, err := sign(chainParams, tx,
-            idx, pkScript, hashType, kdb, sdb, sigType)
-        if err != nil {
-            return nil, err
-        }
+                print("--sigScript: %s" % script.hex())
+                print("--pkScript: %s" % pkScript.hex())
 
-        isStakeType := class == StakeSubmissionTy ||
-            class == StakeSubChangeTy ||
-            class == StakeGenTy ||
-            class == StakeRevocationTy
-        if isStakeType {
-            class, err = GetStakeOutSubclass(pkScript)
-            if err != nil {
-                return nil, fmt.Errorf("unknown stake output subclass encountered")
-            }
-        }
+            try:
+                sender(newTx.txHex())
+                acct.addMempoolTx(tx)
+                acct.spendUTXOs([u for u, _ in txSets])
+                if change:
+                    acct.addUTXO(UTXO(
+                        address = changeAddress,
+                        txid = newTx.txid(),
+                        vout = changeVout,
+                        ts = time.time(),
+                        scriptPubKey = changeScript,
+                        amount = changeAmount*1e-8,
+                        satoshis = changeAmount,
+                    ))
+                self.balanceSignal(acct.calcBalance(self.tip["height"]))
+                return newTx
+            except Exception as e:
+                log.error("failed to send transaction: %s\n%s" % (repr(e), traceback.print_tb(e.__traceback__)))
+            return False
+            
 
-        if class == ScriptHashTy {
-            // TODO keep the sub addressed and pass down to merge.
-            realSigScript, _, _, _, err := sign(chainParams, tx, idx,
-                sigScript, hashType, kdb, sdb, sigType)
-            if err != nil {
-                return nil, err
-            }
-
-            // Append the p2sh script as the last push in the script.
-            builder := NewScriptBuilder()
-            builder.AddOps(realSigScript)
-            builder.AddData(sigScript)
-
-            sigScript, _ = builder.Script()
-            // TODO keep a copy of the script for merging.
-        }
-
-        // Merge scripts. with any previous data, if any.
-        mergedScript := mergeScripts(chainParams, tx, idx, pkScript, class,
-            addresses, nrequired, sigScript, previousScript)
-        return mergedScript, nil
-    }
-
-
-signTxOutput
-
-
-
+        return False
 
 
 json.register(Wallet)
+
+
+class TestWallet(unittest.TestCase):
+    def test_tx_to_outputs(self):
+        pass

@@ -4,16 +4,24 @@ DcrDataClient.endpointList() for available enpoints.
 Arguments can be positional or keyword, not both.
 """
 import urllib.request as urlrequest
-from urllib.parse import urlencode
+from urllib.parse import urlparse
 import traceback
-from tinydecred.pydecred import dcrjson
+from tinydecred.pydecred import dcrjson, helpers
 import time
 import calendar
 import unittest
+import threading
+# pip install websocket_client
+import websocket
+import ssl
+import sys
+import select
+import atexit
+
+log = helpers.getLogger("DCRDATA")
 
 VERSION = "0.0.1"
 HEADERS = {"User-Agent": "PyDcrData/%s" % VERSION}
-
 
 def getUri(uri):
     return performRequest(uri)
@@ -26,12 +34,11 @@ def performRequest(uri, post=None):
         headers = HEADERS
         if post:
             encoded = dcrjson.dump(post).encode("utf-8")
-            print("--encoded: %r" % encoded)
             req = urlrequest.Request(uri, data=encoded)
             req.add_header("User-Agent", "PyDcrData/%s" % VERSION)
             req.add_header("Content-Type", "application/json; charset=utf-8")
         else:
-            req = req = urlrequest.Request(uri, headers=headers, method="POST" if post else "GET", data=post)
+            req = urlrequest.Request(uri, headers=headers, method="GET")
         raw = urlrequest.urlopen(req).read().decode()
         try:
             return dcrjson.load(raw)
@@ -95,6 +102,13 @@ class DcrDataPath:
     def post(self, data):
         return postData(self.getCallsignPath(), data)
 
+def getSocketURIs(uri):
+    uri = urlparse(uri)
+    prot = "wss" if uri.scheme == "https" else "ws"
+    fmt = "{}://{}/{}"
+    ws = fmt.format(prot, uri.netloc, "ws")
+    ps = fmt.format(prot, uri.netloc, "ps")
+    return ws, ps
 
 class DcrDataClient:
     """
@@ -103,12 +117,18 @@ class DcrDataClient:
     """
     timeFmt = "%Y-%m-%d %H:%M:%S"
 
-    def __init__(self, baseUri, customPaths=None):
+    def __init__(self, baseURI, customPaths=None, emitter=None):
         """
         Build the DcrDataPath tree. 
         """
-        self.baseUri = baseUri.rstrip('/').rstrip("/api")
-        self.baseApi = self.baseUri + "/api"
+        self.baseURI = baseURI.rstrip('/').rstrip("/api")
+        self.baseApi = self.baseURI + "/api"
+        self.wsURI, self.psURI = getSocketURIs(self.baseURI)
+        self.ws = None
+        self.ps = None
+        self.subscribedAddresses = []
+        self.emitter = emitter
+        atexit.register(self.close)
         root = self.root = DcrDataPath()
         self.listEntries = []
         customPaths = customPaths if customPaths else []
@@ -126,7 +146,7 @@ class DcrDataClient:
             if path in pathlog or path == "":
                 continue
             pathlog.append(path)
-            baseUri = self.baseUri if "insight" in path else self.baseApi
+            baseURI = self.baseURI if "insight" in path else self.baseApi
             params = []
             pathSequence = []
             templateParts = []
@@ -142,29 +162,202 @@ class DcrDataClient:
             pathPointer = root
             for pathPart in pathSequence:
                 pathPointer = pathPointer.getSubpath(pathPart)
-            pathPointer.addCallsign(params, "/".join([self.baseUri] + templateParts))
+            pathPointer.addCallsign(params, "/".join([baseURI] + templateParts))
             if len(pathSequence) == 1:
                 continue
-            self.listEntries.append(("%s.get(%s)" % (".".join(pathSequence), ", ".join(params)), path))
+            self.listEntries.append(("%s(%s)" % (".".join(pathSequence), ", ".join(params)), path))
 
     def __getattr__(self, key):
         return getattr(self.root, key)
-
+    def close(self):
+        if self.ws:
+            self.ws.close()
+        if self.ps:
+            self.ps.close()
     def endpointList(self):
         return [entry[1] for entry in self.listEntries]
-
     def endpointGuide(self):
         """
         Print on endpoint per line. 
         Each line shows a translation from Python notation to a URL.
         """
         print("\n".join(["%s  ->  %s" % entry for entry in self.listEntries]))
+    def checkEmitter(self, emitter):
+        if emitter is None:
+            if self.emitter is None:
+                raise Exception("no emitter set")
+        else:
+            self.emitter = emitter
+    def psClient(self):
+        if self.ps is None:
+            self.ps = WebsocketClient(self.psURI, emitter=self.emitter, exitObject={"done": "done"})
+            self.ps.activate()
+        return self.ps
+
+    def subscribeAddresses(self, addrs, emitter=None):
+        """
+        addrs: list(str) or str
+            A base58 encoded address or list of addresses to subscribe to
+        """
+        self.checkEmitter(emitter)
+        if isinstance(addrs, str):
+            addrs = [addrs]
+        ps = self.psClient()
+        subscribed = self.subscribedAddresses
+        for a in addrs:
+            if a in subscribed:
+                continue
+            subscribed.append(a)
+            ps.send(Sub.address(a))
+    def subscribeBlocks(self, emitter=None):
+        self.checkEmitter(emitter)
+        ps = self.psClient()
+        ps.send(Sub.newblock)
     @staticmethod
     def timeStringToUnix(fmtStr):
         return calendar.timegm(time.strptime(fmtStr, DcrDataClient.timeFmt))
     @staticmethod
     def RFC3339toUnix(fmtStr):
         return calendar.timegm(time.strptime(fmtStr, "%Y-%m-%dT%H:%M:%SZ"))
+
+
+_subcounter = 0
+
+def makeSubscription(eventID):
+    global _subcounter
+    _subcounter += 1
+    return {
+      "event": "subscribe",
+      "message": {
+        "request_id": _subcounter,
+        "message": eventID,
+      }
+    }
+
+class Sub:
+    newblock = makeSubscription("newblock")
+    mempool = makeSubscription("mempool")
+    ping = makeSubscription("ping")
+    newtxs = makeSubscription("newtxs")
+    blockchainSync = makeSubscription("blockchainSync")
+    def address(addr):
+        global _subcounter
+        _subcounter += 1
+        return {
+          "event": "subscribe",
+          "message": {
+            "request_id": _subcounter,
+            "message": "address:%s" % addr,
+          }
+        }
+
+class WebsocketClient:
+    """
+    A WebSocket client.
+    """
+    def __init__(self, path, emitter=None, exitObject=None, decoder=None, encoder=None):
+        """
+        See python `socketserver documentation  <https://docs.python.org/3/library/socketserver.html/>`_. for inherited attributes and methods.
+        
+        Parameters
+        ----------
+        path: string
+            URI for the websocket connection
+        decoder: func(str), default dcrjson.load
+            A function for processing the string from the server
+
+        """
+        self.path = path
+        self.emitter = emitter
+        self.exitObject = exitObject
+        self.killerBool = False
+        self.earThread = None
+        self.handlinBidness = False
+        self.socket = None
+        self.decoder = decoder if decoder else dcrjson.load
+        self.encoder = encoder if encoder else dcrjson.dump
+    def activate(self):
+        """
+        Start the server and begin parsing messages
+        Returns
+        -------
+        True on success. On failure, StrataMinerServer::errMsg is set, and False is returned
+        """
+        self.socket = websocket.WebSocket(sslopt={"cert_reqs": ssl.CERT_NONE})
+        self.socket.connect(self.path)
+        self.earThread = threading.Thread(target=self.listenLoop)
+        self.earThread.start()
+        if not self.earThread.is_alive():
+            self.errMsg = "Failed to create a server thread"
+            return False
+        self.errMsg = ""
+        return True
+    def listenLoop(self):
+        """
+        This will listen on the socket, with appropriate looping impelemented with select.select
+        """
+        stringBuffer = ""
+        self.handlinBidness = True
+        decoder = self.decoder
+        while True:
+            if self.killerBool:
+                break
+            while True:
+                if self.killerBool:
+                    break
+                try:
+                    status = select.select([self.socket], [], [], 1)
+                    sys.stdout.flush()
+                except OSError as e:
+                    if(e.errno == 9):
+                        #OSError: [Errno 9] Bad file descriptor
+                        pass # probably client closed socket
+                    break
+                if status[0]:
+                    try:
+                        stringBuffer += self.socket.recv()
+                    except ConnectionResetError:
+                        break  # ConnectionResetError: [Errno 104] Connection reset by peer
+                    except UnicodeDecodeError as e:
+                        log.error("Error decoding message from client. Msg: '%s', Error:  %s \n %s" % (stringBuffer, repr(e), traceback.print_tb(e.__traceback__)))
+                        continue
+                    except websocket._exceptions.WebSocketConnectionClosedException:
+                        # Connection has been closed
+                        break
+                    except OSError as e:
+                        if(e.errno == 9):
+                            #OSError: [Errno 9] Bad file descriptor
+                            pass # socket was closed 
+                        break
+                    if stringBuffer == "": # server probably closed socket
+                        break
+                    else:
+                        try:
+                            job = decoder(stringBuffer)
+                            self.emitter(job)
+                            stringBuffer = ""
+                            continue
+                        except Exception as e:
+                            log.Error("error loading message: %s \n %s" % (repr(e), traceback.print_tb(e.__traceback__)))
+                            continue
+        if self.exitObject:
+            self.emitter(self.exitObject)
+        self.handlinBidness = False
+    def send(self, msg): 
+        if not self.socket:
+            log.error("no socket")
+            return          
+        try: 
+            self.socket.send(self.encoder(msg))
+        except Exception as e:
+            log.error("Error while sending websocket message: %s \n %s" % (repr(e), traceback.print_tb(e.__traceback__)))
+    def close(self):
+        """
+        Attempts to shutdown the server gracefully. Equivalent to setting StrataMinerServer::killerBool = True
+        """
+        self.killerBool = True
+        if self.socket:
+            self.socket.close()
 
 
 class DcrDataException(Exception):
@@ -185,3 +378,27 @@ class TestDcrData(unittest.TestCase):
             "rawtx": tx,
         })
         print(repr(r))
+    def test_get(self):
+        dcrdata = DcrDataClient("http://localhost:7777", customPaths={
+            "/tx/send",
+            "/insight/api/addr/{address}/utxo",
+            "insight/api/tx/send"
+        })
+        # print(dcrdata.endpointGuide())
+
+        tx = dcrdata.tx.hex("796a0288a5560400cce55e87b8ccd95ba256a2c509a08f1be8d3198f873f5a2d")
+    def test_websocket(self):
+        """
+        "newblock":       SigNewBlock,
+        "mempool":        SigMempoolUpdate,
+        "ping":           SigPingAndUserCount,
+        "newtxs":         SigNewTxs,
+        "address":        SigAddressTx,
+        "blockchainSync": SigSyncStatus,
+        """
+        client = DcrDataClient("http://localhost:7777")
+        def emitter(o):
+            print("msg: %s" % repr(o))
+        client.subscribeAddresses("SsUYTr1PBd2JMbaUfiRqxUoRcYHj1a1DKY9", emitter=emitter)
+        time.sleep(60*1) # 1 minute
+
