@@ -1,8 +1,12 @@
-from tinydecred.pydecred import helpers
+"""
+Copyright (c) 2019, Brian Stafford
+See LICENSE for details
+"""
 import sqlite3
 import unittest
 import os
 import atexit
+from tinydecred.util import helpers
 
 class NoValue(Exception):
 	pass
@@ -166,7 +170,7 @@ class TestDB(unittest.TestCase):
 				for k, v in td:
 					db[k] = v
 				elapsed = (time.time() - start) * 1000
-				print(f"{elapsed} ms to insert {num} values")
+				print("{} ms to insert {} values".format(num, elapsed))
 				self.assertRaises(NoValue, lambda: db["nonsense"])
 	
 

@@ -1,112 +1,39 @@
-from pydecred import helpers
-from PyQt5 import QtCore, QtWidgets, QtGui
-import time
-import traceback
-import queue
-import re
+"""
+Copyright (c) 2019, Brian Stafford
+See LICENSE for detail
 
+PyQt5 utilities.
+"""
+import re
+from tinydecred.util import helpers
+from PyQt5 import QtCore, QtWidgets, QtGui
+
+# Some colors,
 QT_WHITE = QtGui.QColor("white")
 WHITE_PALETTE = QtGui.QPalette(QT_WHITE)
+
+# Alignments,
 ALIGN_LEFT = QtCore.Qt.AlignLeft
 ALIGN_CENTER = QtCore.Qt.AlignCenter
 ALIGN_RIGHT = QtCore.Qt.AlignRight
 ALIGN_TOP = QtCore.Qt.AlignTop
 ALIGN_BOTTOM = QtCore.Qt.AlignBottom
 
+# Layout directions.
 HORIZONTAL = "horizontal"
 VERTICAL = "vertical"
 GRID = "grid"
 
+# Themes.
 LIGHT_THEME = "light"
 DARK_THEME = "dark"
 
-logger = helpers.ConsoleLogger
-
-
 class ThreadUtilities:
     """
-    Some common utitlities that might be used by a manager
-    Designed for multiple inheritance scheme
+    Utilities for management of SmartThread objects.
     """
-    threadSafeFunctionSignal = QtCore.pyqtSignal(str, tuple, dict)
-
     def __init__(self):
         self.threads = []
-        self.registeredFuncs = {}
-        self.scheduledFuncs = {}
-        self.qLoopThread = None
-        self.qRunning = False
-        self.qKilla = False
-        self.inQ = queue.Queue()
-        self.scheduleTimer = makeTimer(self.scheduledFunctionTick)
-
-        self.threadSafeReturnValues = {}
-        self.threadSafeFunctionSignal.connect(self.runRegisteredFunction)
-
-        # You can use this technique to enforce thread safety in a function
-        self.scheduleFunction = self.makeThreadSafeVersion(self._scheduleFunction)
-
-    def cleanUp(self):
-        """
-        Perform maintenance for shutdown
-        """
-        self.qKilla = True
-
-
-        print("-- cleanUp called")
-
-
-        self.scheduleTimer.stop()
-
-    def registerFunction(self, functionKey, func):
-        """
-        Registers a function in the registeredFuncs dictionary. 
-        Used extensively in the queue loop, where the function should be thread safe, such as a pyqtsignal::emit
-        """
-        self.registeredFuncs[functionKey] = func
-
-    def qEncode(self, func, *args, **kwargs):
-        """
-        Encodes a dictionary to submit the given args and kwargs to a queue.queue
-        """
-        return (func, args, kwargs)
-
-    def startQLoop(self):
-        """
-        If the qLoop is not running, start it
-        """
-        if not self.qRunning:
-            self.qThread = self.makeThread(self.qLoop, lambda *a: None)
-
-    def qLoop(self):
-        """
-        Process items in the `managerQ` until its empty. 
-        Probably triggered as a callback from an API call, although certainly not limited to that purpose.
-
-        :param res: Result of the call to the API
-        :type res: True or StrataError
-        """
-        self.qRunning = True
-        try:
-            while True:
-                if self.qKilla:
-                    break
-                try:
-                    func, args, kwargs = self.inQ.get(True, 1) # Wait for up to 1 second
-                    func(*args, **kwargs)
-                    # self.registeredFuncs[item["function.key"]](*item["args"], **item["kwargs"])
-                except queue.Empty :
-                    continue
-                except (TypeError, ValueError) as e:
-                    if hasattr(self, logger):
-                        self.logger.warning("Error encountered while checking Q: %s \n %s" % (repr(e), traceback.print_tb(e.__traceback__)))
-        except Exception as e:
-            self.qRunning = False
-            if hasattr(self, logger):
-                self.logger.error("Error encountered in qLoop: %s\n%s" % (repr(e), traceback.print_tb(e.__traceback__)))
-            return False
-        self.qRunning = False
-
     def makeThread(self, func, callback=None, *args, **kwargs):
         """
         Create and start a `SmartThread`. 
@@ -128,86 +55,22 @@ class ThreadUtilities:
         self.threads.append(thread)
         return thread
 
-    def runRegisteredFunction(self, functionKey, args, kwargs):
-        """
-        Used just for thread safe passing of parameters via pyqtsignal, although not limited to that purpose
-        """
-        self.threadSafeReturnValues[functionKey] = self.registeredFuncs[functionKey](*args, **kwargs)
-
-    def runThreadSafe(self, function, *args, **kwargs):
-        """
-        Run a function threadSAfe
-        """
-        functionKey = function.__name__
-        self.registeredFuncs[functionKey] = function
-        self.threadSafeFunctionSignal.emit(functionKey, args, kwargs)
-
-    def makeThreadSafeVersion(self, function):
-        """
-        Return a thread-safe version of a function, using self.threadSafeFunctionSignal.emit
-        """
-        functionKey = "%s.%i" % (function.__name__, id(function))
-        self.registerFunction(functionKey, function)
-        return lambda *a, fk=functionKey, **k: self.threadSafeFunctionSignal.emit(fk, a, k)
-
-    def _scheduleFunction(self, functionKey, function, expiration, *args, repeatEvery=None, noForce=False, **kwargs):
-        """
-        expiration should be a timestamp in the future, not the amount of time from now.
-        """
-        if noForce and functionKey in self.scheduledFuncs:
-            return True
-        expiration = expiration*1000.
-        if repeatEvery:
-            repeatEvery = repeatEvery*1000
-        self.scheduledFuncs[functionKey] = {
-            "function": function,
-            "args": args,
-            "kwargs": kwargs,
-            "repeat.every": repeatEvery,
-            "expiration": expiration
-        }
-        tDelta = expiration - time.time()*1000
-        if self.scheduleTimer.isActive() and self.scheduleTimer.remainingTime() < tDelta:
-            return True
-        self.scheduleTimer.start(tDelta if tDelta > 0 else 1)
-        return True
-
-    def cancelFunction(self, functionKey):
-        """
-        Cancel the function of the given key if it exists
-        Will not complain if it does not
-        """
-        self.scheduledFuncs.pop(functionKey, None)
-
-    def scheduledFunctionTick(self):
-        """
-        Check all the functions in the dict and run any that are ready
-        """
-        remainingTime = 1e6  # 100 seconds if not told otherwise
-        tNow = time.time()*1000
-        for functionKey, funcObj in list(self.scheduledFuncs.items()):
-            expiration = funcObj["expiration"]
-            tDelta = expiration - tNow
-            if tDelta <= 0:
-                if funcObj["repeat.every"]:
-                    if funcObj["repeat.every"] < remainingTime:
-                        remainingTime = funcObj["repeat.every"]
-                    funcObj["expiration"] = tNow + funcObj["repeat.every"]
-                else:
-                    self.scheduledFuncs.pop(functionKey)
-                funcObj["function"](*funcObj["args"], **funcObj["kwargs"])
-        for k, funcObj in self.scheduledFuncs.items():
-            expiration = funcObj["expiration"]
-            tDelta = expiration - tNow
-            if tDelta <= remainingTime:
-                remainingTime = tDelta
-        self.scheduleTimer.stop()
-        self.scheduleTimer.start(max(0, remainingTime))
-
-
 class SmartThread(QtCore.QThread):
+    """
+    SmartThread is a QThread extension. It adds little, but offers an
+    alternative interface for creating the thread and callback handling.
+    """
     def __init__(self, func, callback, *args, qtConnectType=QtCore.Qt.AutoConnection, **kwargs):
-        super(SmartThread, self).__init__()
+        """
+        Args:
+            func (function): The function to run in a separate thread.
+            callback (function): A function to receive the return value from 
+            `func`. 
+            *args: optional positional arguements to pass to `func`.
+            qtConnectType: Signal synchronisity. 
+            **kwargs: optional keyword arguments to pass to `func`.
+        """
+        super().__init__()
         self.func = func
         self.args = args
         self.kwargs = kwargs
@@ -216,14 +79,24 @@ class SmartThread(QtCore.QThread):
         self.finished.connect(lambda: self.callitback(), type=qtConnectType)
 
     def run(self):
+        """
+        QThread method. Runs the func.
+        """
         self.returns = self.func(*self.args, **self.kwargs)
 
     def callitback(self):
+        """
+        QThread Slot connected to the connect Signal. Send the value returned 
+        from `func` to the callback function.
+        """
         print("--SmartThread finishing with %s" % self.callback.__name__)
         self.callback(self.returns)
 
 
 class QConsole(QtWidgets.QPlainTextEdit):
+    """
+    A widget for displaying console-style monospace output on a dark background.
+    """
     def __init__(self, parent, *args, **kwargs):
         super(QConsole, self).__init__(parent)
         self.setStyleSheet("")
@@ -239,7 +112,7 @@ class QConsole(QtWidgets.QPlainTextEdit):
         self.consoleBar.sliderReleased.connect(lambda: self.consoleScrollAction("mouse.release"))
         self.consoleBar.valueChanged.connect(lambda v: self.consoleScrollAction("value.changed", v))
         f = self.font()
-        f.setFamily("Roboto Mono")
+        f.setFamily("RobotoMono-Regular")
         self.setFont(f)
         if "palette" in kwargs:
             self.setPalette(kwargs["palette"])
@@ -334,7 +207,7 @@ class QToggle(QtWidgets.QAbstractButton):
 
     def paintEvent(self, e):
         """
-
+        QAbstractButton method. Paint the button.
         """
         painter = QtGui.QPainter(self)
         painter.setPen(QtCore.Qt.NoPen)
@@ -356,7 +229,7 @@ class QToggle(QtWidgets.QAbstractButton):
 
     def mouseReleaseEvent(self, e):
         """
-    
+        Toggle the button.
         """
         if e.button() == QtCore.Qt.LeftButton:
             self.state = False if self.state else True
@@ -379,7 +252,7 @@ class QToggle(QtWidgets.QAbstractButton):
 
     def sizeHint(self):
         """
-    
+        Required to be implemented and return the size of the widget.
         """
         return QtCore.QSize(2 * (self.slotHeight + self.slotMargin), self.slotHeight + 2 * self.slotMargin)
 
@@ -400,7 +273,7 @@ class QToggle(QtWidgets.QAbstractButton):
 
     def setToggle(self, toggle):
         """
-        set ``switch`` to ``toggle``, and update
+        Set `switch` to `toggle`, and trigger repaint.
         """
         self.switch = toggle
         if self.linkedSetting and self.linkedDict:
@@ -413,28 +286,17 @@ class QToggle(QtWidgets.QAbstractButton):
             self.xPos = self.slotHeight/2
         self.update()
 
-
-def qLabeledToggle(label, parent, *args, **kwargs):
-    wgt, lyt = makeWidget(QtWidgets.QWidget, "vertical", parent)
-    toggle = QToggle(parent, *args, **kwargs)
-    lyt.addWidget(QtWidgets.QLabel(label, wgt))
-    lyt.addWidget(toggle)
-    return wgt, toggle
-
-def makeTimer(callback):
-    timer = QtCore.QTimer()
-    timer.setTimerType(QtCore.Qt.PreciseTimer)
-    timer.timeout.connect(callback)
-    return timer
-
-
 def makeWidget(widgetClass, layoutDirection="vertical", parent=None):
     """
-    The simply returns a tuple of (widget, layout), with layout of type specified with layout direction.
-    layout's parent will be widget. layout's alignment is set to top-left, and margins are set to 0 on both layout and widget
+    The creates a tuple of (widget, layout), with layout of type specified with 
+    layout direction.
+    layout's parent will be widget. layout's alignment is set to top-left, and 
+    margins are set to 0 on both layout and widget
     
-    :param QtWidgets.QAbstractWidget widgetClass: The type of widget to make.
-    :param str layoutDirection : optional. default "vertical". One of ("vertical","horizontal","grid"). Determines the type of layout applied to the widget 
+    widgetClass (QtWidgets.QAbstractWidget:) The type of widget to make.
+    layoutDirection (str): optional. default "vertical". One of 
+        ("vertical","horizontal","grid"). Determines the type of layout applied 
+        to the widget.
     """
     widget = widgetClass(parent)
     widget.setContentsMargins(0, 0, 0, 0)
@@ -466,42 +328,35 @@ def addHoverColor(widget, color):
 
 
 def setBackgroundColor(widget, color):
+    """
+    Setting a background color with a stylesheet can get messy. Use the palette
+    when possible.
+    """
     widget.setAutoFillBackground(True)
     p = widget.palette()
     p.setColor(QtGui.QPalette.Window, QtGui.QColor(color))
     widget.setPalette(p)
 
-
-def horizontalRule(l=0, t=0, r=0, b=0, color="#aaaaaa", height=2, parent=None):
+def makeLabel(s, fontSize, a=ALIGN_CENTER, **k):
     """
-    Create a horizontal rule with the margins and color
+    Create a QLabel and set the font size and alignment.
 
-    :param int l: Left margin
-    :param int t: Top margin
-    :param int r: Right margin
-    :param int b: Bottom margin
-    :param string color: Hex color, with the hash
+    Args:
+        s (str): The label text.
+        fontSize (int): Pixel size of the label font.
+        a (Qt.QAlignment): The text alignment in the label. 
+            default QtCore.Qt.AlignCenter
+        **k: Additional keyword arguments to pass to setProperties.
     """
-    wdgt, lyt = makeWidget(QtWidgets.QWidget, "vertical", parent=parent)
-    wdgt.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Maximum)
-    wdgt.setContentsMargins(l, t, r, b)
-    #wdgt.setFixedHeight(t+b+height)
-    line = QtWidgets.QFrame()
-    line.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Maximum)
-    line.setFixedHeight(height)
-    line.setStyleSheet("background-color:%s;" % color)
-    line.setContentsMargins(0, 0, 0, 0)
-    lyt.addWidget(line, 1)
-    return wdgt
-
-
-def makeLabel(s, y, a=ALIGN_CENTER, **k):
     lbl = QtWidgets.QLabel(s)
-    setProperties(lbl, fontSize=y, **k)
+    setProperties(lbl, fontSize=fontSize, **k)
     lbl.setAlignment(a)
     return lbl
 
 def setProperties(lbl, color=None, fontSize=None, fontFamily=None):
+    """
+    A few common properties of QLabels. 
+    """
     if color:
         palette =  lbl.palette()
         c = QtGui.QColor(color)
@@ -527,6 +382,9 @@ def pad(wgt, t, r, b, l):
 
 
 class QSimpleTable(QtWidgets.QTableWidget):
+    """
+    QSimpleTable is a simple table layout with reasonable default settings. 
+    """
     def __init__(self, parent, *args, iconStacking=None, singleHeader=False, fontWeight=None, maxHeight=None, **kwargs):
         super(QSimpleTable, self).__init__(parent)
         self.singleHeader = singleHeader
@@ -579,7 +437,9 @@ class QSimpleTable(QtWidgets.QTableWidget):
             self.setItem(0, i, item)
 
     def clearTable(self, fromRow=None, resize=True):
-        """ Clear all but the header row"""
+        """
+        Clear all but the header row.
+        """
         startRow = self.offset
         if fromRow:
             fromRow += self.offset # To account for the headers
@@ -652,8 +512,9 @@ def clearLayout(layout, delete=False):
     """
     Clears all items from the given layout. Optionally deletes the parent widget
 
-    :param QAbstractLayout layout: Layout to clear
-    :param bool delete: Default False. Whether or not to delete the widget as well
+    Args:
+        layout (QAbstractLayout): Layout to clear
+        delete (bool): Default False. Whether or not to delete the widget as well
     """
     for i in reversed(range(layout.count())): 
         widget = layout.itemAt(i).widget()
@@ -665,9 +526,10 @@ def clearLayout(layout, delete=False):
 def layoutWidgets(layout):
     """
     generator to iterate the widgets in a layout
-
-    :param QAbstractLayout layout: Layout to clear
-    :param bool delete: Default False. Whether or not to delete the widget as well
+    
+    Args:
+        layout (QAbstractLayout): Layout to clear
+        delete (bool): Default False. Whether or not to delete the widget as well.
     """
     for i in range(layout.count()): 
         yield layout.itemAt(i).widget()

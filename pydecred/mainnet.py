@@ -1,5 +1,9 @@
 """
-Mainnet holds mainnet parameters. Any values should mirror exactly
+Copyright (c) 2019, Brian Stafford
+Copyright (c) 2019, The Decred developers
+See LICENSE for details
+
+mainnet holds mainnet parameters. Any values should mirror exactly
 https://github.com/decred/dcrd/blob/master/chaincfg/mainnetparams.go
 """
 import tinydecred.pydecred.constants as C

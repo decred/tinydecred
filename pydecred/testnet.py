@@ -1,5 +1,11 @@
-import tinydecred.pydecred.constants as C
+"""
+Copyright (c) 2019, Brian Stafford
+Copyright (c) 2019, The Decred developers
+See LICENSE for details
 
+testnet holds testnet3 parameters. Any values should mirror exactly
+https://github.com/decred/dcrd/blob/master/chaincfg/testnetparams.go
+"""
 Name = "testnet3"
 DefaultPort = "19108"
 DNSSeeds = [
@@ -12,15 +18,15 @@ GenesisHash = "a649dce53918caf422e9c711c858837e08d626ecfcd198969b24f7b634a49bac"
 PowLimit = 2^232 - 1
 PowLimitBits = 0x1e00ffff
 ReduceMinDifficulty = True
-MinDiffReductionTime = C.MINUTE * 10 # ~99.3% chance to be mined before reduction
+MinDiffReductionTime = 60 * 10 # ~99.3% chance to be mined before reduction
 GenerateSupported = True
 MaximumBlockSizes = [1310720]
 MaxTxSize = 1000000
-TargetTimePerBlock = C.MINUTE * 2
+TargetTimePerBlock = 60 * 2
 WorkDiffAlpha = 1
 WorkDiffWindowSize = 144
 WorkDiffWindows = 20
-TargetTimespan = C.MINUTE * 2 * 144 # TimePerBlock * WindowSize
+TargetTimespan = 60 * 2 * 144 # TimePerBlock * WindowSize
 RetargetAdjustmentFactor = 4
 
 # Subsidy parameters.

@@ -1,3 +1,7 @@
+"""
+Copyright (c) 2019, Brian Stafford
+See LICENSE for details
+"""
 import json
 
 JSONDecodeError = json.JSONDecodeError
@@ -5,26 +9,30 @@ JSONDecodeError = json.JSONDecodeError
 _types = {}
 
 def clsKey(cls):
-    return cls.__module__ + '.' + cls.__qualname__
+    return cls.__qualname__
 
 def register(cls):
     """
     Registered types will be checked for compliance with the JSONMarshaller. 
     When an object of a registered type is dump'ed, it's __tojson__ method 
     will be called to retreive the JSON-compliant dict. A special attribute
-    __jsontype__ is quietly added during encoding. When that JSON object
-    is decoded with load
+    _jt_ is quietly added during encoding. When that JSON object
+    is decoded with load, the type is converted using the static __fromjson__
+    method.
     """
     if not hasattr(cls, "__fromjson__") or not hasattr(cls, "__tojson__"):
         raise KeyError("register: registered types must have a __fromjson__ method")
-    _types[clsKey(cls)] = cls
+    k = clsKey(cls)
+    if k in _types:
+        raise Exception("tinyjson: mutliple attempts to register class %s" % k)
+    _types[k] = cls
 
 def decoder(obj):
-    if "__jsontype__" in obj:
+    if "_jt_" in obj:
         for k in obj.keys():
             if isinstance(obj[k], dict):
                 obj[k] = decoder(obj[k])
-        return _types[obj["__jsontype__"]].__fromjson__(obj)
+        return _types[obj["_jt_"]].__fromjson__(obj)
     return obj
 
 def load(s):
@@ -54,7 +62,7 @@ class Encoder(json.JSONEncoder):
         ck = clsKey(obj.__class__)
         if ck in _types:
             encoded = obj.__tojson__()
-            encoded["__jsontype__"] = ck
+            encoded["_jt_"] = ck
             return encoded
         # Let the base class default method raise the TypeError
         return json.JSONEncoder.default(self, obj)

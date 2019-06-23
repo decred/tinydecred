@@ -1,8 +1,12 @@
-# A few useful constants.
+"""
+Copyright (c) 2019, Brian Stafford
+See LICENSE for details
+
+Just some constants.
+"""
 import os
 
 PYDECRED_PACKAGEDIR =  os.path.dirname(os.path.realpath(__file__))
-FONTDIR = os.path.join(PYDECRED_PACKAGEDIR, "fonts")
 FAVICON = os.path.join(PYDECRED_PACKAGEDIR, "favicon-32x32.png")
 INF = float("inf")
 MINUTE = 60

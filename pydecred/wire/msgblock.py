@@ -1,8 +1,13 @@
+"""
+Copyright (c) 2019, Brian Stafford
+Copyright (c) 2019, The Decred developers
+See LICENSE for details
+
+Based on dcrd MsgBlock.
+"""
+import unittest
 from tinydecred.crypto.bytearray import ByteArray
 from tinydecred.crypto.crypto import hashH
-from tinydecred.pydecred import helpers
-import unittest
-from tinydecred.wire import wire
 
 # chainhash.HashSize in go
 HASH_SIZE = 32
@@ -183,7 +188,7 @@ class BlockHeader:
 		# encode could fail except being out of memory which would cause a
 		# run-time panic.
 		return hashH(self.serialize().bytes())
-	def blockHashString(self):
+	def id(self):
 		return reversed(self.blockHash()).hex()
 
 
@@ -211,7 +216,7 @@ class TestBlockHeader(unittest.TestCase):
 		print("stakeVersion: %s" % repr(header.stakeVersion)) 
 		recoded = header.serialize().hex()
 		self.assertEqual(recoded, encoded)
-		self.assertEqual(header.blockHashString(), "52dc18bd18910e0e785411305b04f1281353ab29135a144c0fca9ea4746c2b66")
+		self.assertEqual(header.id(), "52dc18bd18910e0e785411305b04f1281353ab29135a144c0fca9ea4746c2b66")
 
 
 

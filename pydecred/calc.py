@@ -1,10 +1,35 @@
-from pydecred import helpers
-from pydecred import constants as C
-from pydecred import mainnet
+"""
+Copyright (c) 2019, Brian Stafford
+See LICENSE for details
+
+Some network math.
+"""
 import math
+from tinydecred.util import helpers
+from tinydecred.pydecred import constants as C, mainnet
 
 NETWORK = mainnet
 MODEL_DEVICE = helpers.makeDevice(**C.MODEL_DEVICE)
+
+def makeDevice(model=None, price=None, hashrate=None, power=None, release=None, source=None):
+    """
+    Create a device
+    """
+    device = {
+        "model": model,
+        "price": price,
+        "hashrate": hashrate,
+        "power": power,
+        "release": release,
+        "source": source
+    }
+    device["daily.power.cost"] = C.PRIME_POWER_RATE*device["power"]/1000*24
+    device["min.profitability"] = -1*device["daily.power.cost"]/device["price"]
+    device["power.efficiency"] = device["hashrate"]/device["power"]
+    device["relative.price"] = device["price"]/device["hashrate"]
+    if release and isinstance(release, str):
+        device["release"] = helpers.mktime(*[int(x) for x in device["release"].split("-")])
+    return device
 
 
 def setNetwork(network):

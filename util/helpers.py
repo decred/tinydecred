@@ -1,19 +1,26 @@
+"""
+Copyright (c) 2019, Brian Stafford
+See LICENSE for details
+"""
 import os
-import platform
 import sys
 import time
 import calendar
-import configparser
-from tempfile import TemporaryDirectory
-from tinydecred.pydecred import constants as C
-from tinydecred.pydecred import dcrjson as json
-# import traceback
-import urllib.request as urlrequest
-
-# For logging
+import traceback
 import logging
 from logging.handlers import RotatingFileHandler
+from tempfile import TemporaryDirectory
+from tinydecred.util import tinyjson
 
+def formatTraceback(e):
+    """
+    Format an traceback for an exception. 
+
+    Returns: 
+        str: The __str__() of the traceback, followed by the standard formatting
+            of the traceback on the following lines.
+    """
+    return "%s\n%s" % (e, traceback.print_tb(e.__traceback__))
 
 def mkdir(path):
     """
@@ -45,23 +52,6 @@ def mktime(year, month=None, day=None):
         return calendar.timegm(time.strptime("%i-%s" % (year, str(month).zfill(2)), "%Y-%m"))
     return calendar.timegm(time.strptime(str(year), "%Y"))
 
-
-def dt2stamp(dt):
-    return int(time.mktime(dt.timetuple()))
-
-
-def stamp2dayStamp(stamp):
-    """
-    Reduces Unix timestamp to midnight.
-    """
-    return int(mktime(*yearmonthday(stamp)))
-
-
-def ymdString(stamp):
-    """ YY-MM-DD """
-    return ".".join([str(x).zfill(2) for x in yearmonthday(stamp)])
-
-
 def recursiveUpdate(target, source):
     """
     Recursively update the target dictionary with the source dictionary, leaving unfound keys in place.
@@ -79,10 +69,11 @@ def recursiveUpdate(target, source):
             target[k] = v
     return target
 
-
 class Benchmarker:
+    """
+    A class for basic execution timing.
+    """
     on = False
-
     def __init__(self, startStr=None):
         if not self.on:
             return
@@ -113,27 +104,15 @@ class Benchmarker:
             print("%i ms to %s" % (int(tNow-self.startTime), identifier))
             self.start()
 
-
-class DotObject:
-    """
-    If you want to use .dot notation but don't want to write a class.
-    """
-    def __init__(self, atsDict={}, **kwargs):
-        for k, v in atsDict.items():
-            setattr(self, k, v)
-        for k, v in kwargs.items():
-            setattr(self, k, v)
-
-
 def formatNumber(number, billions="B", spacer=" ", isMoney = False):
         """
         Format the number to a string with max 3 sig figs, and appropriate unit multipliers
 
-        :param number:  The number to format
-        :type number: float or int
-        :param str billions: Default "G". The unit multiplier to use for billions. "B" is also common.
-        :param str spacer: Default " ". A spacer to insert between the number and the unit multiplier. Empty string also common.
-        :param bool isMoney: If True, a number less than 0.005 will always be 0.00, and a number will never be formatted with just one decimal place.
+        Args:
+            number (float or int):  The number to format.
+            billions (str): Default "G". The unit multiplier to use for billions. "B" is also common.
+            spacer (str): Default " ". A spacer to insert between the number and the unit multiplier. Empty string also common.
+            isMoney (bool): If True, a number less than 0.005 will always be 0.00, and a number will never be formatted with just one decimal place.
         """
         if number == 0:
             return "0%s" % spacer
@@ -206,39 +185,16 @@ def getLogger(name, logLvl=logging.INFO):
 
 class ConsoleLogger:
     """
-    A logger that only prints
+    A logger that only prints to stdout.
     """
-
     @staticmethod
     def log(s):
         print(s)
-
     debug = log
     info = log
     warning = log
     error = log
     critical = log
-
-
-def makeDevice(model=None, price=None, hashrate=None, power=None, release=None, source=None):
-    """
-    Create a device
-    """
-    device = {
-        "model": model,
-        "price": price,
-        "hashrate": hashrate,
-        "power": power,
-        "release": release,
-        "source": source
-    }
-    device["daily.power.cost"] = C.PRIME_POWER_RATE*device["power"]/1000*24
-    device["min.profitability"] = -1*device["daily.power.cost"]/device["price"]
-    device["power.efficiency"] = device["hashrate"]/device["power"]
-    device["relative.price"] = device["price"]/device["hashrate"]
-    if release and isinstance(release, str):
-        device["release"] = mktime(*[int(x) for x in device["release"].split("-")])
-    return device
 
 def fetchSettingsFile(filepath):
     """
@@ -247,8 +203,7 @@ def fetchSettingsFile(filepath):
     if not os.path.isfile(filepath):
         with open(filepath, 'w+') as file:
             file.write("{}")
-    return json.loadFile(filepath)
-
+    return tinyjson.loadFile(filepath)
 
 def saveFile(path, contents, binary=False):
     """
@@ -261,40 +216,3 @@ def saveFile(path, contents, binary=False):
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmpPath, path)
-
-
-def getUriAsJson(uri):
-    """
-    GET request parsed as JSON
-    """
-    req = urlrequest.Request(uri,
-     headers={'Content-Type': 'application/json'},
-     method="GET"
-    )
-    return json.load(urlrequest.urlopen(req).read().decode())
-
-
-def appDataDir(appName):
-    """
-    Mirror of `dcrutil.AppDataDir`.
-    """
-    opSys = platform.system()
-    if opSys == "Windows":
-        appDir = os.getenv("LOCALAPPDATA")
-        if not appDir: 
-            appDir = os.getenv("APPDATA")
-        return os.path.join(appDir, appName.capitalize())
-    from pathlib import Path
-    appDir = str(Path.home())
-    if opSys == "Darwin":
-        return os.path.join(appDir, "Library", "Application Support", appName.capitalize())
-    return os.path.join(appDir, "."+appName)
-
-
-def parseConfig(iniPath):
-    """
-    Parse the config file at `iniPath`. Returns a `configparser.ConfigParser`.
-    """
-    config = configparser.ConfigParser()
-    config.read(iniPath)
-    return config

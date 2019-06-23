@@ -1,3 +1,10 @@
+"""
+Copyright (c) 2019, Brian Stafford
+Copyright (c) 2019, The Decred developers
+See LICENSE for details
+
+PGP-based mnemonic seed generation. 
+"""
 from tinydecred.crypto.crypto import sha256ChecksumByte
 from tinydecred.crypto.bytearray import ByteArray
 

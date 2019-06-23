@@ -1,3 +1,12 @@
+"""
+Copyright (c) 2019, Brian Stafford
+See LICENSE for details
+"""
+import os
+
+PACKAGEDIR = os.path.dirname(os.path.realpath(__file__))
+FONTDIR = os.path.join(PACKAGEDIR, "fonts")
+
 TINY = "tiny"
 SMALL = "small"
 MEDIUM = "medium"

@@ -1,3 +1,12 @@
+"""
+Copyright (c) 2019, Brian Stafford
+Copyright (c) 2019, The Decred developers
+See LICENSE for details
+
+module curve
+	Pure Python secp256k1 curve implementation. Based entirely on the Decred 
+	dcrd golang version. 
+"""
 from tinydecred.crypto.secp256k1.field import FieldVal, BytePoints
 from tinydecred.crypto.bytearray import ByteArray
 from tinydecred.crypto.rando import generateSeed
@@ -98,7 +107,7 @@ class PublicKey:
 		return b
 	def serializeUncompressed(self):
 		"""
-		SerializeUncompressed serializes a public key in a 65-byte uncompressed
+		serializeUncompressed serializes a public key in a 65-byte uncompressed
 		format.
 		"""
 		b = ByteArray(PUBKEY_UNCOMPRESSED)
@@ -124,13 +133,14 @@ def randFieldElement(): # c elliptic.Curve, rand io.Reader) (k *big.Int, err err
 	return k
 
 def generateKey(): # (*PrivateKey, error) {
-	""" GenerateKey generates a public and private key pair."""
+	"""
+	generateKey generates a public and private key pair.
+	"""
 	k = randFieldElement()
 	x, y = curve.scalarBaseMult(k)
 	return PrivateKey(curve, k, x, y)
 
 class KoblitzCurve:
-
 	def __init__(self, P, N, B, Gx, Gy, BitSize, H, q, byteSize, lamda, beta, a1, b1, a2, b2):
 		self.P = P
 		self.N = N
@@ -148,20 +158,17 @@ class KoblitzCurve:
 		self.a2 = a2
 		self.b2 = b2
 
-	def scalarBaseMult(self, k): # []byte) (*big.Int, *big.Int) {
+	def scalarBaseMult(self, k):
 		"""
-		ScalarBaseMult returns k*G where G is the base point of the group and k is a
+		scalarBaseMult returns k*G where G is the base point of the group and k is a
 		big endian integer.
 		Part of the elliptic.Curve interface.
 		"""
-	# 	newK := curve.moduloReduce(k)
-	# 	diff := len(curve.bytePoints) - len(newK)
 		kb = ByteArray(k % self.N)
 		diff = len(BytePoints) - len(kb)
 
 
-	# 	// Point Q = ∞ (point at infinity).
-	# 	qx, qy, qz := new(fieldVal), new(fieldVal), new(fieldVal)
+		# Point Q = ∞ (point at infinity).
 		qx, qy, qz = FieldVal(), FieldVal(), FieldVal()
 
 		# curve.bytePoints has all 256 byte points for each 8-bit window. The
@@ -201,13 +208,10 @@ class KoblitzCurve:
 		tmp2 = c2 * self.b2
 		k2 = tmp2 - tmp1
 
-		# Note Bytes() throws out the sign of k1 and k2. This matters
-		# since k1 and/or k2 can be negative. Hence, we pass that
-		# back separately.
 		return k1, k2
-	def scalarMult(self, Bx, By, k): #(Bx, By *big.Int, k []byte) (*big.Int, *big.Int) {
+	def scalarMult(self, Bx, By, k):
 		"""
-		ScalarMult returns k*(Bx, By) where k is a big endian integer.
+		scalarMult returns k*(Bx, By) where k is a big endian integer.
 		Part of the elliptic.Curve interface.
 		"""
 		# Point Q = ∞ (point at infinity).
@@ -304,9 +308,9 @@ class KoblitzCurve:
 		return PublicKey(self, x, y)
 	def parsePubKey(self, pubKeyStr):
 		"""
-		# ParsePubKey parses a public key for a koblitz curve from a bytestring into a
-		# ecdsa.Publickey, verifying that it is valid. It supports compressed and
-		# uncompressed signature formats, but not the hybrid format.
+		parsePubKey parses a public key for a koblitz curve from a bytestring into a
+		ecdsa.Publickey, verifying that it is valid. It supports compressed and
+		uncompressed signature formats, but not the hybrid format.
 		"""
 		if len(pubKeyStr) == 0:
 			raise Exception("empty pubkey string")
@@ -404,7 +408,7 @@ class KoblitzCurve:
 		self.addGeneric(x1, y1, z1, x2, y2, z2, x3, y3, z3)
 	def add(self, x1, y1, x2, y2):
 		"""
-		Add returns the sum of (x1,y1) and (x2,y2). Part of the elliptic.Curve
+		add returns the sum of (x1,y1) and (x2,y2). Part of the elliptic.Curve
 		interface.
 		"""
 		# A point at infinity is the identity according to the group law for
@@ -496,11 +500,11 @@ class KoblitzCurve:
 
 	def addZ1EqualsZ2(self, x1, y1, z1, x2, y2, x3, y3, z3):
 		"""
-		# addZ1EqualsZ2 adds two Jacobian points that are already known to have the
-		# same z value and stores the result in (x3, y3, z3).  That is to say
-		# (x1, y1, z1) + (x2, y2, z1) = (x3, y3, z3).  It performs faster addition than
-		# the generic add routine since less arithmetic is needed due to the known
-		# equivalence.
+		addZ1EqualsZ2 adds two Jacobian points that are already known to have the
+		same z value and stores the result in (x3, y3, z3).  That is to say
+		(x1, y1, z1) + (x2, y2, z1) = (x3, y3, z3).  It performs faster addition than
+		the generic add routine since less arithmetic is needed due to the known
+		equivalence.
 		"""
 		# To compute the point addition efficiently, this implementation splits
 		# the equation into intermediate elements which are used to minimize

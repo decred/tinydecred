@@ -1,3 +1,8 @@
+"""
+Copyright (c) 2019, Brian Stafford
+Copyright (c) 2019, The Decred developers
+See LICENSE for details
+"""
 OP_0                   = 0x00 # 0
 OP_FALSE               = 0x00 # 0 - AKA OP_0
 OP_DATA_1              = 0x01 # 1

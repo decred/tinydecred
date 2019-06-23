@@ -1,23 +1,20 @@
 """
+Copyright (c) 2019, Brian Stafford
 Copyright (c) 2019, The Decred developers
-Copyright (c) 2018-2019, Brian Stafford
 See LICENSE for details
 
-tinycrypto package
+accounts module
     Mostly account handling, interaction with this package's functions will 
     mostly be through the AccountManager.
     The tinycrypto package relies heavily on the lower-level crypto modules.
-
-
-Much inspiration from https://github.com/decred/dcrd/blob/master/dcrec/secp256k1
 """
 import unittest
 import hashlib
 import hmac
-from tinydecred.pydecred import dcrjson as json, mainnet, simnet, helpers
-from tinydecred.pydecred import constants as C
+from tinydecred.util import tinyjson, helpers
+from tinydecred import api
+from tinydecred.pydecred import mainnet, simnet, constants as DCR, txscript
 from tinydecred.crypto import crypto
-from tinydecred.crypto import txscript
 from tinydecred.crypto.rando import generateSeed
 from tinydecred.crypto.bytearray import ByteArray
 
@@ -48,15 +45,17 @@ def newMaster(seed, network):
     can be used to generate coin-type and account keys in accordance with 
     BIP-0032 and BIP-0044.
 
-    :param seed bytes-like: A random seed from which the extended key is made.
-    :param network: an object with BIP32 hierarchical deterministic extended key
-        magics as attributes `HDPrivateKeyID` and `HDPublicKeyID`.
+    Args:
+        seed (bytes-like): A random seed from which the extended key is made.
+        network (obj): an object with BIP32 hierarchical deterministic extended 
+            key magics as attributes `HDPrivateKeyID` and `HDPublicKeyID`.
 
     """
     seedLen = len(seed)
-    assert seedLen >= C.MinSeedBytes and seedLen <= C.MaxSeedBytes
+    assert seedLen >= DCR.MinSeedBytes and seedLen <= DCR.MaxSeedBytes
 
     # First take the HMAC-SHA512 of the master key and the seed data:
+    # SHA512 hash is 64 bytes.
     lr = hmac.digest(MASTER_KEY, msg=seed, digest=hashlib.sha512)
 
     # Split "I" into two 32-byte sequences Il and Ir where:
@@ -73,7 +72,7 @@ def newMaster(seed, network):
 
     parentFp = bytes.fromhex("00 00 00 00")
 
-    return crypto.ExtendedKey( #privVer, pubVer, key, chainCode, parentFP, depth, childNum, isPrivate)
+    return crypto.ExtendedKey(
         privVer = network.HDPrivateKeyID,
         pubVer = network.HDPublicKeyID,
         key = secretKey,
@@ -134,60 +133,22 @@ class Balance:
             total = obj["total"],
             available = obj["available"]
         )
-json.register(Balance)
+tinyjson.register(Balance)
 
-class UTXO:
-    def __init__(self, address, txid, vout, ts=None, scriptPubKey=None, 
-                 height=-1, amount=0, satoshis=0, maturity=None):
-        self.address = address
-        self.txid = txid
-        self.vout = vout
-        self.ts = ts
-        self.scriptPubKey = scriptPubKey
-        self.height = height
-        self.amount = amount
-        self.satoshis = satoshis
-        self.maturity = None
-    def __tojson__(self):
-        return {
-            "address": self.address,
-            "txid": self.txid,
-            "vout": self.vout,
-            "ts": self.ts,
-            "scriptPubKey": self.scriptPubKey,
-            "height": self.height,
-            "amount": self.amount,
-            "satoshis": self.satoshis,
-            "maturity": self.maturity,
-        }
-    @staticmethod
-    def __fromjson__(obj):
-        return UTXO.parse(obj)
-    @staticmethod
-    def parse(obj):
-        return UTXO(
-            address = obj["address"],
-            txid = obj["txid"],
-            vout = obj["vout"],
-            ts = obj["ts"] if "ts" in obj else None,
-            scriptPubKey = obj["scriptPubKey"] if "scriptPubKey" in obj else None,
-            height = obj["height"] if "height" in obj else -1,
-            amount = obj["amount"] if "amount" in obj else 0,
-            satoshis = obj["satoshis"] if "satoshis" in obj else 0,
-            maturity = obj["maturity"] if "maturity" else None,
-        )
-    def isConfirmed(self):
-        return self.height > -1
-    def key(self):
-        return UTXO.makeKey(self.txid, self.vout)
-    @staticmethod
-    def makeKey(txid, vout):
-        return txid + "#" + str(vout)
-
-json.register(UTXO)
+UTXO = api.UTXO
 
 class Account:
+    """
+    A BIP0044 account. Keys are stored as encrypted strings. The account is 
+    JSON-serializable with the tinyjson module. Unencoded keys will not be 
+    serialized. 
+    """
     def __init__(self, pubKeyEncrypted, privKeyEncrypted, name):
+        """
+        Args:
+            pubKeyEncrypted (str): The encrypted public key bytes.
+            privKeyEncrypted (str): The encrypted private key bytes.
+        """
         self.pubKeyEncrypted = pubKeyEncrypted
         self.privKeyEncrypted = privKeyEncrypted
         self.name = name
@@ -208,10 +169,9 @@ class Account:
         # If the accounts privKey is set with the private extended key
         # the account is considered "open". close'ing the wallet zeros
         # and drops reference to the privKey. 
-        self.privKey = None
-        self.extPub = None
-        self.intPub = None
-        self.generateSalt()
+        self.privKey = None # The private extended key. 
+        self.extPub = None # The external branch public extended key.
+        self.intPub = None # The internal branch public extended key.
     def __tojson__(self):
         return {
             "pubKeyEncrypted": self.pubKeyEncrypted,
@@ -243,27 +203,65 @@ class Account:
         acct.balance = obj["balance"]
         return acct
     def addrTxs(self, addr):
+        """
+        Get the list of known txid for the provided address.
+
+        Args:
+            addr (str): Base-58 encoded address.
+
+        Returns:
+            list(str): List of transaction IDs. 
+        """
         if addr in self.txs:
             return self.txs[addr]
         return []
     def addressUTXOs(self, addr):
+        """
+        Get the known unspent transaction outputs for an address.
+
+        Args:
+            addr (str): Base-58 encoded address.
+
+        Returns:
+            list(UTXO): UTXOs for the provided address.
+        """
         return [u for u in self.db["utxo"].values() if u.address == addr]
     def utxoscan(self):
+        """
+        A generator for iterating UTXOs. None of the UTXO set modifying 
+        functions (addUTXO, spendUTXO) should be used during iteration.
+
+        Returns:
+            generator(UTXO): A UTXO generator that iterates all known UTXOs.
+        """
         for utxo in self.utxos.values():
             yield utxo
     def addUTXO(self, utxo):
+        """
+        Add a UTXO. 
+
+        Args:
+            utxo (UTXO): The UTXO to add.
+        """
         self.unconfirmedUTXOs[utxo.key()] = utxo
     def getUTXO(self, txid, vout):
+        """
+        Get a UTXO by txid and tx output index. 
+
+        Args:
+            txid (str): The hex-encoded transaction ID.
+            vout (int): The transaction output index.
+        """
         uKey =  UTXO.makeKey(txid,  vout)
         return self.utxos[uKey] if uKey in self.utxos else None
-    def addrHasUTXOs(self, addr):
-        for utxo in self.utxos:
-            if utxo.address == addr:
-                return True
-        return False
-    def addrHasTxs(self, addr):
-        return addr in self.txs and len(self.txs[addr]) > 0
     def caresAboutTxid(self, txid):
+        """
+        Indicates whether the account has any UTXOs with this transaction ID, or
+        has this transaction in mempool.
+
+        Args:
+            txid (str): The hex-encoded transaction ID.
+        """
         return txid in self.mempool or self.hasUTXOwithTXID(txid)
     def hasUTXOwithTXID(self, txid):
         for utxo in self.utxos.value():
@@ -271,22 +269,50 @@ class Account:
                 return True
         return False
     def UTXOsForTXID(self, txid):
+        """
+        Get any UTXOs with the provided transaction ID.
+
+        Args:
+            txid (str): The hex-encoded transaction ID.
+        """
         return [utxo for utxo in self.unconfirmedUTXOs.values() if utxo.txid == txid]
-    # def checkCursor(self, addr):
-    #     branch, idx = self.getBranchIdx(addr)
-    #     if branch is None or branch != EXTERNAL_BRANCH:
-    #         return
-    #     if idx > self.cursor:
-    #         # consider generating new addresses here
-    #         self.cursor = idx + 1
     def spendUTXOs(self, utxos):
+        """
+        Spend the UTXO.
+
+        Args:
+            utxo (UTXO): The UTXO to spend.
+        """
         for utxo in utxos:
-            self.utxos(utxo["address"]).pop(utxo.key, None)
+            self.utxos.pop(utxo.key(), None)
     def spendTxidVout(self, txid, vout):
+        """
+        Spend the UTXO.
+
+        Args:
+            txid (str): The hex-encoded transaction ID.
+            vout (int): The transaction output index.
+        """
         return self.utxos.pop(UTXO.makeKey(txid, vout), None)
     def addMempoolTx(self, tx):
+        """
+        Add a Transaction-implementing object to the mempool.
+
+        Args:
+            tx (Transaction): An object that implements the Transaction API
+                from tinydecred.api.
+        """
         self.mempool[tx.txid()] = tx
     def confirmTx(self, tx, blockHeight):
+        """
+        Confirm a transaction. Sets height for any unconfirmed UTXOs in the 
+        transaction. Removes the transaction from mempool.
+
+        Args:
+            tx (Transaction): An object that implements the Transaction API
+                from tinydecred.api.
+            blockHeight (int): The height of the transactions block.
+        """
         txid = tx.txid()
         self.mempool.pop(txid, None)
         for utxo in self.UTXOsForTXID(txid):
@@ -295,12 +321,26 @@ class Account:
                 # this is a coinbase transaction, set the maturity height.
                 utxo.maturity = utxo.height + self.net.CoinbaseMaturity
     def addTx(self, addr, txid):
+        """
+        Add the transaction ID to the address-txid map. 
+
+        Args:
+            addr (str): Base-58 encoded address.
+            txid (str): The hex-encoded transaction ID.
+        """
         if addr not in self.txs:
             self.txs[addr] = []
         txids = self.txs[addr]
         if txid not in txids:
             txids.append(txid)
     def calcBalance(self, tipHeight):
+        """
+        Calculate the balance. The height current height must be provided to 
+        separate UTXOs which are not mature. 
+
+        Args:
+            tipHeight (int): The current best block height. 
+        """
         tot = 0
         avail = 0
         for utxo in self.utxos:
@@ -314,6 +354,13 @@ class Account:
         self.balance.avail = avail
         return self.balance
     def generateNextPaymentAddress(self):
+        """
+        Generate a new address and add it to the list of external addresses.
+        Does not move the cursor. 
+
+        Returns:
+            addr (str): Base-58 encoded address.
+        """
         if len(self.externalAddresses) != self.lastExternalIndex + 1:
             raise Exception("index-address length mismatch")
         idx = self.lastExternalIndex + 1
@@ -326,11 +373,21 @@ class Account:
         self.lastExternalIndex = idx
         return addr
     def getNextPaymentAddress(self):
+        """
+        Get the next address after the cursor and move the cursor.
+
+        Returns:
+            addr (str): Base-58 encoded address.
+        """
         self.cursor += 1
-        if self.cursor > len(self.externalAddresses):
-            self.cursor = len(self.externalAddresses) - 1
+        while self.cursor >= len(self.externalAddresses):
+            self.generateNextPaymentAddress()
         return self.externalAddresses(self.cursor)
     def generateGapAddresses(self, gap):
+        """
+        Generate addresses up to gap addresses after the cursor. Do not move the
+        cursor. 
+        """
         if self.extPub is None:
             log.warning("attempting to generate gap addresses on a closed account")
         highest = 0
@@ -343,6 +400,12 @@ class Account:
         while len(self.externalAddresses) < tip:
             self.generateNextPaymentAddress()
     def getChangeAddress(self):
+        """
+        Return a new change address.
+
+        Returns:
+            addr (str): Base-58 encoded address.
+        """
         if len(self.internalAddresses) != self.lastInternalIndex + 1:
             raise Exception("index-address length mismatch while generating change address")
         idx = self.lastInternalIndex + 1
@@ -355,8 +418,20 @@ class Account:
         self.lastInternalIndex = idx
         return addr
     def allAddresses(self):
+        """
+        Get the list of all known addresses for this account.
+
+        Returns:
+            list(str): A list of base-58 encoded addresses. 
+        """
         return self.internalAddresses + self.externalAddressess
     def addressesOfInterest(self):
+        """
+        Get the list of all known addresses for this account.
+
+        Returns:
+            list(str): A list of base-58 encoded addresses. 
+        """
         a = set()
         for utxo in self.utxoscan():
             a.add(utxo.address)
@@ -365,25 +440,68 @@ class Account:
             a.add(ext[i])
         return a
     def paymentAddress(self):
+        """
+        Get the external address at the cursor. The cursor is not moved. 
+
+        Returns:
+            addr (str): Base-58 encoded address.
+        """
         return self.externalAddresses[self.cursor]
-    def generateSalt(self):
-        self.privPassphraseSalt = ByteArray(generateSeed(SALT_SIZE))
     def privateExtendedKey(self, net, pw):
+        """
+        Decode the private extended key using the provided SecretKey.
+
+        Args:
+            net (obj): Network parameters.
+            pw (SecretKey): The secret key.
+        """
         return crypto.decodeExtendedKey(net, pw, self.privKeyEncrypted)
     def publicExtendedKey(self, net, pw):
+        """
+        Decode the public extended key using the provided SecretKey.
+
+        Args:
+            net (obj): Network parameters.
+            pw (SecretKey): The secret key.
+        """
         return crypto.decodeExtendedKey(net, pw, self.pubKeyEncrypted)
     def open(self, net, pw):
+        """
+        Open the account. While the account is open, the private and public keys
+        are stored at least in memory. No precautions are taken to prevent the
+        the keys from getting into swap memory, but the ByteArray keys are
+        wrappers for mutable Python bytearrays and can be zeroed on close. 
+
+        Args:
+            net (obj): Network parameters.
+            pw (byte-like): The user supplied password for this account. 
+        """
         self.net = net
         self.privKey = self.privateExtendedKey(net, pw)
         pubX = self.privKey.neuter()
         self.extPub = pubX.child(EXTERNAL_BRANCH)
         self.intPub = pubX.child(INTERNAL_BRANCH)
     def close(self):
+        """
+        Close the account. Zero the keys.
+        """
         if self.privKey:
             self.privKey.key.zero()
             self.privKey.pubKey.zero()
+            self.extPub.key.zero()
+            self.extPub.pubKey.zero()            
+            self.intPub.key.zero()
+            self.intPub.pubKey.zero()
         self.privKey = None
+        self.extPub = None
+        self.intPub = None
     def branchAndIndex(self, addr):
+        """
+        Find the branch and index of the address.
+
+        Args:
+            addr (str): Base-58 encoded address.
+        """
         branch, idx = None, None
         if addr in self.externalAddresses:
             branch = EXTERNAL_BRANCH
@@ -393,6 +511,12 @@ class Account:
             idx = self.internalAddresses.index(addr)
         return branch, idx
     def getPrivKeyForAddress(self, addr):
+        """
+        Get the private key for the address.
+
+        Args:
+            addr (str): Base-58 encoded address.
+        """
         branch, idx = self.branchAndIndex(addr)
         if branch is None:
             raise Exception("unknown address")
@@ -401,29 +525,35 @@ class Account:
         privKey = branchKey.child(idx)
         return crypto.privKeyFromBytes(privKey.key)
 
-json.register(Account)
+tinyjson.register(Account)
 
 class AccountManager:
+    """
+    The AccountManager provides generation, organization, and other management 
+    of Accounts. 
+    """
     def __init__(self, cryptoKeyPubEnc, cryptoKeyPrivEnc, cryptoKeyScriptEnc, 
         coinTypeLegacyPubEnc, coinTypeLegacyPrivEnc, coinTypeSLIP0044PubEnc, coinTypeSLIP0044PrivEnc, baseAccount,
         privParams, pubParams):
-        """
-        
-        """
+        # The crypto keys are used to decrypt the other keys. 
         self.cryptoKeyPubEnc = cryptoKeyPubEnc
         self.cryptoKeyPrivEnc = cryptoKeyPrivEnc
         self.cryptoKeyScriptEnc = cryptoKeyScriptEnc
+
+        # The coin-type keys are used to generate encrypt a master key that
+        # can be used to generate account for any BIP0044 coin.
         self.coinTypeLegacyPubEnc = coinTypeLegacyPubEnc
         self.coinTypeLegacyPrivEnc = coinTypeLegacyPrivEnc
         self.coinTypeSLIP0044PubEnc = coinTypeSLIP0044PubEnc
         self.coinTypeSLIP0044PrivEnc = coinTypeSLIP0044PrivEnc
+
         self.baseAccount = baseAccount
+
+        # The Scrypt parameters used to encrypt the crypto keys.
         self.privParams = privParams
         self.pubParams = pubParams
 
         self.watchingOnly = False
-        self.nextInternalIndex = 0
-        self.nextExternalIndex = 0
         self.accounts = []
     def __tojson__(self):
         return {
@@ -438,8 +568,6 @@ class AccountManager:
             "privParams": self.privParams,
             "pubParams": self.pubParams,
             "watchingOnly": self.watchingOnly,
-            "nextInternalIndex": self.nextInternalIndex,
-            "nextExternalIndex": self.nextExternalIndex,
             "accounts": self.accounts,
         }
     @staticmethod
@@ -457,58 +585,68 @@ class AccountManager:
             pubParams = obj["pubParams"],
         )
         manager.watchingOnly = obj["watchingOnly"]
-        manager.nextInternalIndex = obj["nextInternalIndex"]
-        manager.nextExternalIndex = obj["nextExternalIndex"]
         manager.accounts = obj["accounts"]
         return manager
     def addAccount(self, account):
+        """
+        Add the account. No checks are done to ensure the account is correctly
+        placed for its index.
+
+        Args:
+            account (Account): The account to add. 
+        """
         self.accounts.append(account)
     def account(self, idx):
+        """
+        Get the account at the provided index.
+
+        Args:
+            idx (int): The account index. 
+        """
         return self.accounts[idx]
-    def openAccount(self, idx, net, pw):
+    def openAccount(self, acct, net, pw):
+        """
+        Open an account. 
+
+        Args:
+            acct (int): The acccount index, which is its position in the accounts
+                list. 
+            net (obj): Network parameters.
+            pw (byte-like): An ASCII-encoded user-supplied password for the
+                account.
+
+        Returns:
+            Account: The open account. 
+        """
+        # Generate the master key, which is used to decrypt the crypto keys.
         userSecret = crypto.SecretKey.rekey(pw, self.privParams)
+        # Decrypt the crypto keys.
         cryptKeyPriv = ByteArray(userSecret.decrypt(self.cryptoKeyPrivEnc.bytes()))
-        account = self.accounts[idx]
+        # Retreive and open the account.
+        account = self.accounts[acct]
         account.open(net, cryptKeyPriv)
         return account
-    def acctPrivateKey(self, acct, net, pw):
-        userSecret = crypto.SecretKey.rekey(pw, self.privParams)
-        cryptKeyPriv = ByteArray(userSecret.decrypt(self.cryptoKeyPrivEnc.bytes()))
-        account = self.accounts[acct]
-        return account.privateExtendedKey(net, cryptKeyPriv)
-    def acctPublicKey(self, acct, net, pw):
-        userSecret = crypto.SecretKey.rekey(pw, self.pubParams)
-        cryptKeyPub = ByteArray(userSecret.decrypt(self.cryptoKeyPubEnc.bytes()))
-        account = self.accounts[acct]
-        return account.publicExtendedKey(net, cryptKeyPub)
 
-
-json.register(AccountManager)
+tinyjson.register(AccountManager)
 
 def createNewAccountManager(seed, pubPassphrase, privPassphrase, chainParams):
     """
-    ns walletdb.ReadWriteBucket
-    seed, pubPassphrase, privPassphrase []byte
-    chainParams *chaincfg.Params
+    Create a new account manager and a set of BIP0044 keys for creating 
+    accounts. The zeroth account is created for the provided network parameters. 
+
+    Args:
+        pubPassphrase (byte-like): A user-supplied password to protect the 
+            public keys. The public keys can always be generated from the 
+            private keys, but it may be convenient to perform some actions,
+            such as address generation, without decrypting the private keys. 
+        privPassphrase (byte-like): A user-supplied password to protect the 
+            private the account private keys. 
+        chainParams (obj): Network parameters. 
     """
-    # # Return an error if the manager has already been created in the given
-    # # database namespace.
-    # if managerExists(ns) {
-    #   return errors.E(errors.Exist, "address manager already exists")
-    # }
 
     # Ensure the private passphrase is not empty.
     if len(privPassphrase) == 0:
         raise Exception("createAddressManager: private passphrase cannot be empty")
-
-
-#   // Perform the initial bucket creation and database namespace setup.
-#   if err := createManagerNS(ns); err != nil {
-#       return err
-#   }
-
-    # Generate the BIP0044 HD key structure to ensure the provided seed
-    # can generate the required structure with no issues.
 
     # Derive the master extended key from the seed.
     root = newMaster(seed, chainParams)
@@ -653,32 +791,34 @@ def createNewAccountManager(seed, pubPassphrase, privPassphrase, chainParams):
     manager.addAccount(zerothAccount)
     return manager
 
-testSeed = ByteArray("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", mainnet)
+testSeed = ByteArray("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef").b
 
 def addressForPubkeyBytes(b, net):
     return crypto.newAddressPubKeyHash(crypto.hash160(b), net, crypto.STEcdsaSecp256k1).string()
 
-class TestTinyCrypto(unittest.TestCase):
+class TestAccounts(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         helpers.prepareLogger("TestTinyCrypto")
         # log.setLevel(0)
-    def test_encode_decode(self):
-        extKey = newMaster(generateSeed(), mainnet)
-        jsonKey = json.dump(extKey)
-        newKey = json.load(jsonKey)
+    def custom(self):
+        print("custom")
+    # def test_encode_decode(self):
+    #     extKey = newMaster(generateSeed(), mainnet)
+    #     jsonKey = tinyjson.dump(extKey)
+    #     newKey = tinyjson.load(jsonKey)
 
-        self.assertEqual(extKey.privVer, newKey.privVer)
-        self.assertEqual(extKey.pubVer, newKey.pubVer)
-        self.assertEqual(extKey.key, newKey.key)
-        self.assertEqual(extKey.pubKey, newKey.pubKey)
-        self.assertEqual(extKey.chainCode, newKey.chainCode)
-        self.assertEqual(extKey.parentFP, newKey.parentFP)
-        self.assertEqual(extKey.depth, newKey.depth)
-        self.assertEqual(extKey.childNum, newKey.childNum)
-        self.assertEqual(extKey.isPrivate, newKey.isPrivate)
+    #     self.assertEqual(extKey.privVer, newKey.privVer)
+    #     self.assertEqual(extKey.pubVer, newKey.pubVer)
+    #     self.assertEqual(extKey.key, newKey.key)
+    #     self.assertEqual(extKey.pubKey, newKey.pubKey)
+    #     self.assertEqual(extKey.chainCode, newKey.chainCode)
+    #     self.assertEqual(extKey.parentFP, newKey.parentFP)
+    #     self.assertEqual(extKey.depth, newKey.depth)
+    #     self.assertEqual(extKey.childNum, newKey.childNum)
+    #     self.assertEqual(extKey.isPrivate, newKey.isPrivate)
     def test_child(self):
-        extKey = newMaster(ByteArray("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef").b, mainnet)
+        extKey = newMaster(testSeed, mainnet)
         kid = extKey.child(0)
         pub = extKey.neuter()
         self.assertEqual(pub.string(), "dpubZ9169KDAEUnyo8vdTJcpFWeaUEKH3G6detaXv46HxtQcENwxGBbRqbfTCJ9BUnWPCkE8WApKPJ4h7EAapnXCZq1a9AqWWzs1n31VdfwbrQk")
@@ -686,7 +826,7 @@ class TestTinyCrypto(unittest.TestCase):
         print("--addr: %s", addr)
     def test_address_manager(self):
         pw = "abc".encode("ascii")
-        am = createNewAccountManager(ByteArray("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef").b, bytearray(0), pw, mainnet)
+        am = createNewAccountManager(testSeed, bytearray(0), pw, mainnet)
         rekey = am.acctPrivateKey(0, mainnet, pw)
         pubFromPriv = rekey.neuter()
         addr1 = pubFromPriv.deriveChildAddress(5, mainnet)
@@ -702,14 +842,15 @@ class TestTinyCrypto(unittest.TestCase):
         extKey = newMaster(b.b, mainnet)
     def test_change_addresses(self):
         pw = "abc".encode("ascii")
-        acctManager = createNewAccountManager(ByteArray("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef").b, bytearray(0), pw, mainnet)
-        acct = acctManager.account(0)
+        acctManager = createNewAccountManager(testSeed, bytearray(0), pw, mainnet)
+        # acct = acctManager.account(0)
+        acct = acctManager.openAccount(0, mainnet, pw)
         for i in range(10):
             addr = acct.getChangeAddress()
             print("change address %i: %s" % (i, addr))
     def test_signatures(self):
         pw = "abc".encode("ascii")
-        am = createNewAccountManager(ByteArray("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef").b, bytearray(0), pw, mainnet)
+        am = createNewAccountManager(testSeed, bytearray(0), pw, mainnet)
         acct = am.openAccount(0, mainnet, pw)
 
         print("\n")

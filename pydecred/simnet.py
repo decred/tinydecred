@@ -1,9 +1,11 @@
-# Copyright (c) 2014-2016 The btcsuite developers
-# Copyright (c) 2015-2019 The Decred developers
-# Use of this source code is governed by an ISC
-# license that can be found in the LICENSE file.
+"""
+Copyright (c) 2019, Brian Stafford
+Copyright (c) 2019, The Decred developers
+See LICENSE for details
 
-import pydecred.constants as C
+simnet holds simnet parameters. Any values should mirror exactly
+https://github.com/decred/dcrd/blob/master/chaincfg/simnetparams.go
+"""
 
 # SimNetParams defines the network parameters for the simulation test network.
 # This network is similar to the normal test network except it is intended for

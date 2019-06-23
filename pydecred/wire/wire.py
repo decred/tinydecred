@@ -1,3 +1,10 @@
+"""
+Copyright (c) 2019, Brian Stafford
+Copyright (c) 2019, The Decred developers
+See LICENSE for details
+
+Constants and common routines from the dcrd wire package. 
+"""
 from tinydecred.crypto.bytearray import ByteArray
 
 MaxInt8   = (1<<7) - 1

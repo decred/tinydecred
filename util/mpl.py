@@ -1,15 +1,19 @@
-from pydecred import helpers
-from pydecred import constants as C
+"""
+Copyright (c) 2019, Brian Stafford
+See LICENSE for details
+"""
+import os
+import time
 import matplotlib
 from matplotlib.figure import Figure
-from matplotlib.patches import Circle, Wedge, Polygon, Ellipse, Rectangle
-# from matplotlib.ticker import AutoMinorLocator
+# from matplotlib.patches import Circle, Wedge, Polygon, Ellipse, Rectangle
 from matplotlib import font_manager as FontManager
 from mpl_toolkits.mplot3d import Axes3D # leave this even if the linter complains
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-# import scipy.optimize as optimize
-import os
-import time
+from tinydecred.util import helpers
+import tinydecred.ui as UI
+from tinydecred.pydecred import constants as C
+
 
 MPL_COLOR = '#333333'
 matplotlib.rcParams['mathtext.fontset'] = 'cm'
@@ -52,7 +56,7 @@ def getFont(font, size):
         MPL_FONTS[font] = {}
     if size not in MPL_FONTS[font]:
         MPL_FONTS[font][size] = FontManager.FontProperties(
-            fname=os.path.join(C.PACKAGEDIR, "fonts", "%s.ttf" % font), 
+            fname=os.path.join(UI.PACKAGEDIR, "fonts", "%s.ttf" % font), 
             size=size
         )
     return MPL_FONTS[font][size]

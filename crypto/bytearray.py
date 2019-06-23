@@ -1,7 +1,14 @@
-from tinydecred.pydecred import dcrjson as json
-from tinydecred.crypto.rando import generateSeed
-import nacl.secret
+"""
+Copyright (c) 2019, Brian Stafford
+See LICENSE for details
+
+A class that wraps ByteArray and provides some convenient operators.
+"""
 import unittest
+import nacl.secret
+from tinydecred.util import tinyjson
+from tinydecred.crypto.rando import generateSeed
+
 
 def decodeBA(b, copy=False):
 	"""
@@ -159,7 +166,7 @@ class ByteArray:
 		return b
 
 # register the ByteArray class with the json encoder/decoder.
-json.register(ByteArray)
+tinyjson.register(ByteArray)
 
 class TestByteArray(unittest.TestCase):
 	def test_operators(self):

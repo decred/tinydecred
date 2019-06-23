@@ -1,8 +1,13 @@
-from tinydecred.crypto.bytearray import ByteArray
-from tinydecred.crypto.secp256k1.bytepoints import secp256k1BytePoints
+"""
+Copyright (c) 2019, Brian Stafford
+Copyright (c) 2019, The Decred developers
+See LICENSE for details
+"""
 from base64 import b64decode
 from zlib import decompress as zdecompress
 import unittest
+from tinydecred.crypto.bytearray import ByteArray
+from tinydecred.crypto.secp256k1.bytepoints import secp256k1BytePoints
 
 # Constants used to make the code more readable.
 twoBitsMask   = 0x03

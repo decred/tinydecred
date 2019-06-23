@@ -1,8 +1,15 @@
+"""
+Copyright (c) 2019, Brian Stafford
+Copyright (c) 2019, The Decred developers
+See LICENSE for details
+
+Based on dcrd MsgTx.
+"""
+import unittest
 from tinydecred.crypto.bytearray import ByteArray
 from tinydecred.crypto.crypto import hashH
-from tinydecred.pydecred import helpers
-import unittest
-from tinydecred.wire import wire
+from tinydecred.util import helpers
+from tinydecred.pydecred.wire import wire
 
 
 # TxVersion is the current latest supported transaction version.

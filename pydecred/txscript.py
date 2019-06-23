@@ -1,9 +1,15 @@
-from tinydecred.crypto.bytearray import ByteArray
-from tinydecred.wire import wire, msgtx # A couple of usefule serialization functions.
-from tinydecred.crypto import opcode, crypto, rando
-from tinydecred.crypto.secp256k1.curve import curve as Curve
-import unittest
+"""
+Copyright (c) 2019, Brian Stafford
+Copyright (c) 2019, The Decred developers
+See LICENSE for details
 
+Based on dcrd txscript.
+"""
+import unittest
+from tinydecred.crypto.bytearray import ByteArray
+from tinydecred.pydecred.wire import wire, msgtx # A couple of usefule serialization functions.
+from tinydecred.crypto import opcode, crypto
+from tinydecred.crypto.secp256k1.curve import curve as Curve
 
 HASH_SIZE = 32
 SHA256_SIZE = 32
@@ -647,6 +653,7 @@ def signatureScript(tx, idx, subscript, hashType, privKey, compress): # tx *wire
     uncompressed format based on compress. This format must match the same format
     used to generate the payment address, or the script validation will fail.
     """
+
     sig = rawTxInSignature(tx, idx, subscript, hashType, privKey.key)
 
     pubKey = privKey.pub
@@ -1512,11 +1519,20 @@ class TestTxScript(unittest.TestCase):
 
         # Since the script engine is not implmented, hard code the keys and 
         # check that the script signature is the same as produced by dcrd.
+
+        # For compressed keys
         tests = (
-            ("b78a743c0c6557f24a51192b82925942ebade0be86efd7dad58b9fa358d3857c", "483045022100e1bab52fe0b460c71e4a4226ada35ebbbff9959835fa26c70e2571ef2634a05b02200683f9bf8233ba89c5f9658041cc8edc56feef74cad238f060c3b04e0c4f1cb1014104e11d2c0e415343435294079ac0774a21c8e6b1e6fd9b671cb08af43a397f3df1c4d3fa86c79cfe4f9d13f1c31fd75de316cdfe913b03c07252b1f02f7ee15c9c"),
-            ("a00616c21b117ba621d4c72faf30d30cd665416bdc3c24e549de2348ac68cfb8", "473044022029cf920fe059ca4d7e5d74060ed234ebcc7bca520dfed7238dc1e32a48d182a9022043141a443740815baf0caffc19ff7b948d41424832b4a9c6273be5beb15ed7ce01410424397bd81b0e80ec1bbfe104fb251b57eb0adcf044c3eec05d913e2e8e04396b422f7f8591e7a4030eddb635e753523bce3c6025fc4e97987adb385b08984e94"),
-            ("8902ea1f64c6fb7aa40dfbe798f5dc53b466a3fc01534e867581936a8ecbff5b", "473044022015f417f05573c3201f96f5ae706c0789539e638a4a57915dc077b8134c83f1ff022001afa12cebd5daa04d7a9d261d78d0fb910294d78c269fe0b2aabc2423282fe5014104255f71eab9eb2a7e3f822569484448acbe2880d61b4db61020f73fd54cbe370d031fee342d455077982fe105e82added63ad667f0b616f3c2c17e1cc9205f3d1"),
+            ("b78a743c0c6557f24a51192b82925942ebade0be86efd7dad58b9fa358d3857c", "47304402203220ddaee5e825376d3ae5a0e20c463a45808e066abc3c8c33a133446a4c9eb002200f2b0b534d5294d9ce5974975ab5af11696535c4c76cadaed1fa327d6d210e19012102e11d2c0e415343435294079ac0774a21c8e6b1e6fd9b671cb08af43a397f3df1"),
+            ("a00616c21b117ba621d4c72faf30d30cd665416bdc3c24e549de2348ac68cfb8", "473044022020eb42f1965c31987a4982bd8f654d86c1451418dd3ccc0a342faa98a384186b022021cd0dcd767e607df159dd25674469e1d172e66631593bf96023519d5c07c43101210224397bd81b0e80ec1bbfe104fb251b57eb0adcf044c3eec05d913e2e8e04396b"),
+            ("8902ea1f64c6fb7aa40dfbe798f5dc53b466a3fc01534e867581936a8ecbff5b", "483045022100d71babc95de02df7be1e7b14c0f68fb5dcab500c8ef7cf8172b2ea8ad627533302202968ddc3b2f9ff07d3a736b04e74fa39663f028035b6d175de6a4ef90838b797012103255f71eab9eb2a7e3f822569484448acbe2880d61b4db61020f73fd54cbe370d"),
         )
+
+        # For uncompressed keys
+        # tests = (
+        #     ("b78a743c0c6557f24a51192b82925942ebade0be86efd7dad58b9fa358d3857c", "483045022100e1bab52fe0b460c71e4a4226ada35ebbbff9959835fa26c70e2571ef2634a05b02200683f9bf8233ba89c5f9658041cc8edc56feef74cad238f060c3b04e0c4f1cb1014104e11d2c0e415343435294079ac0774a21c8e6b1e6fd9b671cb08af43a397f3df1c4d3fa86c79cfe4f9d13f1c31fd75de316cdfe913b03c07252b1f02f7ee15c9c"),
+        #     ("a00616c21b117ba621d4c72faf30d30cd665416bdc3c24e549de2348ac68cfb8", "473044022029cf920fe059ca4d7e5d74060ed234ebcc7bca520dfed7238dc1e32a48d182a9022043141a443740815baf0caffc19ff7b948d41424832b4a9c6273be5beb15ed7ce01410424397bd81b0e80ec1bbfe104fb251b57eb0adcf044c3eec05d913e2e8e04396b422f7f8591e7a4030eddb635e753523bce3c6025fc4e97987adb385b08984e94"),
+        #     ("8902ea1f64c6fb7aa40dfbe798f5dc53b466a3fc01534e867581936a8ecbff5b", "473044022015f417f05573c3201f96f5ae706c0789539e638a4a57915dc077b8134c83f1ff022001afa12cebd5daa04d7a9d261d78d0fb910294d78c269fe0b2aabc2423282fe5014104255f71eab9eb2a7e3f822569484448acbe2880d61b4db61020f73fd54cbe370d031fee342d455077982fe105e82added63ad667f0b616f3c2c17e1cc9205f3d1"),
+        # )
 
         # Pay to Pubkey Hash (uncompressed)
         # secp256k1 := chainec.Secp256k1
@@ -1534,7 +1550,7 @@ class TestTxScript(unittest.TestCase):
                         # k = Curve.generateKey(rand.Reader)
                         k = ByteArray(kStr)
                         privKey = crypto.privKeyFromBytes(k)
-                        pkBytes = privKey.pub.serializeUncompressed()
+                        pkBytes = privKey.pub.serializeCompressed()
                     # elif suite == crypto.STEd25519:
                     #   keyDB, _, _, _ = chainec.Edwards.GenerateKey(rand.Reader)
                     #   key, pk = chainec.Edwards.PrivKeyFromBytes(keyDB)
@@ -1548,12 +1564,13 @@ class TestTxScript(unittest.TestCase):
                     else:
                         raise Exception("test for signature suite %d not implemented" % suite)
 
-                    address = newAddressPubKeyHash(crypto.hash160(pkBytes.bytes()), testingParams, suite)
+                    address = crypto.newAddressPubKeyHash(crypto.hash160(pkBytes.bytes()), testingParams, suite)
 
                     pkScript = makePayToAddrScript(address.string(), testingParams)
 
                     # chainParams, tx, idx, pkScript, hashType, kdb, sdb, previousScript, sigType
                     sigScript = signTxOutput(privKey, testingParams, tx, idx, pkScript, hashType, None, suite)
+
                     self.assertEqual(sigScript, ByteArray(sigStr), msg="%d:%d:%d" % (hashType, idx, suite))
         return
 
