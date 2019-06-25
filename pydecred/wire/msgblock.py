@@ -179,9 +179,9 @@ class BlockHeader:
 		if i != MaxHeaderSize:
 			raise Exception("unexpected BlockHeader enocoded size")
 		return b
-	def blockHash(self): # chainhash.Hash {
+	def hash(self): # chainhash.Hash {
 		"""
-		BlockHash computes the block identifier hash for the given block header.
+		hash computes the block identifier hash for the given block header.
 		"""
 		# Encode the header and hash256 everything prior to the number of
 		# transactions.  Ignore the error returns since there is no way the
@@ -189,7 +189,7 @@ class BlockHeader:
 		# run-time panic.
 		return hashH(self.serialize().bytes())
 	def id(self):
-		return reversed(self.blockHash()).hex()
+		return reversed(self.hash()).hex()
 
 
 class TestBlockHeader(unittest.TestCase):

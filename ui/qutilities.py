@@ -28,7 +28,11 @@ GRID = "grid"
 LIGHT_THEME = "light"
 DARK_THEME = "dark"
 
-class ThreadUtilities:
+STRETCH = "stretch"
+
+PyObj = 'PyQt_PyObject'
+
+class ThreadUtilities(object):
     """
     Utilities for management of SmartThread objects.
     """
@@ -82,6 +86,7 @@ class SmartThread(QtCore.QThread):
         """
         QThread method. Runs the func.
         """
+        # print("--SmartThread starting with %s" % self.func.__name__)
         self.returns = self.func(*self.args, **self.kwargs)
 
     def callitback(self):
@@ -89,7 +94,7 @@ class SmartThread(QtCore.QThread):
         QThread Slot connected to the connect Signal. Send the value returned 
         from `func` to the callback function.
         """
-        print("--SmartThread finishing with %s" % self.callback.__name__)
+        # print("--SmartThread finishing with %s" % self.callback.__name__)
         self.callback(self.returns)
 
 
@@ -311,6 +316,16 @@ def makeWidget(widgetClass, layoutDirection="vertical", parent=None):
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setAlignment(ALIGN_TOP | ALIGN_LEFT)
     return widget, layout
+
+def makeSeries(layoutDirection, *widgets, align=None):
+    align = align if align else QtCore.Qt.Alignment()
+    wgt, lyt = makeWidget(QtWidgets.QWidget, layoutDirection)
+    for w in widgets:
+        if w == STRETCH:
+            lyt.addStretch(1)
+        else:
+            lyt.addWidget(w, 0, align)
+    return wgt, lyt
 
 
 def addHoverColor(widget, color):

@@ -6,13 +6,14 @@ See LICENSE for detail
 import os
 import time
 from PyQt5 import QtGui, QtCore, QtWidgets
-from tinydecred import keys as SK, config
+from tinydecred import config
 from tinydecred.ui import qutilities as Q, ui
 from tinydecred.wallet import Wallet
 from tinydecred.util import helpers
+from tinydecred.pydecred import constants as DCR
 
 UI_DIR = os.path.dirname(os.path.realpath(__file__))
-log = helpers.getLogger("APPUI") #, logLvl=0)
+log = helpers.getLogger("APPUI", logLvl=0)
 cfg = config.load()
 
 # Some commonly used ui constants.
@@ -26,7 +27,7 @@ FADE_IN_ANIMATION = "fadeinanimation"
 
 formatTraceback = helpers.formatTraceback
 
-def pixmapFromSvg(filename, w, h, color=None):
+def pixmapFromSvg(filename, w, h):
     """
     Create a QPixmap from the svg file in the icons directory.
 
@@ -45,9 +46,13 @@ class TinyDialog(QtWidgets.QFrame):
     TinyDialog is a widget for handling Screen instances. This si the primary
     window of the TinyDecred application. It has a fixed (tiny!) size. 
     """
-    maxWidth = 500
-    maxHeight = 500
+    maxWidth = 525
+    maxHeight = 375
     targetPadding = 15
+    popSig = QtCore.pyqtSignal(Q.PyObj)
+    topMenuHeight = 26
+    successSig = QtCore.pyqtSignal(str)
+    errorSig = QtCore.pyqtSignal(str)
     def __init__(self, app):
         """
         Args:
@@ -56,6 +61,8 @@ class TinyDialog(QtWidgets.QFrame):
         super().__init__()
         self.app = app
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
+        self.popSig.connect(self.pop_)
+        self.pop = lambda w=None: self.popSig.emit(w)
 
         # Set the width and height explicitly. Keep it tiny.
         screenGeo = app.qApp.primaryScreen().availableGeometry()            
@@ -66,6 +73,11 @@ class TinyDialog(QtWidgets.QFrame):
         self.setGeometry(
             screenGeo.x() + screenGeo.width() - self.w - self.padX, 
             screenGeo.y() + screenGeo.height() - self.h, self.w, self.h)
+
+        self.successSig.connect(self.showSuccess_)
+        self.showSuccess = lambda s: self.successSig.emit(s)
+        self.errorSig.connect(self.showError_)
+        self.showError = lambda s: self.errorSig.emit(s)
         
         self.mainLayout = QtWidgets.QVBoxLayout(self)
         self.setFrameShape(QtWidgets.QFrame.Box)
@@ -74,7 +86,15 @@ class TinyDialog(QtWidgets.QFrame):
         # The TinyDialog is frameless, but a custom menu bar is implemented.
         menuBar, menuLayout = Q.makeWidget(QtWidgets.QWidget, "horizontal")
         self.mainLayout.addWidget(menuBar)
-        menuBar.setFixedHeight(26)
+        menuBar.setFixedHeight(TinyDialog.topMenuHeight)
+
+        # A little spinner that it shown while the wallet is locked.
+        self.working = Spinner(self.app, 20, 3, 0)
+        self.working.setVisible(False)
+        self.working.setFixedSize(20,20)
+        menuLayout.addWidget(Q.pad(self.working, 3, 3, 3, 3), 0, Q.ALIGN_CENTER)
+        app.registerSignal(ui.WORKING_SIGNAL, lambda: self.working.setVisible(True))
+        app.registerSignal(ui.DONE_SIGNAL, lambda: self.working.setVisible(False))
 
         # If enabled by a Screen instance, the user can navigate directly to
         # the home screen.
@@ -98,6 +118,16 @@ class TinyDialog(QtWidgets.QFrame):
         # Create a layout to hold Screens.
         w, self.layout = Q.makeWidget(QtWidgets.QWidget, "vertical", self)
         self.mainLayout.addWidget(w)
+
+        # Some styling for the callout
+        self.msg = None
+        self.borderPen = QtGui.QPen()
+        self.borderPen.setWidth(1)
+        self.mainFont = QtGui.QFont("Roboto")
+        self.errorBrush = QtGui.QBrush(QtGui.QColor("#fff1f1"))
+        self.successBrush = QtGui.QBrush(QtGui.QColor("#f1fff1"))
+        self.bgBrush = self.successBrush
+        self.textFlags = QtCore.Qt.TextWordWrap | QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop
     def showEvent(self, e):
         # geo = self.app.sysTray.geometry()
         # print("sysTray.x: %r" % repr(geo.x()))
@@ -115,12 +145,12 @@ class TinyDialog(QtWidgets.QFrame):
         for wgt in Q.layoutWidgets(self.layout):
             wgt.setVisible(False)
         self.layout.addWidget(w)
+        log.debug("stack setting top screen to %s" % type(w).__name__)
         w.runAnimation(FADE_IN_ANIMATION)
         w.setVisible(True)
         self.setIcons(w)
         self.setVisible(True)
-    @QtCore.pyqtSlot()
-    def pop(self, screen=None):
+    def pop_(self, screen=None):
         """
         Pop the top screen from the stack. If a Screen instance is provided, 
         only pop if that is the top screen.
@@ -130,13 +160,13 @@ class TinyDialog(QtWidgets.QFrame):
         """
         widgetList = list(Q.layoutWidgets(self.layout))
         if len(widgetList) < 2:
-            log.warning("attempted to pop an empty layout")
             return
         popped, top = widgetList[-1], widgetList[-2]
-        if screen and top is not screen:
+        if screen and popped is not screen:
             return
         popped.setVisible(False)
         self.layout.removeWidget(popped)
+        log.debug("pop setting top screen to %s" % type(top).__name__)
         top.setVisible(True)
         top.runAnimation(FADE_IN_ANIMATION)
         self.setIcons(top)
@@ -150,6 +180,7 @@ class TinyDialog(QtWidgets.QFrame):
         Args:
             home (Screen): The home screen.
         """
+        log.debug("setting home screen")
         for wgt in list(Q.layoutWidgets(self.layout)):
             wgt.setVisible(False)
             self.layout.removeWidget(wgt)
@@ -185,6 +216,77 @@ class TinyDialog(QtWidgets.QFrame):
         The clicked slot for the back icon. Pops the top screen. 
         """
         self.pop()
+    def showError_(self, msg):
+        """
+        Show an error message with a light red background.
+
+        Args:
+            msg (str): The error message.
+        """
+        self.bgBrush = self.errorBrush
+        self.showMessage(msg)
+    def showSuccess_(self, msg):
+        """
+        Show an success message with a light green background.
+
+        Args:
+            msg (str): The success message.
+        """
+        self.bgBrush = self.successBrush
+        self.showMessage(msg)
+    def showMessage(self, msg):
+        """
+        Show a message.
+
+        Args:
+            msg (str): The message.
+        """
+        self.msg = msg
+        self.update()
+        timeout = 5 * 1000
+        QtCore.QTimer.singleShot(timeout, lambda s=msg: self.hideMessage(s))
+    def hideMessage(self, check):
+        if self.msg == check:
+            self.msg = None
+            self.update()
+    def paintEvent(self, e):
+        """
+        Paint the callout in the appropriate place
+        """
+        super().paintEvent(e)
+
+        if self.msg:
+            painter = QtGui.QPainter(self)
+            painter.setPen(self.borderPen)
+            painter.setFont(self.mainFont)
+            # painter.setBrush(self.bgBrush)
+            
+            pad = 15
+            fullWidth = self.geometry().width()
+
+            column = QtCore.QRect(0, 0, fullWidth - 4*pad, 10000)
+
+            textBox = painter.boundingRect(
+                column, 
+                self.textFlags,
+                self.msg
+            )
+
+            lrPad = (fullWidth - textBox.width()) / 2 - pad
+
+            outerWidth = textBox.width() + 2*pad
+            outerHeight = textBox.height() + 2*pad
+
+            w = textBox.width() + 2*pad
+            pTop = TinyDialog.topMenuHeight + pad
+            
+            painter.fillRect(lrPad, pTop, outerWidth, outerHeight, self.bgBrush)
+            painter.drawRect(lrPad, pTop, outerWidth, outerHeight)
+            painter.drawText(
+                QtCore.QRect(lrPad + pad, pTop + pad, w, 10000), 
+                self.textFlags,
+                self.msg
+            )
 
 class Screen(QtWidgets.QWidget):
     """
@@ -271,39 +373,72 @@ class HomeScreen(Screen):
         layout.setSpacing(50)
 
         # Display the current account balance.
-        row, rowLyt = Q.makeWidget(QtWidgets.QWidget, Q.HORIZONTAL)
+        logo = QtWidgets.QLabel()
+        logo.setPixmap(pixmapFromSvg(DCR.LOGO, 40, 40))
+        
+        self.totalBalance = b = ClickyLabel(self.balanceClicked, "0.00")
+        Q.setProperties(b, fontFamily="Roboto-Bold", fontSize=36)
+        self.totalUnit = Q.makeLabel("DCR", 18, color="#777777")
+        self.totalUnit.setContentsMargins(0, 7, 0, 0)
+
+        self.availBalance = ClickyLabel(self.balanceClicked, "0.00 spendable")
+        Q.setProperties(self.availBalance, fontSize=15)
+
+        tot, totLyt = Q.makeSeries(Q.HORIZONTAL, 
+            self.totalBalance,
+            self.totalUnit,
+        )
+
+        bals, balsLyt = Q.makeSeries(Q.VERTICAL, 
+            tot,
+            self.availBalance,
+            align=Q.ALIGN_RIGHT,
+        )
+
+        logoCol, logoLyt = Q.makeSeries(Q.VERTICAL,
+            logo,
+            Q.makeLabel("Decred", fontSize=18, color="#777777"),
+            align=Q.ALIGN_LEFT,
+        )
+
+        row, rowLyt = Q.makeSeries(Q.HORIZONTAL, 
+            logoCol, 
+            Q.STRETCH,
+            bals,
+        )
+
         layout.addWidget(row)
-        rowLyt.addStretch(1)
-        self.balance = b = ClickyLabel(self.balanceClicked, "0.00")
-        rowLyt.addWidget(b)
-        Q.setProperties(b, fontFamily="Roboto-Bold", fontSize=45)
-        self.unit = Q.makeLabel("DCR", 22, color="#777777")
-        rowLyt.addWidget(self.unit, 0, Q.ALIGN_BOTTOM)
-        self.unit.setContentsMargins(0, 0, 0, 5)
-        rowLyt.addStretch(1)
 
         # Create a row to hold an address.
-        col, colLyt = Q.makeWidget(QtWidgets.QWidget, Q.VERTICAL)
-        layout.addWidget(col)
-        row, rowLyt = Q.makeWidget(QtWidgets.QWidget, Q.HORIZONTAL)
-        colLyt.addWidget(row)
-        rowLyt.addWidget(Q.makeLabel("Address", 14, color="#777777"), 0, Q.ALIGN_LEFT)
-        rowLyt.addStretch(1)
+        addrLbl = Q.makeLabel("Address", 14, color="#777777")
         new = ClickyLabel(self.newAddressClicked, "+new")
         Q.setProperties(new, color="#777777")
-        rowLyt.addWidget(new)
         self.address = Q.makeLabel("", 18, fontFamily="RobotoMono-Bold")
-        colLyt.addWidget(self.address)
-        self.address.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse) # | QtCore.Qt.TextSelectableByKeyboard)
+        self.address.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+
+        header, headerLyt = Q.makeSeries(Q.HORIZONTAL,
+            addrLbl,
+            Q.STRETCH,
+            new,
+        )
+
+        col, colLyt = Q.makeSeries(Q.VERTICAL, 
+            header,
+            self.address,
+        )
+
+        layout.addWidget(col)
 
         # Option buttons.
         opts, optsLyt = Q.makeWidget(QtWidgets.QWidget, Q.GRID)
         layout.addWidget(opts, 1)
+
         # Send DCR.
         spend = app.getButton(SMALL, "Send DCR")
         spend.setMinimumWidth(110)
         spend.clicked.connect(self.spendClicked)
         optsLyt.addWidget(spend, 0, 0, Q.ALIGN_LEFT)
+
         # Navigate to the settings screen.
         settings = app.getButton(SMALL, "Settings")
         settings.setMinimumWidth(110)
@@ -324,12 +459,12 @@ class HomeScreen(Screen):
         """
         Callback for newAddressClicked. Sets the displayed address.
         """
-        self.address.setText(address)
+        if address:
+            self.address.setText(address)
     def showEvent(self, e):
         """
         When this screen is shown, set the payment address.
         """
-        print("-- Can I do away with this?")
         app = self.app
         if app.wallet:
             address = app.wallet.paymentAddress()
@@ -343,10 +478,11 @@ class HomeScreen(Screen):
         """
         A BALANCE_SIGNAL receiver that updates the displayed balance.
         """
-        log.debug("balance signal received: %f" % bal)
-        dcr = bal.total*1e-8
-        self.balance.setText("{0:,.2f}".format(dcr))
-        self.balance.setToolTip("%.8f" % dcr)
+        dcr = bal.total*1e-8 // 0.01 * 0.01
+        availStr = "%.8f" % (bal.available*1e-8, )
+        self.totalBalance.setText("{0:,.2f}".format(dcr))
+        self.totalBalance.setToolTip("%.8f" % dcr)
+        self.availBalance.setText("%s spendable" % availStr.rstrip('0').rstrip('.'))
     def spendClicked(self, e=None):
         """
         Display a form to send funds to an address. A Qt Slot, but any event 
@@ -373,11 +509,11 @@ class PasswordDialog(Screen):
         self.canGoHome = False
 
         mainLayout.addWidget(QtWidgets.QLabel("password"))
-        self.pwInput = QtWidgets.QLineEdit()
-        mainLayout.addWidget(self.pwInput)
-        self.pwInput.setEchoMode(QtWidgets.QLineEdit.Password)
-        self.pwInput.setMinimumWidth(350)
-        self.pwInput.returnPressed.connect(self.pwSubmit)
+        pw = self.pwInput = QtWidgets.QLineEdit()
+        mainLayout.addWidget(pw)
+        pw.setEchoMode(QtWidgets.QLineEdit.Password)
+        pw.setMinimumWidth(250)
+        pw.returnPressed.connect(self.pwSubmit)
         self.callback = lambda p: None
 
         # Allow user to toggle plain text display.
@@ -468,33 +604,6 @@ class ClickyLabel(QtWidgets.QLabel):
         if x < 0 or y < 0 or x > qSize.width() or y > qSize.height():
             self.mouseDown = False
 
-class PopupMessage(Screen):
-    """
-    A screen for displaying a simple plain test message to the users. 
-    """
-    def __init__(self, app):
-        """
-        Args:
-            app (TinyDecred): The TinyDecred application instance.
-        """
-        super().__init__(app)
-        self.canGoHome = False
-        self.msg = ""
-        self.lbl = QtWidgets.QLabel()
-        self.layout.addWidget(Q.pad(self.lbl, 0, 40, 0, 40))
-    def withMessage(self, msg):
-        """
-        Set the current message.
-
-        Args:
-            msg (str): The message to display.
-
-        Returns: 
-            The screen itself is returned as a convenience.
-        """
-        self.lbl.setText(msg)
-        return self
-
 class InitializationScreen(Screen):
     """
     A screen shown when no wallet file is detected. This screen offers options
@@ -542,11 +651,10 @@ class InitializationScreen(Screen):
         """
         # either way, pop the password window
         app = self.app
-        app.appWindow.pop()
         if pw is None or pw == "":
-            app.showMessage("you must enter a password to create a wallet")
+            app.appWindow.showError("you must enter a password to create a wallet")
         else:
-            app.waitThread(Wallet.create, self.walletCreationComplete, app.getNetSetting(SK.currentWallet), pw, cfg.net)
+            app.waitThread(Wallet.create, self.walletCreationComplete, app.walletFilename(), pw, cfg.net)
     def walletCreationComplete(self, ret):
         """
         Receives the result from new wallet creation.
@@ -558,13 +666,12 @@ class InitializationScreen(Screen):
         app = self.app
         if ret:
             words, wallet = ret
-            app.setNetSetting(SK.currentWallet, wallet.path)
             app.saveSettings()
             app.setWallet(wallet)
             app.home()
             app.showMnemonics(words)
         else:
-            app.showMessage("failed to create wallet")
+            app.appWindow.showError("failed to create wallet")
     def loadClicked(self):
         """
         The user has selected the "load from from" option. Prompt for a file 
@@ -574,18 +681,18 @@ class InitializationScreen(Screen):
         walletPath, _ = QtWidgets.QFileDialog.getOpenFileName(self, "select wallet file")
         log.debug('loading wallet from %r' % walletPath)
         if walletPath == "":
-            app.showMessage("no file selected")
+            app.appWindow.showError("no file selected")
         elif not os.path.isfile(walletPath):
             log.error("no file found at %s" % walletPath)
             app.showMessaage("file error. try again")
         else:
             def load(pw, userPath):
                 if pw is None or pw == "":
-                    self.showMessage("you must enter the password for this wallet")
+                    app.appWindow.showError("you must enter the password for this wallet")
                 else:
                     try:
-                        appWalletPath = app.getNetSetting(SK.currentWallet)
-                        wallet = Wallet.openFile(userPath, pw, cfg.net)
+                        appWalletPath = app.walletFilename()
+                        wallet = Wallet.openFile(userPath, pw)
                         # Save the wallet to the standard location.
                         wallet.path = appWalletPath
                         wallet.save()
@@ -593,7 +700,7 @@ class InitializationScreen(Screen):
                         app.home()
                     except Exception as e:
                         log.warning("exception encountered while attempting to open wallet: %s" % formatTraceback(e))
-                        app.showMessage("error opening this wallet\npassword correct\ncorrect network?")
+                        app.appWindow.showError("error opening this wallet? password correct? correct network?")
             app.getPassword(load, walletPath)
     def restoreClicked(self):
         """
@@ -642,7 +749,8 @@ class SendScreen(Screen):
         layout.addWidget(col)
         colLyt.addWidget(Q.makeLabel("to address", 16, color="#777777"), 0, Q.ALIGN_LEFT)
         self.addressField = af = QtWidgets.QLineEdit()
-        af.setFixedWidth(300)
+        Q.setProperties(af, fontSize=14)
+        af.setFixedWidth(350)
         colLyt.addWidget(af)
 
         # The user must click the send button. No return button from QLineEdit.
@@ -669,9 +777,9 @@ class SendScreen(Screen):
         app = self.app
         if res:
             app.home()
-            app.showMessage("sent")
+            app.appWindow.showSuccess("sent")
         else:
-            app.showMessage("transaction error")
+            app.appWindow.showError("transaction error")
 
 
 
@@ -687,7 +795,7 @@ class WaitingScreen(Screen):
         super().__init__(app)
         self.isPoppable = False
         self.canGoHome = False
-        self.spinner = Spinner(self.app, 40)
+        self.spinner = Spinner(self.app, 60)
         self.layout.addWidget(self.spinner)
 
 class MnemonicScreen(Screen):
@@ -732,7 +840,7 @@ class MnemonicScreen(Screen):
         Pop this screen.
         """
         self.lbl.setText("")
-        self.app.appWindow.pop()
+        self.app.appWindow.pop(self)
 
 class MnemonicRestorer(Screen):
     """
@@ -784,13 +892,13 @@ class MnemonicRestorer(Screen):
         app = self.app
         words = self.edit.toPlainText().strip().split()
         if not words:
-            app.showMessage("enter words to create a wallet")
+            app.appWindow.showError("enter words to create a wallet")
         else:
             def create(pw, words):
                 if pw:
-                    app.waitThread(Wallet.createFromMnemonic, self.walletCreationComplete, words, app.getNetSetting(SK.currentWallet), pw, cfg.net)
+                    app.waitThread(Wallet.createFromMnemonic, self.walletCreationComplete, words, app.walletFilename(), pw, cfg.net)
                 else:
-                    app.showMessage("must enter a password to recreate the wallet")
+                    app.appWindow.showError("must enter a password to recreate the wallet")
             app.getPassword(create, words)
     def walletCreationComplete(self, wallet):
         """
@@ -802,12 +910,11 @@ class MnemonicRestorer(Screen):
         """
         app = self.app
         if wallet:
-            app.setNetSetting(SK.currentWallet, wallet.path)
             app.saveSettings()
             app.setWallet(wallet)
             app.home()
         else:
-            app.showMessage("failed to create wallet")
+            app.appWindow.showError("failed to create wallet")
 
 class Spinner(QtWidgets.QLabel):
     """
@@ -815,7 +922,7 @@ class Spinner(QtWidgets.QLabel):
     """
     tickName = "spin"
     tickTime = 1 / 30
-    def __init__(self, app, spinnerSize):
+    def __init__(self, app, spinnerSize, width=4, pad=2):
         """
         Args:
             app (TinyDecred): The TinyDecred application instance.
@@ -823,19 +930,36 @@ class Spinner(QtWidgets.QLabel):
         """
         super().__init__()
         self.app = app
-        self.pic = pixmapFromSvg("spinner.svg", spinnerSize, spinnerSize)
+        # self.pic = pixmapFromSvg("spinner.svg", spinnerSize, spinnerSize)
         self.period = 1 # 1 rotation per second
-        self.t = QtCore.QTimer()
-        self.t.setInterval(Spinner.tickTime*1000)
-        self.t.timeout.connect(self.tick)
-    def showEvent(self, e):
-        self.t.start()
-    def hideEvent(self, e):
-        self.t.stop()
-    @QtCore.pyqtSlot()
-    def tick(self):
-        matrix = QtGui.QTransform()
-        rotation = (time.time() % self.period) / self.period * 360
-        matrix.rotate(rotation)
-        self.setPixmap(self.pic.transformed(matrix, QtCore.Qt.SmoothTransformation))
-        self.update()
+        self.sz = spinnerSize
+        self.width = width
+        self.setFixedSize(spinnerSize, spinnerSize)
+        self.c = spinnerSize / 2.
+        # g = self.gradient = QtGui.QConicalGradient(c, c, 0)
+        # g.setColorAt(0.0, QtGui.QColor("black"))
+        # g.setColorAt(1.0, QtGui.QColor("white"))
+        # self.qPen = QtGui.QPen(QtGui.QBrush(g), width, cap=QtCore.Qt.RoundCap)
+
+        p = width + pad
+        self.rect = (p, p, spinnerSize-2*p, spinnerSize-2*p)
+
+        ani = self.ani = QtCore.QVariantAnimation()
+        ani.setDuration(86400*1000) # give it a day
+        ani.setStartValue(0.0)
+        ani.setEndValue(1000.0)
+        ani.valueChanged.connect(self.update)
+        self.showEvent = lambda e: self.ani.start()
+        self.hideEvent = lambda e: self.ani.stop()
+    def getPen(self):
+        g = QtGui.QConicalGradient(self.c, self.c, 0)
+        g.setColorAt(0.0, QtGui.QColor("black"))
+        g.setColorAt(1.0, QtGui.QColor("white"))
+        g.setAngle((time.time() % self.period) / self.period * -360)
+        return QtGui.QPen(QtGui.QBrush(g), self.width, cap=QtCore.Qt.RoundCap)
+    def paintEvent(self, e):
+        super().paintEvent(e)
+        painter = QtGui.QPainter(self)
+        painter.setRenderHints(QtGui.QPainter.HighQualityAntialiasing)
+        painter.setPen(self.getPen())
+        painter.drawEllipse(*self.rect)

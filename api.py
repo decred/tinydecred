@@ -40,9 +40,12 @@ class UTXO:
         Decode the UTXO from the json encoding as returned by __tojson__
         """
         raise Unimplemented("__fromjson__ not implemented")
-    def isSpendable(self, header, tx):
+    def isSpendable(self, tipHeight):
         """
         Determine whether this UTXO is currently spendable. 
+
+        Args:
+            tipHeight (int): The height of the best block.
         """
         raise Unimplemented("isSpendable not implemented")
     def key(self):
@@ -52,6 +55,10 @@ class UTXO:
         Returns:
             str: A unique ID for this UTXO.
         """
+        raise Unimplemented("key not implemented")
+    @staticmethod
+    def makeKey(txid, vout):
+        return txid + "#" + str(vout)
 
 class Blockchain:
     """
@@ -159,6 +166,9 @@ class BlockHeader:
     BlockHeader defines an API that must be implemented within Blockchain for 
     block header objects. 
     """
+    def __init__(self, height, timestamp):
+        self.height = height
+        self.timestamp = timestamp
     @staticmethod
     def deserialize(b):
         """

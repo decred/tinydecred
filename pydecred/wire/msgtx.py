@@ -328,7 +328,7 @@ class OutPoint:
             self.index == other.index and
             self.tree == other.tree
         )
-    def hashString(self):
+    def txid(self):
         return reversed(self.hash).hex()
 
 class MsgTx:
@@ -384,7 +384,7 @@ class MsgTx:
         self.txIn.append(tx)
     def addTxOut(self, tx):
         self.txOut.append(tx)
-    def txHash(self): # chainhash.Hash {
+    def hash(self): # chainhash.Hash {
         """
         TxHash generates the hash for the transaction prefix.  Since it does not
         contain any witness data, it is not malleable and therefore is stable for
@@ -398,7 +398,7 @@ class MsgTx:
         return self.serialize().hex()
     def txid(self):
         """ hex encoded, byte-reversed tx hash """
-        return reversed(self.txHash()).hex()
+        return reversed(self.hash()).hex()
     def command(self):
         """
         Command returns the protocol command string for the message.  This is part
@@ -997,7 +997,7 @@ class TestMsgTx(unittest.TestCase):
         msgTx.lockTime = 0
         msgTx.expiry = 0
         # Ensure the hash produced is expected.
-        self.assertEqual(msgTx.txHash(), wantHash)
+        self.assertEqual(msgTx.hash(), wantHash)
             
     def test_tx_serialize_prefix(self):
         """

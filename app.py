@@ -6,11 +6,10 @@ A PyQt light wallet.
 """
 import os
 import sys
-import time
 from PyQt5 import QtGui, QtCore, QtWidgets
-from tinydecred import keys as SK, config
+from tinydecred import config
 from tinydecred.util import helpers
-from tinydecred.pydecred import constants as C
+from tinydecred.pydecred import constants as DCR
 from tinydecred.pydecred.dcrdata import DcrdataBlockchain
 from tinydecred.wallet import Wallet
 from tinydecred.ui import screens, ui, qutilities as Q
@@ -29,6 +28,8 @@ LARGE = ui.LARGE
 WALLET_FILE_NAME = "wallet.db"
 
 formatTraceback = helpers.formatTraceback
+
+currentWallet = "current.wallet"
 
 def tryExecute(f, *a, **k):
     """
@@ -49,12 +50,12 @@ def tryExecute(f, *a, **k):
         log.error("tryExecute %s failed: %s" % (f.__name__, formatTraceback(e)))
     return False
 
-class TinySignals:
+class TinySignals(object):
     """
     Implements the Signals API as defined in tinydecred.api. TinySignals is used 
     by the Wallet to broadcast notifications.
     """
-    def __init__(self, balance=None):
+    def __init__(self, balance=None, working=None, done=None):
         """
         Args:
             balance (func(Balance)): A function to receive balance updates.
@@ -62,6 +63,8 @@ class TinySignals:
         """
         dummy = lambda *a, **k: None
         self.balance = balance if balance else dummy
+        self.working = working if working else dummy
+        self.done = done if done else dummy
 
 class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
     """
@@ -72,6 +75,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
     TinyDecred is a system tray application. 
     """
     qRawSignal = QtCore.pyqtSignal(tuple)
+    homeSig = QtCore.pyqtSignal()
     def __init__(self, qApp):
         """
         Args: 
@@ -83,12 +87,12 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         self.wallet = None
         # Some CSS-styled elements to be updated if dark mode is enabled/disabled.
         self.trackedCssItems = []
-       	self.sysTray = QtWidgets.QSystemTrayIcon(QtGui.QIcon(C.FAVICON))
+       	st = self.sysTray = QtWidgets.QSystemTrayIcon(QtGui.QIcon(DCR.FAVICON))
         self.contextMenu = ctxMenu = QtWidgets.QMenu()
         ctxMenu.addAction("minimize").triggered.connect(self.minimizeApp)
         ctxMenu.addAction("quit").triggered.connect(lambda *a: self.qApp.quit())
-       	self.sysTray.setContextMenu(ctxMenu)
-        self.sysTray.activated.connect(self.sysTrayActivated)
+       	st.setContextMenu(ctxMenu)
+        st.activated.connect(self.sysTrayActivated)
 
         # The signalRegistry maps a signal to any number of receivers. Signals 
         # are routed through a Qt Signal.
@@ -96,6 +100,8 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         self.qRawSignal.connect(self.signal_)
         self.blockchainSignals = TinySignals(
             balance = self.balanceSync,
+            working = lambda: self.emitSignal(ui.WORKING_SIGNAL),
+            done = lambda: self.emitSignal(ui.DONE_SIGNAL),
         )
 
         self.loadSettings()
@@ -109,11 +115,12 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         self.appWindow = screens.TinyDialog(self)
 
         self.homeScreen = screens.HomeScreen(self)
+        self.homeSig.connect(self.home_)
+        self.home = lambda: self.homeSig.emit()
+
         self.appWindow.stack(self.homeScreen)
 
         self.pwDialog = screens.PasswordDialog(self)
-
-        self.message = screens.PopupMessage(self)
 
         self.waitingScreen = screens.WaitingScreen(self)
 
@@ -124,18 +131,20 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
 
         # If there is a wallet file, prompt for a password to open the wallet, 
         # otherwise show the initialization screen.
-        if os.path.isfile(self.getNetSetting(SK.currentWallet)):
+        if os.path.isfile(self.walletFilename()):
             def openw(path, pw):
                 try:
-                    return Wallet.openFile(path, pw, cfg.net)
+                    w = Wallet.openFile(path, pw)
+                    self.appWindow.pop(self.pwDialog)
+                    return w
                 except Exception as e:
                     log.warning("exception encountered while attempting to open wallet: %s" % formatTraceback(e))
-                    self.showMessage("incorrect password")
+                    self.appWindow.showError("incorrect password")
             def login(pw):
                 if pw is None or pw == "":
-                    self.showMessage("you must enter a password to continue")
+                    self.appWindow.showError("you must enter a password to continue")
                 else:
-                    path = self.getNetSetting(SK.currentWallet)
+                    path = self.walletFilename()
                     self.waitThread(openw, self.finishOpen, path, pw)                  
             self.getPassword(login)
         else:
@@ -193,6 +202,8 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
             **kwargs: Keyword arguments passed directly to f.
         """
         self.appWindow.stack(self.pwDialog.withCallback(f, *args, **kwargs))
+    def walletFilename(self):
+        return self.getNetSetting(currentWallet)
     def sysTrayActivated(self, trigger):
         """
         Qt Slot called when the user interacts with the system tray icon. Shows 
@@ -230,8 +241,8 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
             if k not in settings:
                 settings[k] = v
         netSettings = self.getNetSetting()
-        # if SK.currentWallet not in netSettings:
-        netSettings[SK.currentWallet] = os.path.join(self.netDirectory(), WALLET_FILE_NAME)
+        # if currentWallet not in netSettings:
+        netSettings[currentWallet] = os.path.join(self.netDirectory(), WALLET_FILE_NAME)
         helpers.mkdir(self.netDirectory())
         cfg.save()
     def saveSettings(self):
@@ -324,18 +335,21 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
             if pw:
                 self.waitThread(step2, cb, pw, a, k)
             else:
-                self.showMessage("password required to open wallet")
+                self.appWindow.showError("password required to open wallet")
         # step 2 receives the open wallet.
         def step2(pw, a, k):
+            self.emitSignal(ui.WORKING_SIGNAL)
             try:
                 with self.wallet.open(pw, self.dcrdata, self.blockchainSignals) as w:
-                    print("--running %s with open wallet" % f.__name__)
                     r = f(w, *a, **k)
-                    print("--finished %s" % f.__name__)
+                    self.appWindow.pop(self.waitingScreen)
+                    self.appWindow.pop(self.pwDialog)
                     return r
             except Exception as e:
                 log.warning("exception encountered while performing wallet action: %s" % formatTraceback(e))
-                self.showMessage("error")
+                self.appWindow.showError("error")
+            finally:
+                self.emitSignal(ui.DONE_SIGNAL)
             return False
         self.getPassword(step1, cb, a, k)
     def tryInitSync(self):
@@ -345,15 +359,16 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         wallet = self.wallet
         if wallet and wallet.openAccount and self.dcrdata:
             wallet.lock()
+            self.emitSignal(ui.WORKING_SIGNAL)
             self.makeThread(wallet.sync, self.doneSyncing, self.dcrdata, self.blockchainSignals)
     def doneSyncing(self, res):
         """
         The wallet sync is complete. Close and lock the wallet. 
         """
+        self.emitSignal(ui.DONE_SIGNAL)
         self.wallet.unlock()
         self.wallet.close()
         self.emitSignal(ui.SYNC_SIGNAL)
-    @QtCore.pyqtSlot(str)
     def balanceSync(self, balance):
         """
         A Signal method for the wallet. Emits the BALANCE_SIGNAL.
@@ -361,38 +376,25 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         Args:
             balance (Balance): The balance to pass to subscribed receivers. 
         """
-        self.wallet.save()
-        self.home()
         self.emitSignal(ui.BALANCE_SIGNAL, balance)
     def initDCR(self):
         """
         Connect to dcrdata. On exception, returns None.
         """
         try:
-            return self.dcrdata.connect()
+            self.dcrdata.connect()
+            return True
         except Exception as e:
             log.error("unable to initialize dcrdata connection at %s: %s" % (self.dcrdata.baseURI, formatTraceback(e)))
             return None
-    def setDCR(self, dcrdata):
+    def setDCR(self, res):
         """
         Callback to receive return value from initDCR. 
         """
-        if dcrdata is None:
-            self.showMessage("No dcrdata connection available.")
+        if not res:
+            self.appWindow.showError("No dcrdata connection available.")
             return
-        self.dcrdata = dcrdata
         self.tryInitSync()
-    @QtCore.pyqtSlot(str)
-    def showMessage(self, msg):
-        """
-        Show a message screen that disappears after 5 seconds. 
-
-        Args:
-            msg (str): A message to display. 
-        """
-        self.appWindow.stack(self.message.withMessage(msg))
-        timeout = 5*1000
-        QtCore.QTimer.singleShot(timeout, lambda: self.appWindow.pop(self.message))
     def getButton(self, size, text, tracked=True):
         """
         Get a button of the requested size. 
@@ -423,8 +425,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         if tracked:
             self.trackedCssItems.append(button)
         return button
-    @QtCore.pyqtSlot()
-    def home(self):
+    def home_(self):
         """
         Go to the home screen.
         """
@@ -468,6 +469,8 @@ def runTinyDecred():
     qApp = QtWidgets.QApplication(sys.argv)
     qApp.setStyleSheet(Q.QUTILITY_STYLE)
     qApp.setPalette(Q.lightThemePalette)
+    qApp.setWindowIcon(QtGui.QIcon(screens.pixmapFromSvg(DCR.LOGO, 64, 64)))
+    qApp.setApplicationName("Tiny Decred")
     loadFonts()
 
     decred = TinyDecred(qApp)

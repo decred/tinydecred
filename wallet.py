@@ -4,31 +4,17 @@ See LICENSE for details
 """
 import os
 import unittest
-import time
 from threading import Lock as Mutex
 from tinydecred.util import tinyjson, helpers
-from tinydecred.crypto import crypto, mnemonic, rando
+from tinydecred.crypto import crypto, mnemonic
 from tinydecred.pydecred import txscript
 from tinydecred.accounts import createNewAccountManager, UTXO
-from tinydecred.crypto.bytearray import ByteArray
 
 log = helpers.getLogger("WLLT", logLvl=0)
 
-ID_TAG = "tinywallet"
 VERSION = "0.0.1"
 
-SALT_SIZE = 32
-
-def generateSalt(self):
-    """
-    Generate a random salt.
-
-    Returns:
-        ByteArray: Random bytes.
-    """
-    return ByteArray(rando.generateSeed(SALT_SIZE))
-
-class KeySource:
+class KeySource(object):
     """
     Implements the KeySource API from tinydecred.api.
     """
@@ -36,7 +22,7 @@ class KeySource:
         self.priv = priv
         self.change = change
 
-class Wallet:
+class Wallet(object):
     """
     Wallet is a wallet. An application would use a Wallet to create and 
     manager addresses and funds and to interact with various blockchains.
@@ -68,6 +54,7 @@ class Wallet:
         # The AccountManager that holds all account information. acctManager is 
         # saved with the encrypted wallet file.
         self.acctManager = None
+        self.selectedAccount = None
         self.openAccount = None
         # The fileKey is a hash generated with the user's password as an input. 
         # The fileKey hash is used to AES encrypt and decrypt the wallet file.
@@ -77,22 +64,21 @@ class Wallet:
         # light node.
         self.blockchain = None
         # The best block.
-        self.tip = None
         self.users = 0
         # A user provided callbacks for certain events.
         self.signals = None
         self.mtx = Mutex()
-        self.salt = None
+        self.version = None
     def __tojson__(self):
         return {
             "acctManager": self.acctManager,
-            "chainName": self.chainName,
+            "version": self.version,
         }
     @staticmethod
     def __fromjson__(obj):
-        w = Wallet(None)
-        w.chainName = obj["chainName"]
+        w = Wallet()
         w.acctManager = obj["acctManager"]
+        w.version = obj["version"]
         return w
     @staticmethod
     def create(path, password, chain, userSeed = None):
@@ -115,21 +101,15 @@ class Wallet:
         """
         if os.path.isfile(path):
             raise FileExistsError("wallet already exists at path %s" % path)
-        wallet = Wallet(chain)
+        wallet = Wallet()
+        wallet.version = VERSION
         wallet.path = path
         seed = userSeed.bytes() if userSeed else crypto.generateSeed(crypto.KEY_SIZE)
-        pw = password.encode("ascii")
+        pw = password.encode()
         # Create the keys and coin type account, using the seed, the public password, private password and blockchain params.
         wallet.acctManager = createNewAccountManager(seed, ''.encode(), pw, chain)
-        wallet.file = {
-            "tag": ID_TAG,
-            "accounts": wallet.acctManager,
-            "version": VERSION,
-        }
-        wallet.salt = generateSalt()
-
-        wallet.fileKey = crypto.hash160(pw+wallet.salt.bytes())
-        wallet.openAccount = wallet.acctManager.openAccount(0, chain, password.encode("ascii"))
+        wallet.fileKey = crypto.SecretKey(pw)
+        wallet.selectedAccount = wallet.openAccount = wallet.acctManager.openAccount(0, password.encode())
         wallet.save()
 
         if userSeed:
@@ -160,19 +140,17 @@ class Wallet:
         if not self.fileKey:
             log.error("attempted to save a closed wallet")
             return
-        encrypted = crypto.AES.encrypt(self.fileKey.bytes(), tinyjson.dump(self))
+        encrypted = self.fileKey.encrypt(tinyjson.dump(self).encode()).hex() # crypto.AES.encrypt(self.fileKey.bytes(), tinyjson.dump(self))
         w = tinyjson.dump({
-            "salt": self.salt.hex(),
+            "keyparams": self.fileKey.params(),
             "wallet": encrypted,
         })
         helpers.saveFile(self.path, w)
     def setAccountHandlers(self, blockchain, signals):
         self.blockchain = blockchain
-        self.chain = blockchain.params
-        self.chainName = self.chain.Name
         self.signals = signals
     @staticmethod
-    def openFile(path, password, chain):
+    def openFile(path, password):
         """
         Open the wallet located at `path`, encrypted with `password`. The zeroth
         account or the wallet is open , but the wallet's `blockchain` and 
@@ -182,7 +160,6 @@ class Wallet:
             path (str): Filepath of the encrypted wallet.
             password (str): User-supplied password. Must match password in use 
                 when saved.
-            chain (obj): Network parameters.
 
         Returns:
             Wallet: An opened, unlocked Wallet with the default account open.
@@ -190,19 +167,14 @@ class Wallet:
         if not os.path.isfile(path):
             raise FileNotFoundError("no wallet found at %s" % path)
         with open(path, 'r') as f:
-            wrapper = f.read()
-        pw = password.encode("ascii")
-        salt = ByteArray(wrapper["salt"])
-        fileKey = crypto.hash160(pw+salt.bytes())
-        wallet = tinyjson.load(crypto.AES.decrypt(fileKey.bytes(), wrapper["wallet"]))
-        wallet.salt = salt
-        if wallet.file["tag"] != ID_TAG:
-            raise IOError("unable to open wallet with provided password")
-        if wallet.chainName != wallet.chainName:
-            raise Exception("wrong chain")
+            wrapper = tinyjson.load(f.read())
+        pw = password.encode()
+        keyParams = wrapper["keyparams"]
+        fileKey = crypto.SecretKey.rekey(pw, keyParams)
+        wallet = tinyjson.load(fileKey.decrypt(bytes.fromhex(wrapper["wallet"])).decode())
         wallet.path = path
         wallet.fileKey = fileKey
-        wallet.openAccount = wallet.acctManager.openAccount(0, chain, pw)
+        wallet.selectedAccount = wallet.openAccount = wallet.acctManager.openAccount(0, pw)
         wallet.save()
         return wallet
     def open(self, password, blockchain, signals):
@@ -217,9 +189,8 @@ class Wallet:
         Returns: 
             Wallet: The wallet with the default account open.
         """
-        # self.fileKey = crypto.hash160(pw+self.salt.bytes())
         self.setAccountHandlers(blockchain, signals)
-        self.openAccount = self.acctManager.openAccount(0, self.chain, password)
+        self.selectedAccount = self.openAccount = self.acctManager.openAccount(0, password)
         return self
     def lock(self):
         """
@@ -282,19 +253,20 @@ class Wallet:
         """
         Get the next unused external address.
         """
-        return self.openAccount.getNextPaymentAddress()
+        a = self.selectedAccount.getNextPaymentAddress()
+        self.blockchain.subscribeAddresses(a)
+        self.save()
+        return a
     def paymentAddress(self):
         """
         Gets the payment address at the cursor.
         """
-        return self.openAccount.paymentAddress()
+        return self.selectedAccount.paymentAddress()
     def balance(self):
         """
         Get the balance of the currently selected account.
         """
-        if self.openAccount:
-            return self.openAccount.balance
-        return self.account(0).balance
+        return self.selectedAccount.balance
     def getUTXOs(self, requested, approve=None):
         """
         Find confirmed and mature UTXOs, smallest first, that sum to the 
@@ -340,15 +312,15 @@ class Wallet:
             notification.
         """
         block = sig["message"]["block"]
-        self.tip = block
-        acct = self.openAccount
+        acct = self.selectedAccount
         for newTx in block["Tx"]:
             txid = newTx["TxID"]
             # only grab the tx if its a transaction we care about.
             if acct.caresAboutTxid(txid):
-                tx, _ = self.blockchain.tx(txid)
-                acct.confirmTx(tx, block["height"])
-    def addressSignal(self, sig):
+                tx = self.blockchain.tx(txid)
+                acct.confirmTx(tx, self.blockchain.tipHeight)
+                self.signals.balance(acct.calcBalance(self.blockchain.tipHeight))
+    def addressSignal(self, addr, txid):
         """
         Process an address notification from the block explorer.
 
@@ -356,57 +328,45 @@ class Wallet:
             sig (obj or string): The block explorer's json-decoded address
             notification.
         """
-        print("--processing address signal 1")
-        acct = self.openAccount
-        txid = sig["message"]["transaction"]
-        tx, _ = self.blockchain.tx(txid)
-        decodedTx = self.blockchain.getDecodedTx(txid)
-        block = decodedTx["block"] if "block" in decodedTx else {}
-        blockHeight = block["blockheight"] if "blockheight" in block else -1
-        blockTime = block["blocktime"] if "blocktime" in block else time.time()
-        addr = sig["message"]["address"]
-        acct.addTx(addr, txid)
+        acct = self.selectedAccount
+
+        tx = self.blockchain.tx(txid)
+        acct.addTxid(addr, tx.txid())
+
         matches = False
-        print("--processing address signal 2")
         # scan the inputs for any spends.
         for txin in tx.txIn:
             op = txin.previousOutPoint
-            match = acct.spendTxidVout(op.hashString(), op.index)
+            # spendTxidVout is a no-op if output is unknown
+            match = acct.spendTxidVout(op.txid(), op.index)
             if match:
                 matches += 1
-        print("--processing address signal 3")
         # scan the outputs for any new UTXOs
         for vout, txout in enumerate(tx.txOut):
             try:
-                _, addresses, _ = txscript.extractPkScriptAddrs(0, txout.pkScript, self.chain)
+                _, addresses, _ = txscript.extractPkScriptAddrs(0, txout.pkScript, acct.net)
             except Exception:
                 log.debug("unsupported script %s" % txout.pkScript.hex())
                 continue
             # convert the Address objects to strings.
-            addrs = [a.string() for a in addresses]
-            if addr in addrs:
+            if addr in (a.string() for a in addresses):
                 log.debug("found new utxo for %s" % addr)
-                acct.addUTXO(UTXO(
-                    address = addr,
-                    txid = txid,
-                    vout = vout,
-                    ts = blockTime,
-                    scriptPubKey = txout.pkScript,
-                    height = blockHeight,
-                    amount = round(txout.value*1e-8),
-                    satoshis = txout.value,
-                    maturity = blockHeight + self.chain.CoinbaseMaturity if tx.looksLikeCoinbase() else None,
-                ))
+                utxo = self.blockchain.txVout(txid, vout)
+                utxo.address = addr
+                acct.addUTXO(utxo)
                 matches += 1
-        print("--processing address signal 4")
         if matches:
             # signal the balance update
-            self.signals.balance(acct.calcBalance(self.tip["height"]))
-        print("--done processing address signal 5")
+            self.signals.balance(acct.calcBalance(self.blockchain.tip["height"]))
     def sync(self, blockchain, signals):
         """
         Synchronize the UTXO set with the server. This should be the first
         action after the account is opened or changed.
+
+        Args:
+            blockchain (Blockchain): An object that implements the Blockchain 
+                API.
+            signals (Signals): An object that implements the Signals API.
         """
         self.setAccountHandlers(blockchain, signals)
         acctManager = self.acctManager
@@ -414,50 +374,24 @@ class Wallet:
         gapPolicy = 5
         acct.generateGapAddresses(gapPolicy)
         watchAddresses = set()
-        blockchain = self.blockchain
 
         # send the initial balance
         self.signals.balance(acct.balance)
         addresses = acct.allAddresses()
+        
+        # Update the account with known UTXOs.
         blockchainUTXOs = blockchain.UTXOs(addresses)
-        # addrCount = len(addresses)
-        # addrsPerRequest = 20 # dcrdata allows 25        
-        # getUTXOs = lambda addrs: blockchain.insight.api.addr.utxo(",".join(addrs))
-        # for i in range(addrCount//addrsPerRequest+1):
-        #     start = i*addrsPerRequest
-        #     end = start + addrsPerRequest
-        #     addrs = addresses[start:end]
-        #     blockchainUTXOs += [UTXO.parse(u) for u in getUTXOs(addrs)]
-        newUTXOs = {}
-        dupes = {}
-        missingUtxos = []
-        for utxo in blockchainUTXOs:
-            # If the UTXO is already known, add it to the dupes dict, otherwise
-            # process it as new and add it the the newUTXOs dict. 
-            if acct.getUTXO(utxo.txid, utxo.vout):
-                dupes[utxo.key()] = utxo
-            else:
-                print("--found new utxo for %s" % utxo.address)
-                newUTXOs[utxo.key()] = utxo
-        # Check to see if there are any utxos that were previously known, but 
-        # not seen anymore.
-        for utxo in acct.utxoscan():
-            if utxo.key() in dupes:
-                missingUtxos.append(utxo)
-        # If there are missing UTXOs, remove them. For now, they are simply
-        # forgotten, but maybe they should be stored or some checks performed.
-        for utxo in missingUtxos:
-            acct.removeUTXO(utxo)
-        # Add the new UTXOs.
-        for utxo in newUTXOs.values():
-            acct.addUTXO(utxo)
+        acct.resolveUTXOs(blockchainUTXOs)
+
         # Subscribe to block and address updates.
         blockchain.subscribeBlocks(self.blockSignal)
         watchAddresses = acct.addressesOfInterest()
         if watchAddresses:
             blockchain.subscribeAddresses(watchAddresses, self.addressSignal)
         # Signal the new balance.
-        self.signals.balance(acct.calcBalance(self.tip["height"]))
+        b = acct.calcBalance(self.blockchain.tip["height"])
+        self.signals.balance(b)
+        self.save()
         return True
     def sendToAddress(self, value, address):
         """
@@ -480,8 +414,9 @@ class Wallet:
         acct.spendUTXOs(spentUTXOs)
         for utxo in newUTXOs:
             acct.addUTXO(utxo)
-        self.signals.balance(acct.calcBalance(self.tip["height"]))
-        return self.blockchain.sendToAddress(value, address)
+        self.signals.balance(acct.calcBalance(self.blockchain.tip["height"]))
+        self.save()
+        return tx
         
 tinyjson.register(Wallet)
 

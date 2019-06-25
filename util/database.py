@@ -5,7 +5,7 @@ See LICENSE for details
 import sqlite3
 import unittest
 import os
-import atexit
+from threading import get_ident as threadID
 from tinydecred.util import helpers
 
 class NoValue(Exception):
@@ -52,12 +52,19 @@ class Bucket:
 		self.existsQuery = KVExists.format(tablename=name) # = "SELECT EXISTS(SELECT * FROM kvtable WHERE k = ?);"
 		self.deleteQuery = KVDelete.format(tablename=name) # = "DELETE FROM kvtable WHERE k = ?;"
 		self.countQuery = KVCount.format(tablename=name) # = "SELECT COUNT(*) FROM kvtable;"
+		self.tid = None
 	def __enter__(self):
-		self.conn = self.database.openDB()
+		"""
+		Create a new connection for a every requesting thread.
+		"""
+		tid = threadID()
+		if self.tid != tid:
+			self.conn = self.database.openDB()
+			self.tid = tid
 		self.open()
 		return self
 	def __exit__(self, xType, xVal, xTB):
-		self.conn.close()
+		pass
 	def __setitem__(self, k, v):
 		cursor = self.conn.cursor()
 		cursor.execute(self.setQuery, (k, v))
@@ -111,8 +118,8 @@ class TestDB(unittest.TestCase):
 
 			# Encode it to bytes.
 			for kv in testPairs:
-				kv[0] = kv[0].encode("ascii")
-				kv[1] = kv[1].encode("ascii")
+				kv[0] = kv[0].encode()
+				kv[1] = kv[1].encode()
 
 			# Open a key value db in the temp directory.
 			manager = KeyValueDatabase(os.path.join(tempDir, 'tmp.sqlite'))
@@ -164,7 +171,7 @@ class TestDB(unittest.TestCase):
 				td = []
 				num = 100
 				for i in range(num):				
-					td.append([str(i).encode("ascii"), str(i).encode("ascii")])
+					td.append([str(i).encode(), str(i).encode()])
 
 				start = time.time()
 				for k, v in td:
@@ -172,9 +179,6 @@ class TestDB(unittest.TestCase):
 				elapsed = (time.time() - start) * 1000
 				print("{} ms to insert {} values".format(num, elapsed))
 				self.assertRaises(NoValue, lambda: db["nonsense"])
-	
-
-
-
-
-
+			with manager.getBucket("inttest", datatypes=("INTEGER", "BLOB")) as db:
+				db[5] = b'asdf'
+				self.assertEqual(db[5], b'asdf')

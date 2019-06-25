@@ -14,3 +14,5 @@ LARGE = "large"
 
 BALANCE_SIGNAL = "balance_signal"
 SYNC_SIGNAL = "sync_signal"
+WORKING_SIGNAL = "working_signal"
+DONE_SIGNAL = "done_signal"

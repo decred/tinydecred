@@ -8,6 +8,7 @@ import os
 
 PYDECRED_PACKAGEDIR =  os.path.dirname(os.path.realpath(__file__))
 FAVICON = os.path.join(PYDECRED_PACKAGEDIR, "favicon-32x32.png")
+LOGO = os.path.join(PYDECRED_PACKAGEDIR, "logo.svg")
 INF = float("inf")
 MINUTE = 60
 DAY = 86400

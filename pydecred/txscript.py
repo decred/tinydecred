@@ -1221,7 +1221,7 @@ class TestTxScript(unittest.TestCase):
 
         msg1 = calcSignatureHash(script, SigHashAll, tx, 0, None)
 
-        prefixHash = tx.txHash()
+        prefixHash = tx.hash()
         msg2 = calcSignatureHash(script, SigHashAll, tx, 0, prefixHash)
 
         self.assertEqual(msg1, want)

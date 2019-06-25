@@ -28,9 +28,9 @@ def decodeBA(b, copy=False):
 		return bytearray(b)
 	raise TypeError("decodeBA: unknown type %s" % type(b))
 
-class ByteArray:
+class ByteArray(object):
 	"""
-	ByteArray is a bytearray manager that also implements the helpers.JSONMarshaller interface.
+	ByteArray is a bytearray manager that also implements the tinyjson marshalling.
 	It implements a subset of bytearray's bitwise operators and provides some convenience
 	decodings on the fly, so operations work with various types of input. 
 	Since bytearrays are mutable, ByteArray can provide additional controls of the memory

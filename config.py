@@ -13,6 +13,7 @@ from tinydecred.pydecred import mainnet, testnet, simnet
 # Set the data directory in a OS-appropriate location.
 _ad = AppDirs("TinyDecred", False)
 DATA_DIR = _ad.user_data_dir
+
 helpers.mkdir(DATA_DIR)
 
 # The master configuration file name. 
@@ -26,117 +27,108 @@ SIMNET  = simnet.Name
 
 # Network specific configuration settings.
 MainnetConfig = {
-	"dcrdata":  "https://explorer.dcrdata.org/"
+    "dcrdata":  "https://explorer.dcrdata.org/"
 }
 
 TestnetConfig = {
-	"dcrdata": "https://testnet.dcrdata.org/"
+    "dcrdata": "https://testnet.dcrdata.org/"
 }
 
 SimnetConfig = {
-	"dcrdata": "http://localhost:7777" # Run dcrdata locally
+    "dcrdata": "http://localhost:7777" # Run dcrdata locally
 }
 
 def tinyNetConfig(netName):
-	"""
-	The Decred network parameters for the provided network name.
+    """
+    The default network parameters for the provided network name.
 
-	Returns:
-		obj: The network parameters.
-	"""
-	if netName == MAINNET:
-		return MainnetConfig
-	if netName == TESTNET:
-		return TestnetConfig
-	if netName == SIMNET:
-		return SimnetConfig
-	raise Exception("unknown network")
+    Args:
+        netName (str): Network name. `mainnet`, `simnet`, etc.
+
+    Returns:
+        obj: The network parameters.
+    """
+    if netName == MAINNET:
+        return MainnetConfig
+    if netName == TESTNET:
+        return TestnetConfig
+    if netName == SIMNET:
+        return SimnetConfig
+    raise Exception("unknown network")
 
 class TinyConfig:
-	"""
-	TinyConfig is configuration settings. The configuration file JSON formatted.
-	"""
-	def __init__(self):
-		fileCfg = helpers.fetchSettingsFile(CONFIG_PATH)
-		self.file = fileCfg
-		parser = argparse.ArgumentParser()
-		netGroup = parser.add_mutually_exclusive_group()
-		netGroup.add_argument("--simnet", action='store_true', help="use simnet")
-		netGroup.add_argument("--testnet", action='store_true', help="use testnet")
-		args = parser.parse_args()
-		self.net = None
-		if args.simnet:
-			self.net = simnet
-		elif args.testnet:
-			self.net = testnet
-		self.normalize()
-	def set(self, k, v):
-		"""
-		Set the configuration option. The configuration is not saved, so `save`
-		should be called separately.
+    """
+    TinyConfig is configuration settings. The configuration file JSON formatted.
+    """
+    def __init__(self):
+        fileCfg = helpers.fetchSettingsFile(CONFIG_PATH)
+        self.file = fileCfg
+        parser = argparse.ArgumentParser()
+        netGroup = parser.add_mutually_exclusive_group()
+        netGroup.add_argument("--simnet", action='store_true', help="use simnet")
+        netGroup.add_argument("--testnet", action='store_true', help="use testnet")
+        args = parser.parse_args()
+        self.net = None
+        if args.simnet:
+            self.net = simnet
+        elif args.testnet:
+            self.net = testnet
+        else:
+            self.net = mainnet
+        self.normalize()
+    def set(self, k, v):
+        """
+        Set the configuration option. The configuration is not saved, so `save`
+        should be called separately.
 
-		Args:
-			k (str): The setting key.
-			v (JSON-encodable): The value.
-		"""
-		self.file[k] = v
-	def get(self, *keys):
-		"""
-		Retrieve the setting at the provided key path. Multiple keys can be 
-		provided, with each successive key being retreived from the previous
-		key's value. 
+        Args:
+            k (str): The setting key.
+            v (JSON-encodable): The value.
+        """
+        self.file[k] = v
+    def get(self, *keys):
+        """
+        Retrieve the setting at the provided key path. Multiple keys can be 
+        provided, with each successive key being retreived from the previous
+        key's value. 
 
-		Args:
-			*keys (str): Recursive key list. 
+        Args:
+            *keys (str): Recursive key list. 
 
-		Returns:
-			mixed: The configuration value.
-		"""
-		d = self.file
-		rVal = None
-		for k in keys:
-			if k not in d:
-				return None
-			rVal = d[k]
-			d = rVal
-		return rVal
-	def normalize(self):
-		"""
-		Perform load checks and upgrades. 
-		"""
-		file = self.file
-		if self.net is None:
-			if "network" in file:
-				netName = file["network"]
-				if netName == MAINNET:
-					self.net = mainnet
-				elif netName == TESTNET:
-					self.net = testnet
-				elif netName == SIMNET:
-					self.net = simnet
-			else:
-				file["network"] = MAINNET
-				self.net = mainnet
-		netKey = "networks"
-		if netKey not in file:
-			file[netKey] = {}
-		if self.net.Name not in file[netKey]:
-			d = file[netKey][self.net.Name] = tinyNetConfig(self.net.Name)
-			d["name"] = self.net.Name
-	def save(self):
-		"""
-		Save the file. 
-		"""
-		tinyjson.save(CONFIG_PATH, self.file)
+        Returns:
+            mixed: The configuration value.
+        """
+        d = self.file
+        rVal = None
+        for k in keys:
+            if k not in d:
+                return None
+            rVal = d[k]
+            d = rVal
+        return rVal
+    def normalize(self):
+        """
+        Perform attribute checks and initialization. 
+        """
+        file = self.file
+        netKey = "networks"
+        if netKey not in file:
+            file[netKey] = {}
+        if self.net.Name not in file[netKey]:
+            d = file[netKey][self.net.Name] = tinyNetConfig(self.net.Name)
+            d["name"] = self.net.Name
+    def save(self):
+        """
+        Save the file. 
+        """
+        tinyjson.save(CONFIG_PATH, self.file)
 
 # The configuration is only loaded once. Successive calls to the modular `load`
 # function will return the same instance.
-tinyConfig = None	
+tinyConfig = TinyConfig()
+
 def load():
-	global tinyConfig
-	if not tinyConfig:
-		tinyConfig = TinyConfig()
-	return tinyConfig
+    return tinyConfig
 
 
 

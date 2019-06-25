@@ -79,3 +79,9 @@ def save(filepath, thing, **kwargs):
     """
     with open(filepath, "w") as f:
         f.write(dump(thing, **kwargs))
+
+def dumpFmt(thing):
+    """
+    A pretty-printed string, with newlines and sorted keys.
+    """
+    return dump(thing, indent=4, sort_keys=True)

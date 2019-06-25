@@ -520,7 +520,7 @@ class ExtendedKey:
 
         checkSum = checksum(serializedBytes.b)[:4]
         serializedBytes += checkSum
-        return b58encode(serializedBytes.bytes()).decode("ascii")
+        return b58encode(serializedBytes.bytes()).decode()
     def deriveChildAddress(self, i, net):
         """
         The base-58 encoded address for the i'th child.
@@ -637,7 +637,7 @@ class AESCipher(object):
         key = hashlib.sha256(password).digest()
         raw = self._pad(raw)
         cipher =  pyaes.AESModeOfOperationCTR(key)
-        return base64.b64encode(cipher.encrypt(raw)).decode('ascii')
+        return base64.b64encode(cipher.encrypt(raw)).decode()
     def decrypt(self, password, enc):
         """
         Decrypt a message.
@@ -652,7 +652,7 @@ class AESCipher(object):
         enc = base64.b64decode(enc)
         key = hashlib.sha256(password).digest()
         cipher = pyaes.AESModeOfOperationCTR(key)
-        return self._unpad(cipher.decrypt(enc)).decode('ascii')
+        return self._unpad(cipher.decrypt(enc)).decode()
     def _pad(self, s):
         """
         Normalizes the length of the provided message.
@@ -691,7 +691,7 @@ def defaultKDFParams():
     d = DEFAULT_KDF_PARAMS
     return d["func"], d["hash_name"], d["iterations"]
 
-class KDFParams:
+class KDFParams(object):
     """
     Parameters for the key derivation function, including the function used.
     """
@@ -715,8 +715,8 @@ class KDFParams:
         p = KDFParams(
             salt = obj["salt"],
             digest = obj["digest"],
-            iterations = obj["iterations"],
         )
+        p.iterations = obj["iterations"]
         p.hashName = obj["hashName"]
         p.kdfFunc = obj["kdfFunc"]
         return p
@@ -724,7 +724,7 @@ class KDFParams:
         return repr(self.__tojson__())
 tinyjson.register(KDFParams)
 
-class ScryptParams:
+class ScryptParams(object):
     """
     A set of scrypt parameters. Can be stored and retreived in plain text to
     regenerate encryption keys.
@@ -759,7 +759,7 @@ class ScryptParams:
 
 tinyjson.register(ScryptParams)
 
-class SecretKey:
+class SecretKey(object):
     """
     SecretKey is a password-derived key that can be used for encryption and
     decryption.
@@ -829,9 +829,9 @@ class SecretKey:
 
 class TestCrypto(unittest.TestCase):
     def test_encryption(self):
-        a = SecretKey("abc".encode("ascii"))
+        a = SecretKey("abc".encode())
         aEnc = a.encrypt(b'dprv3n8wmhMhC7p7QuzHn4fYgq2d87hQYAxWH3RJ6pYFrd7LAV71RcBQWrFFmSG3yYWVKrJCbYTBGiniTvKcuuQmi1hA8duKaGM8paYRQNsD1P6')
-        b = SecretKey.rekey("abc".encode("ascii"), a.params())
+        b = SecretKey.rekey("abc".encode(), a.params())
         aUnenc = b.decrypt(aEnc.bytes())
         self.assertTrue(a, aUnenc)
     def test_curve(self):
