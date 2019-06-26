@@ -74,6 +74,9 @@ class TinyConfig:
         elif args.testnet:
             self.net = testnet
         else:
+            print("**********************************************************")
+            print(" WARNING. WALLET FOR TESTING ONLY. NOT FOR USE ON MAINNET ")
+            print("**********************************************************")
             self.net = mainnet
         self.normalize()
     def set(self, k, v):

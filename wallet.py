@@ -140,7 +140,7 @@ class Wallet(object):
         if not self.fileKey:
             log.error("attempted to save a closed wallet")
             return
-        encrypted = self.fileKey.encrypt(tinyjson.dump(self).encode()).hex() # crypto.AES.encrypt(self.fileKey.bytes(), tinyjson.dump(self))
+        encrypted = self.fileKey.encrypt(tinyjson.dump(self).encode()).hex()
         w = tinyjson.dump({
             "keyparams": self.fileKey.params(),
             "wallet": encrypted,
@@ -409,7 +409,10 @@ class Wallet(object):
             priv = self.getKey,
             change = acct.getChangeAddress,
         )
-        tx, spentUTXOs, newUTXOs = self.blockchain.sendToAddress(value, address, keysource, self.getUTXOs)
+        try:
+            tx, spentUTXOs, newUTXOs = self.blockchain.sendToAddress(value, address, keysource, self.getUTXOs)
+        except:
+            return None
         acct.addMempoolTx(tx)
         acct.spendUTXOs(spentUTXOs)
         for utxo in newUTXOs:

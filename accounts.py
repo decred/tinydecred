@@ -196,8 +196,6 @@ class Account(object):
         self.txs = {}
         # utxos is a mapping of utxo key ({txid}#{vout}) to a UTXO. 
         self.utxos = {}
-        # Track spent until they are no longer seen.
-        self.spent = {}
         # If the accounts privKey is set with the private extended key
         # the account is considered "open". close'ing the wallet zeros
         # and drops reference to the privKey. 
@@ -218,7 +216,6 @@ class Account(object):
             "cursor": self.cursor,
             "txs": self.txs,
             "utxos": self.utxos,
-            "spent": self.spent,
             "balance": self.balance,
         }
     @staticmethod
@@ -247,7 +244,6 @@ class Account(object):
 
 
         acct.utxos = obj["utxos"]
-        acct.spent = obj["spent"]
         acct.balance = obj["balance"]
         setNetwork(acct)
         return acct
@@ -275,7 +271,7 @@ class Account(object):
             list(UTXO): UTXOs for the provided address.
         """
         return [u for u in self.db["utxo"].values() if u.address == addr]
-    def utxoscan(self, includeSpent=False):
+    def utxoscan(self):
         """
         A generator for iterating UTXOs. None of the UTXO set modifying 
         functions (addUTXO, spendUTXO) should be used during iteration.
@@ -285,9 +281,6 @@ class Account(object):
         """
         for utxo in self.utxos.values():
             yield utxo
-        if includeSpent:
-            for utxo in self.spent.values():
-                yield utxo
     def addUTXO(self, utxo):
         """
         Add a UTXO. 
@@ -337,31 +330,10 @@ class Account(object):
         """
         for utxo in utxos:
             self.spendUTXO(utxo)
-    def deleteUTXO(self, utxo):
-        """
-        Delete the UTXO.
-
-        Args:
-            utxo (UTXO): The UTXO to delete.
-        """
-        uKey = utxo.key()
-        self.utxos.pop(uKey, None)
-        self.spent.pop(uKey, None)
     def spendUTXO(self, utxo):
-        u = self.utxos.pop(utxo.key(), None)
-        if u:
-            self.spent[u.key()] = u
-    def resolveUTXOs(self, blockchainUTXOs):        
-        # Convert to a dictionary.
-        blockchainUTXOs = {u.key(): u for u in blockchainUTXOs}
-        # Get all known utxos, including spent
-        allKnown = {u.key(): u for u in self.utxoscan(includeSpent=True)}
-        # Delete missing UTXOs. 
-        for missing in (u for k, u in allKnown.items() if k not in blockchainUTXOs):
-            self.deleteUTXO(missing)
-        # The utxo set is now the blockchain utxos minus any spent unconfirmed 
-        # utxos.
-        self.utxos = {k: u for k, u in blockchainUTXOs.items() if k not in self.spent}
+        return self.utxos.pop(utxo.key(), None)
+    def resolveUTXOs(self, blockchainUTXOs):
+        self.utxos = {u.key(): u for u in blockchainUTXOs}
     def spendTxidVout(self, txid, vout):
         """
         Spend the UTXO.
@@ -403,12 +375,6 @@ class Account(object):
             if tx.looksLikeCoinbase():
                 # this is a coinbase transaction, set the maturity height.
                 utxo.maturity = utxo.height + self.net.CoinbaseMaturity
-        pops = []
-        for utxid, utxo in self.spent.items():
-            if utxid == txid:
-                pops.append(utxid)
-        for utxid in pops:
-            self.spent.pop(utxid)
     def calcBalance(self, tipHeight):
         """
         Calculate the balance. The height current height must be provided to 

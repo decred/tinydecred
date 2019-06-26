@@ -809,7 +809,6 @@ class DcrdataBlockchain(object):
         """
         tx = self.tx(txid)
         txout = tx.txOut[vout]
-        block = self.blockForTx(txid)
         utxo = UTXO(
             address = None,
             txid = txid,
@@ -818,8 +817,7 @@ class DcrdataBlockchain(object):
             amount = round(txout.value*1e-8),
             satoshis = txout.value,
         )
-        if block:
-            utxo.confirm(block, tx, self.params)
+        self.confirmUTXO(utxo, None, tx)
         return utxo
 
     def tx(self, txid):
@@ -1036,17 +1034,24 @@ class DcrdataBlockchain(object):
         return txscript.makePayToAddrScript(changeAddress, self.params)
     def approveUTXO(self, utxo):
         # If the UTXO appears unconfirmed, see if it can be confirmed.
-        if utxo.height == -1:
-            try:
-                block = self.blockForTx(utxo.txid)
-                tx = self.tx(utxo.txid)
-                utxo.confirm(block, tx, self.params)
-            except:
-                log.debug("did not find a block header for utxo %s" % utxo.key())
-                return False
+        if utxo.height == -1 and not self.confirmUTXO(utxo):
+            return False
         if utxo.maturity and self.tip["height"] < utxo.maturity:
             return False
         return True
+    def confirmUTXO(self, utxo, block=None, tx=None):
+        if not tx:
+            # No tx found is an issue, so pass the exception.
+            tx = self.tx(utxo.txid)
+        try:           
+            # No block found is not an error. 
+            if not block:
+                block = self.blockForTx(utxo.txid)
+            utxo.confirm(block, tx, self.params)
+            return True
+        except:
+            pass
+        return False
     def sendOutputs(self, outputs, keysource, utxosource): # , minconf=1, randomizeChangeIdx=True):
         """
         Send the `TxOut`s to the address. 

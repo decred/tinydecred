@@ -440,10 +440,11 @@ class HomeScreen(Screen):
         optsLyt.addWidget(spend, 0, 0, Q.ALIGN_LEFT)
 
         # Navigate to the settings screen.
-        settings = app.getButton(SMALL, "Settings")
-        settings.setMinimumWidth(110)
-        settings.clicked.connect(self.settingsClicked)
-        optsLyt.addWidget(settings, 0, 1, Q.ALIGN_RIGHT)
+        # settings = app.getButton(SMALL, "Settings")
+        # settings.setMinimumWidth(110)
+        # settings.clicked.connect(self.settingsClicked)
+
+        optsLyt.addWidget(QtWidgets.QWidget(), 0, 1, Q.ALIGN_RIGHT)
         optsLyt.setColumnStretch(0, 1)
         optsLyt.setColumnStretch(1, 1)
         optsLyt.setSpacing(35)
@@ -766,7 +767,8 @@ class SendScreen(Screen):
         val = float(self.valField.text())
         address = self.addressField.text()
         log.debug("sending %f to %s" % (val, address))
-        self.app.withUnlockedWallet(sendToAddress, self.sent, val, address)
+        if not self.app.withUnlockedWallet(sendToAddress, self.sent, val, address):
+            self.app.showMessage("send error")
     def sent(self, res):
         """
         Receives the result of sending funds.
