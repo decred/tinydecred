@@ -7,7 +7,6 @@ DcrdataClient.endpointList() for available enpoints.
 """
 import urllib.request as urlrequest
 from urllib.parse import urlparse
-import traceback
 import time
 import calendar
 import unittest
@@ -26,7 +25,7 @@ from tinydecred.api import InsufficientFundsError
 from tinydecred.pydecred import txscript, simnet
 from tinydecred.pydecred.wire import msgtx, wire, msgblock
 
-log = helpers.getLogger("DCRDATA", logLvl=0)
+log = helpers.getLogger("DCRDATA") # , logLvl=0)
 
 VERSION = "0.0.1"
 HEADERS = {"User-Agent": "PyDcrData/%s" % VERSION}
@@ -760,6 +759,7 @@ class DcrdataBlockchain(object):
             receiver (func(obj)): A function or method that accepts the address 
                 notifications.
         """
+        log.debug("subscribing to addresses %s" % repr(addrs))
         if receiver:
             self.addressReceiver = receiver
         elif self.addressReceiver == None:
@@ -1015,6 +1015,7 @@ class DcrdataBlockchain(object):
         try:
             if sigType == "address":
                 msg = sig["message"]
+                log.debug("signal received for %s" % msg["address"])
                 self.addressReceiver(msg["address"], msg["transaction"])
             elif sigType == "newblock":
                 self.tip = sig["message"]["block"]

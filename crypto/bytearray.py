@@ -12,7 +12,7 @@ from tinydecred.crypto.rando import generateSeed
 
 def decodeBA(b, copy=False):
 	"""
-	Decode into a bytearray, as a copy if requested and possible.
+	Decode into a bytearray.
 	"""
 	if isinstance(b, ByteArray):
 		return bytearray(b.b) if copy else b.b
@@ -30,16 +30,19 @@ def decodeBA(b, copy=False):
 
 class ByteArray(object):
 	"""
-	ByteArray is a bytearray manager that also implements the tinyjson marshalling.
-	It implements a subset of bytearray's bitwise operators and provides some convenience
-	decodings on the fly, so operations work with various types of input. 
-	Since bytearrays are mutable, ByteArray can provide additional controls of the memory
-	occupied, such as zeroing the internal value. 
-	An important difference between the constructors of ByteArray and bytearray is that 
-	an int argument for b to ByteArray constructor will result in the shortest possible 
-	bytearray representation of the integer, where for bytearray an int argument results 
-	in a zero-valued bytearray of said length. To get a zero-valued ByteArray of length n,
-	provides a bytearray(n) to the ByteArray constructor.
+	ByteArray is a bytearray manager that also implements tinyjson marshalling. 
+	It implements a subset of bytearray's bitwise operators and provides some 
+	convenience decodings on the fly, so operations work with various types of 
+	input.  Since bytearrays are mutable, ByteArray can also zero the internal 
+	value without relying on garbage collection. An
+	important difference between ByteArray and bytearray is 
+	that an integer argument to ByteArray constructor will result in the 
+	shortest possible byte representation of the integer, where for 
+	bytearray an int argument results in a zero-valued bytearray of said 
+	length. To get a zero-valued or zero-padded ByteArray of length n, use the 
+	`length` keyword argument.
+
+
 	"""
 	def __init__(self, b=b'', copy=True, length=None):
 		"""

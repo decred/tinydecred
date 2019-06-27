@@ -28,7 +28,7 @@ DEFAULT_ACCOUNT_NAME = "default"
 
 CrazyAddress = "CRAZYADDRESS"
 
-log = helpers.getLogger("TCRYP") #, logLvl=0)
+log = helpers.getLogger("TCRYP") # , logLvl=0)
 
 class CoinSymbols:
     decred = "dcr"
@@ -375,6 +375,8 @@ class Account(object):
             if tx.looksLikeCoinbase():
                 # this is a coinbase transaction, set the maturity height.
                 utxo.maturity = utxo.height + self.net.CoinbaseMaturity
+            # else:
+            #     utxo.maturity = utxo.height + 1 # Not sure about this
     def calcBalance(self, tipHeight):
         """
         Calculate the balance. The height current height must be provided to 

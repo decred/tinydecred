@@ -489,5 +489,6 @@ if __name__ == '__main__':
     logDir = os.path.join(config.DATA_DIR, "logs")
     helpers.mkdir(logDir)
     log = helpers.prepareLogger("APP", os.path.join(logDir, "tinydecred.log"), logLvl=0)
+    log.debug("configuration file at %s"  % config.CONFIG_PATH)
     runTinyDecred()
 

@@ -13,7 +13,7 @@ from tinydecred.util import helpers
 from tinydecred.pydecred import constants as DCR
 
 UI_DIR = os.path.dirname(os.path.realpath(__file__))
-log = helpers.getLogger("APPUI", logLvl=0)
+log = helpers.getLogger("APPUI") # , logLvl=0)
 cfg = config.load()
 
 # Some commonly used ui constants.
@@ -22,7 +22,7 @@ SMALL = ui.SMALL
 MEDIUM = ui.MEDIUM
 LARGE = ui.LARGE
 
-# A key to identify the common screen fade in animation.
+# A key to identify the screen fade in animation.
 FADE_IN_ANIMATION = "fadeinanimation"
 
 formatTraceback = helpers.formatTraceback
@@ -145,7 +145,7 @@ class TinyDialog(QtWidgets.QFrame):
         for wgt in Q.layoutWidgets(self.layout):
             wgt.setVisible(False)
         self.layout.addWidget(w)
-        log.debug("stack setting top screen to %s" % type(w).__name__)
+        # log.debug("stack setting top screen to %s" % type(w).__name__)
         w.runAnimation(FADE_IN_ANIMATION)
         w.setVisible(True)
         self.setIcons(w)
@@ -166,7 +166,7 @@ class TinyDialog(QtWidgets.QFrame):
             return
         popped.setVisible(False)
         self.layout.removeWidget(popped)
-        log.debug("pop setting top screen to %s" % type(top).__name__)
+        # log.debug("pop setting top screen to %s" % type(top).__name__)
         top.setVisible(True)
         top.runAnimation(FADE_IN_ANIMATION)
         self.setIcons(top)
@@ -180,7 +180,7 @@ class TinyDialog(QtWidgets.QFrame):
         Args:
             home (Screen): The home screen.
         """
-        log.debug("setting home screen")
+        # log.debug("setting home screen")
         for wgt in list(Q.layoutWidgets(self.layout)):
             wgt.setVisible(False)
             self.layout.removeWidget(wgt)
@@ -679,7 +679,18 @@ class InitializationScreen(Screen):
         location and load the wallet.
         """
         app = self.app
-        walletPath, _ = QtWidgets.QFileDialog.getOpenFileName(self, "select wallet file")
+        fd = QtWidgets.QFileDialog(self, "select wallet file")
+        fd.setViewMode(QtWidgets.QFileDialog.Detail)
+        qdir = QtCore.QDir
+        fd.setFilter(qdir.Dirs | qdir.Files | qdir.NoDotAndDotDot | qdir.Hidden)
+        if (fd.exec_()):
+            fileNames = fd.selectedFiles()
+            if len(fileNames) != 1:
+                log.error("More than 1 file selected for importing")
+                raise Exception("More than 1 file selected for importing")
+        else:
+            raise Exception("no file selected")
+        walletPath = fileNames[0]
         log.debug('loading wallet from %r' % walletPath)
         if walletPath == "":
             app.appWindow.showError("no file selected")
@@ -767,8 +778,7 @@ class SendScreen(Screen):
         val = float(self.valField.text())
         address = self.addressField.text()
         log.debug("sending %f to %s" % (val, address))
-        if not self.app.withUnlockedWallet(sendToAddress, self.sent, val, address):
-            self.app.showMessage("send error")
+        self.app.withUnlockedWallet(sendToAddress, self.sent, val, address)
     def sent(self, res):
         """
         Receives the result of sending funds.
@@ -817,13 +827,17 @@ class MnemonicScreen(Screen):
 
         # Some instructions for the user. It is critical that they copy the seed
         # now, as it can't be regenerated. 
-        self.lbl = Q.makeLabel("Copy these words carefully and keep them somewhere secure. This is the only way to regenerate a lost wallet. You will not have this chance again.", 18)
+        self.lbl = Q.makeLabel(
+            "Copy these words carefully and keep them somewhere secure. "
+            "You will not have this chance again.", 
+            16)
         self.lbl.setWordWrap(True)
         self.layout.addWidget(self.lbl)
 
         # Create a label to hold the actual seed.
         lbl = QtWidgets.QLabel(" ".join(words))
-        lbl.setMaximumWidth(300)
+        Q.setProperties(lbl, fontSize=15)
+        lbl.setMaximumWidth(500)
         lbl.setStyleSheet("QLabel{border: 1px solid #777777; padding: 10px;}")
         lbl.setWordWrap(True)
         lbl.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse | QtCore.Qt.TextSelectableByKeyboard)

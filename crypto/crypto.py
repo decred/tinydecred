@@ -6,14 +6,12 @@ See LICENSE for details
 Cryptographic functions. 
 """
 import hashlib
-import pyaes
-import base64
 import hmac
 import unittest
 from tinydecred.util import tinyjson
 from tinydecred.crypto.secp256k1.curve import curve as Curve, PublicKey, PrivateKey
 from tinydecred.crypto.rando import generateSeed
-from tinydecred.crypto.bytearray import ByteArray, decodeBA
+from tinydecred.crypto.bytearray import ByteArray
 from blake256.blake256 import blake_hash
 from base58 import b58encode, b58decode
 
@@ -614,70 +612,6 @@ def decodeExtendedKey(net, pw, key):
         childNum = childNum, 
         isPrivate = isPrivate,
     )
-
-
-class AESCipher(object):
-    """
-    AES encryption and decryption class inspired by
-    http://stackoverflow.com/questions/12524994/encrypt-decrypt-using-pycrypto-aes-256
-    """
-    def __init__(self):
-        self.bs = 32
-    def encrypt(self, password, raw):
-        """
-        Encrypt a message.
-
-        Args:
-            password (byte-like): The encryption key. 
-            raw (byte-like): The message to encrypt.
-
-        Returns:
-            str: An ASCII encoding of the encrypted message.
-        """
-        key = hashlib.sha256(password).digest()
-        raw = self._pad(raw)
-        cipher =  pyaes.AESModeOfOperationCTR(key)
-        return base64.b64encode(cipher.encrypt(raw)).decode()
-    def decrypt(self, password, enc):
-        """
-        Decrypt a message.
-
-        Args:
-            password (byte-like): The encryption key. 
-            enc (byte-like): The message to decrypt.
-
-        Returns:
-            str: An ASCII encoding of the decrypted message.
-        """
-        enc = base64.b64decode(enc)
-        key = hashlib.sha256(password).digest()
-        cipher = pyaes.AESModeOfOperationCTR(key)
-        return self._unpad(cipher.decrypt(enc)).decode()
-    def _pad(self, s):
-        """
-        Normalizes the length of the provided message.
-
-        Args:
-            s (byte-like): The message.
-
-        Returns:
-            byte-like: Padded message.
-        """
-        return s + (self.bs - len(s) % self.bs) * chr(self.bs - len(s) % self.bs)
-    @staticmethod
-    def _unpad(s):
-        """
-        Unpad decrypted message.
-
-        Args:
-            s (byte-like): The decrypted message.
-
-        Returns:
-            byte-like: The unpadded message.
-        """
-        return s[:-ord(s[len(s)-1:])]
-AES = AESCipher()
-
 DEFAULT_KDF_PARAMS = {
     "func": "pbkdf2_hmac",
     "iterations": 100000,

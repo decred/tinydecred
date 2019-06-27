@@ -8,9 +8,9 @@ from threading import Lock as Mutex
 from tinydecred.util import tinyjson, helpers
 from tinydecred.crypto import crypto, mnemonic
 from tinydecred.pydecred import txscript
-from tinydecred.accounts import createNewAccountManager, UTXO
+from tinydecred.accounts import createNewAccountManager
 
-log = helpers.getLogger("WLLT", logLvl=0)
+log = helpers.getLogger("WLLT") # , logLvl=0)
 
 VERSION = "0.0.1"
 
@@ -131,7 +131,12 @@ class Wallet(object):
         Returns:
             Wallet: A wallet initialized from the seed parsed from `words`.
         """
-        userSeed = mnemonic.decode(words)
+        decoded = mnemonic.decode(words)
+        cksum = decoded[-1]
+        userSeed = decoded[:-1]
+        cs = crypto.sha256ChecksumByte(userSeed.b)
+        if cs != cksum:
+            raise Exception("bad checksum %r != %r" % (cs, cksum))
         return Wallet.create(path, password, chain, userSeed=userSeed)
     def save(self):
         """
@@ -319,7 +324,9 @@ class Wallet(object):
             if acct.caresAboutTxid(txid):
                 tx = self.blockchain.tx(txid)
                 acct.confirmTx(tx, self.blockchain.tipHeight)
-                self.signals.balance(acct.calcBalance(self.blockchain.tipHeight))
+        # "Spendable" balance can change as utxo's mature, so update the 
+        # balance at every block.
+        self.signals.balance(acct.calcBalance(self.blockchain.tipHeight))
     def addressSignal(self, addr, txid):
         """
         Process an address notification from the block explorer.
@@ -346,7 +353,7 @@ class Wallet(object):
             try:
                 _, addresses, _ = txscript.extractPkScriptAddrs(0, txout.pkScript, acct.net)
             except Exception:
-                log.debug("unsupported script %s" % txout.pkScript.hex())
+                # log.debug("unsupported script %s" % txout.pkScript.hex())
                 continue
             # convert the Address objects to strings.
             if addr in (a.string() for a in addresses):
