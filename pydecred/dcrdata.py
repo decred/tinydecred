@@ -6,7 +6,8 @@ pyDcrDdta
 DcrdataClient.endpointList() for available enpoints.
 """
 import urllib.request as urlrequest
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlencode
+
 import time
 import calendar
 import unittest
@@ -119,20 +120,17 @@ class DcrdataPath(object):
     def __init__(self):
         self.subpaths = {}
         self.callSigns = []
-
     def getSubpath(self, subpathPart):
         if subpathPart in self.subpaths:
             return self.subpaths[subpathPart]
         p = self.subpaths[subpathPart] = DcrdataPath()
         return p
-
     def addCallsign(self, argList, template):
         """
         Some paths have multiple call signatures or optional parameters.
         Keeps a list of arguments associated with path templates to differentiate.
         """
         self.callSigns.append((argList, template))
-
     def getCallsignPath(self, *args, **kwargs):
         """
         Find the path template that matches the passed arguments.
@@ -142,12 +140,14 @@ class DcrdataPath(object):
             if len(argList) != argLen:
                 continue
             if args:
-                return template % args
+                uri = template % args
+                if len(kwargs):
+                    uri += "?"+urlencode(kwargs)
+                return uri
             if all([x in kwargs for x in argList]):
                 return template % tuple(kwargs[x] for x in argList)
         raise DcrDataException("ArgumentError", "Supplied arguments, %r, do not match any of the know call signatures, %r." % 
             (args if args else kwargs, [argList for argList, _ in self.callSigns]))
-
     def __getattr__(self, key):
         if key in self.subpaths:
             return self.subpaths[key]
