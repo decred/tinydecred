@@ -55,31 +55,34 @@ SigHashOptimization = False
 
 varIntSerializeSize = wire.varIntSerializeSize
 
-# Curve order and halforder, used to tame ECDSA malleability (see BIP-0062)
-order     = Curve.N
-halforder = order>>1
-
-mac = crypto.mac
-hashH = crypto.hashH
-
 # These are the constants specified for maximums in individual scripts.
 MaxOpsPerScript       = 255  # Max number of non-push operations.
 MaxPubKeysPerMultiSig = 20   # Multisig can't have more sigs than this.
 MaxScriptElementSize  = 2048 # Max bytes pushable to the stack.
 
+# A couple of hashing functions from the crypto module.
+mac = crypto.mac
+hashH = crypto.hashH
+
 class Signature:
+    """
+    The Signature class represents an ECDSA-algorithm signature. 
+    """
     def __init__(self, r, s):
         self.r = r
         self.s = s
     def serialize(self):
         """
-        Serialize returns the ECDSA signature in the more strict DER format.  Note
+        serialize returns the ECDSA signature in the more strict DER format.  Note
         that the serialized bytes returned do not include the appended hash type
         used in Decred signature scripts.
                 
         encoding/asn1 is broken so we hand roll this output:
         0x30 <length> 0x02 <length r> r 0x02 <length s> s
         """
+        # Curve order and halforder, used to tame ECDSA malleability (see BIP-0062)
+        order     = Curve.N
+        halforder = order>>1
         # low 'S' malleability breaker
         sigS = self.s
         if sigS > halforder: 
@@ -119,9 +122,6 @@ class ScriptTokenizer:
     
     Upon successfully parsing an opcode, the opcode and data associated with it
     may be obtained via the Opcode and Data functions, respectively.
-    
-    The ByteIndex function may be used to obtain the tokenizer's current offset
-    into the raw script.
     """
     def __init__(self, version, script):
         self.script = script
@@ -209,14 +209,35 @@ class ScriptTokenizer:
         # impossible.
         raise Exception("unreachable")
     def done(self):
+        """ 
+        Script parsing has completed 
+        
+        Returns: 
+            bool: True if script parsing complete.
+        """
         return self.err != None or self.offset >= len(self.script)
     def opcode(self):
+        """
+        The current step's opcode
+
+        Returns:
+            int: the opcode. See crypto.opcode for more information.
+        """
         if self.op is None:
             return None
         return self.op.value
 
 def checkScriptParses(scriptVersion, script):
-    """ checkScriptParses returns an error if the provided script fails to parse."""
+    """ 
+    checkScriptParses returns None when the script parses without error. 
+    
+    Args:
+        scriptVersion (int): The script version.
+        script (ByteArray): The script.
+
+    Returns:
+        None or Exception: None on success. Exception is returned, not raised. 
+    """
     tokenizer = ScriptTokenizer(scriptVersion, script)
     while tokenizer.next():
         pass
@@ -226,6 +247,13 @@ def finalOpcodeData(scriptVersion, script):
     """ 
     finalOpcodeData returns the data associated with the final opcode in the
     script.  It will return nil if the script fails to parse.
+
+    Args:
+        scriptVersion (int): The script version.
+        script (ByteArray): The script.
+
+    Returns:
+        ByteArray: The data associated with the final script opcode.
     """
     # Avoid unnecessary work.
     if len(script) == 0:
@@ -239,7 +267,7 @@ def finalOpcodeData(scriptVersion, script):
         return None
     return data
 
-def canonicalizeInt(val): # val *big.Int) []byte {
+def canonicalizeInt(val):
     """
     canonicalizeInt returns the bytes for the passed big integer adjusted as
     necessary to ensure that a big-endian encoded integer can't possibly be
@@ -247,6 +275,12 @@ def canonicalizeInt(val): # val *big.Int) []byte {
     significant bit is set, so it is padded by a leading zero byte in this case.
     Also, the returned bytes will have at least a single byte when the passed
     value is 0.  This is required for DER encoding.
+
+    Args:
+        val (int): The value to encode.
+
+    Returns:
+        ByteArray: The encoded integer with any necessary zero padding.
     """
     b = ByteArray(val)
     if len(b) == 0:
@@ -255,7 +289,7 @@ def canonicalizeInt(val): # val *big.Int) []byte {
         b = ByteArray(0, length=len(b)+1) | b
     return b
 
-def hashToInt(h): # []byte) *big.Int {
+def hashToInt(h): 
     """
     hashToInt converts a hash value to an integer. There is some disagreement
     about how this is done. [NSA] suggests that this is done in the obvious
@@ -264,6 +298,12 @@ def hashToInt(h): # []byte) *big.Int {
     OpenSSL right shifts excess bits from the number if the hash is too large
     and we mirror that too.
     This is borrowed from crypto/ecdsa.
+
+    Args:
+        h (byte-like): The hash to convert.
+
+    Returns:
+        int: The integer.
     """
     orderBits = Curve.N.bit_length()
     orderBytes = (orderBits + 7) // 8
@@ -278,8 +318,15 @@ def hashToInt(h): # []byte) *big.Int {
 
 def getScriptClass(version, script):
     """
-    GetScriptClass returns the class of the script passed.
+    getScriptClass returns the class of the script passed.
     NonStandardTy will be returned when the script does not parse.
+
+    Args:
+        version (int): The script version.
+        script (ByteArray): The script.
+
+    Returns: 
+        int: The script class.
     """
     if version != DefaultScriptVersion:
         return NonStandardTy
@@ -296,28 +343,8 @@ def typeOfScript(scriptVersion, script):
     """
     if scriptVersion != DefaultScriptVersion:
         return NonStandardTy
-    # if isPubKeyScript(script):
-    #   return PubKeyTy
-    # if isPubKeyAltScript(script):
-    #   return PubkeyAltTy
     if isPubKeyHashScript(script):
         return PubKeyHashTy
-    # if isPubKeyHashAltScript(script):
-    #   return PubkeyHashAltTy
-    # if isScriptHashScript(script):
-    #   return ScriptHashTy
-    # if isMultisigScript(scriptVersion, script):
-    #   return MultiSigTy
-    # if isNullDataScript(scriptVersion, script):
-    #   return NullDataTy
-    # if isStakeSubmissionScript(scriptVersion, script):
-    #   return StakeSubmissionTy
-    # if isStakeGenScript(scriptVersion, script):
-    #   return StakeGenTy
-    # if isStakeRevocationScript(scriptVersion, script):
-    #   return StakeRevocationTy
-    # if isStakeChangeScript(scriptVersion, script):
-    #   return StakeSubChangeTy
     return NonStandardTy
 
 def isPubKeyHashScript(script):
@@ -340,7 +367,7 @@ def extractPubKeyHash(script):
         return script[3:23]
     return None
 
-def payToAddrScript(netID, pkHash, chain): #addr dcrutil.Address) ([]byte, error) {
+def payToAddrScript(netID, pkHash, chain):
     """
     payToAddrScript creates a new script to pay a transaction output to a the
     specified address.
@@ -355,55 +382,7 @@ def payToAddrScript(netID, pkHash, chain): #addr dcrutil.Address) ([]byte, error
         return script
     raise Exception("unimplemented signature type")
 
-    # switch addr := addr.(type) {
-    # case *dcrutil.AddressPubKeyHash:
-    #     if addr == nil {
-    #         return nil, scriptError(ErrUnsupportedAddress,
-    #             nilAddrErrStr)
-    #     }
-    #     switch addr.DSA(addr.Net()) {
-    #     case dcrec.STEcdsaSecp256k1:
-    #         return payToPubKeyHashScript(addr.ScriptAddress())
-    #     case dcrec.STEd25519:
-    #         return payToPubKeyHashEdwardsScript(addr.ScriptAddress())
-    #     case dcrec.STSchnorrSecp256k1:
-    #         return payToPubKeyHashSchnorrScript(addr.ScriptAddress())
-    #     }
-
-    # case *dcrutil.AddressScriptHash:
-    #     if addr == nil {
-    #         return nil, scriptError(ErrUnsupportedAddress,
-    #             nilAddrErrStr)
-    #     }
-    #     return payToScriptHashScript(addr.ScriptAddress())
-
-    # case *dcrutil.AddressSecpPubKey:
-    #     if addr == nil {
-    #         return nil, scriptError(ErrUnsupportedAddress,
-    #             nilAddrErrStr)
-    #     }
-    #     return payToPubKeyScript(addr.ScriptAddress())
-
-    # case *dcrutil.AddressEdwardsPubKey:
-    #     if addr == nil {
-    #         return nil, scriptError(ErrUnsupportedAddress,
-    #             nilAddrErrStr)
-    #     }
-    #     return payToEdwardsPubKeyScript(addr.ScriptAddress())
-
-    # case *dcrutil.AddressSecSchnorrPubKey:
-    #     if addr == nil {
-    #         return nil, scriptError(ErrUnsupportedAddress,
-    #             nilAddrErrStr)
-    #     }
-    #     return payToSchnorrPubKeyScript(addr.ScriptAddress())
-    # }
-
-    # str := fmt.Sprintf("unable to generate payment script for unsupported "+
-    #     "address type %T", addr)
-    # return nil, scriptError(ErrUnsupportedAddress, str)
-
-def decodeAddress(addr, chain): #s string, params *chaincfg.Params) (dcrutil.Address, error) {
+def decodeAddress(addr, chain): 
     """
     decodeAddress decodes the string encoding of an address and returns
     the Address if addr is a valid encoding for a known address type
@@ -421,32 +400,12 @@ def decodeAddress(addr, chain): #s string, params *chaincfg.Params) (dcrutil.Add
         return netID, decoded #newAddressPubKeyHash(decoded, chain, crypto.STEcdsaSecp256k1)
     else: 
         raise Exception("unsupported address type")
-    # switch netID {
-    #     case net.PubKeyAddrID:
-    #         return NewAddressPubKey(decoded, net)
-
-    #     case net.PubKeyHashAddrID:
-    #         return NewAddressPubKeyHash(decoded, net, dcrec.STEcdsaSecp256k1)
-
-    #     case net.PKHEdwardsAddrID:
-    #         return NewAddressPubKeyHash(decoded, net, dcrec.STEd25519)
-
-    #     case net.PKHSchnorrAddrID:
-    #         return NewAddressPubKeyHash(decoded, net, dcrec.STSchnorrSecp256k1)
-
-    #     case net.ScriptHashAddrID:
-    #         return NewAddressScriptHashFromHash(decoded, net)
-
-    #     default:
-    #         return nil, ErrUnknownAddressType
-    #     }
-    # }
 
 def makePayToAddrScript(addrStr, chain):
     netID, pkHash = decodeAddress(addrStr, chain)
     return payToAddrScript(netID, pkHash, chain)
 
-def int2octets(v, rolen): #v *big.Int, rolen int) []byte {
+def int2octets(v, rolen):
     """ https://tools.ietf.org/html/rfc6979#section-2.3.3"""
     out = ByteArray(v)
 
@@ -463,7 +422,7 @@ def int2octets(v, rolen): #v *big.Int, rolen int) []byte {
         return out2
     return out
 
-def bits2octets(bits, rolen): # in []byte, rolen int) []byte {
+def bits2octets(bits, rolen):
     """ https://tools.ietf.org/html/rfc6979#section-2.3.4"""
     z1 = hashToInt(bits)
     z2 = z1 - Curve.N
@@ -471,9 +430,9 @@ def bits2octets(bits, rolen): # in []byte, rolen int) []byte {
         return int2octets(z1, rolen)
     return int2octets(z2, rolen)
 
-def nonceRFC6979(privKey, inHash, extra, version): #privkey *big.Int, hash []byte, extra []byte, version []byte) *big.Int {
+def nonceRFC6979(privKey, inHash, extra, version):
     """
-    NonceRFC6979 generates an ECDSA nonce (`k`) deterministically according to
+    nonceRFC6979 generates an ECDSA nonce (`k`) deterministically according to
     RFC 6979. It takes a 32-byte hash as an input and returns 32-byte nonce to
     be used in ECDSA algorithm.
     """
@@ -531,8 +490,16 @@ def nonceRFC6979(privKey, inHash, extra, version): #privkey *big.Int, hash []byt
 
 def verifySig(pub, inHash, r, s):
     """
-    Verify verifies the signature in r, s of hash using the public key, pub. Its
-    return value records whether the signature is valid.
+    verifySig verifies the signature in r, s of inHash using the public key, pub.
+
+    Args: 
+        pub (PublicKey): The public key.
+        inHash (byte-like): The thing being signed.
+        r (int): The R-parameter of the ECDSA signature.
+        s (int): The S-parameter of the ECDSA signature.
+
+    Returns:
+        bool: True if the signature verifies the key. 
     """
     # See [NSA] 3.4.2
     N = Curve.N
@@ -560,7 +527,7 @@ def verifySig(pub, inHash, r, s):
     x = x % N
     return x == r
 
-def signRFC6979(privateKey, inHash): # privateKey *PrivateKey, hash []byte) (*Signature, error) {
+def signRFC6979(privateKey, inHash):
     """
     signRFC6979 generates a deterministic ECDSA signature according to RFC 6979
     and BIP 62.
@@ -587,7 +554,7 @@ def signRFC6979(privateKey, inHash): # privateKey *PrivateKey, hash []byte) (*Si
 
     return Signature(r, s)
 
-def putVarInt(val): # buf []byte, val uint64) int {
+def putVarInt(val):
     """
     putVarInt serializes the provided number to a variable-length integer and
     according to the format described above returns the number of bytes of the
@@ -642,7 +609,7 @@ def addData(data):
     b += data
     return b
 
-def signatureScript(tx, idx, subscript, hashType, privKey, compress): # tx *wire.MsgTx, idx int, subscript []byte, hashType SigHashType, privKey chainec.PrivateKey, compress bool) ([]byte,error) {
+def signatureScript(tx, idx, subscript, hashType, privKey, compress):
     """
     SignatureScript creates an input signature script for tx to spend coins sent
     from a previous output to the owner of privKey. tx must include all
@@ -668,7 +635,7 @@ def signatureScript(tx, idx, subscript, hashType, privKey, compress): # tx *wire
 
     return script
 
-def rawTxInSignature(tx, idx, subScript, hashType, key): # tx *wire.MsgTx, idx int, subScript []byte, hashType SigHashType, key chainec.PrivateKey) ([]byte, error) {
+def rawTxInSignature(tx, idx, subScript, hashType, key):
     """
     rawTxInSignature returns the serialized ECDSA signature for the input idx of
     the given transaction, with hashType appended to it.
@@ -681,7 +648,7 @@ def rawTxInSignature(tx, idx, subScript, hashType, key): # tx *wire.MsgTx, idx i
     sig = signRFC6979(key, sigHash).serialize()
     return sig + ByteArray(hashType)
 
-def calcSignatureHash(script, hashType, tx, idx, cachedPrefix): # ([]byte, error) {
+def calcSignatureHash(script, hashType, tx, idx, cachedPrefix):
     """
     CalcSignatureHash computes the signature hash for the specified input of
     the target transaction observing the desired signature hash type.  The
@@ -790,10 +757,7 @@ def calcSignatureHash(script, hashType, tx, idx, cachedPrefix): # ([]byte, error
         elif requiredSigs == SigHashSingle:
             txOuts = tx.txOut[:idx+1]
 
-        # size = sigHashPrefixSerializeSize(hashType, txIns, txOuts, idx)
-        
-
-        # prefixBuf := make([]byte, size)
+        expectedSize = sigHashPrefixSerializeSize(hashType, txIns, txOuts, idx)
 
         prefixBuf = ByteArray(b'')
 
@@ -839,6 +803,8 @@ def calcSignatureHash(script, hashType, tx, idx, cachedPrefix): # ([]byte, error
         # Commit to the lock time and expiry.
         prefixBuf += ByteArray(tx.lockTime, length=4).littleEndian()
         prefixBuf += ByteArray(tx.expiry, length=4).littleEndian()
+        if len(prefixBuf) != expectedSize:
+            raise Exception("incorrect prefix serialization size %i != %i" % (len(prefixBuf), expectedSize))
         prefixHash = hashH(prefixBuf.bytes())
 
     # The witness hash commits to the input witness data depending on
@@ -860,7 +826,7 @@ def calcSignatureHash(script, hashType, tx, idx, cachedPrefix): # ([]byte, error
     #    a) length of prevout pkscript (as varint)
     #    b) prevout pkscript (as unmodified bytes)
 
-    # expectedSize = sigHashWitnessSerializeSize(txIns, script)
+    expectedSize = sigHashWitnessSerializeSize(txIns, script)
     witnessBuf = ByteArray(b'')
 
     # Commit to the version and hash serialization type.
@@ -878,6 +844,8 @@ def calcSignatureHash(script, hashType, tx, idx, cachedPrefix): # ([]byte, error
             commitScript = b''
         witnessBuf += putVarInt(len(commitScript))
         witnessBuf += commitScript
+    if len(witnessBuf) != expectedSize:
+        raise Exception("incorrect witness serialization size %i != %i" % (len(witnessBuf), expectedSize))
     witnessHash = hashH(witnessBuf.bytes())
 
     # The final signature hash (message to sign) is the hash of the
@@ -893,7 +861,7 @@ def calcSignatureHash(script, hashType, tx, idx, cachedPrefix): # ([]byte, error
     h = hashH(sigHashBuf.bytes())
     return h
 
-def sigHashPrefixSerializeSize(hashType, txIns, txOuts, signIdx): # hashType SigHashType, txIns []*wire.TxIn, txOuts []*wire.TxOut, signIdx int) int {
+def sigHashPrefixSerializeSize(hashType, txIns, txOuts, signIdx): 
     """
     sigHashPrefixSerializeSize returns the number of bytes the passed parameters
     would take when encoded with the format used by the prefix hash portion of
@@ -919,14 +887,14 @@ def sigHashPrefixSerializeSize(hashType, txIns, txOuts, signIdx): # hashType Sig
     size = (4 + varIntSerializeSize(numTxIns) + numTxIns*(HASH_SIZE+4+1+4) +
         varIntSerializeSize(numTxOuts) + numTxOuts*(8+2) + 4 + 4)
     for txOutIdx, txOut in enumerate(txOuts):
-        pkScript = txOut.PkScript
+        pkScript = txOut.pkScript
         if hashType&sigHashMask == SigHashSingle and txOutIdx != signIdx:
             pkScript = b''
         size += varIntSerializeSize(len(pkScript))
         size += len(pkScript)
     return size
 
-def sigHashWitnessSerializeSize(txIns, signScript): # txIns []*wire.TxIn, signScript []byte) int {
+def sigHashWitnessSerializeSize(txIns, signScript):
     """
     sigHashWitnessSerializeSize returns the number of bytes the passed parameters
     would take when encoded with the format used by the witness hash portion of
@@ -948,7 +916,7 @@ def sigHashWitnessSerializeSize(txIns, signScript): # txIns []*wire.TxIn, signSc
     numTxIns = len(txIns)
     return 4 + varIntSerializeSize(numTxIns) + (numTxIns - 1) + varIntSerializeSize(len(signScript)) +  len(signScript)
 
-def pubKeyHashToAddrs(pkHash, params): # hash []byte, params *chaincfg.Params) []dcrutil.Address {
+def pubKeyHashToAddrs(pkHash, params):
     """
     pubKeyHashToAddrs is a convenience function to attempt to convert the
     passed hash to a pay-to-pubkey-hash address housed within an address
@@ -957,7 +925,7 @@ def pubKeyHashToAddrs(pkHash, params): # hash []byte, params *chaincfg.Params) [
     addrs = [crypto.newAddressPubKeyHash(pkHash, params, crypto.STEcdsaSecp256k1)]
     return addrs
 
-def extractPkScriptAddrs(version, pkScript, chainParams): # version uint16, pkScript []byte, chainParams *chaincfg.Params) (ScriptClass, []dcrutil.Address, int, error) {
+def extractPkScriptAddrs(version, pkScript, chainParams):
     """
     extractPkScriptAddrs returns the type of script, addresses and required
     signatures associated with the passed PkScript.  Note that it only works for
@@ -978,88 +946,6 @@ def extractPkScriptAddrs(version, pkScript, chainParams): # version uint16, pkSc
     # EVERYTHING AFTER TIHS IS UN-IMPLEMENTED
     raise Exception("Not a pay-to-pubkey-hash script")
 
-    # # Check for pay-to-script-hash.
-    # pkHash = extractScriptHash(pkScript)
-    # if pkHash != None:
-    #     return txscript.ScriptHashTy, scriptHashToAddrs(pkHash, chainParams), 1
-
-    # # Check for pay-to-alt-pubkey-hash script.
-    # data, sigType = extractPubKeyHashAltDetails(pkScript)
-    # if data != None:
-    #     addrs = [newAddressPubKeyHash(data, chainParams, sigType)]
-    #     return txscript.PubkeyHashAltTy, addrs, 1
-
-    # # Check for pay-to-pubkey script.
-    # data = extractPubKey(pkScript)
-    # if data != None:
-    #     pk = secp256k1.ParsePubKey(data)
-    #     addrs = [newAddressSecpPubKeyCompressed(pk, chainParams)]
-    #     return txscript.PubKeyTy, addrs, 1
-
-    # # Check for pay-to-alt-pubkey script.
-    # pk, sigType := extractPubKeyAltDetails(pkScript)
-    # if pk != None:
-    #     if sigType == dcrec.STEd25519:
-    #         addrs = [newAddressEdwardsPubKey(pk, chainParams)]
-    #     elif sigType == dcrec.STSchnorrSecp256k1:
-    #         addr = [newAddressSecSchnorrPubKey(pk, chainParams)]
-    #     return txscript.PubkeyAltTy, addrs, 1
-
-    # # Check for multi-signature script.
-    # details = extractMultisigScriptDetails(version, pkScript, True)
-    # if details.valid:
-    #     # Convert the public keys while skipping any that are invalid.
-    #     addrs = []
-    #     for i in range(details.numPubKeys):
-    #         pubkey = secp256k1.parsePubKey(details.pubKeys[i])
-    #         addrs.append(newAddressSecpPubKeyCompressed(pubkey, chainParams))
-    #     return txscript.MultiSigTy, addrs, details.requiredSigs
-
-    # # Check for stake submission script.  Only stake-submission-tagged
-    # # pay-to-pubkey-hash and pay-to-script-hash are allowed.
-    # pkHash = extractStakePubKeyHash(pkScript, opcode.OP_SSTX)
-    # if pkHash != None:
-    #     return txscript.StakeSubmissionTy, pubKeyHashToAddrs(pkHash, chainParams), 1
-    # pkHash = extractStakeScriptHash(pkScript, opcode.OP_SSTX)
-    # if pkHash != None:
-    #     return txscript.StakeSubmissionTy, scriptHashToAddrs(pkHash, chainParams), 1
-
-    # # Check for stake generation script.  Only stake-generation-tagged
-    # # pay-to-pubkey-hash and pay-to-script-hash are allowed.
-    # pkHash = extractStakePubKeyHash(pkScript, opcode.OP_SSGEN)
-    # if pkHash != None:
-    #     return txscript.StakeGenTy, pubKeyHashToAddrs(pkHash, chainParams), 1
-    # pkHash = extractStakeScriptHash(pkScript, opcode.OP_SSGEN)
-    # if pkHash != None:
-    #     return txscript.StakeGenTy, scriptHashToAddrs(pkHash, chainParams), 1
-
-    # # Check for stake revocation script.  Only stake-revocation-tagged
-    # # pay-to-pubkey-hash and pay-to-script-hash are allowed.
-    # pkHash = extractStakePubKeyHash(pkScript, opcode.OP_SSRTX)
-    # if pkHash != None:
-    #     return txscript.StakeRevocationTy, pubKeyHashToAddrs(pkHash, chainParams), 1
-    # pkHash = extractStakeScriptHash(pkScript, opcode.OP_SSRTX)
-    # if pkHash != None:
-    #     return txscript.StakeRevocationTy, scriptHashToAddrs(pkHash, chainParams), 1
-
-    # # Check for stake change script.  Only stake-change-tagged
-    # # pay-to-pubkey-hash and pay-to-script-hash are allowed.
-    # pkHash = extractStakePubKeyHash(pkScript, opcode.OP_SSTXCHANGE)
-    # if pkHash != None:
-    #     return txscript.StakeSubChangeTy, pubKeyHashToAddrs(pkHash, chainParams), 1
-    # pkHash = extractStakeScriptHash(pkScript, opcode.OP_SSTXCHANGE)
-    # if pkHash != None:
-    #     return txscript.StakeSubChangeTy, scriptHashToAddrs(pkHash, chainParams), 1
-
-    # # Check for null data script.
-    # if isNullDataScript(version, pkScript):
-    #     # Null data transactions have no addresses or required signatures.
-    #     return txscript.NullDataTy, None, 0
-
-    # # Don't attempt to extract addresses or required signatures for nonstandard
-    # # transactions.
-    # return txscript.NonStandardTy, None, 0
-
 def sign(privKey, chainParams, tx, idx, subScript, hashType, sigType):
     scriptClass, addresses, nrequired = extractPkScriptAddrs(DefaultScriptVersion, subScript, chainParams)
 
@@ -1072,8 +958,6 @@ def sign(privKey, chainParams, tx, idx, subScript, hashType, sigType):
 
     return script, scriptClass, addresses, nrequired
 
-
-# (chainParams *chaincfg.Params, tx *wire.MsgTx, idx int, pkScript []byte, class ScriptClass, addresses []dcrutil.Address, nRequired int, sigScript, prevScript []byte) []byte {
 def mergeScripts(chainParams, tx, idx, pkScript, scriptClass, addresses, nRequired, sigScript, prevScript):
     """
     mergeScripts merges sigScript and prevScript assuming they are both
@@ -1240,19 +1124,6 @@ class TestTxScript(unittest.TestCase):
         TestScriptTokenizer ensures a wide variety of behavior provided by the script
         tokenizer performs as expected.
         """
-        # type expectedResult struct {
-        #   op    byte   // expected parsed opcode
-        #   data  []byte // expected parsed data
-        #   index int32  // expected index into raw script after parsing token
-        # }
-
-        # type tokenizerTest struct {
-        #   name     string           // test description
-        #   script   []byte           // the script to tokenize
-        #   expected []expectedResult // the expected info after parsing each token
-        #   finalIdx int32            // the expected final byte index
-        #   err      error            // expected error
-        # }
 
         # Add both positive and negative tests for OP_DATA_1 through OP_DATA_75.
         tests = []
@@ -1442,6 +1313,9 @@ class TestTxScript(unittest.TestCase):
             tokenizerIdx = tokenizer.offset
             self.assertEqual(tokenizerIdx, test_finalIdx, msg="%s: unexpected final byte index -- got %d, want %d" % (test_name, tokenizerIdx, test_finalIdx))
     def test_sign_tx(self):
+        """
+        Based on dcrd TestSignTxOutput.
+        """
         # make key
         # make script based on key.
         # sign with magic pixie dust.
@@ -1551,16 +1425,6 @@ class TestTxScript(unittest.TestCase):
                         k = ByteArray(kStr)
                         privKey = crypto.privKeyFromBytes(k)
                         pkBytes = privKey.pub.serializeCompressed()
-                    # elif suite == crypto.STEd25519:
-                    #   keyDB, _, _, _ = chainec.Edwards.GenerateKey(rand.Reader)
-                    #   key, pk = chainec.Edwards.PrivKeyFromBytes(keyDB)
-                    #   pkBytes = pk.SerializeUncompressed()
-                    # elif suite == crypto.STSchnorrSecp256k1:
-                    #   keyDB, _, _, _ = chainec.SecSchnorr.GenerateKey(
-                    #       rand.Reader)
-                    #   key, pk = chainec.SecSchnorr.PrivKeyFromBytes(keyDB)
-                    #   pkBytes = pk.Serialize()
-                    # }
                     else:
                         raise Exception("test for signature suite %d not implemented" % suite)
 
@@ -1573,233 +1437,3 @@ class TestTxScript(unittest.TestCase):
 
                     self.assertEqual(sigScript, ByteArray(sigStr), msg="%d:%d:%d" % (hashType, idx, suite))
         return
-
-
-
-        #           if err := signAndCheck(msg, tx, i, pkScript, hashType,
-        #               mkGetKey(map[string]addressToKey{
-        #                   address.EncodeAddress(): {&key, false},
-        #               }), mkGetScript(nil), suite); err != nil {
-        #               t.Error(err)
-        #               break
-        #           }
-
-        #           if err := signBadAndCheck(msg, tx, i, pkScript, hashType,
-        #               mkGetKey(map[string]addressToKey{
-        #                   address.EncodeAddress(): {&key, false},
-        #               }), mkGetScript(nil), suite); err == nil {
-        #               t.Errorf("corrupted signature validated %s: %v",
-        #                   msg, err)
-        #               break
-        #           }
-        #       }
-        #   }
-        # }
-
-        # // Pay to Pubkey Hash (uncompressed) (merging with correct)
-        # for _, hashType := range hashTypes {
-        #   for _, suite := range signatureSuites {
-        #       for i := range tx.TxIn {
-        #           var keyDB, pkBytes []byte
-        #           var key chainec.PrivateKey
-        #           var pk chainec.PublicKey
-
-        #           switch suite {
-        #           case dcrec.STEcdsaSecp256k1:
-        #               keyDB, _, _, _ = secp256k1.GenerateKey(rand.Reader)
-        #               key, pk = secp256k1.PrivKeyFromBytes(keyDB)
-        #               pkBytes = pk.SerializeUncompressed()
-        #           case dcrec.STEd25519:
-        #               keyDB, _, _, _ = chainec.Edwards.GenerateKey(rand.Reader)
-        #               key, pk = chainec.Edwards.PrivKeyFromBytes(keyDB)
-        #               pkBytes = pk.SerializeUncompressed()
-        #           case dcrec.STSchnorrSecp256k1:
-        #               keyDB, _, _, _ = chainec.SecSchnorr.GenerateKey(rand.Reader)
-        #               key, pk = chainec.SecSchnorr.PrivKeyFromBytes(keyDB)
-        #               pkBytes = pk.Serialize()
-        #           }
-
-        #           msg := fmt.Sprintf("%d:%d:%d", hashType, i, suite)
-
-        #           address, err := dcrutil.NewAddressPubKeyHash(
-        #               dcrutil.Hash160(pkBytes), testingParams,
-        #               suite)
-        #           if err != nil {
-        #               t.Errorf("failed to make address for %s: %v",
-        #                   msg, err)
-        #               break
-        #           }
-
-        #           pkScript, err := PayToAddrScript(address)
-        #           if err != nil {
-        #               t.Errorf("failed to make pkscript "+
-        #                   "for %s: %v", msg, err)
-        #           }
-
-        #           sigScript, err := SignTxOutput(
-        #               testingParams, tx, i, pkScript,
-        #               hashType, mkGetKey(map[string]addressToKey{
-        #                   address.EncodeAddress(): {&key, false},
-        #               }), mkGetScript(nil), nil, suite)
-        #           if err != nil {
-        #               t.Errorf("failed to sign output %s: %v", msg,
-        #                   err)
-        #               break
-        #           }
-
-        #           // by the above loop, this should be valid, now sign
-        #           // again and merge.
-        #           sigScript, err = SignTxOutput(
-        #               testingParams, tx, i, pkScript,
-        #               hashType, mkGetKey(map[string]addressToKey{
-        #                   address.EncodeAddress(): {&key, false},
-        #               }), mkGetScript(nil), sigScript, suite)
-        #           if err != nil {
-        #               t.Errorf("failed to sign output %s a "+
-        #                   "second time: %v", msg, err)
-        #               break
-        #           }
-
-        #           err = checkScripts(msg, tx, i, sigScript, pkScript)
-        #           if err != nil {
-        #               t.Errorf("twice signed script invalid for "+
-        #                   "%s: %v", msg, err)
-        #               break
-        #           }
-        #       }
-        #   }
-        # }
-
-        # // Pay to Pubkey Hash (compressed)
-        # for _, hashType := range hashTypes {
-        #   for _, suite := range signatureSuites {
-        #       for i := range tx.TxIn {
-        #           var keyDB, pkBytes []byte
-        #           var key chainec.PrivateKey
-        #           var pk chainec.PublicKey
-
-        #           switch suite {
-        #           case dcrec.STEcdsaSecp256k1:
-        #               keyDB, _, _, _ = secp256k1.GenerateKey(rand.Reader)
-        #               key, pk = secp256k1.PrivKeyFromBytes(keyDB)
-        #               pkBytes = pk.SerializeCompressed()
-        #           case dcrec.STEd25519:
-        #               keyDB, _, _, _ = chainec.Edwards.GenerateKey(rand.Reader)
-        #               key, pk = chainec.Edwards.PrivKeyFromBytes(keyDB)
-        #               pkBytes = pk.SerializeCompressed()
-        #           case dcrec.STSchnorrSecp256k1:
-        #               keyDB, _, _, _ = chainec.SecSchnorr.GenerateKey(rand.Reader)
-        #               key, pk = chainec.SecSchnorr.PrivKeyFromBytes(keyDB)
-        #               pkBytes = pk.SerializeCompressed()
-        #           }
-
-        #           msg := fmt.Sprintf("%d:%d:%d", hashType, i, suite)
-
-        #           address, err := dcrutil.NewAddressPubKeyHash(
-        #               dcrutil.Hash160(pkBytes), testingParams,
-        #               suite)
-        #           if err != nil {
-        #               t.Errorf("failed to make address for %s: %v",
-        #                   msg, err)
-        #               break
-        #           }
-
-        #           pkScript, err := PayToAddrScript(address)
-        #           if err != nil {
-        #               t.Errorf("failed to make pkscript "+
-        #                   "for %s: %v", msg, err)
-        #           }
-
-        #           if err := signAndCheck(msg, tx, i, pkScript, hashType,
-        #               mkGetKey(map[string]addressToKey{
-        #                   address.EncodeAddress(): {&key, true},
-        #               }), mkGetScript(nil), suite); err != nil {
-        #               t.Error(err)
-        #               break
-        #           }
-
-        #           if err := signBadAndCheck(msg, tx, i, pkScript, hashType,
-        #               mkGetKey(map[string]addressToKey{
-        #                   address.EncodeAddress(): {&key, true},
-        #               }), mkGetScript(nil), suite); err == nil {
-        #               t.Errorf("corrupted signature validated %s: %v",
-        #                   msg, err)
-        #               break
-        #           }
-        #       }
-        #   }
-        # }
-
-        # // Pay to Pubkey Hash (compressed) with duplicate merge
-        # for _, hashType := range hashTypes {
-        #   for _, suite := range signatureSuites {
-        #       for i := range tx.TxIn {
-        #           var keyDB, pkBytes []byte
-        #           var key chainec.PrivateKey
-        #           var pk chainec.PublicKey
-
-        #           switch suite {
-        #           case dcrec.STEcdsaSecp256k1:
-        #               keyDB, _, _, _ = secp256k1.GenerateKey(rand.Reader)
-        #               key, pk = secp256k1.PrivKeyFromBytes(keyDB)
-        #               pkBytes = pk.SerializeCompressed()
-        #           case dcrec.STEd25519:
-        #               keyDB, _, _, _ = chainec.Edwards.GenerateKey(rand.Reader)
-        #               key, pk = chainec.Edwards.PrivKeyFromBytes(keyDB)
-        #               pkBytes = pk.SerializeCompressed()
-        #           case dcrec.STSchnorrSecp256k1:
-        #               keyDB, _, _, _ = chainec.SecSchnorr.GenerateKey(rand.Reader)
-        #               key, pk = chainec.SecSchnorr.PrivKeyFromBytes(keyDB)
-        #               pkBytes = pk.SerializeCompressed()
-        #           }
-
-        #           msg := fmt.Sprintf("%d:%d:%d", hashType, i, suite)
-
-        #           address, err := dcrutil.NewAddressPubKeyHash(
-        #               dcrutil.Hash160(pkBytes), testingParams,
-        #               suite)
-        #           if err != nil {
-        #               t.Errorf("failed to make address for %s: %v",
-        #                   msg, err)
-        #               break
-        #           }
-
-        #           pkScript, err := PayToAddrScript(address)
-        #           if err != nil {
-        #               t.Errorf("failed to make pkscript "+
-        #                   "for %s: %v", msg, err)
-        #           }
-
-        #           sigScript, err := SignTxOutput(testingParams,
-        #               tx, i, pkScript, hashType,
-        #               mkGetKey(map[string]addressToKey{
-        #                   address.EncodeAddress(): {&key, true},
-        #               }), mkGetScript(nil), nil, suite)
-        #           if err != nil {
-        #               t.Errorf("failed to sign output %s: %v", msg,
-        #                   err)
-        #               break
-        #           }
-
-        #           // by the above loop, this should be valid, now sign
-        #           // again and merge.
-        #           sigScript, err = SignTxOutput(testingParams,
-        #               tx, i, pkScript,
-        #               hashType, mkGetKey(map[string]addressToKey{
-        #                   address.EncodeAddress(): {&key, true},
-        #               }), mkGetScript(nil), sigScript, suite)
-        #           if err != nil {
-        #               t.Errorf("failed to sign output %s a "+
-        #                   "second time: %v", msg, err)
-        #               break
-        #           }
-
-        #           err = checkScripts(msg, tx, i, sigScript, pkScript)
-        #           if err != nil {
-        #               t.Errorf("twice signed script invalid for "+
-        #                   "%s: %v", msg, err)
-        #               break
-        #           }
-        #       }
-        #   }
-        # }

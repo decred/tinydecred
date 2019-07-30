@@ -1,6 +1,5 @@
 """
 Copyright (c) 2019, Brian Stafford
-Copyright (c) 2019, The Decred developers
 See LICENSE for detail
 """
 import os

@@ -329,28 +329,3 @@ def minimizeAy(*args, grains=100, **kwargs):
             lowest = A.attackCost
             result = A
     return result
-
-# def hueGenerator():
-#     denominator = 2
-#     numerator = 1
-# # todo: translate from js
-# #    this.generateHue = function(){
-#  #        // Generates colors on the sequence 0, 1/2, 1/4, 3/4, 1/8, 3/8, 5/8, 7/8, 1/16, ...
-#  #        while(self.colorDenominator < 512){ //Should generate a little more than 100 unique values
-#  #            if(self.colorNumerator == 0){
-#  #                self.colorNumerator += 1
-#  #                return 0;
-#  #            }
-#  #            if(self.colorNumerator >= self.colorDenominator){
-#  #                self.colorNumerator = 1; // reset the numerator
-#  #                self.colorDenominator *= 2; // double the denominator
-#  #                continue;
-#  #            }
-#  #            hue = self.colorNumerator/self.colorDenominator*360
-#  #            self.colorNumerator += 2;
-#  #            return hue
-#  #        }
-#  #        self.colorNumerator = 0
-#  #        self.colorDenominator = 2
-#  #        return self.generateHue()
-#  #    }

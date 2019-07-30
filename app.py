@@ -13,7 +13,6 @@ from tinydecred.pydecred import constants as DCR
 from tinydecred.pydecred.dcrdata import DcrdataBlockchain
 from tinydecred.wallet import Wallet
 from tinydecred.ui import screens, ui, qutilities as Q
-from tinydecred.util.database import KeyValueDatabase
 
 # The directory of the tinydecred package.
 PACKAGEDIR = os.path.dirname(os.path.realpath(__file__))
@@ -83,7 +82,6 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         """
         super().__init__()
         self.qApp = qApp
-        self.dbManager = KeyValueDatabase(os.path.join(self.netDirectory(), "tiny.db"))
         self.wallet = None
         # Some CSS-styled elements to be updated if dark mode is enabled/disabled.
         self.trackedCssItems = []
@@ -108,7 +106,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
 
         # The initialized DcrdataBlockchain will not be connected, as that is a
         # blocking operation. Connect will be called in a QThread in `initDCR`.
-        self.dcrdata = DcrdataBlockchain(self.dbManager, cfg.net, self.getNetSetting("dcrdata"))
+        self.dcrdata = DcrdataBlockchain(os.path.join(self.netDirectory(), "dcr.db"), cfg.net, self.getNetSetting("dcrdata"))
 
         # appWindow is the main application window. The TinyDialog class has 
         # methods for organizing a stack of Screen widgets. 
@@ -489,6 +487,7 @@ if __name__ == '__main__':
     logDir = os.path.join(config.DATA_DIR, "logs")
     helpers.mkdir(logDir)
     log = helpers.prepareLogger("APP", os.path.join(logDir, "tinydecred.log"), logLvl=0)
-    log.debug("configuration file at %s"  % config.CONFIG_PATH)
+    log.info("configuration file at %s"  % config.CONFIG_PATH)
+    log.info("data directory at %s" % config.DATA_DIR)
     runTinyDecred()
 

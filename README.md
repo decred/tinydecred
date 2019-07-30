@@ -1,6 +1,8 @@
 # TinyDecred
 
-A Python 3 library for Decred. 
+A Python 3 Decred toolkit. The modules in TinyDecred can be used to integrate 
+Decred into Python projects. Everything needed to create wallets to send and
+receive DCR.
 
 ## Features
 
@@ -36,7 +38,7 @@ remarkably stable.
 
 ## Wallet
 
-TinyDecred is the name of the package, as well as the experimental light wallet
+TinyDecred is the name of the package as well as the experimental light wallet
 GUI application. 
 **The light wallet is experimental, and should not be used on mainnet.**
 
@@ -59,7 +61,7 @@ unobtrusive part of your digital environment.
 The small dialog size keeps user interactions focused.
 Bells and whistles are minimized in favor of simplicity whenever possible.
 Blockchain mechanics are invisible. 
-The goal is to make using Decred easier than pulling change out of your pocket. 
+The goal is to make using Decred easier than pulling change out of your pocket.
 
 ## Roadmap
 
@@ -72,7 +74,7 @@ In no particular order
 - Decred DEX integration
 - Lightning network
 
-[screenshot]: https://user-images.githubusercontent.com/6109680/60224645-ed6e3200-9848-11e9-8d9b-5c4586839186.png
+[screenshot]: https://user-images.githubusercontent.com/6109680/62095772-08b4ce80-b247-11e9-81ae-66931ebb07be.png
 
 
 

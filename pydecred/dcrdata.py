@@ -24,6 +24,7 @@ from tinydecred.crypto.bytearray import ByteArray
 from tinydecred.api import InsufficientFundsError
 from tinydecred.pydecred import txscript, simnet
 from tinydecred.pydecred.wire import msgtx, wire, msgblock
+from tinydecred.util.database import KeyValueDatabase
 
 log = helpers.getLogger("DCRDATA") # , logLvl=0)
 
@@ -429,7 +430,7 @@ class UTXO(object):
         self.height = height
         self.amount = amount
         self.satoshis = satoshis
-        self.maturity = None
+        self.maturity = maturity
     def __tojson__(self):
         return {
             "address": self.address,
@@ -464,7 +465,7 @@ class UTXO(object):
         self.ts = block.timestamp
     def isSpendable(self, tipHeight):
         if self.maturity:
-            return self.maturity < tipHeight
+            return self.maturity <= tipHeight
         return self.height > -1
     def key(self):
         return UTXO.makeKey(self.txid, self.vout)
@@ -709,14 +710,13 @@ class DcrdataBlockchain(object):
     """
     DcrdataBlockchain implements the Blockchain API from tinydecred.api.
     """
-    def __init__(self, db, params, datapath):
+    def __init__(self, dbPath, params, datapath):
         """
         Args:
-            db (KeyValueDatabase): A key-value database for storing blocks
-                and transactions.
+            db (string): A database file path. 
             params obj: Network parameters.
         """
-        self.db = db
+        self.db = KeyValueDatabase(dbPath)
         self.params = params
         # The blockReceiver and addressReceiver will be set when the respective 
         # subscribe* method is called.
