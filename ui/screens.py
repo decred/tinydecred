@@ -654,14 +654,17 @@ class InitializationScreen(Screen):
         if pw is None or pw == "":
             app.appWindow.showError("you must enter a password to create a wallet")
         else:
-            app.waitThread(Wallet.create, self.walletCreationComplete, app.walletFilename(), pw, cfg.net)
-    def walletCreationComplete(self, ret):
+            def create():
+                try:
+                    words, wallet = Wallet.create(app.walletFilename(), pw, cfg.net)
+                    wallet.open(0, pw, app.dcrdata, app.blockchainSignals)
+                    return words, wallet
+                except Exception as e:
+                    log.error("failed to create wallet: %s" % formatTraceback(e))
+            app.waitThread(create, self.finishInit)
+    def finishInit(self, ret):
         """
-        Receives the result from new wallet creation.
-
-        Args:
-            ret (None or tuple(list(str), Wallet)): The wallet and mnemonic seed
-                if creation was successful. None if failed. 
+        The callback from new wallet creation.
         """
         app = self.app
         if ret:
@@ -909,12 +912,31 @@ class MnemonicRestorer(Screen):
         if not words:
             app.appWindow.showError("enter words to create a wallet")
         else:
-            def create(pw, words):
+            def pwcb(pw, words):
                 if pw:
-                    app.waitThread(Wallet.createFromMnemonic, self.walletCreationComplete, words, app.walletFilename(), pw, cfg.net)
+                    def create():
+                        try:
+                            wallet = Wallet.createFromMnemonic(words, app.walletFilename(), pw, cfg.net)
+                            wallet.open(0, pw, app.dcrdata, app.blockchainSignals)
+                            return wallet
+                        except Exception as e:
+                            log.error("failed to create wallet: %s" % formatTraceback(e))
+                    app.waitThread(create, self.finishCreation)
                 else:
                     app.appWindow.showError("must enter a password to recreate the wallet")
-            app.getPassword(create, words)
+            app.getPassword(pwcb, words)
+    def finishCreation(self, ret):
+        """
+        The callback from new wallet creation.
+        """
+        app = self.app
+        if ret:
+            wallet = ret
+            app.saveSettings()
+            app.setWallet(wallet)
+            app.home()
+        else:
+            app.appWindow.showError("failed to create wallet")
     def walletCreationComplete(self, wallet):
         """
         Receives the result from wallet creation.

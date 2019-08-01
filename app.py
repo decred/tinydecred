@@ -106,7 +106,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
 
         # The initialized DcrdataBlockchain will not be connected, as that is a
         # blocking operation. Connect will be called in a QThread in `initDCR`.
-        self.dcrdata = DcrdataBlockchain(os.path.join(self.netDirectory(), "dcr.db"), cfg.net, self.getNetSetting("dcrdata"))
+        self.dcrdata = DcrdataBlockchain(os.path.join(self.netDirectory(), "dcr.db"), cfg.net, self.getNetSetting("dcrdata"), skipConnect=True)
 
         # appWindow is the main application window. The TinyDialog class has 
         # methods for organizing a stack of Screen widgets. 
@@ -133,6 +133,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
             def openw(path, pw):
                 try:
                     w = Wallet.openFile(path, pw)
+                    w.open(0, pw, self.dcrdata, self.blockchainSignals)
                     self.appWindow.pop(self.pwDialog)
                     return w
                 except Exception as e:
@@ -168,6 +169,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
             *args: Positional arguments passed to f.
             **kwargs: Keyword arguments passed directly to f.
         """
+        cb = cb if cb else lambda *a, **k: None
         self.waiting()
         def unwaiting(*cba, **cbk):
             self.appWindow.pop(self.waitingScreen)
@@ -338,7 +340,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         def step2(pw, a, k):
             self.emitSignal(ui.WORKING_SIGNAL)
             try:
-                with self.wallet.open(pw, self.dcrdata, self.blockchainSignals) as w:
+                with self.wallet.open(0, pw, self.dcrdata, self.blockchainSignals) as w:
                     r = f(w, *a, **k)
                     self.appWindow.pop(self.waitingScreen)
                     self.appWindow.pop(self.pwDialog)
@@ -358,7 +360,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         if wallet and wallet.openAccount and self.dcrdata:
             wallet.lock()
             self.emitSignal(ui.WORKING_SIGNAL)
-            self.makeThread(wallet.sync, self.doneSyncing, self.dcrdata, self.blockchainSignals)
+            self.makeThread(wallet.sync, self.doneSyncing)
     def doneSyncing(self, res):
         """
         The wallet sync is complete. Close and lock the wallet. 

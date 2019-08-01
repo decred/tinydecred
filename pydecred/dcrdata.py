@@ -466,7 +466,7 @@ class UTXO(object):
     def isSpendable(self, tipHeight):
         if self.maturity:
             return self.maturity <= tipHeight
-        return self.height > -1
+        return True
     def key(self):
         return UTXO.makeKey(self.txid, self.vout)
     @staticmethod
@@ -571,6 +571,15 @@ def getP2PKHOpCode(pkScript):
     # this should always be the case for now.
     return opNonstake
 
+def spendScriptSize(pkScript):
+    # Unspent credits are currently expected to be either P2PKH or
+    # P2PK, P2PKH/P2SH nested in a revocation/stakechange/vote output.
+    scriptClass = txscript.getScriptClass(txscript.DefaultScriptVersion, pkScript)
+
+    if scriptClass == txscript.PubKeyHashTy:
+        return RedeemP2PKHSigScriptSize
+    raise Exception("unimplemented")
+
 def estimateInputSize(scriptSize):
     """
     estimateInputSize returns the worst case serialize size estimate for a tx input
@@ -650,7 +659,6 @@ def estimateSerializeSize(scriptSizes, txOuts, changeScriptSize):
     if changeScriptSize > 0:
         changeSize = estimateOutputSize(changeScriptSize)
         outputCount += 1
-
     # 12 additional bytes are for version, locktime and expiry.
     return (12 + (2 * wire.varIntSerializeSize(inputCount)) +
         wire.varIntSerializeSize(outputCount) +
@@ -658,18 +666,24 @@ def estimateSerializeSize(scriptSizes, txOuts, changeScriptSize):
         sumOutputSerializeSizes(txOuts) +
         changeSize)
 
-def feeForSerializeSize(relayFeePerKb, txSerializeSize):
+def calcMinRequiredTxRelayFee(relayFeePerKb, txSerializeSize):
     """
-    feeForSerializeSize calculates the required fee for a transaction of some
-    arbitrary size given a mempool's relay fee policy.
+    calcMinRequiredTxRelayFee returns the minimum transaction fee required for a
+    transaction with the passed serialized size to be accepted into the memory
+    pool and relayed.
 
     Args:
-        feeForSerializeSize (float): The fee per kilobyte.
+        relayFeePerKb (float): The fee per kilobyte.
         txSerializeSize int: (Size) of the byte-encoded transaction.
 
     Returns:
         int: Fee in atoms.
     """
+    # Calculate the minimum fee for a transaction to be allowed into the
+    # mempool and relayed by scaling the base fee (which is the minimum
+    # free transaction relay fee).  minTxRelayFee is in Atom/KB, so
+    # multiply by serializedSize (which is in bytes) and divide by 1000 to
+    # get minimum Atoms.
     fee = relayFeePerKb * txSerializeSize / 1000
 
     if fee == 0 and relayFeePerKb > 0:
@@ -710,11 +724,13 @@ class DcrdataBlockchain(object):
     """
     DcrdataBlockchain implements the Blockchain API from tinydecred.api.
     """
-    def __init__(self, dbPath, params, datapath):
+    def __init__(self, dbPath, params, datapath, skipConnect=False):
         """
         Args:
-            db (string): A database file path. 
-            params obj: Network parameters.
+            dbPath str: A database file path
+            params obj: Network parameters
+            datapath str: A uri for a dcrdata server
+            skipConnect bool: Skip initial connection
         """
         self.db = KeyValueDatabase(dbPath)
         self.params = params
@@ -729,7 +745,13 @@ class DcrdataBlockchain(object):
         self.headerDB = self.db.getBucket("header")
         self.txBlockMap = self.db.getBucket("blocklink")
         self.tip = None
+        if not skipConnect:
+            self.connect()
+
     def connect(self):
+        """
+        Connect to dcrdata.
+        """
         self.dcrdata = DcrdataClient(
             self.datapath, 
             customPaths=(
@@ -740,6 +762,12 @@ class DcrdataBlockchain(object):
             emitter=self.pubsubSignal,
         )
         self.updateTip()
+    def close(self):
+        """
+        close any underlying connections.
+        """
+        if self.dcrdata:
+            self.dcrdata.close()
     def subscribeBlocks(self, receiver):
         """
         Subscribe to new block notifications.
@@ -965,7 +993,7 @@ class DcrdataBlockchain(object):
         with self.heightMap as heightMap, self.headerDB as headers:
             heightMap[header.height] = bHash
             headers[bHash] = header.serialize().bytes()
-    def sendToAddress(self, value, address, keysource, utxosource):
+    def sendToAddress(self, value, address, keysource, utxosource, feeRate=None):
         """
         Send the amount in atoms to the specified address.
 
@@ -984,7 +1012,7 @@ class DcrdataBlockchain(object):
         """
         self.updateTip()
         outputs = makeOutputs([(address, value)], self.params)
-        return self.sendOutputs(outputs, keysource, utxosource)
+        return self.sendOutputs(outputs, keysource, utxosource, feeRate)
     def broadcast(self, txHex):
         """
         Broadcast the hex encoded transaction to dcrdata.
@@ -1035,8 +1063,6 @@ class DcrdataBlockchain(object):
         return txscript.makePayToAddrScript(changeAddress, self.params)
     def approveUTXO(self, utxo):
         # If the UTXO appears unconfirmed, see if it can be confirmed.
-        if utxo.height == -1 and not self.confirmUTXO(utxo):
-            return False
         if utxo.maturity and self.tip["height"] < utxo.maturity:
             return False
         return True
@@ -1053,7 +1079,7 @@ class DcrdataBlockchain(object):
         except:
             pass
         return False
-    def sendOutputs(self, outputs, keysource, utxosource): # , minconf=1, randomizeChangeIdx=True):
+    def sendOutputs(self, outputs, keysource, utxosource, feeRate=None): # , minconf=1, randomizeChangeIdx=True):
         """
         Send the `TxOut`s to the address. 
 
@@ -1088,13 +1114,12 @@ class DcrdataBlockchain(object):
         changeScriptVersion = txscript.DefaultScriptVersion
         changeScriptSize = P2PKHPkScriptSize
 
-        relayFeePerKb = self.relayFee()
+        relayFeePerKb = feeRate * 1e3 if feeRate else self.relayFee()
         for txout in outputs:
             checkOutput(txout, relayFeePerKb)
 
-        maxSignedSize = estimateSerializeSize([RedeemP2PKHSigScriptSize], outputs, changeScriptSize)
-        targetFee = feeForSerializeSize(relayFeePerKb, maxSignedSize)
-
+        signedSize = estimateSerializeSize([RedeemP2PKHSigScriptSize], outputs, changeScriptSize)
+        targetFee = calcMinRequiredTxRelayFee(relayFeePerKb, signedSize)
         targetAmount = sum(txo.value for txo in outputs)
 
         while True:
@@ -1107,26 +1132,24 @@ class DcrdataBlockchain(object):
                 txout = tx.txOut[utxo.vout]
 
                 opCodeClass = getP2PKHOpCode(txout.pkScript)
-
                 tree = wire.TxTreeRegular if opCodeClass == opNonstake else wire.TxTreeStake
                 op = msgtx.OutPoint(
                     txHash=tx.hash(), 
                     idx=utxo.vout, 
                     tree=tree
                 )
-
                 txIn = msgtx.TxIn(previousOutPoint=op, valueIn=txout.value)
 
                 total += txout.value
                 inputs.append(txIn)
                 scripts.append(txout.pkScript)
-                scriptSizes.append(len(txout.pkScript))
+                scriptSizes.append(spendScriptSize(txout.pkScript))
 
-            maxSignedSize = estimateSerializeSize(scriptSizes, outputs, changeScriptSize)
-            maxRequiredFee = feeForSerializeSize(relayFeePerKb, maxSignedSize)
+            signedSize = estimateSerializeSize(scriptSizes, outputs, changeScriptSize)
+            requiredFee = calcMinRequiredTxRelayFee(relayFeePerKb, signedSize)
             remainingAmount = total - targetAmount
-            if remainingAmount < maxRequiredFee:
-                targetFee = maxRequiredFee
+            if remainingAmount < requiredFee:
+                targetFee = requiredFee
                 continue
 
             newTx = msgtx.MsgTx(
@@ -1142,7 +1165,7 @@ class DcrdataBlockchain(object):
             change = None
             newUTXOs = []
             changeVout = -1
-            changeAmount = round(total - targetAmount - maxRequiredFee)
+            changeAmount = round(total - targetAmount - requiredFee)
             if changeAmount != 0 and not isDustAmount(changeAmount, changeScriptSize, relayFeePerKb):
                 if len(changeScript) > txscript.MaxScriptElementSize:
                     raise Exception("script size exceed maximum bytes pushable to the stack")
@@ -1154,7 +1177,7 @@ class DcrdataBlockchain(object):
                 changeVout = len(newTx.txOut)
                 newTx.txOut.append(change)
             else:
-                maxSignedSize = estimateSerializeSize(scriptSizes, newTx.txOut, 0)
+                signedSize = estimateSerializeSize(scriptSizes, newTx.txOut, 0)
 
             # dcrwallet conditionally randomizes the change position here
             if len(newTx.txIn) != len(scripts):
@@ -1165,10 +1188,9 @@ class DcrdataBlockchain(object):
                 pkScript = scripts[i]
                 sigScript = txin.signatureScript
                 scriptClass, addrs, numAddrs = txscript.extractPkScriptAddrs(0, pkScript, self.params)
-                privKey = keysource.priv(addrs[0].string()) # acct.getPrivKeyForAddress(addrs[0].string())
+                privKey = keysource.priv(addrs[0].string())
                 script = txscript.signTxOutput(privKey, self.params, newTx, i, pkScript, txscript.SigHashAll, sigScript, crypto.STEcdsaSecp256k1)
                 txin.signatureScript = script
-
             self.broadcast(newTx.txHex())
             if change:
                 newUTXOs.append(UTXO(
@@ -1180,6 +1202,7 @@ class DcrdataBlockchain(object):
                     amount = changeAmount*1e-8,
                     satoshis = changeAmount,
                 ))
+
             return newTx, utxos, newUTXOs
 
 class TestDcrdata(unittest.TestCase):
@@ -1224,3 +1247,4 @@ class TestDcrdata(unittest.TestCase):
             blockchain = DcrdataBlockchain(db, simnet, "http://localhost:7777")
             blockchain.connect()
             blockchain.blockHeader("00000e0cae637353e73ad85fc0073ebb7ed00a0668b068b376a6aef2812e1bf3")
+

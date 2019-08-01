@@ -524,13 +524,21 @@ Yucatan"""
 
 def pgWords():
 	wordList = alternatingWords.split("\n")
-	idxMap = {} # make(map[string]uint16, len(wordList))
+	idxMap = {}
 	for i, word in enumerate(wordList):
 		idxMap[word.lower()] = i
 	return wordList, idxMap
 
 def encode(seed):
-	# words := make([]string, len(seed)+1) // Extra word for checksumByte
+	"""
+	Encode the seed to a mnemonic seed.
+
+	Args:
+		seed (ByteArray): The seed to encode.
+
+	Returns:
+		list(str): A mnemonic seed.
+	"""
 	if isinstance(seed, ByteArray):
 		seed = seed.bytes()
 	wordList, _ = pgWords()

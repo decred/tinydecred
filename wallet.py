@@ -107,10 +107,10 @@ class Wallet(object):
         seed = userSeed.bytes() if userSeed else crypto.generateSeed(crypto.KEY_SIZE)
         pw = password.encode()
         # Create the keys and coin type account, using the seed, the public password, private password and blockchain params.
-        wallet.acctManager = createNewAccountManager(seed, ''.encode(), pw, chain)
+        wallet.acctManager = createNewAccountManager(seed, b'', pw, chain)
         wallet.fileKey = crypto.SecretKey(pw)
-        wallet.selectedAccount = wallet.openAccount = wallet.acctManager.openAccount(0, password.encode())
-        wallet.save()
+        wallet.selectedAccount = wallet.acctManager.openAccount(0, password)
+        wallet.close()
 
         if userSeed:
             # No mnemonic seed is retured when the user provided the seed.
@@ -179,23 +179,26 @@ class Wallet(object):
         wallet = tinyjson.load(fileKey.decrypt(bytes.fromhex(wrapper["wallet"])).decode())
         wallet.path = path
         wallet.fileKey = fileKey
-        wallet.selectedAccount = wallet.openAccount = wallet.acctManager.openAccount(0, pw)
-        wallet.save()
+        wallet.selectedAccount = wallet.acctManager.openAccount(0, password)
+        wallet.close()
         return wallet
-    def open(self, password, blockchain, signals):
+    def open(self, acct, password, blockchain, signals):
         """
         Open an account. The Wallet is returned so that it can be used in 
             `with ... as` block for context management. 
 
         Args:
-            password (str): Wallet password. Should be the same as used to open the 
-                wallet. 
+            acct (int): The account number to open
+            password (str): Wallet password. Should be the same as used to open 
+                the wallet
+            blockchain: An api.Blockchain for the account
+            signals: An api.Signals 
 
         Returns: 
             Wallet: The wallet with the default account open.
         """
         self.setAccountHandlers(blockchain, signals)
-        self.selectedAccount = self.openAccount = self.acctManager.openAccount(0, password)
+        self.selectedAccount = self.openAccount = self.acctManager.openAccount(acct, password)
         return self
     def lock(self):
         """
@@ -259,7 +262,8 @@ class Wallet(object):
         Get the next unused external address.
         """
         a = self.selectedAccount.getNextPaymentAddress()
-        self.blockchain.subscribeAddresses(a)
+        if self.blockchain:
+            self.blockchain.subscribeAddresses(a)
         self.save()
         return a
     def paymentAddress(self):
@@ -365,17 +369,11 @@ class Wallet(object):
         if matches:
             # signal the balance update
             self.signals.balance(acct.calcBalance(self.blockchain.tip["height"]))
-    def sync(self, blockchain, signals):
+    def sync(self):
         """
         Synchronize the UTXO set with the server. This should be the first
         action after the account is opened or changed.
-
-        Args:
-            blockchain (Blockchain): An object that implements the Blockchain 
-                API.
-            signals (Signals): An object that implements the Signals API.
         """
-        self.setAccountHandlers(blockchain, signals)
         acctManager = self.acctManager
         acct = acctManager.account(0)
         gapPolicy = 5
@@ -387,20 +385,21 @@ class Wallet(object):
         addresses = acct.allAddresses()
         
         # Update the account with known UTXOs.
-        blockchainUTXOs = blockchain.UTXOs(addresses)
+        chain = self.blockchain
+        blockchainUTXOs = chain.UTXOs(addresses)
         acct.resolveUTXOs(blockchainUTXOs)
 
         # Subscribe to block and address updates.
-        blockchain.subscribeBlocks(self.blockSignal)
+        chain.subscribeBlocks(self.blockSignal)
         watchAddresses = acct.addressesOfInterest()
         if watchAddresses:
-            blockchain.subscribeAddresses(watchAddresses, self.addressSignal)
+            chain.subscribeAddresses(watchAddresses, self.addressSignal)
         # Signal the new balance.
         b = acct.calcBalance(self.blockchain.tip["height"])
         self.signals.balance(b)
         self.save()
         return True
-    def sendToAddress(self, value, address):
+    def sendToAddress(self, value, address, feeRate=None):
         """
         Send the value to the address. 
 
@@ -416,10 +415,7 @@ class Wallet(object):
             priv = self.getKey,
             change = acct.getChangeAddress,
         )
-        try:
-            tx, spentUTXOs, newUTXOs = self.blockchain.sendToAddress(value, address, keysource, self.getUTXOs)
-        except:
-            return None
+        tx, spentUTXOs, newUTXOs = self.blockchain.sendToAddress(value, address, keysource, self.getUTXOs, feeRate)
         acct.addMempoolTx(tx)
         acct.spendUTXOs(spentUTXOs)
         for utxo in newUTXOs:

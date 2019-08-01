@@ -13,7 +13,7 @@ import hashlib
 import hmac
 from tinydecred.util import tinyjson, helpers
 from tinydecred import api
-from tinydecred.pydecred import mainnet, simnet, testnet, constants as DCR
+from tinydecred.pydecred import nets, constants as DCR
 from tinydecred.crypto import crypto
 from tinydecred.crypto.rando import generateSeed
 from tinydecred.crypto.bytearray import ByteArray
@@ -46,7 +46,7 @@ def setNetwork(acct):
     # will be needed.
 
     if acct.coinID == CoinSymbols.decred:
-        for net in (mainnet, simnet, testnet):
+        for net in (nets.mainnet, nets.simnet, nets.testnet):
             if net.Name == acct.netID:
                 acct.net = net
                 return
@@ -155,6 +155,11 @@ class Balance(object):
         return Balance(
             total = obj["total"],
             available = obj["available"]
+        )
+    def __repr__(self):
+        return (
+            "Balance(total=%.8f, available=%.8f)" % 
+            (self.total*1e-8, self.available*1e-8)
         )
 tinyjson.register(Balance)
 
@@ -837,18 +842,18 @@ class TestAccounts(unittest.TestCase):
         helpers.prepareLogger("TestTinyCrypto")
         # log.setLevel(0)
     def test_child_neuter(self):
-        extKey = newMaster(testSeed, mainnet)
+        extKey = newMaster(testSeed, nets.mainnet)
         extKey.child(0)
         pub = extKey.neuter()
         self.assertEqual(pub.string(), "dpubZ9169KDAEUnyo8vdTJcpFWeaUEKH3G6detaXv46HxtQcENwxGBbRqbfTCJ9BUnWPCkE8WApKPJ4h7EAapnXCZq1a9AqWWzs1n31VdfwbrQk")
     def test_accounts(self):
         pw = "abc".encode()
-        am = createNewAccountManager(testSeed, bytearray(0), pw, mainnet)
-        rekey = am.acctPrivateKey(0, mainnet, pw)
+        am = createNewAccountManager(testSeed, bytearray(0), pw, nets.mainnet)
+        rekey = am.acctPrivateKey(0, nets.mainnet, pw)
         pubFromPriv = rekey.neuter()
-        addr1 = pubFromPriv.deriveChildAddress(5, mainnet)
-        pubKey = am.acctPublicKey(0, mainnet, "")
-        addr2 = pubKey.deriveChildAddress(5, mainnet)
+        addr1 = pubFromPriv.deriveChildAddress(5, nets.mainnet)
+        pubKey = am.acctPublicKey(0, nets.mainnet, "")
+        addr2 = pubKey.deriveChildAddress(5, nets.mainnet)
         self.assertEqual(addr1, addr2)
         acct = am.openAccount(0, pw)
         for n in range(20):
@@ -885,7 +890,7 @@ class TestAccounts(unittest.TestCase):
         acct.spendUTXO(utxo)
         self.assertEqual(utxocount(), 0)
     def test_newmaster(self):
-        kpriv = newMaster(testSeed, mainnet)
+        kpriv = newMaster(testSeed, nets.mainnet)
         # --extKey: f2418d00085be520c6449ddb94b25fe28a1944b5604193bd65f299168796f862
         # --kpub: 0317a47499fb2ef0ff8dc6133f577cd44a5f3e53d2835ae15359dbe80c41f70c9b
         # --kpub_branch0: 02dfed559fddafdb8f0041cdd25c4f9576f71b0e504ce61837421c8713f74fb33c
@@ -908,7 +913,7 @@ class TestAccounts(unittest.TestCase):
         self.assertEqual(kpriv01_neutered.key.hex(), kpub_branch0_child1.key.hex())
     def test_change_addresses(self):
         pw = "abc".encode()
-        acctManager = createNewAccountManager(testSeed, bytearray(0), pw, mainnet)
+        acctManager = createNewAccountManager(testSeed, bytearray(0), pw, nets.mainnet)
         # acct = acctManager.account(0)
         acct = acctManager.openAccount(0, pw)
         for i in range(10):

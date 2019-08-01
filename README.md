@@ -36,7 +36,11 @@ be simply `pip`.
 You're probably okay with newer versions of PyQt5, but `5.9.2` has been 
 remarkably stable.
 
-## Wallet
+## Use
+
+[View Code Examples](examples.md)
+
+## TinyDecred GUI Wallet
 
 TinyDecred is the name of the package as well as the experimental light wallet
 GUI application. 

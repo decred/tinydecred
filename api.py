@@ -145,13 +145,14 @@ class Blockchain:
         bestBlock will produce a decoded block as a Python dict.
         """
         raise Unimplemented("bestBlock not implemented")
-    def sendToAddress(self, value, address):
+    def sendToAddress(self, value, address, feeRate=None):
         """
         Send the amount in atoms to the specified address.
 
         Args:
             value int: The amount to send, in atoms.
             address str: The base-58 encoded address.
+            feeRate float: The reeRate (atoms/byte) to pay. (optional. will have a default value per-blockchain)
 
         Returns: 
             Transaction: The newly created transaction.

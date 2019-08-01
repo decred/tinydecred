@@ -14,7 +14,7 @@ from tinydecred.util import tinyjson
 
 def formatTraceback(e):
     """
-    Format an traceback for an exception. 
+    Format a traceback for an exception. 
 
     Returns: 
         str: The __str__() of the traceback, followed by the standard formatting

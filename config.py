@@ -8,7 +8,7 @@ import os
 import argparse
 from appdirs import AppDirs
 from tinydecred.util import tinyjson, helpers
-from tinydecred.pydecred import mainnet, testnet, simnet
+from tinydecred.pydecred import nets
 
 # Set the data directory in a OS-appropriate location.
 _ad = AppDirs("TinyDecred", False)
@@ -21,9 +21,9 @@ CONFIG_NAME = "tinywallet.conf"
 CONFIG_PATH = os.path.join(DATA_DIR, CONFIG_NAME)
 
 # Some decred constants.
-MAINNET = mainnet.Name
-TESTNET = testnet.Name
-SIMNET  = simnet.Name
+MAINNET = nets.mainnet.Name
+TESTNET = nets.testnet.Name
+SIMNET  = nets.simnet.Name
 
 # Network specific configuration settings.
 MainnetConfig = {
@@ -70,14 +70,14 @@ class TinyConfig:
         args = parser.parse_args()
         self.net = None
         if args.simnet:
-            self.net = simnet
+            self.net = nets.simnet
         elif args.testnet:
-            self.net = testnet
+            self.net = nets.testnet
         else:
             print("**********************************************************")
             print(" WARNING. WALLET FOR TESTING ONLY. NOT FOR USE ON MAINNET ")
             print("**********************************************************")
-            self.net = mainnet
+            self.net = nets.mainnet
         self.normalize()
     def set(self, k, v):
         """

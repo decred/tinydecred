@@ -399,6 +399,8 @@ class MsgTx:
     def txid(self):
         """ hex encoded, byte-reversed tx hash """
         return reversed(self.hash()).hex()
+    def id(self):
+        return self.txid()
     def command(self):
         """
         Command returns the protocol command string for the message.  This is part
