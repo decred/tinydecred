@@ -3,6 +3,7 @@ Copyright (c) 2019, Brian Stafford
 See LICENSE for details
 """
 import os
+import shutil
 import sys
 import time
 import calendar
@@ -215,4 +216,4 @@ def saveFile(path, contents, binary=False):
             f.write(contents)
             f.flush()
             os.fsync(f.fileno())
-        os.replace(tmpPath, path)
+        shutil.move(tmpPath, path)
