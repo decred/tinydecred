@@ -88,6 +88,18 @@ class Address:
         # reverse
         return answer[::-1]
 
+def hmacDigest(key, msg, digestmod=hashlib.sha512):
+    """
+    Get the hmac keyed hash.
+
+    Args:
+        key (byte-like): the key
+        msg (byte-like): the message
+        digestmod (digest): A hashlib digest type constant.
+    """
+    h = hmac.new(key, msg=msg, digestmod=digestmod)
+    return h.digest()
+
 def hash160(b):
     """
     A RIPEMD160 hash of the blake256 hash of the input.
@@ -122,7 +134,7 @@ def mac(key, msg):
     Returns:
         ByteArray: The authentication hash.
     """
-    return ByteArray(hmac.digest(key.bytes(), msg=msg.bytes(), digest=hashlib.sha256))
+    return ByteArray(hmacDigest(key.bytes(), msg.bytes(), hashlib.sha256))
 
 def egcd(a, b):
     """
@@ -359,7 +371,7 @@ class ExtendedKey:
         # Take the HMAC-SHA512 of the current key's chain code and the derived
         # data:
         #   I = HMAC-SHA512(Key = chainCode, Data = data)
-        ilr = ByteArray(hmac.digest(self.chainCode.b, msg=data.b, digest=hashlib.sha512))
+        ilr = ByteArray(hmacDigest(self.chainCode.b, data.b, hashlib.sha512))
 
         # Split "I" into two 32-byte sequences Il and Ir where:
         #   Il = intermediate key used to derive the child

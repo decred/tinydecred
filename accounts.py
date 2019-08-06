@@ -10,7 +10,6 @@ accounts module
 """
 import unittest
 import hashlib
-import hmac
 from tinydecred.util import tinyjson, helpers
 from tinydecred import api
 from tinydecred.pydecred import nets, constants as DCR
@@ -79,7 +78,7 @@ def newMaster(seed, network):
 
     # First take the HMAC-SHA512 of the master key and the seed data:
     # SHA512 hash is 64 bytes.
-    lr = hmac.digest(MASTER_KEY, msg=seed, digest=hashlib.sha512)
+    lr = crypto.hmacDigest(MASTER_KEY, seed)
 
     # Split "I" into two 32-byte sequences Il and Ir where:
     #   Il = master secret key
