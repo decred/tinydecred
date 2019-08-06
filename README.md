@@ -22,18 +22,21 @@ from the dcrd/wire package: `MsgTx`, `BlockHeader`, `OutPoint`, etc.
 ## Installation
 
 Install by cloning the git repo. 
-The `tinydecred` directory or a symlink will need to be in `PYTHONPATH`. 
+The parent directory of *tinydecred* will need to be in `sys.path`.  
+You can add it by setting the `PYTHONPATH` environment variable.
+Alternatively, you can put a symlink to the *tinydecred* directory in your 
+Python installation's *lib/site-packages/* directory or other `sys.path`
+directory.
 
 All dependencies are available through PyPi.
 
 ```
-sudo pip3 install PyQt5==5.9.2 websocket_client blake256 base58 pynacl appdirs
+pip install PyQt5==5.9.2 websocket_client blake256 base58 pynacl appdirs
 ```
 
-though depending on your setup, you may or may not need `sudo`, and `pip3` might
-be simply `pip`. 
+though depending on your setup, you may need `sudo`, and `pip` might be `pip3`.
 
-You're probably okay with newer versions of PyQt5, but `5.9.2` has been 
+You're probably okay to use newer versions of PyQt5, but `5.9.2` has been 
 remarkably stable.
 
 ## Use

@@ -173,6 +173,7 @@ class DcrdataClient(object):
     constructor is the path to a DCRData server, e.g. http://explorer.dcrdata.org.
     """
     timeFmt = "%Y-%m-%d %H:%M:%S"
+    rfc3339Z = "%Y-%m-%dT%H:%M:%SZ"
 
     def __init__(self, baseURI, customPaths=None, emitter=None):
         """
@@ -267,7 +268,7 @@ class DcrdataClient(object):
         return calendar.timegm(time.strptime(fmtStr, DcrdataClient.timeFmt))
     @staticmethod
     def RFC3339toUnix(fmtStr):
-        return calendar.timegm(time.strptime(fmtStr, "%Y-%m-%dT%H:%M:%SZ"))
+        return calendar.timegm(time.strptime(fmtStr, DcrdataClient.rfc3339Z))
 
 
 _subcounter = 0
