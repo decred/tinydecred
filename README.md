@@ -31,10 +31,10 @@ directory.
 All dependencies are available through PyPi.
 
 ```
-pip install PyQt5==5.9.2 websocket_client blake256 base58 pynacl appdirs
+pip3 install -r requirements.txt
 ```
 
-though depending on your setup, you may need `sudo`, and `pip` might be `pip3`.
+though depending on your setup, you may need `sudo`, and `pip3` might be `pip`.
 
 You're probably okay to use newer versions of PyQt5, but `5.9.2` has been 
 remarkably stable.
