@@ -6,7 +6,7 @@ receive DCR.
 
 ## Features
 
-1. Pure-Python secp256k1 elliptical curve.
+1. Pure-Python secp256k1 elliptic curve.
 
 1. Serializable and de-serializable python versions of important types
 from the dcrd/wire package: `MsgTx`, `BlockHeader`, `OutPoint`, etc. 
