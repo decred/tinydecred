@@ -39,9 +39,10 @@ though depending on your setup, you may need `sudo`, and `pip3` might be `pip`.
 You're probably okay to use newer versions of PyQt5, but `5.9.2` has been 
 remarkably stable.
 
-## Use
+## Examples
 
-[View Code Examples](examples.md)
+In the examples directory, there are scripts for creating and using wallets, 
+and for using dcrdata and matplotlib to plot Decred network data.
 
 ## TinyDecred GUI Wallet
 
