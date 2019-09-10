@@ -128,7 +128,7 @@ class ScriptTokenizer:
         self.version = version
         self.offset = 0
         self.op = None
-        self.data = None
+        self.d = None
         self.err = None
     def next(self):
         """
@@ -159,7 +159,7 @@ class ScriptTokenizer:
             # OP_0, and OP_[1-16] represent the data themselves.
             self.offset += 1
             self.op = op
-            self.data = None
+            self.d = ByteArray(b'')
             return True
         elif op.length > 1:
             # Data pushes of specific lengths -- OP_DATA_[1-75].
@@ -171,7 +171,7 @@ class ScriptTokenizer:
             # Move the offset forward and set the opcode and data accordingly.
             self.offset += op.length
             self.op = op
-            self.data = script[1:op.length]
+            self.d = script[1:op.length]
             return True
         elif op.length < 0:
             # Data pushes with parsed lengths -- OP_PUSHDATA{1,2,4}.
@@ -202,7 +202,7 @@ class ScriptTokenizer:
             # Move the offset forward and set the opcode and data accordingly.
             self.offset += 1 - op.length + dataLen
             self.op = op
-            self.data = script[:dataLen]
+            self.d = script[:dataLen]
             return False
 
         # The only remaining case is an opcode with length zero which is
@@ -226,6 +226,25 @@ class ScriptTokenizer:
         if self.op is None:
             return None
         return self.op.value
+    def data(self):
+        """
+        Data returns the data associated with the most recently successfully parsed
+        opcode.
+
+        Returns:
+            ByteArray: The data
+        """
+        return self.d
+    def byteIndex(self):
+        """
+        ByteIndex returns the current offset into the full script that will be 
+        parsed next and therefore also implies everything before it has already 
+        been parsed.
+
+        Returns:
+            int: the current offset
+        """
+        return self.offset
 
 def checkScriptParses(scriptVersion, script):
     """ 
@@ -353,7 +372,7 @@ def isPubKeyHashScript(script):
 def extractPubKeyHash(script):
     """
     extractPubKeyHash extracts the public key hash from the passed script if it
-    is a standard pay-to-pubkey-hash script.  It will return nil otherwise.
+    is a standard pay-to-pubkey-hash script. It will return None otherwise.
     """
     # A pay-to-pubkey-hash script is of the form:
     # OP_DUP OP_HASH160 <20-byte hash> OP_EQUALVERIFY OP_CHECKSIG
@@ -367,43 +386,321 @@ def extractPubKeyHash(script):
         return script[3:23]
     return None
 
-def payToAddrScript(netID, pkHash, chain):
+def extractScriptHash(pkScript):
+    """
+    extractScriptHash extracts the script hash from the passed script if it is a
+    standard pay-to-script-hash script.  It will return nil otherwise.
+        
+    NOTE: This function is only valid for version 0 opcodes.  Since the function
+    does not accept a script version, the results are undefined for other script
+    versions.
+    """
+    # A pay-to-script-hash script is of the form:
+    #  OP_HASH160 <20-byte scripthash> OP_EQUAL
+    if (len(pkScript) == 23 and
+        pkScript[0] == opcode.OP_HASH160 and
+        pkScript[1] == opcode.OP_DATA_20 and
+        pkScript[22] == opcode.OP_EQUAL):
+
+        return pkScript[2:22]
+    return None
+
+def isScriptHashScript(pkScript):
+    """
+    isScriptHashScript returns whether or not the passed script is a standard
+    pay-to-script-hash script.
+    """
+    return extractScriptHash(pkScript) != None
+
+def extractPubKey(script):
+    """
+    extractPubKey extracts either compressed or uncompressed public key from the
+    passed script if it is a either a standard pay-to-compressed-secp256k1-pubkey
+    or pay-to-uncompressed-secp256k1-pubkey script, respectively.  It will return
+    nil otherwise.
+    """
+    pubkey = extractCompressedPubKey(script)
+    if pubkey:
+        return pubkey
+    return extractUncompressedPubKey(script)
+
+def extractCompressedPubKey(script):
+    """
+    extractCompressedPubKey extracts a compressed public key from the passed
+    script if it is a standard pay-to-compressed-secp256k1-pubkey script.  It
+    will return nil otherwise.
+    """
+    # pay-to-compressed-pubkey script is of the form:
+    #  OP_DATA_33 <33-byte compresed pubkey> OP_CHECKSIG
+
+    # All compressed secp256k1 public keys must start with 0x02 or 0x03.
+    if (len(script) == 35 and
+        script[34] == opcode.OP_CHECKSIG and
+        script[0] == opcode.OP_DATA_33 and
+        (script[1] == 0x02 or script[1] == 0x03)):
+        return script[1:34]
+    return None
+
+def extractUncompressedPubKey(script):
+    """
+    extractUncompressedPubKey extracts an uncompressed public key from the
+    passed script if it is a standard pay-to-uncompressed-secp256k1-pubkey
+    script.  It will return nil otherwise.
+    """
+    # A pay-to-compressed-pubkey script is of the form:
+    #  OP_DATA_65 <65-byte uncompressed pubkey> OP_CHECKSIG
+
+    # All non-hybrid uncompressed secp256k1 public keys must start with 0x04.
+    if (len(script) == 67 and
+        script[66] == opcode.OP_CHECKSIG and
+        script[0] == opcode.OP_DATA_65 and
+        script[1] == 0x04):
+
+        return script[1:66]
+    return None
+
+def isPubKeyScript(script):
+    """
+    isPubKeyScript returns whether or not the passed script is either a standard
+    pay-to-compressed-secp256k1-pubkey or pay-to-uncompressed-secp256k1-pubkey
+    script.
+    """
+    return extractPubKey(script) != None
+
+
+def isStakeScriptHash(script, stakeOpcode):
+    """
+    isStakeScriptHash returns whether or not the passed public key script is a
+    standard pay-to-script-hash script tagged with the provided stake opcode.
+    """
+    return extractStakeScriptHash(script, stakeOpcode) != None
+
+def extractStakeScriptHash(script, stakeOpcode):
+    """
+    extractStakeScriptHash extracts a script hash from the passed public key
+    script if it is a standard pay-to-script-hash script tagged with the provided
+    stake opcode. It will return None otherwise.
+    """
+    if (len(script) == 24 and
+        script[0] == stakeOpcode and
+        script[1] == opcode.OP_HASH160 and
+        script[2] == opcode.OP_DATA_20 and
+        script[23] == opcode.OP_EQUAL):
+        return script[3:23]
+    return None
+
+def extractStakePubKeyHash(script, stakeOpcode):
+    """
+    extractStakePubKeyHash extracts the public key hash from the passed script if
+    it is a standard stake-tagged pay-to-pubkey-hash script with the provided
+    stake opcode.  It will return nil otherwise.
+    """
+    # A stake-tagged pay-to-pubkey-hash is of the form:
+    #   <stake opcode> <standard-pay-to-pubkey-hash script>
+
+    # The script can't possibly be a stake-tagged pay-to-pubkey-hash if it
+    # doesn't start with the given stake opcode.  Fail fast to avoid more work
+    # below.
+    if len(script) < 1 or script[0] != stakeOpcode:
+        return None
+    return extractPubKeyHash(script[1:])
+
+class multiSigDetails(object):
+    """
+    multiSigDetails houses details extracted from a standard multisig script.
+    """
+    def __init__(self, pubkeys, numPubKeys, requiredSigs, valid):
+        self.requiredSigs = requiredSigs
+        self.numPubKeys = numPubKeys
+        self.pubKeys = pubkeys
+        self.valid = valid
+
+def invalidMSDetails():
+    return multiSigDetails([], 0, [], False)
+
+def extractMultisigScriptDetails(scriptVersion, script, extractPubKeys):
+    """
+    extractMultisigScriptDetails attempts to extract details from the passed
+    script if it is a standard multisig script.  The returned details struct will
+    have the valid flag set to false otherwise.
+    
+    The extract pubkeys flag indicates whether or not the pubkeys themselves
+    should also be extracted and is provided because extracting them results in
+    an allocation that the caller might wish to avoid.  The pubKeys member of
+    the returned details struct will be nil when the flag is false.
+    
+    NOTE: This function is only valid for version 0 scripts.  The returned
+    details struct will always be empty and have the valid flag set to false for
+    other script versions.
+    """
+    # The only currently supported script version is 0.
+    if scriptVersion != 0:
+        return invalidMSDetails()
+
+    # A multi-signature script is of the form:
+    #  NUM_SIGS PUBKEY PUBKEY PUBKEY ... NUM_PUBKEYS OP_CHECKMULTISIG
+
+    # The script can't possibly be a multisig script if it doesn't end with
+    # OP_CHECKMULTISIG or have at least two small integer pushes preceding it.
+    # Fail fast to avoid more work below.
+    if len(script) < 3 or script[len(script)-1] != opcode.OP_CHECKMULTISIG:
+        return invalidMSDetails()
+    # The first opcode must be a small integer specifying the number of
+    # signatures required.
+    tokenizer = ScriptTokenizer(scriptVersion, script)
+    if not tokenizer.next() or not isSmallInt(tokenizer.opcode()):
+        return invalidMSDetails()
+    requiredSigs = asSmallInt(tokenizer.opcode())
+    # The next series of opcodes must either push public keys or be a small
+    # integer specifying the number of public keys.
+    numPubkeys = 0
+    pubkeys = []
+    while tokenizer.next():
+        data = tokenizer.data()
+        if not isStrictPubKeyEncoding(data):
+            break
+        numPubkeys += 1
+        if extractPubKeys:
+            pubkeys.append(data)
+    if tokenizer.done():
+        return invalidMSDetails()
+    # The next opcode must be a small integer specifying the number of public
+    # keys required.
+    op = tokenizer.opcode()
+    if not isSmallInt(op) or asSmallInt(op) != numPubkeys:
+        return invalidMSDetails()
+
+    # There must only be a single opcode left unparsed which will be
+    # OP_CHECKMULTISIG per the check above.
+    if len(tokenizer.script)-tokenizer.byteIndex() != 1:
+        return invalidMSDetails()
+    return multiSigDetails(pubkeys, numPubkeys, requiredSigs, True)
+
+# asSmallInt returns the passed opcode, which must be true according to
+# isSmallInt(), as an integer.
+def asSmallInt(op):
+    if op == opcode.OP_0:
+        return 0
+    return int(op - (opcode.OP_1 - 1))
+
+def isSmallInt(op):
+    """
+    isSmallInt returns whether or not the opcode is considered a small integer,
+    which is an OP_0, or OP_1 through OP_16.
+
+    NOTE: This function is only valid for version 0 opcodes.  Since the function
+    does not accept a script version, the results are undefined for other script
+    versions.
+    """
+    return op == opcode.OP_0 or (op >= opcode.OP_1 and op <= opcode.OP_16)
+
+def isStrictPubKeyEncoding(pubKey):
+    """
+    isStrictPubKeyEncoding returns whether or not the passed public key adheres
+    to the strict encoding requirements.
+    """
+    if len(pubKey) == 33 and (pubKey[0] == 0x02 or pubKey[0] == 0x03):
+        # Compressed
+        return True
+    if len(pubKey) == 65 and pubKey[0] == 0x04:
+        # Uncompressed
+        return True
+    return False
+
+def payToAddrScript(addr):
+    """
+    PayToAddrScript creates a new script to pay a transaction output to a the
+    specified address.
+    """
+    if isinstance(addr, crypto.AddressPubKeyHash):
+        if addr.sigType == crypto.STEcdsaSecp256k1:
+            return payToPubKeyHashScript(addr.scriptAddress())
+        elif addr.sigType == crypto.STEd25519:
+            # return payToPubKeyHashEdwardsScript(addr.ScriptAddress())
+            raise Exception("Edwards signatures not implemented")
+        elif addr.sigType == crypto.STSchnorrSecp256k1:
+            # return payToPubKeyHashSchnorrScript(addr.ScriptAddress())
+            raise Exception("Schnorr signatures not implemented")
+        raise Exception("unknown signature type %d" % addr.sigType)
+
+    elif isinstance(addr, crypto.AddressScriptHash):
+        return payToScriptHashScript(addr.scriptAddress())
+
+    elif isinstance(addr, crypto.AddressSecpPubKey):
+        return payToPubKeyScript(addr.scriptAddress())
+
+    elif isinstance(addr, crypto.AddressEdwardsPubKey):
+        # return payToEdwardsPubKeyScript(addr.ScriptAddress())
+        raise Exception("Edwards signatures not implemented")
+
+    elif isinstance(addr, crypto.AddressSecSchnorrPubKey):
+        # return payToSchnorrPubKeyScript(addr.ScriptAddress())
+        raise Exception("Schnorr signatures not implemented")
+
+    raise Exception("unable to generate payment script for unsupported address type %s" % type(addr))
+
+def payToPubKeyHashScript(pkHash):
     """
     payToAddrScript creates a new script to pay a transaction output to a the
     specified address.
     """
-    if netID == chain.PubKeyHashAddrID:
-        script = ByteArray(b'')
-        script += opcode.OP_DUP
-        script += opcode.OP_HASH160
-        script += addData(pkHash)
-        script += opcode.OP_EQUALVERIFY
-        script += opcode.OP_CHECKSIG
-        return script
-    raise Exception("unimplemented signature type")
+    if len(pkHash) != 20:
+        raise Exception("cannot create script with pubkey hash length %d. expected length 20" % len(pkHash))
+    script = ByteArray(b'')
+    script += opcode.OP_DUP
+    script += opcode.OP_HASH160
+    script += addData(pkHash)
+    script += opcode.OP_EQUALVERIFY
+    script += opcode.OP_CHECKSIG
+    return script
 
-def decodeAddress(addr, chain): 
+def payToScriptHashScript(scriptHash):
     """
-    decodeAddress decodes the string encoding of an address and returns
-    the Address if addr is a valid encoding for a known address type
+    payToScriptHashScript creates a new script to pay a transaction output to a
+    script hash. It is expected that the input is a valid hash.
     """
-    addrLen = len(addr)
-    if addrLen == 66 or addrLen == 130:
-        # Secp256k1 pubkey as a string, handle differently.
-        # return newAddressSecpPubKey(ByteArray(addr), chain)
-        raise Exception("decode from secp256k1 pubkey string unimplemented")
+    script = ByteArray('')
+    script += opcode.OP_HASH160
+    script += addData(scriptHash)
+    script += opcode.OP_EQUAL
+    return script
 
+def payToPubKeyScript(serializedPubKey):
+    """
+    payToPubkeyScript creates a new script to pay a transaction output to a
+    public key. It is expected that the input is a valid pubkey.
+    """
+    script = ByteArray('')
+    script += addData(serializedPubKey)
+    script += opcode.OP_CHECKSIG
+    return script
+
+def decodeAddress(addr, net):
+    """
+    DecodeAddress decodes the string encoding of an address and returns the
+    Address if it is a valid encoding for a known address type and is for the
+    provided network.
+    """
+    # Switch on decoded length to determine the type.
     decoded, netID = crypto.b58CheckDecode(addr)
 
-    # regular tx nedID is PubKeyHashAddrID
-    if netID == chain.PubKeyHashAddrID:
-        return netID, decoded #newAddressPubKeyHash(decoded, chain, crypto.STEcdsaSecp256k1)
-    else: 
-        raise Exception("unsupported address type")
+    if netID == net.PubKeyAddrID:
+        return crypto.newAddressPubKey(decoded, net)
+    elif netID == net.PubKeyHashAddrID:
+        return crypto.newAddressPubKeyHash(decoded, net, crypto.STEcdsaSecp256k1)
+    elif netID == net.PKHEdwardsAddrID:
+        # return NewAddressPubKeyHash(decoded, net, STEd25519)
+        raise Exception("Edwards signatures not implemented")
+    elif netID == net.PKHSchnorrAddrID:
+        # return NewAddressPubKeyHash(decoded, net, STSchnorrSecp256k1)
+        raise Exception("Schnorr signatures not implemented")
+    elif netID == net.ScriptHashAddrID:
+        return crypto.newAddressScriptHashFromHash(decoded, net)
+    raise Exception("unknown network ID %s" % netID)
 
 def makePayToAddrScript(addrStr, chain):
-    netID, pkHash = decodeAddress(addrStr, chain)
-    return payToAddrScript(netID, pkHash, chain)
+    addr = decodeAddress(addrStr, chain)
+    return payToAddrScript(addr)
 
 def int2octets(v, rolen):
     """ https://tools.ietf.org/html/rfc6979#section-2.3.3"""
@@ -920,10 +1217,17 @@ def pubKeyHashToAddrs(pkHash, params):
     """
     pubKeyHashToAddrs is a convenience function to attempt to convert the
     passed hash to a pay-to-pubkey-hash address housed within an address
-    slice.  It is used to consolidate common code.
+    list.  It is used to consolidate common code.
     """
-    addrs = [crypto.newAddressPubKeyHash(pkHash, params, crypto.STEcdsaSecp256k1)]
-    return addrs
+    return [crypto.newAddressPubKeyHash(pkHash, params, crypto.STEcdsaSecp256k1)]
+
+def scriptHashToAddrs(scriptHash, params):
+    """
+    scriptHashToAddrs is a convenience function to attempt to convert the passed
+    hash to a pay-to-script-hash address housed within an address list.  It is
+    used to consolidate common code.
+    """
+    return [crypto.newAddressScriptHashFromHash(scriptHash, params)]
 
 def extractPkScriptAddrs(version, pkScript, chainParams):
     """
@@ -941,10 +1245,70 @@ def extractPkScriptAddrs(version, pkScript, chainParams):
 
     # Check for pay-to-pubkey-hash script.
     pkHash = extractPubKeyHash(pkScript)
-    if pkHash != None:
+    if pkHash:
         return PubKeyHashTy, pubKeyHashToAddrs(pkHash, chainParams), 1
+
+    # Check for pay-to-script-hash.
+    scriptHash = extractScriptHash(pkScript)
+    if scriptHash:
+        return ScriptHashTy, scriptHashToAddrs(scriptHash, chainParams), 1
+
+    # Check for pay-to-pubkey script.
+    data = extractPubKey(pkScript)
+    if data:
+        addrs = []
+        pk = Curve.parsePubKey(data)
+        addrs = [crypto.AddressSecpPubKey(pk.serializeCompressed(), chainParams)]
+        return PubKeyTy, addrs, 1
+
+    # Check for multi-signature script.
+    details = extractMultisigScriptDetails(version, pkScript, True)
+    if details.valid:
+        # Convert the public keys while skipping any that are invalid.
+        addrs = []
+        for encodedPK in details.pubKeys:
+            pk = Curve.parsePubKey(encodedPK)
+            addrs.append(crypto.AddressSecpPubKey(pk.serializeCompressed(), chainParams))
+        return MultiSigTy, addrs, details.requiredSigs
+
+    # Check for stake submission script.  Only stake-submission-tagged
+    # pay-to-pubkey-hash and pay-to-script-hash are allowed.
+    pkHash = extractStakePubKeyHash(pkScript, opcode.OP_SSTX)
+    if pkHash:
+        return StakeSubmissionTy, pubKeyHashToAddrs(hash, chainParams), 1
+    scriptHash = extractStakeScriptHash(pkScript, opcode.OP_SSTX)
+    if scriptHash:
+        return StakeSubmissionTy, scriptHashToAddrs(hash, chainParams), 1
+
+    # Check for stake generation script.  Only stake-generation-tagged
+    # pay-to-pubkey-hash and pay-to-script-hash are allowed.
+    pkHash = extractStakePubKeyHash(pkScript, opcode.OP_SSGEN)
+    if pkHash:
+        return StakeGenTy, pubKeyHashToAddrs(pkHash, chainParams), 1
+    scriptHash = extractStakeScriptHash(pkScript, opcode.OP_SSGEN)
+    if scriptHash:
+        return StakeGenTy, scriptHashToAddrs(scriptHash, chainParams), 1
+
+    # Check for stake revocation script.  Only stake-revocation-tagged
+    # pay-to-pubkey-hash and pay-to-script-hash are allowed.
+    pkHash = extractStakePubKeyHash(pkScript, opcode.OP_SSRTX)
+    if pkHash:
+        return StakeRevocationTy, pubKeyHashToAddrs(pkHash, chainParams), 1
+    scriptHash = extractStakeScriptHash(pkScript, opcode.OP_SSRTX)
+    if scriptHash:
+        return StakeRevocationTy, scriptHashToAddrs(scriptHash, chainParams), 1
+
+    # Check for stake change script.  Only stake-change-tagged
+    # pay-to-pubkey-hash and pay-to-script-hash are allowed.
+    pkHash = extractStakePubKeyHash(pkScript, opcode.OP_SSTXCHANGE)
+    if pkHash:
+        return StakeSubChangeTy, pubKeyHashToAddrs(pkHash, chainParams), 1
+    scriptHash = extractStakeScriptHash(pkScript, opcode.OP_SSTXCHANGE)
+    if scriptHash:
+        return StakeSubChangeTy, scriptHashToAddrs(scriptHash, chainParams), 1
+
     # EVERYTHING AFTER TIHS IS UN-IMPLEMENTED
-    raise Exception("Not a pay-to-pubkey-hash script")
+    raise Exception("unsupported script")
 
 def sign(privKey, chainParams, tx, idx, subScript, hashType, sigType):
     scriptClass, addresses, nrequired = extractPkScriptAddrs(DefaultScriptVersion, subScript, chainParams)
@@ -1281,7 +1645,6 @@ class TestTxScript(unittest.TestCase):
             opcodeNum = 0
             while tokenizer.next():
                 # Ensure Next never returns true when there is an error set.
-                # print("--test_expected: %s" % repr(test_expected))
                 self.assertIs(tokenizer.err, None, msg="%s: Next returned true when tokenizer has err: %r" % (test_name, tokenizer.err))
 
                 # Ensure the test data expects a token to be parsed.
@@ -1329,8 +1692,8 @@ class TestTxScript(unittest.TestCase):
         )
         signatureSuites = (
             crypto.STEcdsaSecp256k1,
-            # dcrec.STEd25519,
-            # dcrec.STSchnorrSecp256k1,
+            # crypto.STEd25519,
+            # crypto.STSchnorrSecp256k1,
         )
 
         testValueIn = 12345
@@ -1437,3 +1800,526 @@ class TestTxScript(unittest.TestCase):
 
                     self.assertEqual(sigScript, ByteArray(sigStr), msg="%d:%d:%d" % (hashType, idx, suite))
         return
+    def test_addresses(self):
+        from tinydecred.pydecred import mainnet, testnet
+        from base58 import b58decode
+        class test:
+            def __init__(self, name="", addr="", saddr="", encoded="", valid=False, scriptAddress=None, f=None, net=None):
+                self.name = name
+                self.addr = addr
+                self.saddr = saddr
+                self.encoded = encoded
+                self.valid = valid
+                self.scriptAddress = scriptAddress
+                self.f = f
+                self.net = net
+        
+        addrPKH = crypto.newAddressPubKeyHash
+        addrSH = crypto.newAddressScriptHash
+        addrSHH = crypto.newAddressScriptHashFromHash
+        addrPK = crypto.AddressSecpPubKey
+
+        tests = []
+        # Positive P2PKH tests.
+        tests.append(test(
+            name = "mainnet p2pkh",
+            addr = "DsUZxxoHJSty8DCfwfartwTYbuhmVct7tJu",
+            encoded = "DsUZxxoHJSty8DCfwfartwTYbuhmVct7tJu",
+            valid = True,
+            scriptAddress = ByteArray("2789d58cfa0957d206f025c2af056fc8a77cebb0"),
+            f = lambda: addrPKH(
+                ByteArray("2789d58cfa0957d206f025c2af056fc8a77cebb0"),
+                mainnet,
+                crypto.STEcdsaSecp256k1,
+            ),
+            net = mainnet,
+        ))
+        tests.append(test(
+            name =    "mainnet p2pkh 2",
+            addr =    "DsU7xcg53nxaKLLcAUSKyRndjG78Z2VZnX9",
+            encoded = "DsU7xcg53nxaKLLcAUSKyRndjG78Z2VZnX9",
+            valid =   True,
+            scriptAddress = ByteArray("229ebac30efd6a69eec9c1a48e048b7c975c25f2"),
+            f = lambda: addrPKH(
+                ByteArray("229ebac30efd6a69eec9c1a48e048b7c975c25f2"),
+                mainnet,
+                crypto.STEcdsaSecp256k1,
+            ),
+            net = mainnet,
+        ))
+        tests.append(test(
+            name =    "testnet p2pkh",
+            addr =    "Tso2MVTUeVrjHTBFedFhiyM7yVTbieqp91h",
+            encoded = "Tso2MVTUeVrjHTBFedFhiyM7yVTbieqp91h",
+            valid =   True,
+            scriptAddress = ByteArray("f15da1cb8d1bcb162c6ab446c95757a6e791c916"),
+            f = lambda: addrPKH(
+                ByteArray("f15da1cb8d1bcb162c6ab446c95757a6e791c916"),
+                testnet, 
+                crypto.STEcdsaSecp256k1
+            ),
+            net = testnet,
+        ))
+
+        # Negative P2PKH tests.
+        tests.append(test(
+            name = "p2pkh wrong hash length",
+            addr = "",
+            valid = False,
+            f = lambda: addrPKH(
+                ByteArray("000ef030107fd26e0b6bf40512bca2ceb1dd80adaa"),
+                mainnet,
+                crypto.STEcdsaSecp256k1,
+            ),
+        ))
+        tests.append(test(
+            name =  "p2pkh bad checksum",
+            addr =  "TsmWaPM77WSyA3aiQ2Q1KnwGDVWvEkhip23",
+            valid = False,
+            net =   testnet,
+        ))
+
+        # Positive P2SH tests.
+        tests.append(test(
+            # Taken from transactions:
+            # output: 3c9018e8d5615c306d72397f8f5eef44308c98fb576a88e030c25456b4f3a7ac
+            # input:  837dea37ddc8b1e3ce646f1a656e79bbd8cc7f558ac56a169626d649ebe2a3ba.
+            name =    "mainnet p2sh",
+            addr =    "DcuQKx8BES9wU7C6Q5VmLBjw436r27hayjS",
+            encoded = "DcuQKx8BES9wU7C6Q5VmLBjw436r27hayjS",
+            valid =   True,
+            scriptAddress = ByteArray("f0b4e85100aee1a996f22915eb3c3f764d53779a"),
+            f = lambda: addrSH(
+                ByteArray("512103aa43f0a6c15730d886cc1f0342046d20175483d90d7ccb657f90c489111d794c51ae"),
+                mainnet,
+            ),
+            net = mainnet,
+        ))
+        tests.append(test(
+            # Taken from transactions:
+            # output: b0539a45de13b3e0403909b8bd1a555b8cbe45fd4e3f3fda76f3a5f52835c29d
+            # input: (not yet redeemed at time test was written)
+            name =    "mainnet p2sh 2",
+            addr =    "DcqgK4N4Ccucu2Sq4VDAdu4wH4LASLhzLVp",
+            encoded = "DcqgK4N4Ccucu2Sq4VDAdu4wH4LASLhzLVp",
+            valid =   True,
+            scriptAddress = ByteArray("c7da5095683436f4435fc4e7163dcafda1a2d007"),
+            f = lambda: addrSHH(
+                ByteArray("c7da5095683436f4435fc4e7163dcafda1a2d007"),
+                mainnet,
+            ),
+            net = mainnet,
+        ))
+        tests.append(test(
+            # Taken from bitcoind base58_keys_valid.
+            name =    "testnet p2sh",
+            addr =    "TccWLgcquqvwrfBocq5mcK5kBiyw8MvyvCi",
+            encoded = "TccWLgcquqvwrfBocq5mcK5kBiyw8MvyvCi",
+            valid =   True,
+            scriptAddress = ByteArray("36c1ca10a8a6a4b5d4204ac970853979903aa284"),
+            f = lambda: addrSHH(
+                ByteArray("36c1ca10a8a6a4b5d4204ac970853979903aa284"),
+                testnet,
+            ),
+            net = testnet,
+        ))
+
+        # Negative P2SH tests.
+        tests.append(test(
+            name =  "p2sh wrong hash length",
+            addr =  "",
+            valid = False,
+            f = lambda: addrSHH(
+                ByteArray("00f815b036d9bbbce5e9f2a00abd1bf3dc91e95510"),
+                mainnet,
+            ),
+            net = mainnet,
+        ))
+
+        # Positive P2PK tests.
+        tests.append(test(
+            name =    "mainnet p2pk compressed (0x02)",
+            addr =    "DsT4FDqBKYG1Xr8aGrT1rKP3kiv6TZ5K5th",
+            encoded = "DsT4FDqBKYG1Xr8aGrT1rKP3kiv6TZ5K5th",
+            valid =   True,
+            scriptAddress = ByteArray("028f53838b7639563f27c94845549a41e5146bcd52e7fef0ea6da143a02b0fe2ed"),
+            f = lambda: addrPK(
+                ByteArray("028f53838b7639563f27c94845549a41e5146bcd52e7fef0ea6da143a02b0fe2ed"),
+                mainnet,
+            ),
+            net = mainnet,
+        ))
+        tests.append(test(
+            name =    "mainnet p2pk compressed (0x03)",
+            addr =    "DsfiE2y23CGwKNxSGjbfPGeEW4xw1tamZdc",
+            encoded = "DsfiE2y23CGwKNxSGjbfPGeEW4xw1tamZdc",
+            valid =   True,
+            scriptAddress = ByteArray("03e925aafc1edd44e7c7f1ea4fb7d265dc672f204c3d0c81930389c10b81fb75de"),
+            f = lambda: addrPK(
+                ByteArray("03e925aafc1edd44e7c7f1ea4fb7d265dc672f204c3d0c81930389c10b81fb75de"),
+                mainnet,
+            ),
+            net = mainnet,
+        ))
+        tests.append(test(
+            name =    "mainnet p2pk uncompressed (0x04)",
+            addr =    "DkM3EyZ546GghVSkvzb6J47PvGDyntqiDtFgipQhNj78Xm2mUYRpf",
+            encoded = "DsfFjaADsV8c5oHWx85ZqfxCZy74K8RFuhK",
+            valid =   True,
+            saddr =   "0264c44653d6567eff5753c5d24a682ddc2b2cadfe1b0c6433b16374dace6778f0",
+            scriptAddress = ByteArray("0464c44653d6567eff5753c5d24a682ddc2b2cadfe1b0c6433b16374dace6778f0b87ca4279b565d2130ce59f75bfbb2b88da794143d7cfd3e80808a1fa3203904"),
+            f = lambda: addrPK(
+                ByteArray("0464c44653d6567eff5753c5d24a682ddc2b2cadfe1b0c6433b16374dace6778f0b87ca4279b565d2130ce59f75bfbb2b88da794143d7cfd3e80808a1fa3203904"),
+                mainnet,
+            ),
+            net = mainnet,
+        ))
+        tests.append(test(
+            name =    "testnet p2pk compressed (0x02)",
+            addr =    "Tso9sQD3ALqRsmEkAm7KvPrkGbeG2Vun7Kv",
+            encoded = "Tso9sQD3ALqRsmEkAm7KvPrkGbeG2Vun7Kv",
+            valid =   True,
+            scriptAddress = ByteArray("026a40c403e74670c4de7656a09caa2353d4b383a9ce66eef51e1220eacf4be06e"),
+            f = lambda: addrPK(
+                ByteArray("026a40c403e74670c4de7656a09caa2353d4b383a9ce66eef51e1220eacf4be06e"),
+                testnet,
+            ),
+            net = testnet,
+        ))
+        tests.append(test(
+            name =    "testnet p2pk compressed (0x03)",
+            addr =    "TsWZ1EzypJfMwBKAEDYKuyHRGctqGAxMje2",
+            encoded = "TsWZ1EzypJfMwBKAEDYKuyHRGctqGAxMje2",
+            valid =   True,
+            scriptAddress =  ByteArray("030844ee70d8384d5250e9bb3a6a73d4b5bec770e8b31d6a0ae9fb739009d91af5"),
+            f = lambda: addrPK(
+                ByteArray("030844ee70d8384d5250e9bb3a6a73d4b5bec770e8b31d6a0ae9fb739009d91af5"),
+                testnet,
+            ),
+            net = testnet,
+        ))
+        tests.append(test(
+            name =    "testnet p2pk uncompressed (0x04)",
+            addr =    "TkKmMiY5iDh4U3KkSopYgkU1AzhAcQZiSoVhYhFymZHGMi9LM9Fdt",
+            encoded = "Tso9sQD3ALqRsmEkAm7KvPrkGbeG2Vun7Kv",
+            valid =   True,
+            saddr =   "026a40c403e74670c4de7656a09caa2353d4b383a9ce66eef51e1220eacf4be06e",
+            scriptAddress = ByteArray("046a40c403e74670c4de7656a09caa2353d4b383a9ce66eef51e1220eacf4be06ed548c8c16fb5eb9007cb94220b3bb89491d5a1fd2d77867fca64217acecf2244"),
+            f = lambda: addrPK(
+                ByteArray("046a40c403e74670c4de7656a09caa2353d4b383a9ce66eef51e1220eacf4be06ed548c8c16fb5eb9007cb94220b3bb89491d5a1fd2d77867fca64217acecf2244"),
+                testnet,
+            ),
+            net = testnet,
+        ))
+
+        # Negative P2PK tests.
+        tests.append(test(
+            name =  "mainnet p2pk hybrid (0x06)",
+            addr =  "",
+            valid = False,
+            f = lambda: addrPK(
+                ByteArray("0664c44653d6567eff5753c5d24a682ddc2b2cadfe1b0c6433b16374dace6778f0b87ca4279b565d2130ce59f75bfbb2b88da794143d7cfd3e80808a1fa3203904"),
+                mainnet,
+            ),
+            net = mainnet,
+        ))
+        tests.append(test(
+            name =  "mainnet p2pk hybrid (0x07)",
+            addr =  "",
+            valid = False,
+            f = lambda: addrPK(
+                ByteArray("07348d8aeb4253ca52456fe5da94ab1263bfee16bb8192497f666389ca964f84798375129d7958843b14258b905dc94faed324dd8a9d67ffac8cc0a85be84bac5d"),
+                mainnet,
+            ),
+            net = mainnet,
+        ))
+        tests.append(test(
+            name =  "testnet p2pk hybrid (0x06)",
+            addr =  "",
+            valid = False,
+            f = lambda: addrPK(
+                ByteArray("066a40c403e74670c4de7656a09caa2353d4b383a9ce66eef51e1220eacf4be06ed548c8c16fb5eb9007cb94220b3bb89491d5a1fd2d77867fca64217acecf2244"),
+                testnet,
+            ),
+            net = testnet,
+        ))
+        tests.append(test(
+            name =  "testnet p2pk hybrid (0x07)",
+            addr =  "",
+            valid = False,
+            f = lambda: addrPK(
+                ByteArray("07edd40747de905a9becb14987a1a26c1adbd617c45e1583c142a635bfda9493dfa1c6d36735974965fe7b861e7f6fcc087dc7fe47380fa8bde0d9c322d53c0e89"),
+                testnet,
+            ),
+            net = testnet,
+        ))
+
+        for test in tests:
+            # Decode addr and compare error against valid.
+            err = None
+            try: 
+                decoded = decodeAddress(test.addr, test.net)
+            except Exception as e:
+                err = e
+            self.assertEqual(err == None, test.valid, "%s error: %s" % (test.name, err))
+
+            if err == None:
+                # Ensure the stringer returns the same address as theoriginal.
+                self.assertEqual(test.addr, decoded.string(), test.name)
+
+                # Encode again and compare against the original.
+                encoded = decoded.address()
+                self.assertEqual(test.encoded, encoded)
+
+                # Perform type-specific calculations.
+                if isinstance(decoded, crypto.AddressPubKeyHash):
+                    d = ByteArray(b58decode(encoded))
+                    saddr = d[2 : 2+crypto.RIPEMD160_SIZE]
+
+                elif isinstance(decoded, crypto.AddressScriptHash):
+                    d = ByteArray(b58decode(encoded))
+                    saddr = d[2 : 2+crypto.RIPEMD160_SIZE]
+
+                elif isinstance(decoded, crypto.AddressSecpPubKey):
+                    # Ignore the error here since the script
+                    # address is checked below.
+                    try: 
+                        saddr = ByteArray(decoded.string())
+                    except Exception:
+                        saddr = test.saddr
+
+                elif isinstance(decoded, crypto.AddressEdwardsPubKey):
+                    # Ignore the error here since the script
+                    # address is checked below.
+                    # saddr = ByteArray(decoded.String())
+                    self.fail("Edwards sigs unsupported")
+
+                elif isinstance(decoded, crypto.AddressSecSchnorrPubKey):
+                    # Ignore the error here since the script
+                    # address is checked below.
+                    # saddr = ByteArray(decoded.String())
+                    self.fail("Schnorr sigs unsupported")
+
+                # Check script address, as well as the Hash160 method for P2PKH and
+                # P2SH addresses.
+                self.assertEqual(saddr, decoded.scriptAddress(), test.name)
+
+                if isinstance(decoded, crypto.AddressPubKeyHash):
+                    self.assertEqual(decoded.pkHash, saddr)
+
+                if isinstance(decoded, crypto.AddressScriptHash):
+                    self.assertEqual(decoded.hash160(), saddr)
+
+            if not test.valid:
+                # If address is invalid, but a creation function exists,
+                # verify that it returns a nil addr and non-nil error.
+                if test.f != None:
+                    try:
+                        test.f()
+                        self.fail("%s: address is invalid but creating new address succeeded" % test.name)
+                    except Exception:
+                        pass
+                continue
+
+            # Valid test, compare address created with f against expected result.
+            try:
+                addr = test.f()
+            except Exception as e:
+                self.fail("%s: address is valid but creating new address failed with error %s", test.name, e)
+            self.assertEqual(addr.scriptAddress(), test.scriptAddress, test.name)
+
+    def test_extract_script_addrs(self):
+        from tinydecred.pydecred import mainnet
+        scriptVersion = 0
+        tests = []
+        def pkAddr(b):
+            addr = crypto.AddressSecpPubKey(b, mainnet)
+            # force the format to compressed, as per golang tests.
+            addr.pubkeyFormat = crypto.PKFCompressed
+            return addr
+
+        class test:
+            def __init__(self, name="", script=b'', addrs=None, reqSigs=-1, scriptClass=-1, exception=None):
+                self.name = name 
+                self.script = script 
+                self.addrs = addrs if addrs else []
+                self.reqSigs = reqSigs 
+                self.scriptClass = scriptClass
+                self.exception = exception
+        tests.append(test(
+            name = "standard p2pk with compressed pubkey (0x02)",
+            script = ByteArray("2102192d74d0cb94344c9569c2e77901573d8d7903c3ebec3a957724895dca52c6b4ac"),
+            addrs = [pkAddr(ByteArray("02192d74d0cb94344c9569c2e77901573d8d7903c3ebec3a957724895dca52c6b4"))],
+            reqSigs = 1,
+            scriptClass = PubKeyTy,
+        ))
+        tests.append(test(
+            name = "standard p2pk with uncompressed pubkey (0x04)",
+            script = ByteArray("410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddf"
+                "b84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac"),
+            addrs = [
+                pkAddr(ByteArray("0411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482eca"
+                    "d7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3")),
+            ],
+            reqSigs = 1,
+            scriptClass = PubKeyTy,
+        ))
+        tests.append(test(
+            name = "standard p2pk with compressed pubkey (0x03)",
+            script = ByteArray("2103b0bd634234abbb1ba1e986e884185c61cf43e001f9137f23c2c409273eb16e65ac"),
+            addrs = [pkAddr(ByteArray("03b0bd634234abbb1ba1e986e884185c61cf43e001f9137f23c2c409273eb16e65"))],
+            reqSigs = 1,
+            scriptClass = PubKeyTy,
+        ))
+        tests.append(test(
+            name = "2nd standard p2pk with uncompressed pubkey (0x04)",
+            script = ByteArray("4104b0bd634234abbb1ba1e986e884185c61cf43e001f9137f23c2c409273eb16e6537a576782"
+                "eba668a7ef8bd3b3cfb1edb7117ab65129b8a2e681f3c1e0908ef7bac"),
+            addrs = [
+                pkAddr(ByteArray("04b0bd634234abbb1ba1e986e884185c61cf43e001f9137f23c2"
+                    "c409273eb16e6537a576782eba668a7ef8bd3b3cfb1edb7117ab65129b8a2e681f3c1e0908ef7b")),
+            ],
+            reqSigs = 1,
+            scriptClass = PubKeyTy,
+        ))
+        tests.append(test(
+            name = "standard p2pkh",
+            script = ByteArray("76a914ad06dd6ddee55cbca9a9e3713bd7587509a3056488ac"),
+            addrs = [crypto.newAddressPubKeyHash(ByteArray("ad06dd6ddee55cbca9a9e3713bd7587509a30564"), mainnet, crypto.STEcdsaSecp256k1)],
+            reqSigs = 1,
+            scriptClass = PubKeyHashTy,
+        ))
+        tests.append(test(
+            name = "standard p2sh",
+            script = ByteArray("a91463bcc565f9e68ee0189dd5cc67f1b0e5f02f45cb87"),
+            addrs = [crypto.newAddressScriptHashFromHash(ByteArray("63bcc565f9e68ee0189dd5cc67f1b0e5f02f45cb"), mainnet)],
+            reqSigs = 1,
+            scriptClass = ScriptHashTy,
+        ))
+        # from real tx 60a20bd93aa49ab4b28d514ec10b06e1829ce6818ec06cd3aabd013ebcdc4bb1, vout 0
+        tests.append(test(
+            name = "standard 1 of 2 multisig",
+            script = ByteArray("514104cc71eb30d653c0c3163990c47b976f3fb3f37cccdcbedb169a1dfef58bbfbfaff7d8a47"
+                "3e7e2e6d317b87bafe8bde97e3cf8f065dec022b51d11fcdd0d348ac4410461cbdcc5409fb4b4d42b51d3338"
+                "1354d80e550078cb532a34bfa2fcfdeb7d76519aecc62770f5b0e4ef8551946d8a540911abe3e7854a26f39f58b25c15342af52ae"),
+            addrs = [
+                pkAddr(ByteArray("04cc71eb30d653c0c3163990c47b976f3fb3f37cccdcbedb169a"
+                    "1dfef58bbfbfaff7d8a473e7e2e6d317b87bafe8bde97e3cf8f065dec022b51d11fcdd0d348ac4")),
+                pkAddr(ByteArray("0461cbdcc5409fb4b4d42b51d33381354d80e550078cb532a34b"
+                    "fa2fcfdeb7d76519aecc62770f5b0e4ef8551946d8a540911abe3e7854a26f39f58b25c15342af")),
+            ],
+            reqSigs = 1,
+            scriptClass = MultiSigTy,
+        ))
+        # from real tx d646f82bd5fbdb94a36872ce460f97662b80c3050ad3209bef9d1e398ea277ab, vin 1
+        tests.append(test(
+            name = "standard 2 of 3 multisig",
+            script = ByteArray("524104cb9c3c222c5f7a7d3b9bd152f363a0b6d54c9eb312c4d4f9af1e8551b6c421a6a4ab0e2"
+                "9105f24de20ff463c1c91fcf3bf662cdde4783d4799f787cb7c08869b4104ccc588420deeebea22a7e900cc8"
+                "b68620d2212c374604e3487ca08f1ff3ae12bdc639514d0ec8612a2d3c519f084d9a00cbbe3b53d071e9b09e"
+                "71e610b036aa24104ab47ad1939edcb3db65f7fedea62bbf781c5410d3f22a7a3a56ffefb2238af8627363bd"
+                "f2ed97c1f89784a1aecdb43384f11d2acc64443c7fc299cef0400421a53ae"),
+            addrs = [
+                pkAddr(ByteArray("04cb9c3c222c5f7a7d3b9bd152f363a0b6d54c9eb312c4d4f9af"
+                    "1e8551b6c421a6a4ab0e29105f24de20ff463c1c91fcf3bf662cdde4783d4799f787cb7c08869b")),
+                pkAddr(ByteArray("04ccc588420deeebea22a7e900cc8b68620d2212c374604e3487"
+                    "ca08f1ff3ae12bdc639514d0ec8612a2d3c519f084d9a00cbbe3b53d071e9b09e71e610b036aa2")),
+                pkAddr(ByteArray("04ab47ad1939edcb3db65f7fedea62bbf781c5410d3f22a7a3a5"
+                    "6ffefb2238af8627363bdf2ed97c1f89784a1aecdb43384f11d2acc64443c7fc299cef0400421a")),
+            ],
+            reqSigs = 2,
+            scriptClass = MultiSigTy,
+        ))
+
+        # The below are nonstandard script due to things such as
+        # invalid pubkeys, failure to parse, and not being of a
+        # standard form.
+
+        tests.append(test(
+            name = "p2pk with uncompressed pk missing OP_CHECKSIG",
+            script = ByteArray("410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddf"
+                "b84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3"),
+            addrs =   [],
+            exception = "unsupported script",
+        ))
+        tests.append(test(
+            name = "valid signature from a sigscript - no addresses",
+            script = ByteArray("47304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd41022"
+                "0181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901"),
+            addrs =   [],
+            exception = "unsupported script",
+        ))
+        # Note the technically the pubkey is the second item on the
+        # stack, but since the address extraction intentionally only
+        # works with standard PkScripts, this should not return any
+        # addresses.
+        tests.append(test(
+            name = "valid sigscript to redeem p2pk - no addresses",
+            script = ByteArray("493046022100ddc69738bf2336318e4e041a5a77f305da87428ab1606f023260017854350ddc0"
+                "22100817af09d2eec36862d16009852b7e3a0f6dd76598290b7834e1453660367e07a014104cd4240c198e12"
+                "523b6f9cb9f5bed06de1ba37e96a1bbd13745fcf9d11c25b1dff9a519675d198804ba9962d3eca2d5937d58e5a75a71042d40388a4d307f887d"),
+            addrs =   [],
+            reqSigs = 0,
+            exception = "unsupported script",
+        ))
+        # adapted from btc:
+        # tx 691dd277dc0e90a462a3d652a1171686de49cf19067cd33c7df0392833fb986a, vout 0
+        # invalid public keys
+        tests.append(test(
+            name = "1 of 3 multisig with invalid pubkeys",
+            script = ByteArray("5141042200007353455857696b696c65616b73204361626c6567617465204261636b75700a0a6"
+                "361626c65676174652d3230313031323034313831312e377a0a0a446f41046e6c6f61642074686520666f6c6"
+                "c6f77696e67207472616e73616374696f6e732077697468205361746f736869204e616b616d6f746f2773206"
+                "46f776e6c6f61410420746f6f6c2077686963680a63616e20626520666f756e6420696e207472616e7361637"
+                "4696f6e2036633533636439383731313965663739376435616463636453ae"),
+            addrs =   [],
+            exception = "isn't on secp256k1 curve",
+        ))
+        # adapted from btc:
+        # tx 691dd277dc0e90a462a3d652a1171686de49cf19067cd33c7df0392833fb986a, vout 44
+        # invalid public keys
+        tests.append(test(
+            name = "1 of 3 multisig with invalid pubkeys 2",
+            script = ByteArray("514104633365633235396337346461636536666430383862343463656638630a6336366263313"
+                "9393663386239346133383131623336353631386665316539623162354104636163636539393361333938386"
+                "134363966636336643664616266640a323636336366613963663463303363363039633539336333653931666"
+                "56465373032392102323364643432643235363339643338613663663530616234636434340a00000053ae"),
+            addrs =   [],
+            exception = "isn't on secp256k1 curve",
+        ))
+        tests.append(test(
+            name =    "empty script",
+            script =  ByteArray(b''),
+            addrs =   [],
+            reqSigs = 0,
+            exception = "unsupported script",
+        ))
+        tests.append(test(
+            name = "script that does not parse",
+            script =  ByteArray([opcode.OP_DATA_45]),
+            addrs =   [],
+            reqSigs = 0,
+            exception = "unsupported script",
+        ))
+
+        def checkAddrs(a, b, name):
+            if len(a) != len(b):
+                t.fail("extracted address length mismatch. expected %d, got %d" % (len(a), len(b)))
+            for av, bv in zip(a, b):
+                if av.scriptAddress() != bv.scriptAddress():
+                    self.fail("scriptAddress mismatch. expected %s, got %s (%s)" % 
+                        (av.scriptAddress().hex(), bv.scriptAddress().hex(), name))
+
+        for i, t in enumerate(tests):
+            try: 
+                scriptClass, addrs, reqSigs = extractPkScriptAddrs(scriptVersion, t.script, mainnet)
+            except Exception as e:
+                if t.exception and t.exception in str(e):
+                    continue
+                self.fail("extractPkScriptAddrs #%d (%s): %s" % (i, t.name, e))
+
+            self.assertEqual(scriptClass, t.scriptClass, t.name)
+
+            self.assertEqual(reqSigs, t.reqSigs, t.name)
+
+            checkAddrs(t.addrs, addrs, t.name)

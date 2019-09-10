@@ -2,10 +2,8 @@
 Copyright (c) 2019, Brian Stafford
 See LICENSE for details
 
-pyDcrDdta
 DcrdataClient.endpointList() for available enpoints.
 """
-import urllib.request as urlrequest
 from urllib.parse import urlparse, urlencode
 
 import time
@@ -19,7 +17,7 @@ import atexit
 import os
 import websocket
 from tempfile import TemporaryDirectory
-from tinydecred.util import tinyjson, helpers, database
+from tinydecred.util import tinyjson, helpers, database, http
 from tinydecred.crypto import opcode, crypto
 from tinydecred.crypto.bytearray import ByteArray
 from tinydecred.api import InsufficientFundsError
@@ -30,8 +28,11 @@ from tinydecred.util.database import KeyValueDatabase
 log = helpers.getLogger("DCRDATA") # , logLvl=0)
 
 VERSION = "0.0.1"
-HEADERS = {"User-Agent": "PyDcrData/%s" % VERSION}
-
+GET_HEADERS = {"User-Agent": "PyDcrData/%s" % VERSION}
+POST_HEADERS = {
+    "User-Agent": "tinydecred/%s" % VERSION,
+    "Content-Type":"application/json; charset=utf-8",
+}
 # Many of these constants were pulled from the dcrd, and are left as mixed case
 # to maintain reference. 
 
@@ -81,34 +82,6 @@ P2PKHPkScriptSize = 1 + 1 + 1 + 20 + 1 + 1
 
 formatTraceback = helpers.formatTraceback
 
-def getUri(uri):
-    return performRequest(uri)
-
-def postData(uri, data):
-    return performRequest(uri, data)
-
-def performRequest(uri, post=None):
-    try:
-        headers = HEADERS
-        if post:
-            encoded = tinyjson.dump(post).encode("utf-8")
-            req = urlrequest.Request(uri, data=encoded)
-            req.add_header("User-Agent", "PyDcrData/%s" % VERSION)
-            req.add_header("Content-Type", "application/json; charset=utf-8")
-        else:
-            req = urlrequest.Request(uri, headers=headers, method="GET")
-        raw = urlrequest.urlopen(req).read().decode()
-        try:
-            return tinyjson.load(raw)
-        except tinyjson.JSONDecodeError:
-            # A couple of paths return simple strings or integers. block/best/hash or block/best/height for instance.
-            return raw
-        except Exception as e:
-            raise DcrDataException("JSONError", "Failed to decode server response from path %s: %s : %s" % (uri, raw, formatTraceback(e)))
-    except Exception as e:
-        raise DcrDataException("RequestError", "Error encountered in requesting path %s: %s" % (uri, formatTraceback(e)))
-
-
 class DcrdataPath(object):
     """
     DcrdataPath represents some point along a URL. It may just be a node that
@@ -154,10 +127,10 @@ class DcrdataPath(object):
         raise DcrDataException("SubpathError", "No subpath %s found in datapath" % (key,))
 
     def __call__(self, *args, **kwargs):
-        return getUri(self.getCallsignPath(*args, **kwargs))
+        return http.get(self.getCallsignPath(*args, **kwargs), headers=GET_HEADERS)
 
     def post(self, data):
-        return postData(self.getCallsignPath(), data)
+        return http.post(self.getCallsignPath(), data, headers=POST_HEADERS)
 
 def getSocketURIs(uri):
     uri = urlparse(uri)
@@ -191,7 +164,7 @@ class DcrdataClient(object):
         self.listEntries = []
         customPaths = customPaths if customPaths else []
         # /list returns a json list of enpoints with parameters in template format, base/A/{param}/B
-        endpoints = getUri(self.baseApi + "/list")
+        endpoints = http.get(self.baseApi + "/list", headers=GET_HEADERS)
         endpoints += customPaths
 
         def getParam(part):

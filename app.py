@@ -13,6 +13,7 @@ from tinydecred.util import helpers
 from tinydecred.pydecred import constants as DCR
 from tinydecred.pydecred.dcrdata import DcrdataBlockchain
 from tinydecred.wallet import Wallet
+from tinydecred.crypto import crypto
 from tinydecred.ui import screens, ui, qutilities as Q
 
 # the directory of the tinydecred package
