@@ -380,10 +380,10 @@ class MsgTx:
             self.lockTime == tx.lockTime and
             self.expiry == tx.expiry
         )
-    def addTxIn(self, tx):
-        self.txIn.append(tx)
-    def addTxOut(self, tx):
-        self.txOut.append(tx)
+    def addTxIn(self, txin):
+        self.txIn.append(txin)
+    def addTxOut(self, txout):
+        self.txOut.append(txout)
     def hash(self): # chainhash.Hash {
         """
         TxHash generates the hash for the transaction prefix.  Since it does not

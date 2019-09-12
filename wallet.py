@@ -19,9 +19,9 @@ class KeySource(object):
     """
     Implements the KeySource API from tinydecred.api.
     """
-    def __init__(self, priv, change):
+    def __init__(self, priv, internal):
         self.priv = priv
-        self.change = change
+        self.internal = internal
 
 class Wallet(object):
     """
@@ -440,7 +440,7 @@ class Wallet(object):
         acct = self.openAccount
         keysource = KeySource(
             priv = self.getKey,
-            change = acct.getChangeAddress,
+            internal = acct.getChangeAddress,
         )
         tx, spentUTXOs, newUTXOs = self.blockchain.sendToAddress(value, address, keysource, self.getUTXOs, feeRate)
         acct.addMempoolTx(tx)

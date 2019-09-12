@@ -93,9 +93,9 @@ class AddressPubKeyHash:
     def address(self):
         return self.string()
     def scriptAddress(self):
-        return self.pkHash
+        return self.pkHash.copy()
     def hash160(self):
-        return self.pkHash
+        return self.pkHash.copy()
 
 class AddressSecpPubKey:
     """
@@ -187,9 +187,9 @@ class AddressScriptHash(object):
         """
         return self.string()
     def scriptAddress(self):
-        return self.scriptHash
+        return self.scriptHash.copy()
     def hash160(self):
-        return self.scriptHash
+        return self.scriptHash.copy()
 
 def hmacDigest(key, msg, digestmod=hashlib.sha512):
     """
@@ -341,7 +341,7 @@ def b58CheckDecode(s):
     cksum =decoded[len(decoded)-4:]
     if checksum(decoded[:len(decoded)-4]) != cksum:
         raise Exception("checksum error")
-    payload = decoded[2 : len(decoded)-4]
+    payload = ByteArray(decoded[2 : len(decoded)-4])
     return payload, version
 
 def newAddressPubKey(decoded, net):

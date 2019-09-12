@@ -364,11 +364,11 @@ class KeySource:
             PrivateKey: Private key.
         """
         raise Unimplemented("KeySource not implemented")
-    def change(self):
+    def internal(self):
         """
-        Get a new change address.
+        Get a new internal address.
 
         Returns:
             str: A new base-58 encoded change address.
         """
-        raise Unimplemented("change not implemented")
+        raise Unimplemented("internal not implemented")
