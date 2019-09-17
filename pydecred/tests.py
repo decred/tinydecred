@@ -1128,8 +1128,6 @@ class TestTxScript(unittest.TestCase):
         # )
 
         # Pay to Pubkey Hash (uncompressed)
-        # secp256k1 := chainec.Secp256k1
-        from tinydecred.pydecred import mainnet
         testingParams = mainnet
         for hashType in hashTypes:
             for suite in signatureSuites:
@@ -1151,13 +1149,61 @@ class TestTxScript(unittest.TestCase):
 
                     pkScript = txscript.makePayToAddrScript(address.string(), testingParams)
 
-                    # chainParams, tx, idx, pkScript, hashType, kdb, sdb, previousScript, sigType
-                    sigScript = txscript.signTxOutput(privKey, testingParams, tx, idx, pkScript, hashType, None, suite)
+                    class keysource:
+                        @staticmethod
+                        def priv(addr):
+                            return privKey
+
+                    sigScript = txscript.signTxOutput(testingParams, tx, idx, pkScript, hashType, keysource, None, suite)
 
                     self.assertEqual(sigScript, ByteArray(sigStr), msg="%d:%d:%d" % (hashType, idx, suite))
         return
+    def test_sign_stake_p2pkh_outputs(self):
+        from tinydecred.crypto.secp256k1 import curve as Curve
+        from tinydecred.crypto import rando
+        txIn = msgtx.TxIn(
+            previousOutPoint = msgtx.OutPoint(
+                txHash =  ByteArray(rando.generateSeed(32)),
+                idx = 0,
+                tree =  0,
+            ),
+            sequence =    4294967295,
+            valueIn =     1,
+            blockHeight = 78901,
+            blockIndex =  23456,
+        )
+        tx = msgtx.MsgTx(
+            serType = wire.TxSerializeFull,
+            version = 1,
+            txIn = [
+                txIn,
+            ],
+            txOut = [
+                msgtx.TxOut(
+                    version = wire.DefaultPkScriptVersion,
+                    value =   1,
+                ),
+            ],
+            lockTime = 0,
+            expiry = 0,
+            cachedHash = None,
+        )
+
+        privKey = Curve.generateKey()
+        pkHash = crypto.hash160(privKey.pub.serializeCompressed().b)
+        addr = crypto.AddressPubKeyHash(mainnet.PubKeyHashAddrID, pkHash)
+        class keysource:
+            @staticmethod
+            def priv(addr):
+                return privKey
+        for opCode in (opcode.OP_SSGEN, opcode.OP_SSRTX, opcode.OP_SSTX):
+            pkScript = txscript.payToStakePKHScript(addr, opcode.OP_SSTX)
+            # Just looking to raise an exception for now.
+            txscript.signTxOutput(mainnet, tx, 0, pkScript, 
+                txscript.SigHashAll, keysource, None, crypto.STEcdsaSecp256k1)
+
+
     def test_addresses(self):
-        from tinydecred.pydecred import mainnet, testnet
         from base58 import b58decode
         class test:
             def __init__(self, name="", addr="", saddr="", encoded="", valid=False, scriptAddress=None, f=None, net=None):
@@ -1928,16 +1974,16 @@ class TestDcrdata(unittest.TestCase):
             poolAddr = crypto.AddressPubKeyHash(testnet.PubKeyHashAddrID, pkHash)
             scriptHash = crypto.hash160("some script. doesn't matter".encode())
             scriptAddr = crypto.AddressScriptHash(testnet.ScriptHashAddrID, scriptHash)
-            ticketPrice = int(blockchain.stakeDiff()["next"]*1e8)
+            ticketPrice = int(blockchain.stakeDiff()*1e8)
             class request:
                 minConf = 0
                 expiry = 0
-                spendLimit = ticketPrice*1.1
-                poolAddress = poolAddr
-                votingAddress = scriptAddr
+                spendLimit = ticketPrice*2*1.1
+                poolAddress = poolAddr.string()
+                votingAddress = scriptAddr.string()
                 ticketFee = 0
                 poolFees = 7.5
-                count = 1
+                count = 2
                 txFee = 0
             ticket, spent, newUTXOs = blockchain.purchaseTickets(KeySource(), utxosource, request())
 
@@ -1952,26 +1998,24 @@ class TestStakePool(unittest.TestCase):
             raise unittest.SkipTest
     def stakePool(self):
         stakePool = stakepool.StakePool(self.poolURL, self.apiKey)
-        stakePool.signingAddress = self.signingAddress
+        stakePool.authorize(self.signingAddress, testnet)
         return stakePool
-    def test_get_purchase_info(self):
-        from tinydecred.pydecred import testnet
+    def test_get_purchase_info(self):        
         stakePool = self.stakePool()
-        pi = stakePool.getPurchaseInfo(testnet)
+        pi = stakePool.getPurchaseInfo()
         print(pi.__tojson__())
     def test_get_stats(self):
         stakePool = self.stakePool()
         stats = stakePool.getStats()
         print(stats.__tojson__())
     def test_voting(self):
-        from tinydecred.pydecred import testnet
         stakePool = self.stakePool()
-        pi = stakePool.getPurchaseInfo(testnet)
+        pi = stakePool.getPurchaseInfo()
         if pi.voteBits&(1 << 1) != 0:
             nextVote = 1|(1 << 2)
         else:
             nextVote = 1|(1 << 1)
         print("changing vote from %d to %d" % (pi.voteBits, nextVote))
         stakePool.setVoteBits(nextVote)
-        pi = stakePool.getPurchaseInfo(testnet)
+        pi = stakePool.getPurchaseInfo()
         self.assertEqual(pi.voteBits, nextVote)

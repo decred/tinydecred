@@ -13,7 +13,6 @@ from tinydecred.util import helpers
 from tinydecred.pydecred import constants as DCR
 from tinydecred.pydecred.dcrdata import DcrdataBlockchain
 from tinydecred.wallet import Wallet
-from tinydecred.crypto import crypto
 from tinydecred.ui import screens, ui, qutilities as Q
 
 # the directory of the tinydecred package
@@ -127,6 +126,8 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         self.waitingScreen = screens.WaitingScreen(self)
 
         self.sendScreen = screens.SendScreen(self)
+
+        self.confirmScreen = screens.ConfirmScreen(self)
 
         self.sysTray.show()
         self.appWindow.show()
@@ -382,6 +383,11 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
                 self.emitSignal(ui.DONE_SIGNAL)
             return False
         self.getPassword(step1, cb, a, k)
+    def confirm(self, msg, cb):
+        """
+        Call the callback function only if the user confirms the prompt.
+        """
+        self.appWindow.stack(self.confirmScreen.withPurpose(msg, cb))
     def tryInitSync(self):
         """
         If conditions are right, start syncing the wallet.
@@ -428,6 +434,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         if not res:
             self.appWindow.showError("No dcrdata connection available.")
             return
+        self.emitSignal(ui.BLOCKCHAIN_CONNECTED)
         self.tryInitSync()
     def getButton(self, size, text, tracked=True):
         """

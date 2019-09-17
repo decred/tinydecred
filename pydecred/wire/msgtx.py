@@ -1373,5 +1373,5 @@ class TestMsgTx(unittest.TestCase):
         print(repr(tx.lockTime))
         print(repr(tx.expiry))
         v = sum(txout.value for txout in tx.txOut)
-        print("--total sent: %.2f" % (v*1e-8,))
+        print("total sent: %.2f" % (v*1e-8,))
         print(tx.txHex())

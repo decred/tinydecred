@@ -9,7 +9,6 @@ accounts module
     The tinycrypto package relies heavily on the lower-level crypto modules.
 """
 import unittest
-import hashlib
 from tinydecred.util import tinyjson, helpers
 from tinydecred import api
 from tinydecred.pydecred import nets, constants as DCR
@@ -235,8 +234,9 @@ class Account(object):
             "balance": self.balance,
         }
     @staticmethod
-    def __fromjson__(obj):
-        acct = Account(
+    def __fromjson__(obj, cls=None):
+        cls = cls if cls else Account
+        acct = cls(
             obj["pubKeyEncrypted"],
             obj["privKeyEncrypted"],
             obj["name"],
@@ -374,6 +374,30 @@ class Account(object):
                 to.
         """
         self.utxos = {u.key(): u for u in blockchainUTXOs}
+    def getUTXOs(self, requested, approve=None):
+        """
+        Find confirmed and mature UTXOs, smallest first, that sum to the
+        requested amount, in atoms.
+
+        Args:
+            requested (int): Required amount in atoms.
+            filter (func(UTXO) -> bool): Optional UTXO filtering function.
+
+        Returns:
+            list(UTXO): A list of UTXOs.
+            bool: True if the UTXO sum is >= the requested amount.
+        """
+        matches = []
+        collected = 0
+        pairs = [(u.satoshis, u) for u in self.utxoscan()]
+        for v, utxo in sorted(pairs, key=lambda p: p[0]):
+            if approve and not approve(utxo):
+                continue
+            matches.append(utxo)
+            collected += v
+            if collected >= requested:
+                break
+        return matches, collected >= requested
     def spendTxidVout(self, txid, vout):
         """
         Spend the UTXO. The UTXO is removed from the watched list and returned.
@@ -536,7 +560,7 @@ class Account(object):
         ext = self.externalAddresses
         for i in range(max(self.cursor - 10, 0), self.cursor+1):
             a.add(ext[i])
-        return a
+        return list(a)
     def paymentAddress(self):
         """
         Get the external address at the cursor. The cursor is not moved.
@@ -800,7 +824,8 @@ class AccountManager(object):
 
 tinyjson.register(AccountManager)
 
-def createNewAccountManager(seed, pubPassphrase, privPassphrase, chainParams):
+
+def createNewAccountManager(seed, pubPassphrase, privPassphrase, chainParams, constructor=None):
     """
     Create a new account manager and a set of BIP0044 keys for creating
     accounts. The zeroth account is created for the provided network parameters.
@@ -817,6 +842,7 @@ def createNewAccountManager(seed, pubPassphrase, privPassphrase, chainParams):
     Returns:
         AccountManager: An initialized account manager.
     """
+    constructor = constructor if constructor else Account
 
     # Ensure the private passphrase is not empty.
     if len(privPassphrase) == 0:
@@ -899,12 +925,12 @@ def createNewAccountManager(seed, pubPassphrase, privPassphrase, chainParams):
     acctPrivSLIP0044Enc = cryptoKeyPriv.encrypt(apes.encode())
 
     # Derive the default account from the legacy coin type.
-    baseAccount = Account(acctPubLegacyEnc, acctPrivLegacyEnc,
+    baseAccount = constructor(acctPubLegacyEnc, acctPrivLegacyEnc,
         DEFAULT_ACCOUNT_NAME, CoinSymbols.decred, chainParams.Name)
 
     # Save the account row for the 0th account derived from the coin type
     # 42 key.
-    zerothAccount = Account(acctPubSLIP0044Enc, acctPrivSLIP0044Enc,
+    zerothAccount = constructor(acctPubSLIP0044Enc, acctPrivSLIP0044Enc,
         DEFAULT_ACCOUNT_NAME, CoinSymbols.decred, chainParams.Name)
     # Open the account.
     zerothAccount.open(cryptoKeyPriv)

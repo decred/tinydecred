@@ -339,13 +339,66 @@ class DcrDataException(Exception):
         self.name = name
         self.message = message
 
+class APIBlock:
+    def __init__(self, blockHash, height):
+        self.hash = blockHash
+        self.height = height
+    @staticmethod
+    def __fromjson__(obj):
+        return APIBlock(obj["hash"], obj["height"])
+    def __tojson__(self):
+        return {
+            "hash": self.blockHash,
+            "height": self.blockHeight,
+        }
+
+tinyjson.register(APIBlock, tag="dcrdata.APIBlock")
+
+class TicketInfo:
+    def __init__(self, status, purchaseBlock, maturityHeight, expirationHeight, 
+                 lotteryBlock, vote, revocation):
+         self.status = status
+         self.purchaseBlock = purchaseBlock
+         self.maturityHeight = maturityHeight
+         self.expirationHeight = expirationHeight
+         self.lotteryBlock = lotteryBlock
+         self.vote = vote
+         self.revocation = revocation
+    @staticmethod
+    def parse(obj):
+        return TicketInfo(
+            status = obj["status"],
+            purchaseBlock = obj["purchase_block"],
+            maturityHeight = obj["maturity_height"],
+            expirationHeight = obj["expiration_height"],
+            lotteryBlock = obj["lottery_block"],
+            vote = obj["vote"],
+            revocation = obj["revocation"],
+        )
+    @staticmethod
+    def __fromjson__(obj):
+        return TicketInfo.parse(obj)
+    def __tojson__(self):
+        return {
+            "status": self.status,
+            "purchase_block": self.purchaseBlock,
+            "maturity_height": self.maturityHeight,
+            "expiration_height": self.expirationHeight,
+            "lottery_block": self.lotteryBlock,
+            "vote": self.vote,
+            "revocation": self.revocation,
+        }
+
+tinyjson.register(TicketInfo, tag="dcr.TicketInfo")
+
 class UTXO(object):
     """
     The UTXO is part of the wallet API. BlockChains create and parse UTXO 
     objects and fill fields as required by the Wallet.
     """
     def __init__(self, address, txid, vout, ts=None, scriptPubKey=None, 
-                 height=-1, amount=0, satoshis=0, maturity=None):
+                 height=-1, amount=0, satoshis=0, maturity=None, 
+                 scriptClass=None, tinfo=None):
         self.address = address
         self.txid = txid
         self.vout = vout
@@ -355,6 +408,10 @@ class UTXO(object):
         self.amount = amount
         self.satoshis = satoshis
         self.maturity = maturity
+        self.scriptClass = scriptClass
+        if not scriptClass:
+            self.parseScriptClass()
+        self.tinfo = tinfo
 
     def __tojson__(self):
         return {
@@ -367,28 +424,38 @@ class UTXO(object):
             "amount": self.amount,
             "satoshis": self.satoshis,
             "maturity": self.maturity,
+            "scriptClass": self.scriptClass,
+            "tinfo": self.tinfo,
         }
     @staticmethod
     def __fromjson__(obj):
         return UTXO.parse(obj)
     @staticmethod
     def parse(obj):
-        return UTXO(
+        utxo = UTXO(
             address = obj["address"],
             txid = obj["txid"],
             vout = obj["vout"],
             ts = obj["ts"] if "ts" in obj else None,
-            scriptPubKey = obj["scriptPubKey"] if "scriptPubKey" in obj else None,
+            scriptPubKey = ByteArray(obj["scriptPubKey"]),
             height = obj["height"] if "height" in obj else -1,
             amount = obj["amount"] if "amount" in obj else 0,
             satoshis = obj["satoshis"] if "satoshis" in obj else 0,
             maturity = obj["maturity"] if "maturity" in obj else None,
+            scriptClass = obj["scriptClass"] if "scriptClass" in obj else None,
+            tinfo = obj["tinfo"] if "tinfo" in obj else None,
         )
+        return utxo
+    def parseScriptClass(self):
+        if self.scriptPubKey:
+            self.scriptClass = txscript.getScriptClass(0, self.scriptPubKey)
     def confirm(self, block, tx, params):
         self.height = block.height
         self.maturity = block.height + params.CoinbaseMaturity if tx.looksLikeCoinbase() else None
         self.ts = block.timestamp
     def isSpendable(self, tipHeight):
+        if self.isTicket():
+            return False
         if self.maturity:
             return self.maturity <= tipHeight
         return True
@@ -397,7 +464,15 @@ class UTXO(object):
     @staticmethod
     def makeKey(txid, vout):
         return txid + "#" + str(vout)
-tinyjson.register(UTXO)
+    def setTicketInfo(self, apiTinfo):
+        self.tinfo = TicketInfo.parse(apiTinfo)
+        self.maturity = self.tinfo.maturityHeight
+    def isTicket(self):
+        return self.scriptClass == txscript.StakeSubmissionTy
+    def isLiveTicket(self):
+        return self.tinfo and self.tinfo.status in ("immature", "live")
+
+tinyjson.register(UTXO, tag="dcr.UTXO")
 
 
 def makeOutputs(pairs, chain):
@@ -561,6 +636,14 @@ class DcrdataBlockchain(object):
         if tx.looksLikeCoinbase():
             # This is a coinbase or stakebase transaction. Set the maturity.
             utxo.maturity = utxo.height + self.params.CoinbaseMaturity
+        if utxo.isTicket():
+            # Mempool tickets will be returned from the utxo endpoint, but 
+            # the tinfo endpoint is an error until mined.
+            try:
+                rawTinfo = self.dcrdata.tx.tinfo(utxo.txid)
+                utxo.setTicketInfo(rawTinfo)
+            except:
+                utxo.tinfo = TicketInfo("mempool", None, -1, -1, None, 0, None)
         return utxo
     def UTXOs(self, addrs):
         """
@@ -716,7 +799,7 @@ class DcrdataBlockchain(object):
         """
         return self.dcrdata.block.best()
     def stakeDiff(self):
-        return self.dcrdata.stake.diff()
+        return self.dcrdata.stake.diff()["next"]
     def updateTip(self):
         """
         Update the tip block. If the wallet is subscribed to block updates, 
@@ -819,6 +902,9 @@ class DcrdataBlockchain(object):
         # If the UTXO appears unconfirmed, see if it can be confirmed.
         if utxo.maturity and self.tip["height"] < utxo.maturity:
             return False
+        if utxo.isTicket():
+            # Temporary until revocations implemented.
+            return False
         return True
     def confirmUTXO(self, utxo, block=None, tx=None):
         if not tx:
@@ -869,7 +955,7 @@ class DcrdataBlockchain(object):
         changeScriptSize = txscript.P2PKHPkScriptSize
 
         relayFeePerKb = feeRate * 1e3 if feeRate else self.relayFee()
-        for txout in outputs:
+        for (i, txout) in enumerate(outputs):
             checkOutput(txout, relayFeePerKb)
 
         signedSize = txscript.estimateSerializeSize([txscript.RedeemP2PKHSigScriptSize], outputs, changeScriptSize)
@@ -942,8 +1028,8 @@ class DcrdataBlockchain(object):
                 pkScript = scripts[i]
                 sigScript = txin.signatureScript
                 scriptClass, addrs, numAddrs = txscript.extractPkScriptAddrs(0, pkScript, self.params)
-                privKey = keysource.priv(addrs[0].string())
-                script = txscript.signTxOutput(privKey, self.params, newTx, i, pkScript, txscript.SigHashAll, sigScript, crypto.STEcdsaSecp256k1)
+                script = txscript.signTxOutput(self.params, newTx, i, pkScript, 
+                    txscript.SigHashAll, keysource, sigScript, crypto.STEcdsaSecp256k1)
                 txin.signatureScript = script
             self.broadcast(newTx.txHex())
             if change:
@@ -961,17 +1047,19 @@ class DcrdataBlockchain(object):
 
     def purchaseTickets(self, keysource, utxosource, req):
         """
+        Based on dcrwallet (*Wallet).purchaseTickets.
         purchaseTickets indicates to the wallet that a ticket should be purchased
         using all currently available funds.  The ticket address parameter in the
         request can be nil in which case the ticket address associated with the
-        wallet instance will be used.  Also, when the spend limit in the request is
-        greater than or equal to 0, tickets that cost more than that limit will
-        return an error that not enough funds are available.
+        wallet instance will be used.  Also, when the spend limit in the request 
+        is greater than or equal to 0, tickets that cost more than that limit 
+        will return an error that not enough funds are available.
         """
-        # Ensure the minimum number of required confirmations is positive.
         self.updateTip()
-        if req.minConf < 0:
-            raise Exception("negative minconf")
+        # account minConf is zero for regular outputs for now. Need to make that 
+        # adjustable.
+        # if req.minConf < 0:
+        #     raise Exception("negative minconf")
 
         # Need a positive or zero expiry that is higher than the next block to
         # generate.
@@ -995,27 +1083,41 @@ class DcrdataBlockchain(object):
         # address this better and prevent address burning.
 
         # Calculate the current ticket price.
-        ticketPrice = int(self.stakeDiff()["next"]*1e8)
+        ticketPrice = int(self.stakeDiff()*1e8)
 
         # Ensure the ticket price does not exceed the spend limit if set.
         if req.spendLimit > 0 and ticketPrice > req.spendLimit:
            raise Exception("ticket price %f above spend limit %f" % (ticketPrice, req.spendLimit))
 
-        # Check the pool address from the request. If none exists in the 
-        # request, try to get the global pool address. Then do the same for pool 
-        # fees, but check sanity too.
-        if not req.poolAddress:
-            raise Exception("no pool address specified. solo voting not supported")
+        # Check that pool fees is zero, which will result in invalid zero-valued
+        # outputs. 
+        if req.poolFees == 0:
+            raise Exception("no pool fee specified")
 
         stakeSubmissionPkScriptSize = 0
 
+        # Check the pool address from the request.
+        if not req.poolAddress:
+            raise Exception("no pool address specified. solo voting not supported")
+
+        poolAddress = txscript.decodeAddress(req.poolAddress, self.params)
+
+        # Check the passed address from the request.
+        if not req.votingAddress:
+            raise Exception("voting address not set in purchaseTickets request")
+
+        # decode the string addresses. This is the P2SH multi-sig script 
+        # address, not the wallets voting address, which is only one of the two
+        # pubkeys included in the redeem P2SH script.
+        votingAddress = txscript.decodeAddress(req.votingAddress, self.params)
+
         # The stake submission pkScript is tagged by an OP_SSTX.
-        if isinstance(req.votingAddress, crypto.AddressScriptHash):
+        if isinstance(votingAddress, crypto.AddressScriptHash):
             stakeSubmissionPkScriptSize = txscript.P2SHPkScriptSize + 1
-        elif isinstance(req.votingAddress, crypto.AddressPubKeyHash) and req.votingAddress.sigType == crypto.STEcdsaSecp256k1:
+        elif isinstance(votingAddress, crypto.AddressPubKeyHash) and votingAddress.sigType == crypto.STEcdsaSecp256k1:
             stakeSubmissionPkScriptSize = txscript.P2PKHPkScriptSize + 1
         else:
-            raise Exception("unsupported pool address type %s" % req.votingAddress.__class__.__name__)
+            raise Exception("unsupported voting address type %s" % votingAddress.__class__.__name__)
 
         ticketFeeIncrement = req.ticketFee
         if ticketFeeIncrement == 0:
@@ -1053,6 +1155,8 @@ class DcrdataBlockchain(object):
         # immediately be consumed as tickets.
         splitTxAddr = keysource.internal()
 
+        print("splitTxAddr: %s" % splitTxAddr)
+
         # TODO: Don't reuse addresses
         # TODO: Consider wrapping. see dcrwallet implementation.
         splitPkScript = txscript.makePayToAddrScript(splitTxAddr, self.params)
@@ -1089,27 +1193,8 @@ class DcrdataBlockchain(object):
         # sendOutputs takes the fee rate in atoms/byte
         splitTx, splitSpent, internalOutputs = self.sendOutputs(splitOuts, keysource, utxosource, int(txFeeIncrement/1000))
 
-        # // After tickets are created and published, watch for future
-        # // relevant transactions
-        # var watchOutPoints []wire.OutPoint
-        # defer func() {
-        #     err := walletdb.View(w.db, func(tx walletdb.ReadTx) error {
-        #         return w.watchFutureAddresses(ctx, tx)
-        #     })
-        #     if err != nil {
-        #         log.Errorf("Failed to watch for future addresses after ticket "+
-        #             "purchases: %v", err)
-        #     }
-        #     if len(watchOutPoints) > 0 {
-        #         err := n.LoadTxFilter(ctx, false, nil, watchOutPoints)
-        #         if err != nil {
-        #             log.Errorf("Failed to watch outpoints: %v", err)
-        #         }
-        #     }
-        # }()
-
         # Generate the tickets individually.
-        ticketHashes = []
+        tickets = []
 
         for i in range(req.count):
             # Generate the extended outpoints that we need to use for ticket
@@ -1140,20 +1225,11 @@ class DcrdataBlockchain(object):
                 pkScript = txOut.pkScript,
             )
 
-            # If the user hasn't specified a voting address
-            # to delegate voting to, just use an address from
-            # this wallet. Check the passed address from the
-            # request first, then check the ticket address
-            # stored from the configuation. Finally, generate
-            # an address.
-            if not req.votingAddress:
-                raise Exception("voting address not set in purchaseTickets request")
-
             addrSubsidy = txscript.decodeAddress(keysource.internal(), self.params)
 
             # Generate the ticket msgTx and sign it.
-            ticket = txscript.makeTicket(self.params, eopPool, eop, req.votingAddress,
-                addrSubsidy, ticketPrice, req.poolAddress)
+            ticket = txscript.makeTicket(self.params, eopPool, eop, votingAddress,
+                addrSubsidy, ticketPrice, poolAddress)
             forSigning = []
             eopPoolCredit = txscript.Credit(
                 op =     eopPool.op,
@@ -1190,7 +1266,18 @@ class DcrdataBlockchain(object):
                 raise Exception("high fees detected")
 
             self.broadcast(ticket.txHex())
-            ticketHash = ticket.hash()
-            ticketHashes.append(ticketHash)
-            log.info("published ticket purchase %s" % ticketHash)
-        return (splitTx, ticket), splitSpent, internalOutputs
+            tickets.append(ticket)
+            log.info("published ticket %s" % ticket.txid())
+
+            # Add a UTXO to the internal outputs list.
+            txOut = ticket.txOut[0]
+            internalOutputs.append(UTXO(
+                address = votingAddress.string(),
+                txid = ticket.txid(),
+                vout = 0, # sstx is output 0
+                ts = int(time.time()),
+                scriptPubKey = txOut.pkScript,
+                amount = txOut.value*1e-8,
+                satoshis = txOut.value,
+            ))
+        return (splitTx, tickets), splitSpent, internalOutputs

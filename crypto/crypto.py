@@ -460,31 +460,6 @@ class ExtendedKey:
         self.depth = depth
         self.childNum = childNum
         self.isPrivate = isPrivate
-    # def __tojson__(self):
-    #     return {
-    #         "privVer": self.privVer,
-    #         "pubVer": self.pubVer,
-    #         "key": self.key,
-    #         "pubKey": self.pubKey,
-    #         "chainCode": self.chainCode,
-    #         "parentFP": self.parentFP,
-    #         "depth": self.depth,
-    #         "childNum": self.childNum,
-    #         "isPrivate": self.isPrivate,
-    #     }
-    # @staticmethod
-    # def __fromjson__(obj):
-    #     return ExtendedKey(
-    #         privVer = obj["privVer"],
-    #         pubVer = obj["pubVer"],
-    #         key = obj["key"],
-    #         pubKey = obj["pubKey"],
-    #         chainCode = obj["chainCode"],
-    #         parentFP = obj["parentFP"],
-    #         depth = obj["depth"],
-    #         childNum = obj["childNum"],
-    #         isPrivate = obj["isPrivate"],
-    #     )
     def deriveCoinTypeKey(self, coinType):
         """
         First two hardened child derivations in accordance with BIP0044.

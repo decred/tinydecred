@@ -4,24 +4,16 @@ Copyright (c) 2019, The Decred developers
 See LICENSE for details
 """
 import os
-import unittest
 from threading import Lock as Mutex
 from tinydecred.util import tinyjson, helpers
 from tinydecred.crypto import crypto, mnemonic
 from tinydecred.pydecred import txscript
+from tinydecred.pydecred.account import DecredAccount
 from tinydecred.accounts import createNewAccountManager
 
 log = helpers.getLogger("WLLT") # , logLvl=0)
 
 VERSION = "0.0.1"
-
-class KeySource(object):
-    """
-    Implements the KeySource API from tinydecred.api.
-    """
-    def __init__(self, priv, internal):
-        self.priv = priv
-        self.internal = internal
 
 class Wallet(object):
     """
@@ -60,9 +52,7 @@ class Wallet(object):
         # The fileKey is a hash generated with the user's password as an input.
         # The fileKey hash is used to AES encrypt and decrypt the wallet file.
         self.fileKey = None
-        # An object implementing the BlockChain API. Eventually should be moved
-        # from wallet in favor of a common interface that wraps a full, spv, or
-        # light node.
+        # An object implementing the BlockChain API.
         self.blockchain = None
         # The best block.
         self.users = 0
@@ -110,7 +100,7 @@ class Wallet(object):
         pw = password.encode()
         # Create the keys and coin type account, using the seed, the public
         # password, private password and blockchain params.
-        wallet.acctManager = createNewAccountManager(seed, b'', pw, chain)
+        wallet.acctManager = createNewAccountManager(seed, b'', pw, chain, constructor=DecredAccount)
         wallet.fileKey = crypto.SecretKey(pw)
         wallet.selectedAccount = wallet.acctManager.openAccount(0, password)
         wallet.close()
@@ -297,42 +287,6 @@ class Wallet(object):
             Balance: The current account's Balance object.
         """
         return self.selectedAccount.balance
-    def getUTXOs(self, requested, approve=None):
-        """
-        Find confirmed and mature UTXOs, smallest first, that sum to the
-        requested amount, in atoms.
-
-        Args:
-            requested (int): Required amount in atoms.
-            filter (func(UTXO) -> bool): Optional UTXO filtering function.
-
-        Returns:
-            list(UTXO): A list of UTXOs.
-            bool: True if the UTXO sum is >= the requested amount.
-        """
-        matches = []
-        acct = self.openAccount
-        collected = 0
-        pairs = [(u.satoshis, u) for u in acct.utxoscan()]
-        for v, utxo in sorted(pairs, key=lambda p: p[0]):
-            if approve and not approve(utxo):
-                continue
-            matches.append(utxo)
-            collected += v
-            if collected >= requested:
-                break
-        return matches, collected >= requested
-    def getKey(self, addr):
-        """
-        Get the private key for the provided address.
-
-        Args:
-            addr (str): The base-58 encoded address.
-
-        Returns:
-            secp256k1.PrivateKey: The private key structure for the address.
-        """
-        return self.openAccount.getPrivKeyForAddress(addr)
     def blockSignal(self, sig):
         """
         Process a new block from the explorer.
@@ -438,22 +392,9 @@ class Wallet(object):
                 failure.
         """
         acct = self.openAccount
-        keysource = KeySource(
-            priv = self.getKey,
-            internal = acct.getChangeAddress,
-        )
-        tx, spentUTXOs, newUTXOs = self.blockchain.sendToAddress(value, address, keysource, self.getUTXOs, feeRate)
-        acct.addMempoolTx(tx)
-        acct.spendUTXOs(spentUTXOs)
-        for utxo in newUTXOs:
-            acct.addUTXO(utxo)
+        tx = acct.sendToAddress(value, address, feeRate, self.blockchain)
         self.signals.balance(acct.calcBalance(self.blockchain.tip["height"]))
         self.save()
         return tx
 
 tinyjson.register(Wallet)
-
-
-class TestWallet(unittest.TestCase):
-    def test_tx_to_outputs(self):
-        pass

@@ -126,7 +126,7 @@ class TinyConfig:
         """
         Save the file.
         """
-        tinyjson.save(CONFIG_PATH, self.file)
+        tinyjson.save(CONFIG_PATH, self.file, indent=4, sort_keys=True)
 
 tinyConfig = TinyConfig()
 

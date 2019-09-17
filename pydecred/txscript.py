@@ -1798,10 +1798,10 @@ def extractPkScriptAddrs(version, pkScript, chainParams):
     # pay-to-pubkey-hash and pay-to-script-hash are allowed.
     pkHash = extractStakePubKeyHash(pkScript, opcode.OP_SSTX)
     if pkHash:
-        return StakeSubmissionTy, pubKeyHashToAddrs(hash, chainParams), 1
+        return StakeSubmissionTy, pubKeyHashToAddrs(pkHash, chainParams), 1
     scriptHash = extractStakeScriptHash(pkScript, opcode.OP_SSTX)
     if scriptHash:
-        return StakeSubmissionTy, scriptHashToAddrs(hash, chainParams), 1
+        return StakeSubmissionTy, scriptHashToAddrs(scriptHash, chainParams), 1
 
     # Check for stake generation script.  Only stake-generation-tagged
     # pay-to-pubkey-hash and pay-to-script-hash are allowed.
@@ -1833,17 +1833,83 @@ def extractPkScriptAddrs(version, pkScript, chainParams):
     # EVERYTHING AFTER TIHS IS UN-IMPLEMENTED
     raise Exception("unsupported script")
 
-def sign(privKey, chainParams, tx, idx, subScript, hashType, sigType):
+def sign(chainParams, tx, idx, subScript, hashType, keysource, sigType):
     scriptClass, addresses, nrequired = extractPkScriptAddrs(DefaultScriptVersion, subScript, chainParams)
 
-    if scriptClass == PubKeyHashTy:
-        # look up key for address
-        # key = acct.getPrivKeyForAddress(addresses[0])
-        script = signatureScript(tx, idx, subScript, hashType, privKey, True)
-    else:
-        raise Exception("un-implemented script class")
+    subClass = scriptClass
+    isStakeType = (scriptClass == StakeSubmissionTy or
+        scriptClass == StakeSubChangeTy or
+        scriptClass == StakeGenTy or
+        scriptClass == StakeRevocationTy)
+    if isStakeType:
+        subClass = getStakeOutSubclass(subScript)
 
-    return script, scriptClass, addresses, nrequired
+    if scriptClass == PubKeyTy:
+        raise Exception("P2PK signature scripts not implemented")
+        # privKey = keysource.priv(addresses[0].string())
+        # script = p2pkSignatureScript(tx, idx, subScript, hashType, key)
+        # return script, scriptClass, addresses, nrequired, nil
+
+    elif scriptClass == PubkeyAltTy:
+        raise Exception("alt signatures not implemented")
+        # privKey = keysource.priv(addresses[0].string())
+        # script = p2pkSignatureScriptAlt(tx, idx, subScript, hashType, key, sigType)
+        # return script, scriptClass, addresses, nrequired, nil
+
+    elif scriptClass == PubKeyHashTy:
+        privKey = keysource.priv(addresses[0].string())
+        script = signatureScript(tx, idx, subScript, hashType, privKey, True)
+        return script, scriptClass, addresses, nrequired
+
+    elif scriptClass == PubkeyHashAltTy:
+        raise Exception("alt signatures not implemented")
+        # look up key for address
+        # privKey = keysource.priv(addresses[0].string())
+        # script = signatureScriptAlt(tx, idx, subScript, hashType, key, compressed, sigType)
+        # return script, scriptClass, addresses, nrequired
+
+    elif scriptClass == ScriptHashTy:
+        raise Exception("script-hash script signing not implemented")
+        # script = keysource.script(addresses[0])
+        # return script, scriptClass, addresses, nrequired
+
+    elif scriptClass == MultiSigTy:
+        raise Exception("spending multi-sig script not implemented")
+        # script = signMultiSig(tx, idx, subScript, hashType, addresses, nrequired, kdb)
+        # return script, scriptClass, addresses, nrequired
+
+    elif scriptClass == StakeSubmissionTy:
+        return handleStakeOutSign(tx, idx, subScript, hashType, keysource, addresses, scriptClass, subClass, nrequired)
+
+    elif scriptClass == StakeGenTy:
+        return handleStakeOutSign(tx, idx, subScript, hashType, keysource, addresses, scriptClass, subClass, nrequired)
+
+    elif scriptClass == StakeRevocationTy:
+        return handleStakeOutSign(tx, idx, subScript, hashType, keysource, addresses, scriptClass, subClass, nrequired)
+
+    elif scriptClass == StakeSubChangeTy:
+        return handleStakeOutSign(tx, idx, subScript, hashType, keysource, addresses, scriptClass, subClass, nrequired)
+
+    elif scriptClass == NullDataTy:
+        raise Exception("can't sign NULLDATA transactions")
+
+    raise Exception("can't sign unknown transactions")
+
+def handleStakeOutSign(tx, idx, subScript, hashType, keysource, addresses, scriptClass, subClass, nrequired):
+    """
+    # handleStakeOutSign is a convenience function for reducing code clutter in
+    # sign. It handles the signing of stake outputs.
+    """
+    if subClass == PubKeyHashTy:
+        privKey = keysource.priv(addresses[0].string())
+        txscript = signatureScript(tx, idx, subScript, hashType, privKey, True)
+        return txscript, scriptClass, addresses, nrequired
+    elif subClass == ScriptHashTy:
+        # This will be needed in order to enable voting.
+        raise Exception("script-hash script signing not implemented")
+        # script = keysource.script(addresses[0].string())
+        # return script, scriptClass, addresses, nrequired
+    raise Exception("unknown subclass for stake output to sign")
 
 def mergeScripts(chainParams, tx, idx, pkScript, scriptClass, addresses, nRequired, sigScript, prevScript):
     """
@@ -1906,7 +1972,7 @@ def mergeScripts(chainParams, tx, idx, pkScript, scriptClass, addresses, nRequir
             return sigScript
         return prevScript
 
-def signTxOutput(privKey, chainParams, tx, idx, pkScript, hashType, previousScript, sigType):
+def signTxOutput(chainParams, tx, idx, pkScript, hashType, keysource, previousScript, sigType):
     """
     signTxOutput signs output idx of the given tx to resolve the script given in
     pkScript with a signature type of hashType. Any keys required will be
@@ -1921,7 +1987,7 @@ def signTxOutput(privKey, chainParams, tx, idx, pkScript, hashType, previousScri
     versions.
     """
 
-    sigScript, scriptClass, addresses, nrequired = sign(privKey, chainParams, tx, idx, pkScript, hashType, sigType)
+    sigScript, scriptClass, addresses, nrequired = sign(chainParams, tx, idx, pkScript, hashType, keysource, sigType)
 
     isStakeType = (scriptClass == StakeSubmissionTy or
         scriptClass == StakeSubChangeTy or
@@ -1987,7 +2053,7 @@ def spendScriptSize(pkScript):
         if scriptClass != PubKeyHashTy:
             raise Exception("unexpected nested script class for credit: %d" % scriptClass)
         return RedeemP2PKHSigScriptSize
-    raise Exception("unimplemented")
+    raise Exception("unimplemented: %s : %r" % (scriptClass, scriptClass))
 
 def estimateInputSize(scriptSize):
     """

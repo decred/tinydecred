@@ -11,7 +11,7 @@ _types = {}
 def clsKey(cls):
     return cls.__qualname__
 
-def register(cls):
+def register(cls, tag=None):
     """
     Registered types will be checked for compliance with the JSONMarshaller. 
     When an object of a registered type is dump'ed, it's __tojson__ method 
@@ -22,7 +22,8 @@ def register(cls):
     """
     if not hasattr(cls, "__fromjson__") or not hasattr(cls, "__tojson__"):
         raise KeyError("register: registered types must have a __fromjson__ method")
-    k = clsKey(cls)
+    k = tag if tag else clsKey(cls)
+    cls.__jsontag__ = k
     if k in _types:
         raise Exception("tinyjson: mutliple attempts to register class %s" % k)
     _types[k] = cls
@@ -59,10 +60,9 @@ class Encoder(json.JSONEncoder):
         probably a dict.  
     """
     def default(self, obj):
-        ck = clsKey(obj.__class__)
-        if ck in _types:
+        if hasattr(obj.__class__, "__jsontag__"):
             encoded = obj.__tojson__()
-            encoded["_jt_"] = ck
+            encoded["_jt_"] = obj.__class__.__jsontag__
             return encoded
         # Let the base class default method raise the TypeError
         return json.JSONEncoder.default(self, obj)

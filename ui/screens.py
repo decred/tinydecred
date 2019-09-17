@@ -4,12 +4,14 @@ See LICENSE for detail
 """
 import os
 import time
+import random
 from PyQt5 import QtGui, QtCore, QtWidgets
 from tinydecred import config
 from tinydecred.ui import qutilities as Q, ui
 from tinydecred.wallet import Wallet
 from tinydecred.util import helpers
 from tinydecred.pydecred import constants as DCR
+from tinydecred.pydecred.stakepool import StakePool
 
 UI_DIR = os.path.dirname(os.path.realpath(__file__))
 log = helpers.getLogger("APPUI") # , logLvl=0)
@@ -71,7 +73,10 @@ class TinyDialog(QtWidgets.QFrame):
         self.padX = self.targetPadding if availPadX >= self.targetPadding else availPadX
         self.setGeometry(
             screenGeo.x() + screenGeo.width() - self.w - self.padX, 
-            screenGeo.y() + screenGeo.height() - self.h, self.w, self.h)
+            screenGeo.y() + screenGeo.height() - self.h, 
+            self.w, 
+            self.h
+        )
 
         self.successSig.connect(self.showSuccess_)
         self.showSuccess = lambda s: self.successSig.emit(s)
@@ -95,17 +100,17 @@ class TinyDialog(QtWidgets.QFrame):
         app.registerSignal(ui.WORKING_SIGNAL, lambda: self.working.setVisible(True))
         app.registerSignal(ui.DONE_SIGNAL, lambda: self.working.setVisible(False))
 
-        # If enabled by a Screen instance, the user can navigate directly to
-        # the home screen.
-        self.homeIcon = ClickyLabel(self.homeClicked)
-        self.homeIcon.setPixmap(pixmapFromSvg("home.svg", 20, 20))
-        menuLayout.addWidget(Q.pad(self.homeIcon, 3, 3, 3, 3))
-
         # If enabled by a Screen instance, the user can navigate back to the 
         # previous screen.
         self.backIcon = ClickyLabel(self.backClicked)
         self.backIcon.setPixmap(pixmapFromSvg("back.svg", 20, 20))
         menuLayout.addWidget(Q.pad(self.backIcon, 3, 3, 3, 3))
+
+        # If enabled by a Screen instance, the user can navigate directly to
+        # the home screen.
+        self.homeIcon = ClickyLabel(self.homeClicked)
+        self.homeIcon.setPixmap(pixmapFromSvg("home.svg", 20, 20))
+        menuLayout.addWidget(Q.pad(self.homeIcon, 3, 3, 3, 3))
 
         # Separate the left and right sub-menus.
         menuLayout.addStretch(1)
@@ -149,6 +154,8 @@ class TinyDialog(QtWidgets.QFrame):
         w.setVisible(True)
         self.setIcons(w)
         self.setVisible(True)
+        if hasattr(w, "stacked"):
+            w.stacked()
     def pop_(self, screen=None):
         """
         Pop the top screen from the stack. If a Screen instance is provided, 
@@ -186,6 +193,8 @@ class TinyDialog(QtWidgets.QFrame):
         home.setVisible(True)
         home.runAnimation(FADE_IN_ANIMATION)
         self.layout.addWidget(home)
+        if hasattr(home, "inserted"):
+            home.inserted()
         self.setIcons(home)
     def setIcons(self, top):
         """
@@ -363,9 +372,13 @@ class HomeScreen(Screen):
         # The TinyDialog won't allow popping of the bottom screen anyway.
         self.isPoppable = False
         self.canGoHome = False
+        self.ticketStats = None
+        self.balance = None
+        self.stakeScreen = StakingScreen(app)
 
         # Update the home screen when the balance signal is received. 
         app.registerSignal(ui.BALANCE_SIGNAL, self.balanceUpdated)
+        app.registerSignal(ui.SYNC_SIGNAL, self.setTicketStats)
 
         layout = self.layout
         layout.setAlignment(Q.ALIGN_LEFT)
@@ -383,6 +396,8 @@ class HomeScreen(Screen):
         self.availBalance = ClickyLabel(self.balanceClicked, "0.00 spendable")
         Q.setProperties(self.availBalance, fontSize=15)
 
+        self.statsLbl = Q.makeLabel("", 15)
+
         tot, totLyt = Q.makeSeries(Q.HORIZONTAL, 
             self.totalBalance,
             self.totalUnit,
@@ -391,6 +406,7 @@ class HomeScreen(Screen):
         bals, balsLyt = Q.makeSeries(Q.VERTICAL, 
             tot,
             self.availBalance,
+            self.statsLbl,
             align=Q.ALIGN_RIGHT,
         )
 
@@ -438,6 +454,13 @@ class HomeScreen(Screen):
         spend.clicked.connect(self.spendClicked)
         optsLyt.addWidget(spend, 0, 0, Q.ALIGN_LEFT)
 
+        # Open staking window. Button is initally hidden until sync is complete.
+        self.stakeBttn = btn = app.getButton(SMALL, "Staking")
+        btn.setVisible(False)
+        btn.setMinimumWidth(110)
+        btn.clicked.connect(self.openStaking)
+        optsLyt.addWidget(btn, 0, 1, Q.ALIGN_RIGHT)
+
         # Navigate to the settings screen.
         # settings = app.getButton(SMALL, "Settings")
         # settings.setMinimumWidth(110)
@@ -453,8 +476,8 @@ class HomeScreen(Screen):
         """
         app = self.app
         def addr(wallet):
-            return app.wallet.getNewAddress()
-        app.withUnlockedWallet(addr, self.setNewAddress)        
+            return wallet.getNewAddress()
+        app.withUnlockedWallet(addr, self.setNewAddress)
     def setNewAddress(self, address):
         """
         Callback for newAddressClicked. Sets the displayed address.
@@ -483,12 +506,31 @@ class HomeScreen(Screen):
         self.totalBalance.setText("{0:,.2f}".format(dcr))
         self.totalBalance.setToolTip("%.8f" % dcr)
         self.availBalance.setText("%s spendable" % availStr.rstrip('0').rstrip('.'))
+        self.balance = bal
+        if self.ticketStats:
+            self.setTicketStats()
+    def setTicketStats(self):
+        """
+        Set the staking statistics. 
+        """
+        acct = self.app.wallet.selectedAccount
+        balance = self.balance
+        stats = acct.ticketStats()
+        if stats and balance and balance.total > 0:
+            self.stakeBttn.setVisible(True)
+            self.statsLbl.setText("%s%% staked" % helpers.formatNumber(stats.value/balance.total*100))
+            self.ticketStats = stats
     def spendClicked(self, e=None):
         """
         Display a form to send funds to an address. A Qt Slot, but any event 
         parameter is ignored.
         """
         self.app.appWindow.stack(self.app.sendScreen)
+    def openStaking(self, e=None):
+        """
+        Display the staking window.
+        """
+        self.app.appWindow.stack(self.stakeScreen)
     def settingsClicked(self, e):
         log.debug("settings clicked")
 
@@ -953,6 +995,453 @@ class MnemonicRestorer(Screen):
         else:
             app.appWindow.showError("failed to create wallet")
 
+class StakingScreen(Screen):
+    """
+    A screen with a simple form for entering a mnemnic seed from which to 
+    generate a wallet.
+    """
+    def __init__(self, app):
+        """
+        Args:
+            app (TinyDecred): The TinyDecred application instance.
+        """
+        super().__init__(app)
+        self.isPoppable = True
+        self.canGoHome = True
+        self.layout.setSpacing(20)
+        self.poolScreen = PoolScreen(app, self.poolAuthed)
+        self.balance = None
+        self.wgt.setContentsMargins(5, 5, 5, 5)
+        self.wgt.setMinimumWidth(400)
+        self.blockchain = app.dcrdata
+
+        # Register for a few key signals.
+        self.app.registerSignal(ui.BLOCKCHAIN_CONNECTED, self.blockchainConnected)
+        self.app.registerSignal(ui.BALANCE_SIGNAL, self.balanceSet)
+        self.app.registerSignal(ui.SYNC_SIGNAL, self.setStats)
+
+        # ticket price is a single row reading `Ticket Price: XX.YY DCR`. 
+        lbl = Q.makeLabel("Ticket Price: ", 16)
+        self.lastPrice = None
+        self.lastPriceStamp = 0
+        self.ticketPrice = Q.makeLabel("--.--", 24, fontFamily="Roboto-Bold")
+        unit = Q.makeLabel("DCR", 16)
+        priceWgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, self.ticketPrice, unit)
+        self.layout.addWidget(priceWgt)
+
+        # Current holdings is a single row that reads `Currently staking X 
+        # tickets worth YY.ZZ DCR`
+        lbl = Q.makeLabel("Currently staking", 14)
+        self.ticketCount = Q.makeLabel("", 18, fontFamily="Roboto-Bold")
+        lbl2 = Q.makeLabel("tickets worth", 14)
+        self.ticketValue = Q.makeLabel("", 18, fontFamily="Roboto-Bold")
+        unit = Q.makeLabel("DCR", 14)
+        wgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, self.ticketCount, lbl2, self.ticketValue, unit)
+        self.layout.addWidget(wgt)
+
+        # Affordability. A row that reads `You can afford X tickets`
+        lbl = Q.makeLabel("You can afford ", 14)
+        self.affordLbl = Q.makeLabel(" ", 17, fontFamily="Roboto-Bold")
+        lbl2 = Q.makeLabel("tickets", 14)
+        affordWgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, self.affordLbl, lbl2)
+        affordWgt.setContentsMargins(0, 0, 0, 30)
+        self.layout.addWidget(affordWgt)
+
+        # The actual purchase form. A box with a drop shadow that contains a 
+        # single row reading `Purchase [ ] tickets     [Buy Now]`.
+        lbl = Q.makeLabel("Purchase", 16)
+        lbl2 = Q.makeLabel("tickets", 16)
+        lbl2.setContentsMargins(0, 0, 30, 0)
+        qty = self.ticketQty = QtWidgets.QLineEdit()
+        qty.setValidator(QtGui.QRegExpValidator(QtCore.QRegExp("[0-9]*")))
+        qty.setFixedWidth(40)
+        font = lbl2.font()
+        font.setPixelSize(18)
+        qty.setFont(font)
+        qty.returnPressed.connect(self.buyClicked)
+        btn = app.getButton(SMALL, "Buy Now")
+        btn.clicked.connect(self.buyClicked)
+        purchaseWgt, lyt = Q.makeSeries(Q.HORIZONTAL, lbl, qty, lbl2, Q.STRETCH, btn)
+        lyt.setContentsMargins(10, 10, 10, 10)
+        Q.addDropShadow(purchaseWgt)
+        self.layout.addWidget(purchaseWgt)
+
+    def stacked(self):
+        """
+        stacked is called on screens when stacked by the TinyDialog.
+        """
+        acct = self.app.wallet.selectedAccount
+        if not acct.hasPool():
+            self.app.appWindow.pop(self)
+            self.app.appWindow.stack(self.poolScreen)
+
+    def setStats(self):
+        """
+        Get the current ticket stats and update the display.
+        """
+        acct = self.app.wallet.selectedAccount
+        stats = acct.ticketStats()
+        self.ticketCount.setText(str(stats.count))
+        self.ticketValue.setText("%.2f" % (stats.value/1e8))
+
+    def blockchainConnected(self):
+        """
+        Connected to the BLOCKCHAIN_CONNECTED signal. Updates the current
+        ticket price.
+        """
+        self.app.makeThread(getTicketPrice, self.ticketPriceCB, self.blockchain)
+
+    def ticketPriceCB(self, ticketPrice):
+        """
+        Sets the current ticket price and updates the display.
+
+        Args:
+            ticketPrice (float): The ticket price, in DCR.
+        """
+        if not ticketPrice:
+            return
+        self.lastPrice = ticketPrice
+        self.lastPriceStamp = int(time.time())
+        self.ticketPrice.setText("%.2f" % ticketPrice)
+        self.ticketPrice.setToolTip("%.8f" % ticketPrice)
+        self.setBuyStats()
+
+    def balanceSet(self, balance):
+        """
+        Connected to the BALANCE_SIGNAL signal. Sets the balance and updates 
+        the display. 
+
+        Args:
+            balance (account.Balance): The current account balance.
+        """
+        self.balance = balance
+        self.setBuyStats()
+
+    def setBuyStats(self):
+        """
+        Update the display of the current affordability stats.
+        """
+        if self.balance and self.lastPrice:
+            self.affordLbl.setText(str(int(self.balance.available/1e8/self.lastPrice)))
+
+    def buyClicked(self, e=None):
+        """
+        Connected to the "Buy Now" button clicked signal. Initializes the ticket 
+        purchase routine.
+        """
+        qtyStr = self.ticketQty.text()
+        if not qtyStr or qtyStr == "":
+            self.app.appWindow.showError("can't purchase zero tickets")
+            return
+        qty = int(qtyStr)
+        if qty > self.balance.available/1e8/self.lastPrice:
+            self.app.appWindow.showError("can't afford %d tickets" % qty)
+        def step():
+            self.app.withUnlockedWallet(self.buyTickets, self.ticketsBought, qty)
+        self.app.confirm("Are you sure you want to purchase %d ticket(s) for %.2f DCR? "
+                         "Once purchased, these funds will be locked until your tickets vote or expire."
+                         % (qty, qty*self.lastPrice), 
+                         step)
+    def buyTickets(self, wallet, qty):
+        """
+        The second step in the sequence for a ticket purchase. Defer the hard
+        work to the open Account.
+
+        Args:
+            wallet (Wallet): The open wallet.
+            qty (int): The number of tickets to purchase.
+
+        Returns:
+            list(msgtx.MsgTx): The purchased tickets.
+        """
+        tip = self.blockchain.tip["height"]
+        acct = wallet.openAccount
+        txs = acct.purchaseTickets(qty, self.lastPrice, self.blockchain)
+        if txs:
+            wallet.signals.balance(acct.calcBalance(tip))
+            self.app.home()
+        self.app.appWindow.showSuccess("bought %s tickets" % qty)
+        wallet.save()
+        return txs
+    def ticketsBought(self, res):
+        """
+        The final callback from a ticket purchase. If res evaluates True, it 
+        should be a list of purchased tickets.
+        """
+        if not res:
+            self.app.appWindow.showError("error purchasing tickets")
+            self.app.home()
+    def poolAuthed(self, res):
+        """
+        The callback from the PoolScreen when a pool is added. If res evaluates
+        True, the pool was successfully authorized.
+        """
+        if not res:
+            # The pool screen handles error notifications.
+            self.app.home()
+        window = self.app.appWindow
+        window.pop(self.poolScreen)
+        window.stack(self)
+
+class PoolScreen(Screen):
+    def __init__(self, app, callback):
+        """
+        Args:
+            app (TinyDecred): The TinyDecred application instance.
+            callback (function): A function to call when a pool is succesfully
+                validated.
+        """
+        super().__init__(app)
+        self.isPoppable = True
+        self.canGoHome = True
+        self.callback = callback
+        self.pools = []
+        self.poolIdx = -1
+        self.app.registerSignal(ui.BLOCKCHAIN_CONNECTED, self.getPools)
+        self.wgt.setMinimumWidth(400)
+        self.wgt.setContentsMargins(15, 0, 15, 0)
+
+        # After the header, there are two rows that make up the form. The first
+        # row is a QLineEdit and a button that takes the pool URL. The second 
+        # row is a slightly larger QLineEdit for the API key.
+        lbl = Q.makeLabel("Add a voting service provider", 16)
+        wgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, Q.STRETCH)
+        self.layout.addWidget(wgt)
+        self.poolIp = edit = QtWidgets.QLineEdit()
+        edit.setPlaceholderText("e.g. https://anothervsp.com")
+        edit.returnPressed.connect(self.authPool)
+        btn = app.getButton(SMALL, "Add")
+        btn.clicked.connect(self.authPool)
+        wgt, _ = Q.makeSeries(Q.HORIZONTAL, self.poolIp, btn)
+        wgt.setContentsMargins(0, 0, 0, 5)
+        self.layout.addWidget(wgt)
+        self.keyIp = edit = QtWidgets.QLineEdit()
+        edit.setPlaceholderText("API key")
+        self.keyIp.setContentsMargins(0, 0, 0, 30)
+        self.layout.addWidget(edit)
+        edit.returnPressed.connect(self.authPool)
+
+        # A separate header for the pick-a-VSP section.
+        l = Q.ALIGN_LEFT
+        lbl = Q.makeLabel("Don't have a VSP yet? Heres one.", 15, a=l)
+        self.layout.addWidget(lbl)
+
+        # Display info for a randomly chosen pool (with some filtering), and a 
+        # couple of links to aid in selecting a VSP..
+        self.poolUrl = Q.makeLabel("", 16, a=l, fontFamily="Roboto-Medium")
+        self.poolUrl.setOpenExternalLinks(True)
+        self.poolUrl.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse);
+        scoreLbl = Q.makeLabel("score:", 14)
+        self.score = Q.makeLabel("", 14)
+        feeLbl = Q.makeLabel("fee:", 14)
+        self.fee = Q.makeLabel("", 14)
+        usersLbl = Q.makeLabel("users:", 14)
+        self.users = Q.makeLabel("", 14)
+        stats, _ = Q.makeSeries( Q.HORIZONTAL,
+            scoreLbl, self.score, Q.STRETCH,
+            feeLbl, self.fee, Q.STRETCH,
+            usersLbl, self.users
+        )
+        poolWgt, lyt = Q.makeSeries(Q.VERTICAL, self.poolUrl, stats)
+        lyt.setContentsMargins(10, 10, 10, 10)
+        lyt.setSpacing(10)
+        Q.addDropShadow(poolWgt)
+        Q.addHoverColor(poolWgt, "#f5ffff")
+        poolWgt.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+        poolWgt.mouseReleaseEvent = self.poolClicked
+        self.layout.addWidget(poolWgt)
+
+        # A button to select a different pool and a link to the master list on 
+        # decred.org.
+        btn1 = app.getButton(TINY, "show another")
+        btn1.clicked.connect(self.randomizePool)
+        btn2 = app.getButton(TINY, "see all")
+        btn2.clicked.connect(self.showAll)
+        wgt, _ = Q.makeSeries(Q.HORIZONTAL, btn1, Q.STRETCH, btn2)
+        self.layout.addWidget(wgt)
+
+    def getPools(self):
+        """
+        Get the current master list of VSPs from decred.org.
+        """
+        net = self.app.dcrdata.params
+        def getPools():
+            try:
+                return StakePool.providers(net)
+            except Exception as e:
+                log.error("error retrieving stake pools: %s" % e)
+                return False
+        self.app.makeThread(getPools, self.setPools)
+
+    def setPools(self, pools):
+        """
+        Cache the list of stake pools from decred.org, and pick one to display.
+
+        Args:
+            pools (list(object)): The freshly-decoded-from-JSON stake pools.
+        """
+        if not pools:
+            return
+        self.pools = pools
+        tNow = int(time.time())
+        # only save pools updated within the last day
+        self.pools = [p for p in pools if tNow - p["LastUpdated"] < 86400]
+        # sort by performance
+        self.pools.sort(key=self.scorePool, reverse=True)
+        self.randomizePool()
+
+    def randomizePool(self, e=None):
+        """
+        Randomly select a pool from the best performing half, where performance
+        is based purely on voting record, e.g. voted/(voted+missed). The sorting
+        and some initial filtering was already performed in setPools.
+        """
+        count = len(self.pools)//2+1
+        pools = self.pools[:count]
+        lastIdx = self.poolIdx
+        if count == 1:
+            self.poolIdx = 0
+        else:
+            # pick random elements until the index changes
+            while self.poolIdx == lastIdx:
+                self.poolIdx = random.randint(0, count-1)
+        pool = pools[self.poolIdx]
+        self.poolUrl.setText(pool["URL"])
+        self.score.setText("%.1f%%" % self.scorePool(pool))
+        self.fee.setText("%.1f%%" % pool["PoolFees"])
+        self.users.setText(str(pool["UserCountActive"]))
+
+    def scorePool(self, pool):
+        """
+        Get the pools performance score, as a float percentage.
+        """
+        return pool["Voted"]/(pool["Voted"]+pool["Missed"])*100
+
+    def authPool(self):
+        """
+        Connected to the "Add" button clicked signal. Attempts to authorize the
+        user-specified pool and API key.
+        """
+        url = self.poolIp.text()
+        app = self.app
+        err = app.appWindow.showError
+        if not url:
+            err("empty address")
+            return
+        if not url.startswith("http://") and not url.startswith("https://"):
+            err("invalid pool address: %s" % url)
+            return
+        apiKey = self.keyIp.text()
+        if not apiKey:
+            err("empty API key")
+            return
+        pool = StakePool(url, apiKey)
+        def votingAddr(wallet):
+            try:
+                addr = wallet.openAccount.votingAddress()
+                wallet.openAccount.setPool(pool)
+                wallet.save()
+                return pool, addr, wallet.openAccount.net
+            except Exception as e:
+                log.error("error getting voting address: %s" % e)
+                err("failed to get voting address")
+                return None
+        app.withUnlockedWallet(votingAddr, self.continueAuth)
+    def continueAuth(self, res):
+        """
+        Follows authPool in the pool authorization process. Send the wallet 
+        voting address to the pool and authorize the response.
+        """
+        if not res:
+            self.callback(False)
+            return
+        pool, addr, net = res
+        app = self.app
+        def setAddr():
+            try:
+                pool.authorize(addr, net)
+                app.appWindow.showSuccess("pool authorized")
+                self.callback(True)
+            except Exception as e:
+                # log.error("failed to set pool address: %s" % e)
+                # self.app.appWindow.showError("failed to set address")
+                # might be okay. 
+                log.error("failed to authorize stake pool: %s" % e)
+                app.appWindow.showError("pool authorization failed")
+            self.callback(False)
+
+        self.app.waitThread(setAddr, None)
+    def showAll(self, e=None):
+        """
+        Connected to the "see all" button clicked signal. Open the full
+        decred.org VSP list in the browser.
+        """
+        QtGui.QDesktopServices.openUrl(QtCore.QUrl("https://decred.org/vsp/"))
+    def poolClicked(self, e=None):
+        """
+        Callback from the clicked signal on the try-this-pool widget. Opens the
+        pools homepage in the users browser.
+        """
+        url = self.poolUrl.text()
+        self.poolIp.setText(url)
+        QtGui.QDesktopServices.openUrl(QtCore.QUrl(url))
+
+
+class ConfirmScreen(Screen):
+    """
+    A screen that displays a custom prompt and calls a callback function 
+    conditionally on user affirmation. The two available buttons say "ok" and 
+    "no". Clicking "ok" triggers the callback. Clicking "no" simply pops this 
+    Screen.
+    """
+    def __init__(self, app):
+        """
+        Args:
+            app (TinyDecred): The TinyDecred application instance.
+        """
+        super().__init__(app)
+        self.isPoppable = True
+        self.canGoHome = False
+        self.callback = None
+
+        self.prompt = Q.makeLabel("", 16)
+        self.prompt.setWordWrap(True)
+        self.layout.addWidget(self.prompt)
+        stop = app.getButton(SMALL, "no")
+        stop.clicked.connect(self.stopClicked)
+        go = app.getButton(SMALL, "ok")
+        go.clicked.connect(self.goClicked)
+        wgt, _ = Q.makeSeries(Q.HORIZONTAL, Q.STRETCH, stop, Q.STRETCH, go, Q.STRETCH)
+        wgt.setContentsMargins(0, 20, 0, 0)
+        self.layout.addWidget(wgt)
+    def withPurpose(self, prompt, callback):
+        """
+        Set the prompts and callback and return self.
+
+        Args:
+            prompt (string): The prompt for the users. 
+            callback (function): The function to call when the user clicks "ok".
+
+        Returns:
+            ConfirmScreen: This instance. Useful for using a patter like
+                app.appWindow.stack(confirmScreen.withPurpose("go ahead?", callbackFunc))
+        """
+        self.prompt.setText(prompt)
+        self.callback = callback
+        return self
+    def stopClicked(self, e=None):
+        """
+        The user has clicked "no". Just pop this screen.
+        """
+        self.app.appWindow.pop(self)
+    def goClicked(self, e=None):
+        """
+        The user has clicked the "ok" button. Pop self and call the callback.
+        """
+        self.app.appWindow.pop(self)
+        if self.callback:
+            self.callback()
+
 class Spinner(QtWidgets.QLabel):
     """
     A waiting/loading spinner.
@@ -1000,3 +1489,10 @@ class Spinner(QtWidgets.QLabel):
         painter.setRenderHints(QtGui.QPainter.HighQualityAntialiasing)
         painter.setPen(self.getPen())
         painter.drawEllipse(*self.rect)
+
+def getTicketPrice(blockchain):
+    try:
+        return blockchain.stakeDiff()
+    except Exception as e:
+        log.error("error fetching ticket price: %s" % e)
+        return False
