@@ -14,7 +14,7 @@ except ImportError:
 	exit()
 
 # Create a dcrdata client and grab the ticket price data.
-dcrdata = DcrdataClient("https://explorer.dcrdata.org")
+dcrdata = DcrdataClient("https://dcrdata.decred.org")
 ticketPrice = dcrdata.chart("ticket-price")
 # ticketPrice["x"] is UNIX timestamp
 # ticketPrice["y"] is ticket price, in atoms
