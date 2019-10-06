@@ -1879,11 +1879,7 @@ class TestTxScript(unittest.TestCase):
 
 class TestDcrdata(unittest.TestCase):
     def client(self, **k):
-        return dcrdata.DcrdataClient("https://alpha.dcrdata.org", customPaths={
-            "/tx/send",
-            "/insight/api/addr/{address}/utxo",
-            "insight/api/tx/send"
-        }, **k)
+        return dcrdata.DcrdataClient("https://alpha.dcrdata.org", **k)
     def test_websocket(self):
         """
         "newblock":       SigNewBlock,
@@ -1904,6 +1900,7 @@ class TestDcrdata(unittest.TestCase):
             blockchain = dcrdata.DcrdataBlockchain(os.path.join(tempDir, "db.db"), mainnet, "https://alpha.dcrdata.org")
             blockchain.connect()
             blockchain.blockHeader("298e5cc3d985bfe7f81dc135f360abe089edd4396b86d2de66b0cef42b21d980")
+            blockchain.close()
     def test_purchase_ticket(self):
         from tinydecred.crypto.secp256k1 import curve as Curve
         from tinydecred.crypto import rando

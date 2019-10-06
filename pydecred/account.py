@@ -6,9 +6,17 @@ The DecredAccount inherits from the tinydecred base Account and adds staking
 support.
 """
 
-from tinydecred.accounts import Account, EXTERNAL_BRANCH
+from tinydecred.accounts import Account
 from tinydecred.util import tinyjson, helpers
 from tinydecred.crypto.crypto import AddressSecpPubKey
+from tinydecred.pydecred import txscript
+
+log = helpers.getLogger("DCRACCT")
+
+# In addition to the standard internal and external branches, we'll have a third
+# branch. This should help accomodate upcoming changes to dcrstakepool. See also
+# https://github.com/decred/dcrstakepool/pull/514
+STAKE_BRANCH = 2
 
 class KeySource(object):
     """
@@ -91,6 +99,8 @@ class DecredAccount(Account):
         self.tickets = []
         self.stakeStats = TicketStats()
         self.stakePools = []
+        self.blockchain = None
+        self.signals = None
     def __tojson__(self):
         obj = super().__tojson__()
         return helpers.recursiveUpdate(obj, {
@@ -155,17 +165,16 @@ class DecredAccount(Account):
         Overload the base class to add the voting address.
         """
         return self.addTicketAddresses(super().allAddresses())
-    def addressesOfInterest(self):
+    def watchAddrs(self):
         """
         Overload the base class to add the voting address.
         """
-        return self.addTicketAddresses(super().addressesOfInterest())
+        return self.addTicketAddresses(super().watchAddrs())
     def votingKey(self):
         """
-        This may change, but for now, the voting key is from the zeroth 
-        child of the zeroth child of the external branch.
+        For now, the voting key is the zeroth child 
         """
-        return self.privKey.child(EXTERNAL_BRANCH).child(0).child(0).privateKey()
+        return self.privKey.child(STAKE_BRANCH).child(0).privateKey()
     def votingAddress(self):
         """
         The voting address is the pubkey address (not pubkey-hash) for the
@@ -204,7 +213,62 @@ class DecredAccount(Account):
         A getter for the stakeStats.
         """
         return self.stakeStats
-    def sendToAddress(self, value, address, feeRate, blockchain):
+    def blockSignal(self, sig):
+        """
+        Process a new block from the explorer.
+
+        Arg:
+            sig (obj or string): The block explorer's json-decoded block
+                notification.
+        """
+        block = sig["message"]["block"]
+        for newTx in block["Tx"]:
+            txid = newTx["TxID"]
+            # only grab the tx if its a transaction we care about.
+            if self.caresAboutTxid(txid):
+                tx = self.blockchain.tx(txid)
+                self.confirmTx(tx, self.blockchain.tipHeight)
+        # "Spendable" balance can change as utxo's mature, so update the 
+        # balance at every block.
+        self.signals.balance(self.calcBalance(self.blockchain.tipHeight))
+    def addressSignal(self, addr, txid):
+        """
+        Process an address notification from the block explorer.
+
+        Args:
+            addr (obj or string): The block explorer's json-decoded address
+                notification's address.
+            txid (obj or string): The block explorer's json-decoded address
+                notification's txid.
+        """
+        tx = self.blockchain.tx(txid)
+        self.addTxid(addr, tx.txid())
+
+        matches = False
+        # scan the inputs for any spends.
+        for txin in tx.txIn:
+            op = txin.previousOutPoint
+            # spendTxidVout is a no-op if output is unknown
+            match = self.spendTxidVout(op.txid(), op.index)
+            if match:
+                matches += 1
+        # scan the outputs for any new UTXOs
+        for vout, txout in enumerate(tx.txOut):
+            try:
+                _, addresses, _ = txscript.extractPkScriptAddrs(0, txout.pkScript, self.net)
+            except Exception:
+                # log.debug("unsupported script %s" % txout.pkScript.hex())
+                continue
+            # convert the Address objects to strings.
+            if addr in (a.string() for a in addresses):
+                utxo = self.blockchain.txVout(txid, vout)
+                utxo.address = addr
+                self.addUTXO(utxo)
+                matches += 1
+        if matches:
+            # signal the balance update
+            self.signals.balance(self.calcBalance(self.blockchain.tip["height"]))
+    def sendToAddress(self, value, address, feeRate):
         """
         Send the value to the address.
 
@@ -217,15 +281,15 @@ class DecredAccount(Account):
         """
         keysource = KeySource(
             priv = self.getPrivKeyForAddress,
-            internal = self.getChangeAddress,
+            internal = self.nextInternalAddress,
         )
-        tx, spentUTXOs, newUTXOs = blockchain.sendToAddress(value, address, keysource, self.getUTXOs, feeRate)
+        tx, spentUTXOs, newUTXOs = self.blockchain.sendToAddress(value, address, keysource, self.getUTXOs, feeRate)
         self.addMempoolTx(tx)
         self.spendUTXOs(spentUTXOs)
         for utxo in newUTXOs:
             self.addUTXO(utxo)
         return tx
-    def purchaseTickets(self, qty, price, blockchain):
+    def purchaseTickets(self, qty, price):
         """
         purchaseTickets completes the purchase of the specified tickets. The 
         DecredAccount uses the blockchain to do the heavy lifting, but must 
@@ -234,7 +298,7 @@ class DecredAccount(Account):
         """
         keysource = KeySource(
             priv = self.getPrivKeyForAddress,
-            internal = self.getChangeAddress,
+            internal = self.nextInternalAddress,
         )
         pool = self.stakePool()
         pi = pool.purchaseInfo
@@ -249,7 +313,7 @@ class DecredAccount(Account):
             count = qty, 
             txFee = 0, # use network default
         )
-        txs, spentUTXOs, newUTXOs = blockchain.purchaseTickets(keysource, self.getUTXOs, req)
+        txs, spentUTXOs, newUTXOs = self.blockchain.purchaseTickets(keysource, self.getUTXOs, req)
         if txs:
             # Add the split transactions
             self.addMempoolTx(txs[0])
@@ -265,5 +329,51 @@ class DecredAccount(Account):
         for utxo in newUTXOs:
             self.addUTXO(utxo)
         return txs[1]
+    def sync(self, blockchain, signals):
+        """
+        Synchronize the UTXO set with the server. This should be the first
+        action after the account is opened or changed.
+        """
+        self.blockchain = blockchain
+        self.signals = signals
+        signals.balance(self.balance)
+        self.generateGapAddresses()
+
+        # First, look at addresses that have been generated but not seen. Run in 
+        # loop until the gap limit is reached.
+        requestedTxs = 0
+        addrs = self.unseenAddrs()
+        while addrs:
+            for addr in addrs:
+                for txid in blockchain.txsForAddr(addr):
+                    requestedTxs += 1
+                    self.addTxid(addr, txid)
+            addrs = self.generateGapAddresses()
+        log.info("%d address transactions sets fetched" % requestedTxs)
+
+        # start with a search for all known addresses
+        addresses = self.allAddresses()
+        
+        # Until the server stops returning UTXOs, keep requesting more addresses
+        # to check.
+        while True:
+            # Update the account with known UTXOs.
+            blockchainUTXOs = blockchain.UTXOs(addresses)
+            if not blockchainUTXOs:
+                break
+            self.resolveUTXOs(blockchainUTXOs)
+            addresses = self.generateGapAddresses()
+            if not addresses:
+                break
+
+        # Subscribe to block and address updates.
+        blockchain.addressReceiver = self.addressSignal
+        blockchain.subscribeBlocks(self.blockSignal)
+        watchAddresses = self.watchAddrs()
+        if watchAddresses:
+            blockchain.subscribeAddresses(watchAddresses)
+        # Signal the new balance.
+        signals.balance(self.calcBalance(self.blockchain.tip["height"]))
+        return True
     
 tinyjson.register(DecredAccount)

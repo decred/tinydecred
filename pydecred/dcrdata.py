@@ -91,6 +91,14 @@ def getSocketURIs(uri):
     ps = fmt.format(prot, uri.netloc, "ps")
     return ws, ps
 
+# To Do: Get the full list here. 
+InsightPaths = [
+    "/tx/send",
+    "/insight/api/addr/{address}/utxo",
+    "/insight/api/addr/{address}/txs",
+    "insight/api/tx/send"
+]
+
 class DcrdataClient(object):
     """
     DcrdataClient represents the base node. The only argument to the
@@ -99,7 +107,7 @@ class DcrdataClient(object):
     timeFmt = "%Y-%m-%d %H:%M:%S"
     rfc3339Z = "%Y-%m-%dT%H:%M:%SZ"
 
-    def __init__(self, baseURI, customPaths=None, emitter=None):
+    def __init__(self, baseURI, emitter=None):
         """
         Build the DcrdataPath tree. 
         """
@@ -113,10 +121,9 @@ class DcrdataClient(object):
         atexit.register(self.close)
         root = self.root = DcrdataPath()
         self.listEntries = []
-        customPaths = customPaths if customPaths else []
         # /list returns a json list of enpoints with parameters in template format, base/A/{param}/B
         endpoints = http.get(self.baseApi + "/list", headers=GET_HEADERS)
-        endpoints += customPaths
+        endpoints += InsightPaths
 
         def getParam(part):
             if part.startswith('{') and part.endswith('}'):
@@ -581,11 +588,6 @@ class DcrdataBlockchain(object):
         """
         self.dcrdata = DcrdataClient(
             self.datapath, 
-            customPaths=(
-                "/tx/send",
-                "/insight/api/addr/{address}/utxo",
-                "insight/api/tx/send"
-            ),
             emitter=self.pubsubSignal,
         )
         self.updateTip()
@@ -663,6 +665,17 @@ class DcrdataBlockchain(object):
                 ads = addrs[start:end]
                 utxos += [self.processNewUTXO(u) for u in get(ads)]
         return utxos
+    def txsForAddr(self, addr):
+        """
+        Get the transaction IDs for the provided address.
+
+        Args:
+            addrs (string): Base-58 encoded address
+        """
+        addrInfo = self.dcrdata.insight.api.addr.txs(addr)
+        if "transactions" not in addrInfo:
+            return  []
+        return addrInfo["transactions"]
     def txVout(self, txid, vout):
         """
         Get a UTXO from the outpoint. The UTXO will not have the address set.
@@ -889,8 +902,12 @@ class DcrdataBlockchain(object):
             elif sigType == "subscribeResp":
                 # should check for error.
                 pass
+            elif sigType == "ping":
+                # nothing to do here right now. May want to implement a
+                # auto-reconnect using this signal.
+                pass
             else:
-                raise Exception("unknown signal")
+                raise Exception("unknown signal %s" % repr(sigType))
         except Exception as e:
             log.error("failed to process pubsub message: %s" % formatTraceback(e))
     def changeScript(self, changeAddress):

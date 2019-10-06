@@ -26,6 +26,12 @@ DEFAULT_ACCOUNT_NAME = "default"
 
 CrazyAddress = "CRAZYADDRESS"
 
+def filterCrazyAddress(addrs):
+    return [a for a in addrs if a != CrazyAddress]
+
+# DefaultGapLimit is the default unused address gap limit defined by BIP0044.
+DefaultGapLimit = 20
+
 log = helpers.getLogger("TCRYP") # , logLvl=0)
 
 class CoinSymbols:
@@ -198,11 +204,18 @@ class Account(object):
         self.netID = netID
         self.net = None
         setNetwork(self)
-        self.lastExternalIndex = -1
-        self.lastInternalIndex = -1
+        # For external addresses, the cursor can sit on the last seen address, 
+        # so start the lastSeen at the 0th external address. This is necessary
+        # because the currentAddress method grabs the address at the current 
+        # cursor position, rather than the next. 
+        self.lastSeenExt = 0
+        # For internal addresses, the cursor can sit below zero, since the
+        # addresses are always retrieved with with nextInternalAddress.
+        self.lastSeenInt = -1
         self.externalAddresses = []
         self.internalAddresses = []
-        self.cursor = 0
+        self.cursorExt = 0
+        self.cursorInt = 0
         self.balance = Balance()
         # Map a txid to a MsgTx for a transaction suspected of being in
         # mempool.
@@ -217,21 +230,22 @@ class Account(object):
         self.privKey = None # The private extended key.
         self.extPub = None # The external branch public extended key.
         self.intPub = None # The internal branch public extended key.
+        self.gapLimit = DefaultGapLimit
     def __tojson__(self):
         return {
             "pubKeyEncrypted": self.pubKeyEncrypted,
             "privKeyEncrypted": self.privKeyEncrypted,
-            "lastExternalIndex": self.lastExternalIndex,
-            "lastInternalIndex": self.lastInternalIndex,
             "name": self.name,
             "coinID": self.coinID,
             "netID": self.netID,
             "externalAddresses": self.externalAddresses,
             "internalAddresses": self.internalAddresses,
-            "cursor": self.cursor,
+            "cursorExt": self.cursorExt,
+            "cursorInt": self.cursorInt,
             "txs": self.txs,
             "utxos": self.utxos,
             "balance": self.balance,
+            "gapLimit": self.gapLimit,
         }
     @staticmethod
     def __fromjson__(obj, cls=None):
@@ -243,14 +257,16 @@ class Account(object):
             obj["coinID"],
             obj["netID"],
         )
-        acct.lastExternalIndex = obj["lastExternalIndex"]
-        acct.lastInternalIndex = obj["lastInternalIndex"]
         acct.externalAddresses = obj["externalAddresses"]
         acct.internalAddresses = obj["internalAddresses"]
-        acct.cursor = obj["cursor"]
+        acct.cursorExt = obj["cursorExt"]
+        acct.cursorInt = obj["cursorInt"]
         acct.txs = obj["txs"]
         acct.utxos = obj["utxos"]
         acct.balance = obj["balance"]
+        acct.gapLimit = obj["gapLimit"]
+        acct.lastSeenExt = acct.lastSeen(acct.externalAddresses)
+        acct.lastSeenInt = acct.lastSeen(acct.internalAddresses)
         setNetwork(acct)
         return acct
     def addrTxs(self, addr):
@@ -432,6 +448,21 @@ class Account(object):
         txids = self.txs[addr]
         if txid not in txids:
             txids.append(txid)
+        try:
+            extIdx = self.externalAddresses.index(addr)
+            if extIdx > self.lastSeenExt:
+                diff = extIdx - self.lastSeenExt
+                self.lastSeenExt = extIdx
+                self.cursorExt = max(0, self.cursorExt-diff)
+        except ValueError:
+            try:
+                intIdx = self.internalAddresses.index(addr)
+                if intIdx > self.lastSeenInt:
+                    diff = intIdx - self.lastSeenInt
+                    self.lastSeenInt = intIdx
+                    self.cursorInt = max(0, self.cursorInt-diff)
+            except ValueError:
+                raise Exception("attempting to add transaction %s for unknown address %s" % (txid, addr))
     def confirmTx(self, tx, blockHeight):
         """
         Confirm a transaction. Sets height for any unconfirmed UTXOs in the
@@ -472,37 +503,91 @@ class Account(object):
         self.balance.total = tot
         self.balance.available = avail
         return self.balance
-    def generateNextPaymentAddress(self):
+    def nextBranchAddress(self, branchKey, branchAddrs):
         """
         Generate a new address and add it to the list of external addresses.
         Does not move the cursor.
 
-        Returns:
-            str: Base-58 encoded address.
-        """
-        if len(self.externalAddresses) != self.lastExternalIndex + 1:
-            raise Exception("index-address length mismatch")
-        idx = self.lastExternalIndex + 1
-        try:
-            addr = self.extPub.deriveChildAddress(idx, self.net)
-        except crypto.ParameterRangeError:
-            log.warning("crazy address generated")
-            addr = CrazyAddress
-        self.externalAddresses.append(addr)
-        self.lastExternalIndex = idx
-        return addr
-    def getNextPaymentAddress(self):
-        """
-        Get the next address after the cursor and move the cursor.
+        Args:
+            branchKey (ExtendedKey): The branch extended public key.
+            branchAddrs (list(string)): The current list of branch addresses.
 
         Returns:
             str: Base-58 encoded address.
         """
-        self.cursor += 1
-        while self.cursor >= len(self.externalAddresses):
-            self.generateNextPaymentAddress()
-        return self.externalAddresses[self.cursor]
-    def generateGapAddresses(self, gap):
+        for i in range(3):
+            try:
+                addr = branchKey.deriveChildAddress(len(branchAddrs), self.net)
+                branchAddrs.append(addr)
+                return addr
+            except crypto.ParameterRangeError:
+                log.warning("crazy address generated")
+                addr = CrazyAddress
+                branchAddrs.append(addr)
+                continue
+        raise Exception("failed to generate new address")
+    def nextExternalAddress(self):
+        """
+        Return a new external address by advancing the cursor.
+
+        Returns:
+            addr (str): Base-58 encoded address.
+        """
+        extAddrs = self.externalAddresses
+        addr = CrazyAddress
+        # Though unlikely, if an out or range key is generated, the account will 
+        # generate an additional address
+        while addr == CrazyAddress:
+            # gap policy is to wrap. Wrapping brings the cursor back to index 1, 
+            # since the index zero is the last seen address. 
+            self.cursorExt += 1
+            if self.cursorExt > self.gapLimit:
+                self.cursorExt = 1
+            idx = self.lastSeenExt + self.cursorExt
+            while len(extAddrs) < idx + 1:
+                self.nextBranchAddress(self.extPub, extAddrs)
+            addr = extAddrs[idx]
+        return addr
+    def nextInternalAddress(self):
+        """
+        Return a new internal address
+
+        Returns:
+            str: Base-58 encoded address.
+        """
+        intAddrs = self.internalAddresses
+        addr = CrazyAddress
+        # Though unlikely, if an out or range key is generated, the account will 
+        # generate an additional address
+        while addr == CrazyAddress:
+            # gap policy is to wrap. Wrapping brings the cursor back to index 1, 
+            # since the index zero is the last seen address. 
+            self.cursorInt += 1
+            if self.cursorInt > self.gapLimit:
+                self.cursorInt = 1
+            idx = self.lastSeenInt + self.cursorInt
+            while len(intAddrs) < idx + 1:
+                self.nextBranchAddress(self.intPub, intAddrs)
+            addr = intAddrs[idx]
+        return addr
+    def lastSeen(self, addrs):
+        """
+        Find the index of the last seen address in the list of addresses. 
+        The last seen address is taken as the last address for which there is an
+        entry in the self.txs dict.
+
+        Args:
+            addrs (list(string)): The list of addresses.
+
+        Returns:
+            int: The highest index of all seen addresses in the list.
+        """
+        lastSeen = -1
+        for i, addr in enumerate(addrs):
+            if addr in self.txs:
+                lastSeen = i
+        return lastSeen
+    def generateGapAddresses(self):
         """
         Generate addresses up to gap addresses after the cursor. Do not move the
         cursor.
@@ -512,33 +597,17 @@ class Account(object):
         """
         if self.extPub is None:
             log.warning("attempting to generate gap addresses on a closed account")
-        highest = 0
-        for addr in self.txs:
-            try:
-                highest = max(highest, self.externalAddresses.index(addr))
-            except ValueError: # Not found
-                continue
-        tip = highest + gap
-        while len(self.externalAddresses) < tip:
-            self.generateNextPaymentAddress()
-    def getChangeAddress(self):
-        """
-        Return a new change address.
-
-        Returns:
-            str: Base-58 encoded address.
-        """
-        if len(self.internalAddresses) != self.lastInternalIndex + 1:
-            raise Exception("index-address length mismatch while generating change address")
-        idx = self.lastInternalIndex + 1
-        try:
-            addr = self.intPub.deriveChildAddress(idx, self.net)
-        except crypto.ParameterRangeError:
-            log.warning("crazy address generated")
-            addr = CrazyAddress
-        self.internalAddresses.append(addr)
-        self.lastInternalIndex = idx
-        return addr
+        newAddrs = []
+        extAddrs, intAddrs = self.externalAddresses, self.internalAddresses
+        minExtLen = self.lastSeenExt + self.gapLimit + 1
+        while len(extAddrs) < minExtLen:
+            self.nextBranchAddress(self.extPub, extAddrs)
+            newAddrs.append(extAddrs[len(extAddrs)-1])
+        minIntLen = self.lastSeenInt + self.gapLimit + 1
+        while len(intAddrs) < minIntLen:
+            self.nextBranchAddress(self.intPub, self.internalAddresses)
+            newAddrs.append(intAddrs[len(intAddrs)-1])
+        return newAddrs
     def allAddresses(self):
         """
         Get the list of all known addresses for this account.
@@ -546,8 +615,8 @@ class Account(object):
         Returns:
             list(str): A list of base-58 encoded addresses.
         """
-        return self.internalAddresses + self.externalAddresses
-    def addressesOfInterest(self):
+        return filterCrazyAddress(self.internalAddresses + self.externalAddresses)
+    def watchAddrs(self):
         """
         Scan and get the list of all known addresses for this account.
 
@@ -555,20 +624,22 @@ class Account(object):
             list(str): A list of base-58 encoded addresses.
         """
         a = set()
-        for utxo in self.utxoscan():
-            a.add(utxo.address)
-        ext = self.externalAddresses
-        for i in range(max(self.cursor - 10, 0), self.cursor+1):
-            a.add(ext[i])
-        return list(a)
-    def paymentAddress(self):
+        a = a.union((utxo.address for utxo in self.utxoscan()))
+        a = a.union(self.externalAddresses)
+        a = a.union((a for a in self.internalAddresses if a not in self.txs))
+        return filterCrazyAddress(a)
+    def unseenAddrs(self):
+        return filterCrazyAddress(
+            [a for a in self.internalAddresses if a not in self.txs] + 
+            [a for a in self.externalAddresses if a not in self.txs])
+    def currentAddress(self):
         """
         Get the external address at the cursor. The cursor is not moved.
 
         Returns:
             str: Base-58 encoded address.
         """
-        return self.externalAddresses[self.cursor]
+        return self.externalAddresses[self.lastSeenExt+self.cursorExt]
     def privateExtendedKey(self, pw):
         """
         Decode the private extended key for the account using the provided
@@ -935,7 +1006,7 @@ def createNewAccountManager(seed, pubPassphrase, privPassphrase, chainParams, co
     # Open the account.
     zerothAccount.open(cryptoKeyPriv)
     # Create the first payment address.
-    zerothAccount.generateNextPaymentAddress()
+    zerothAccount.generateGapAddresses()
     # Close the account to zero the key.
     zerothAccount.close()
 
@@ -1025,7 +1096,7 @@ class TestAccounts(unittest.TestCase):
         self.assertEqual(addr1, addr2)
         acct = am.openAccount(0, pw)
         for n in range(20):
-            acct.getNextPaymentAddress()
+            acct.nextExternalAddress()
         v = 5
         satoshis = v*1e8
         txid = "abcdefghijkl"
@@ -1062,13 +1133,6 @@ class TestAccounts(unittest.TestCase):
         Test extended key derivation.
         '''
         kpriv = newMaster(testSeed, nets.mainnet)
-        # --extKey: f2418d00085be520c6449ddb94b25fe28a1944b5604193bd65f299168796f862
-        # --kpub: 0317a47499fb2ef0ff8dc6133f577cd44a5f3e53d2835ae15359dbe80c41f70c9b
-        # --kpub_branch0: 02dfed559fddafdb8f0041cdd25c4f9576f71b0e504ce61837421c8713f74fb33c
-        # --kpub_branch0_child1: 03745417792d529c66980afe36f364bee6f85a967bae117bc4d316b77e7325f50c
-        # --kpriv_branch0: 6469a8eb3ed6611cc9ee4019d44ec545f3174f756cc41f9867500efdda742dd9
-        # --kpriv_branch0_child1: fb8efe52b3e4f31bc12916cbcbfc0e84ef5ebfbceb7197b8103e8009c3a74328
-
         self.assertEqual(kpriv.key.hex(), "f2418d00085be520c6449ddb94b25fe28a1944b5604193bd65f299168796f862")
         kpub = kpriv.neuter()
         self.assertEqual(kpub.key.hex(), "0317a47499fb2ef0ff8dc6133f577cd44a5f3e53d2835ae15359dbe80c41f70c9b")
@@ -1091,7 +1155,78 @@ class TestAccounts(unittest.TestCase):
         # acct = acctManager.account(0)
         acct = acctManager.openAccount(0, pw)
         for i in range(10):
-            acct.getChangeAddress()
+            acct.nextInternalAddress()
+    def test_gap_handling(self):
+        internalAddrs = [
+            "DskHpgbEb6hqkuHchHhtyojpehFToEtjQSo",
+            "Dsm4oCLnLraGDedfU5unareezTNT75kPbRb",
+            "DsdN6A9bWhKKJ7PAGdcDLxQrYPKEnjnDv2N",
+            "Dsifz8eRHvQrfaPXgHHLMDHZopFJq2pBPU9",
+            "DsmmzJiTTmpafdt2xx7LGk8ZW8cdAKe53Zx",
+            "DsVB47P4N23PK5C1RyaJdqkQDzVuCDKGQbj",
+            "DsouVzScdUUswvtCAv6nxRzi2MeufpWnELD",
+            "DsSoquT5SiDPfksgnveLv3r524k1v8RamYm",
+            "DsbVDrcfhbdLy4YaSmThmWN47xhxT6FC8XB",
+            "DsoSrtGYKruQLbvhA92xeJ6eeuAR1GGJVQA",
+        ]
 
-if __name__ == "__main__":
-    pass
+        externalAddrs = [
+            "DsmP6rBEou9Qr7jaHnFz8jTfrUxngWqrKBw",
+            "DseZQKiWhN3ceBwDJEgGhmwKD3fMbwF4ugf",
+            "DsVxujP11N72PJ46wgU9sewptWztYUy3L7o",
+            "DsYa4UBo379cRMCTpDLxYVfpMvMNBdAGrGS",
+            "DsVSEmQozEnsZ9B3D4Xn4H7kEedDyREgc18",
+            "DsifDp8p9mRocNj7XNNhGAsYtfWhccc2cry",
+            "DsV78j9aF8NBwegbcpPkHYy9cnPM39jWXZm",
+            "DsoLa9Rt1L6qAVT9gSNE5F5XSDLGoppMdwC",
+            "DsXojqzUTnyRciPDuCFFoKyvQFd6nQMn7Gb",
+            "DsWp4nShu8WxefgoPej1rNv4gfwy5AoULfV",
+        ]
+
+        global DefaultGapLimit
+        gapLimit = DefaultGapLimit = 5
+        pw = "abc".encode()
+        am = createNewAccountManager(testSeed, bytearray(0), pw, nets.mainnet)
+        account = am.openAccount(0, pw)
+        account.gapLimit = gapLimit
+        listsAreEqual = lambda a, b: len(a) == len(b) and all(x == y  for x,y in zip(a,b))
+        self.assertTrue(listsAreEqual(account.internalAddresses, internalAddrs[:gapLimit]))
+        # The external branch starts with the "last seen" at the zeroth address, so 
+        # has one additional address to start.
+        self.assertTrue(listsAreEqual(account.externalAddresses, externalAddrs[:gapLimit+1]))
+
+        account.addTxid(internalAddrs[0], "somerandomtxid")
+        newAddrs = account.generateGapAddresses()
+        self.assertEqual(len(newAddrs), 1)
+        self.assertEqual(newAddrs[0], internalAddrs[5])
+
+        # The zeroth external address is considered "seen", so this should not 
+        # change anything.
+        account.addTxid(externalAddrs[0], "somerandomtxid")
+        newAddrs = account.generateGapAddresses()
+        self.assertEqual(len(newAddrs), 0)
+
+        # Mark the 1st address as seen.
+        account.addTxid(externalAddrs[1], "somerandomtxid")
+        newAddrs = account.generateGapAddresses()
+        self.assertEqual(len(newAddrs), 1)
+        self.assertEqual(externalAddrs[1], account.currentAddress())
+
+        # cursor should be at index 0, last seen 1, max index 6, so calling 
+        # nextExternalAddress 5 time should put the cursor at index 6, which is
+        # the gap limit.
+        for i in range(5):
+            account.nextExternalAddress()
+        self.assertEqual(account.currentAddress(), externalAddrs[6])
+
+        # one more should wrap the cursor back to 1, not zero, so the current
+        # address is lastSeenExt(=1) + cursor(=1) = 2
+        a1 = account.nextExternalAddress()
+        self.assertEqual(account.currentAddress(), externalAddrs[2])
+        self.assertEqual(a1, account.currentAddress())
+
+        # Sanity check that internal addresses are wrapping too.
+        for i in range(20):
+            account.nextInternalAddress()
+        addrs = account.internalAddresses
+        self.assertEqual(addrs[len(addrs)-1], internalAddrs[5])

@@ -52,18 +52,20 @@ class Bucket:
 		self.existsQuery = KVExists.format(tablename=name) # = "SELECT EXISTS(SELECT * FROM kvtable WHERE k = ?);"
 		self.deleteQuery = KVDelete.format(tablename=name) # = "DELETE FROM kvtable WHERE k = ?;"
 		self.countQuery = KVCount.format(tablename=name) # = "SELECT COUNT(*) FROM kvtable;"
-		self.tid = None
+		self.conn = None
 	def __enter__(self):
 		"""
 		Create a new connection for a every requesting thread.
 		"""
-		tid = threadID()
-		if self.tid != tid:
-			self.conn = self.database.openDB()
-			self.tid = tid
+		if self.conn:
+			self.conn.close()
+		self.conn = self.database.openDB()
 		self.open()
 		return self
 	def __exit__(self, xType, xVal, xTB):
+		if self.conn:
+			self.conn.close()
+		self.conn = None
 		pass
 	def __setitem__(self, k, v):
 		cursor = self.conn.cursor()

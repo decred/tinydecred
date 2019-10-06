@@ -7,7 +7,6 @@ import os
 from threading import Lock as Mutex
 from tinydecred.util import tinyjson, helpers
 from tinydecred.crypto import crypto, mnemonic
-from tinydecred.pydecred import txscript
 from tinydecred.pydecred.account import DecredAccount
 from tinydecred.accounts import createNewAccountManager
 
@@ -266,19 +265,19 @@ class Wallet(object):
         Returns:
             str: The next unused external address.
         """
-        a = self.selectedAccount.getNextPaymentAddress()
+        a = self.selectedAccount.nextExternalAddress()
         if self.blockchain:
             self.blockchain.subscribeAddresses(a)
         self.save()
         return a
-    def paymentAddress(self):
+    def currentAddress(self):
         """
         Gets the payment address at the cursor.
 
         Returns:
             str: The current external address.
         """
-        return self.selectedAccount.paymentAddress()
+        return self.selectedAccount.currentAddress()
     def balance(self):
         """
         Get the balance of the currently selected account.
@@ -287,65 +286,6 @@ class Wallet(object):
             Balance: The current account's Balance object.
         """
         return self.selectedAccount.balance
-    def blockSignal(self, sig):
-        """
-        Process a new block from the explorer.
-
-        Arg:
-            sig (obj or string): The block explorer's json-decoded block
-                notification.
-        """
-        block = sig["message"]["block"]
-        acct = self.selectedAccount
-        for newTx in block["Tx"]:
-            txid = newTx["TxID"]
-            # Only grab the tx if it's a transaction we care about.
-            if acct.caresAboutTxid(txid):
-                tx = self.blockchain.tx(txid)
-                acct.confirmTx(tx, self.blockchain.tipHeight)
-        # "Spendable" balance can change as UTXOs mature, so update the
-        # balance at every block.
-        self.signals.balance(acct.calcBalance(self.blockchain.tipHeight))
-    def addressSignal(self, addr, txid):
-        """
-        Process an address notification from the block explorer.
-
-        Args:
-            addr (obj or string): The block explorer's json-decoded address
-                notification's address.
-            txid (obj or string): The block explorer's json-decoded address
-                notification's txid.
-        """
-        acct = self.selectedAccount
-
-        tx = self.blockchain.tx(txid)
-        acct.addTxid(addr, tx.txid())
-
-        matches = False
-        # Scan the inputs for any spends.
-        for txin in tx.txIn:
-            op = txin.previousOutPoint
-            # spendTxidVout is a no-op if output is unknown.
-            match = acct.spendTxidVout(op.txid(), op.index)
-            if match:
-                matches += 1
-        # Scan the outputs for any new UTXOs.
-        for vout, txout in enumerate(tx.txOut):
-            try:
-                _, addresses, _ = txscript.extractPkScriptAddrs(0, txout.pkScript, acct.net)
-            except Exception:
-                # log.debug("unsupported script %s" % txout.pkScript.hex())
-                continue
-            # Convert the Address objects to strings.
-            if addr in (a.string() for a in addresses):
-                log.debug("found new utxo for %s" % addr)
-                utxo = self.blockchain.txVout(txid, vout)
-                utxo.address = addr
-                acct.addUTXO(utxo)
-                matches += 1
-        if matches:
-            # Signal the balance update.
-            self.signals.balance(acct.calcBalance(self.blockchain.tip["height"]))
     def sync(self):
         """
         Synchronize the UTXO set with the server. This should be the first
@@ -356,27 +296,10 @@ class Wallet(object):
         """
         acctManager = self.acctManager
         acct = acctManager.account(0)
-        gapPolicy = 5
-        acct.generateGapAddresses(gapPolicy)
-        watchAddresses = set()
 
-        # Send the initial balance.
-        self.signals.balance(acct.balance)
-        addresses = acct.allAddresses()
-
-        # Update the account with known UTXOs.
-        chain = self.blockchain
-        blockchainUTXOs = chain.UTXOs(addresses)
-        acct.resolveUTXOs(blockchainUTXOs)
-
-        # Subscribe to block and address updates.
-        chain.subscribeBlocks(self.blockSignal)
-        watchAddresses = acct.addressesOfInterest()
-        if watchAddresses:
-            chain.subscribeAddresses(watchAddresses, self.addressSignal)
-        # Signal the new balance.
-        b = acct.calcBalance(self.blockchain.tip["height"])
-        self.signals.balance(b)
+        # send the initial balance. This was the balance the last time the
+        # wallet was saved, but may be innacurate until sync in complete.
+        acct.sync(self.blockchain, self.signals)
         self.save()
         return True
     def sendToAddress(self, value, address, feeRate=None):
@@ -392,7 +315,7 @@ class Wallet(object):
                 failure.
         """
         acct = self.openAccount
-        tx = acct.sendToAddress(value, address, feeRate, self.blockchain)
+        tx = acct.sendToAddress(value, address, feeRate)
         self.signals.balance(acct.calcBalance(self.blockchain.tip["height"]))
         self.save()
         return tx

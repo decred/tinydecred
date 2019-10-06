@@ -490,7 +490,7 @@ class HomeScreen(Screen):
         """
         app = self.app
         if app.wallet:
-            address = app.wallet.paymentAddress()
+            address = app.wallet.currentAddress()
             self.address.setText(address)
     def balanceClicked(self):
         """
@@ -1156,7 +1156,7 @@ class StakingScreen(Screen):
         """
         tip = self.blockchain.tip["height"]
         acct = wallet.openAccount
-        txs = acct.purchaseTickets(qty, self.lastPrice, self.blockchain)
+        txs = acct.purchaseTickets(qty, self.lastPrice)
         if txs:
             wallet.signals.balance(acct.calcBalance(tip))
             self.app.home()

@@ -19,4 +19,4 @@ mnemonicSeed, wallet = Wallet.create(walletPath, password, testnet)
 # Print the seed words and an address.
 print("Mnemonic seed\n-------------")
 print(" ".join(mnemonicSeed))
-print("Receive DCR at %s" % wallet.paymentAddress())
+print("Receive DCR at %s" % wallet.currentAddress())
