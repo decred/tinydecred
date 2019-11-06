@@ -1,5 +1,6 @@
 """
 Copyright (c) 2019, Brian Stafford
+Copyright (c) 2019, the Decred developers
 See LICENSE for details
 
 Configuration settings for TinyDecred.
@@ -16,7 +17,7 @@ DATA_DIR = _ad.user_data_dir
 
 helpers.mkdir(DATA_DIR)
 
-# The master configuration file name. 
+# The master configuration file name.
 CONFIG_NAME = "tinywallet.conf"
 CONFIG_PATH = os.path.join(DATA_DIR, CONFIG_NAME)
 
@@ -46,7 +47,7 @@ def tinyNetConfig(netName):
         netName (str): Network name. `mainnet`, `simnet`, etc.
 
     Returns:
-        obj: The network parameters.
+        JSON: The network parameters.
     """
     if netName == MAINNET:
         return MainnetConfig
@@ -58,7 +59,8 @@ def tinyNetConfig(netName):
 
 class TinyConfig:
     """
-    TinyConfig is configuration settings. The configuration file JSON formatted.
+    TinyConfig is configuration settings. The configuration file is JSON
+    formatted.
     """
     def __init__(self):
         fileCfg = helpers.fetchSettingsFile(CONFIG_PATH)
@@ -91,12 +93,12 @@ class TinyConfig:
         self.file[k] = v
     def get(self, *keys):
         """
-        Retrieve the setting at the provided key path. Multiple keys can be 
+        Retrieve the setting at the provided key path. Multiple keys can be
         provided, with each successive key being retreived from the previous
-        key's value. 
+        key's value.
 
         Args:
-            *keys (str): Recursive key list. 
+            *keys (str): Recursive key list.
 
         Returns:
             mixed: The configuration value.
@@ -111,7 +113,7 @@ class TinyConfig:
         return rVal
     def normalize(self):
         """
-        Perform attribute checks and initialization. 
+        Perform attribute checks and initialization.
         """
         file = self.file
         netKey = "networks"
@@ -122,17 +124,20 @@ class TinyConfig:
             d["name"] = self.net.Name
     def save(self):
         """
-        Save the file. 
+        Save the file.
         """
         tinyjson.save(CONFIG_PATH, self.file)
 
-# The configuration is only loaded once. Successive calls to the modular `load`
-# function will return the same instance.
 tinyConfig = TinyConfig()
 
 def load():
+    """
+    Load and return the current configuration.
+
+    The configuration is only loaded once. Successive calls to the modular `load`
+    function will return the same instance.
+
+    Returns:
+        JSON: The current configuration in JSON format.
+    """
     return tinyConfig
-
-
-
-
