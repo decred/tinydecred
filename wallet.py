@@ -97,8 +97,8 @@ class Wallet(object):
                 from a mnemonic seed word list.
 
         Returns:
-            Wallet (obj): An initialized wallet with a single Decred account.
-            list (str): A mnemonic seed. Only retured when the caller does not
+            Wallet: An initialized wallet with a single Decred account.
+            list(str): A mnemonic seed. Only retured when the caller does not
                 provide a seed.
         """
         if os.path.isfile(path):
@@ -132,8 +132,7 @@ class Wallet(object):
             chain (obj): Network parameters.
 
         Returns:
-            Wallet (obj): A wallet initialized from the seed parsed from
-            `words`.
+            Wallet: A wallet initialized from the seed parsed from `words`.
         """
         decoded = mnemonic.decode(words)
         cksum = decoded[-1]
@@ -178,8 +177,7 @@ class Wallet(object):
                 when saved.
 
         Returns:
-            Wallet (obj): An opened, unlocked Wallet with the default account
-            open.
+            Wallet: An opened, unlocked Wallet with the default account open.
         """
         if not os.path.isfile(path):
             raise FileNotFoundError("no wallet found at %s" % path)
@@ -207,7 +205,7 @@ class Wallet(object):
             signals (obj): An api.Signals.
 
         Returns:
-            Wallet (obj): The wallet with the default account open.
+            Wallet: The wallet with the default account open.
         """
         self.setAccountHandlers(blockchain, signals)
         self.selectedAccount = self.openAccount = self.acctManager.openAccount(acct, password)
@@ -265,7 +263,7 @@ class Wallet(object):
                 Decred account located at index 0.
 
         Returns:
-            Account (obj): The account at index acct.
+            Account: The Account object at index acct.
         """
         aMgr = self.acctManager
         if len(aMgr.accounts) <= acct:
@@ -276,7 +274,7 @@ class Wallet(object):
         Get the next unused external address.
 
         Returns:
-            Address (str): The next unused external address.
+            str: The next unused external address.
         """
         a = self.selectedAccount.getNextPaymentAddress()
         if self.blockchain:
@@ -288,7 +286,7 @@ class Wallet(object):
         Gets the payment address at the cursor.
 
         Returns:
-            Address (str): The current external address.
+            str: The current external address.
         """
         return self.selectedAccount.paymentAddress()
     def balance(self):
@@ -296,7 +294,7 @@ class Wallet(object):
         Get the balance of the currently selected account.
 
         Returns:
-            Amount (int): The current account's unspent balance in atoms.
+            Balance: The current account's Balance object.
         """
         return self.selectedAccount.balance
     def getUTXOs(self, requested, approve=None):
@@ -309,8 +307,8 @@ class Wallet(object):
             filter (func(UTXO) -> bool): Optional UTXO filtering function.
 
         Returns:
-            list (UTXO): A list of UTXOs.
-            success (bool): True if the UTXO sum is >= the requested amount.
+            list(UTXO): A list of UTXOs.
+            bool: True if the UTXO sum is >= the requested amount.
         """
         matches = []
         acct = self.openAccount
@@ -332,7 +330,7 @@ class Wallet(object):
             addr (str): The base-58 encoded address.
 
         Returns:
-            privateKey (str): The private key structure for the address.
+            secp256k1.PrivateKey: The private key structure for the address.
         """
         return self.openAccount.getPrivKeyForAddress(addr)
     def blockSignal(self, sig):
@@ -341,7 +339,7 @@ class Wallet(object):
 
         Arg:
             sig (obj or string): The block explorer's json-decoded block
-            notification.
+                notification.
         """
         block = sig["message"]["block"]
         acct = self.selectedAccount
@@ -358,9 +356,11 @@ class Wallet(object):
         """
         Process an address notification from the block explorer.
 
-        Arg:
-            sig (obj or string): The block explorer's json-decoded address
-            notification.
+        Args:
+            addr (obj or string): The block explorer's json-decoded address
+                notification's address.
+            txid (obj or string): The block explorer's json-decoded address
+                notification's txid.
         """
         acct = self.selectedAccount
 
@@ -398,7 +398,7 @@ class Wallet(object):
         action after the account is opened or changed.
 
         Returns:
-            success (bool): True if no exceptions were encountered.
+            bool: `True` if no exceptions were encountered.
         """
         acctManager = self.acctManager
         acct = acctManager.account(0)
@@ -434,8 +434,8 @@ class Wallet(object):
             address (str): The base-58 encoded pubkey hash.
 
         Returns:
-            MsgTx (obj): The newly created transaction on success, `False` on
-            failure.
+            MsgTx or bool: The newly created transaction on success, `False` on
+                failure.
         """
         acct = self.openAccount
         keysource = KeySource(
