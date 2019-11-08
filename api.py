@@ -1,29 +1,34 @@
 """
 Copyright (c) 2019, Brian Stafford
+Copyright (c) 2019, the Decred developers
 See LICENSE for details
 
 This module defines an API used by the wallet and implemented by each asset and
-node type. 
+node type.
 """
 
 class Unimplemented(Exception):
-    """ Unimplemented method. """
+    """
+    Unimplemented method.
+    """
     pass
 
 class InsufficientFundsError(Exception):
-    """Available account balance to low for requested funds."""
+    """
+    Available account balance too low for requested funds.
+    """
     pass
 
 class UTXO:
     """
-    Blockchain-implementing classes must know how to create and handle utxo 
-    objects. 
+    Blockchain-implementing classes must know how to create and handle utxo
+    objects.
     """
     def __init__(self, address, txid, vout):
         """
         Args:
             address (str): Base-58 encoded address string.
-            txid (str): Transaction ID. 
+            txid (str): Transaction ID.
             vout (int): The transaction output index that this UTXO represents.
         """
         self.address = address
@@ -42,9 +47,9 @@ class UTXO:
         raise Unimplemented("__fromjson__ not implemented")
     def isSpendable(self, tipHeight):
         """
-        Determine whether this UTXO is currently spendable. 
+        Determine whether this UTXO is currently spendable.
 
-        Args:
+        Arg:
             tipHeight (int): The height of the best block.
         """
         raise Unimplemented("isSpendable not implemented")
@@ -58,6 +63,16 @@ class UTXO:
         raise Unimplemented("key not implemented")
     @staticmethod
     def makeKey(txid, vout):
+        """
+        Make a key string by combining txid and vout.
+
+        Args:
+            txid (str): Transaction ID.
+            vout (int): The transaction output index.
+
+        Returns:
+            str: txid and vout concatenated with a "#" in-between.
+        """
         return txid + "#" + str(vout)
 
 class Blockchain:
@@ -70,11 +85,11 @@ class Blockchain:
         Args:
             db (KeyValueDatabase): A key-value database for storing blocks
                 and transactions.
-            params obj: Network parameters.
+            params (obj): Network parameters.
         """
         self.db = db
         self.params = params
-        # The blockReceiver and addressReceiver will be set when the respective 
+        # The blockReceiver and addressReceiver will be set when the respective
         # subscribe* method is called.
         self.blockReceiver = None
         self.addressReceiver = None
@@ -82,8 +97,8 @@ class Blockchain:
         """
         Subscribe to new block notifications.
 
-        Args:
-            receiver (func(obj)): A function or method that accepts the block 
+        Arg:
+            receiver (func(obj)): A function or method that accepts the block
                 notifications.
         """
         raise Unimplemented("subscribeBlocks not implemented")
@@ -99,9 +114,9 @@ class Blockchain:
         raise Unimplemented("subscribeAddresses not implemented")
     def UTXOs(self, addrs):
         """
-        UTXOs will produce any known UTXOs for the list of addresses. 
+        UTXOs will produce any known UTXOs for the list of addresses.
 
-        Args:
+        Arg:
             addrs (list(str)): List of base-58 encoded addresses.
         """
         raise Unimplemented("UTXOs not implemented")
@@ -110,7 +125,7 @@ class Blockchain:
         tx will produce a transaction object which implements the Transaction
         API.
 
-        Args:
+        Arg:
             txid (str): Hex-encoded transaction ID.
 
         Returns:
@@ -122,10 +137,10 @@ class Blockchain:
         """
         blockHeader will produce a blockHeader implements the BlockHeader API.
 
-        Args:
+        Arg:
             bHash (str): The block hash of the block header.
 
-        Returns: 
+        Returns:
             BlockHeader: An object which implements the BlockHeader API.
         """
         raise Unimplemented("blockHeader not implemented")
@@ -133,10 +148,10 @@ class Blockchain:
         """
         The blockHeader for the best block at the provided height.
 
-        Args: 
-            height (int): The height of the block header. 
+        Arg:
+            height (int): The height of the block header.
 
-        Returns: 
+        Returns:
             BlockHeader: An object which implements the BlockHeader API.
         """
         raise Unimplemented("blockHeaderByHeight not implemented")
@@ -150,11 +165,12 @@ class Blockchain:
         Send the amount in atoms to the specified address.
 
         Args:
-            value int: The amount to send, in atoms.
-            address str: The base-58 encoded address.
-            feeRate float: The reeRate (atoms/byte) to pay. (optional. will have a default value per-blockchain)
+            value (int): The amount to send, in atoms.
+            address (str): The base-58 encoded address.
+            feeRate (float): The reeRate (atoms/byte) to pay. (Optional. Will
+                have a default value per-blockchain)
 
-        Returns: 
+        Returns:
             Transaction: The newly created transaction.
             list(UTXO): The spent UTXOs.
             list(UTXO): Any newly generated UTXOs, such as change.
@@ -164,8 +180,8 @@ class Blockchain:
 
 class BlockHeader:
     """
-    BlockHeader defines an API that must be implemented within Blockchain for 
-    block header objects. 
+    BlockHeader defines an API that must be implemented within Blockchain for
+    block header objects.
     """
     def __init__(self, height, timestamp):
         self.height = height
@@ -175,7 +191,7 @@ class BlockHeader:
         """
         De-serialize the bytes into a BlockHeader.
 
-        Args:
+        Arg:
             b (ByteArray): A serialized block header.
         """
         raise Unimplemented("deserialize not implemented")
@@ -206,13 +222,13 @@ class BlockHeader:
 
 class Transaction:
     """
-    Transaction defines an API that must be implemented within Blockchain for 
+    Transaction defines an API that must be implemented within Blockchain for
     transaction objects.
     """
     def __eq__(self, tx):
         """
         Check equality of this transaction with another.
-        Args: 
+        Arg:
             tx (Transaction): Another object, presumably of the same class.
         """
         raise Unimplemented("__eq__ not implemented")
@@ -220,7 +236,7 @@ class Transaction:
         """
         A hash of the serialized transaction.
 
-        Returns: 
+        Returns:
             ByteArray: The hashed transaction.
         """
         raise Unimplemented("txHash not implemented")
@@ -236,7 +252,7 @@ class Transaction:
         """
         Serialize the transaction into bytes according to it's network protocol.
 
-        Returns: 
+        Returns:
             ByteArray: The serialized transaction.
         """
         raise Unimplemented("serialize not implemented")
@@ -245,6 +261,9 @@ class Transaction:
         """
         Create a Transaction-implementing object from a serialized transaction,
         such as that produced by serialize.
+
+        Arg:
+            b (ByteArray): The serialized transaction.
         """
         raise Unimplemented("deserialize not implemented")
 
@@ -278,7 +297,7 @@ class Signals:
         """
         A receiver for balance updates.
 
-        Args:
+        Arg:
             balance (Balance): The updated balance.
         """
         raise Unimplemented("Signals not implemented")
@@ -316,8 +335,8 @@ class PublicKey:
 
 class PrivateKey:
     """
-    A private key structure. The associated public key information is stored
-    as an attribute.
+    A private key structure. The associated public key information is stored as
+    an attribute.
     """
     def __init__(self, curve, k, x, y):
         """
@@ -338,7 +357,7 @@ class KeySource:
         """
         Retreive the private key for a base-58 encoded address.
 
-        Args:
+        Arg:
             addr (str): An address.
 
         Returns:
