@@ -3,7 +3,7 @@ Copyright (c) 2019, Brian Stafford
 Copyright (c) 2019, The Decred developers
 See LICENSE for details
 
-Cryptographic functions. 
+Cryptographic functions.
 """
 import hashlib
 import hmac
@@ -56,7 +56,7 @@ class PasswordError(Exception):
 
 class Address:
     """
-    Address represents and address, which is a pubkey hash and it's base-58 
+    Address represents an address, which is a pubkey hash and its base-58
     encoding.
     """
     def __init__(self, netID=None, pkHash=None, net=None):
@@ -67,7 +67,7 @@ class Address:
         """
         A base-58 encoding of the pubkey hash.
 
-        Returns: 
+        Returns:
             str: The encoded address.
         """
         b = ByteArray(self.netID)
@@ -96,6 +96,9 @@ def hmacDigest(key, msg, digestmod=hashlib.sha512):
         key (byte-like): the key
         msg (byte-like): the message
         digestmod (digest): A hashlib digest type constant.
+
+    Returns:
+        str: The secure hash of msg.
     """
     h = hmac.new(key, msg=msg, digestmod=digestmod)
     return h.digest()
@@ -103,6 +106,9 @@ def hmacDigest(key, msg, digestmod=hashlib.sha512):
 def hash160(b):
     """
     A RIPEMD160 hash of the blake256 hash of the input.
+
+    Args:
+        b (byte-like): The bytes to hash.
 
     Returns:
         ByteArray: A 20-byte hash.
@@ -113,7 +119,10 @@ def hash160(b):
 
 def checksum(input):
     """
-    A checksum
+    A checksum.
+
+    Args:
+        input (byte-like): Bytes to obtain a checksum for.
 
     Returns:
         bytes: A 4-byte checksum.
@@ -123,6 +132,12 @@ def checksum(input):
 def sha256ChecksumByte(input):
     """
     This checksum byte is used for the PGP-based mnemonic seed checksum word.
+
+    Args:
+        input (byte-like): Bytes to obtain a checksum for.
+
+    Returns:
+        byte: The first byte of a double sha256 hash of input.
     """
     v = hashlib.sha256(input).digest()
     return hashlib.sha256(v).digest()[0]
@@ -131,6 +146,10 @@ def mac(key, msg):
     """
     SHA256-based message authentication code.
 
+    Args:
+        key (byte-like): Authentication key.
+        msg (byte-like): Message to hash.
+
     Returns:
         ByteArray: The authentication hash.
     """
@@ -138,7 +157,16 @@ def mac(key, msg):
 
 def egcd(a, b):
     """
-    Part of the `modInv` implementation.
+    Calculate the extended Euclidean algorithm. ax + by = gcd(a,b)
+
+    Args:
+        a (int): An integer.
+        b (int): Another integer.
+
+    Returns:
+        int: Greatest common denominator.
+        int: x coefficient of Bezout's identity.
+        int: y coefficient of Bezout's identity.
     """
     if a == 0:
         return (b, 0, 1)
@@ -149,10 +177,14 @@ def egcd(a, b):
 def modInv(a, m):
     """
     Modular inverse based on https://stackoverflow.com/a/9758173/1124661.
-    
-    Args: 
-        a (int): integer
-        m (int): modulus
+    Raises an exception if impossible.
+
+    Args:
+        a (int): An integer.
+        m (int): The modulus.
+
+    Returns:
+        int: The modular inverse.
     """
     g, x, y = egcd(a, m)
     if g != 1:
@@ -164,6 +196,9 @@ def hashH(b):
     """
     The BLAKE256 hash as a ByteArray.
 
+    Args:
+        b (byte-like): The thing to hash.
+
     Returns:
         ByteArray: The hash.
     """
@@ -171,11 +206,14 @@ def hashH(b):
 
 def privKeyFromBytes(pk):
     """
-    PrivKeyFromBytes creates a PrivateKey for the secp256k1 curve based on 
+    PrivKeyFromBytes creates a PrivateKey for the secp256k1 curve based on
     the provided byte-encoding.
 
     Args:
         pk (ByteArray): The private key bytes.
+
+    Returns:
+        secp256k1.Privatekey: The private key structure.
     """
     x, y = Curve.scalarBaseMult(pk.int())
     return PrivateKey(Curve, pk, x, y)
@@ -183,10 +221,15 @@ def privKeyFromBytes(pk):
 def b58CheckDecode(s):
     """
     Decode the base-58 encoded address, parsing the version bytes and the pubkey
-    hash. An exception is raised if the checksum is invalid.
+    hash. An exception is raised if the checksum is invalid or missing.
 
     Args:
         s (str): The base-58 encoded address.
+
+    Returns:
+        ByteArray: Decoded bytes minus the leading version and trailing
+            checksum.
+        int: The version (leading two) bytes.
     """
     decoded = b58decode(s)
     if len(decoded) < 6:
@@ -208,7 +251,7 @@ def newAddressPubKeyHash(pkHash, net, algo):
         algo (int): The signature curve.
 
     Returns:
-        Address: An address object. 
+        Address: An address object.
     """
     if algo == STEcdsaSecp256k1:
         netID = net.PubKeyHashAddrID
@@ -222,22 +265,22 @@ def newAddressPubKeyHash(pkHash, net, algo):
 
 class ExtendedKey:
     """
-    ExtendedKey houses all the information needed to support a BIP0044 
+    ExtendedKey houses all the information needed to support a BIP0044
     hierarchical deterministic extended key.
     """
     def __init__(self, privVer, pubVer, key, pubKey, chainCode, parentFP, depth, childNum, isPrivate):
         """
         Args:
             privVer (byte-like): Network version bytes for extended priv keys.
-            pubVer (byte-like): Network version bytes for extended pub keys
-            key (byte-like): The key. 
+            pubVer (byte-like): Network version bytes for extended pub keys.
+            key (byte-like): The key.
             pubKey (byte-like): Will be the same as `key` for public key. Will
-                be generated from key if zero is provided. 
+                be generated from key if zero is provided.
             chainCode (byte-like): Chain code for key derivation.
-            parentFP (ByteArray): parent key fingerprint
-            depth (int): Key depth. 
+            parentFP (ByteArray): parent key fingerprint.
+            depth (int): Key depth.
             childNum (int): Child number.
-            isPrivate (bool): Whether the key is a private or public key. 
+            isPrivate (bool): Whether the key is a private or public key.
         """
         assert len(privVer) == 4 and len(pubVer) == 4, "Network version bytes of incorrect length"
         self.privVer = ByteArray(privVer)
@@ -269,19 +312,19 @@ class ExtendedKey:
     # @staticmethod
     # def __fromjson__(obj):
     #     return ExtendedKey(
-    #         privVer = obj["privVer"], 
-    #         pubVer = obj["pubVer"], 
+    #         privVer = obj["privVer"],
+    #         pubVer = obj["pubVer"],
     #         key = obj["key"],
     #         pubKey = obj["pubKey"],
-    #         chainCode = obj["chainCode"], 
-    #         parentFP = obj["parentFP"], 
-    #         depth = obj["depth"], 
-    #         childNum = obj["childNum"], 
+    #         chainCode = obj["chainCode"],
+    #         parentFP = obj["parentFP"],
+    #         depth = obj["depth"],
+    #         childNum = obj["childNum"],
     #         isPrivate = obj["isPrivate"],
     #     )
     def deriveCoinTypeKey(self, coinType):
         """
-        First two hardened child derivations in accordance with BIP0044. 
+        First two hardened child derivations in accordance with BIP0044.
 
         Args:
             coinType (int): The BIP0044 coin type. For a full list, see
@@ -294,32 +337,33 @@ class ExtendedKey:
             raise ParameterRangeError("coinType too high. %i > %i" % (coinType, MAX_COIN_TYPE))
 
         purpose = self.child(44 + HARDENED_KEY_START)
-        
+
         # Derive the purpose key as a child of the master node.
         return purpose.child(coinType + HARDENED_KEY_START)
     def child(self, i):
         """
-        Child returns a derived child extended key at the given index.  When this
-        extended key is a private extended key (as determined by the IsPrivate
-        function), a private extended key will be derived.  Otherwise, the derived
-        extended key will be also be a public extended key.
-                
-        When the index is greater to or equal than the HardenedKeyStart constant, the
-        derived extended key will be a hardened extended key.  It is only possible to
-        derive a hardended extended key from a private extended key.  Consequently,
-        this function will return ErrDeriveHardFromPublic if a hardened child
-        extended key is requested from a public extended key.
-                
-        A hardened extended key is useful since, as previously mentioned, it requires
-        a parent private extended key to derive.  In other words, normal child
-        extended public keys can be derived from a parent public extended key (no
-        knowledge of the parent private key) whereas hardened extended keys may not
-        be.
-                
-        NOTE: There is an extremely small chance (< 1 in 2^127) the specific child
-        index does not derive to a usable child.  The ErrInvalidChild error will be
-        returned if this should occur, and the caller is expected to ignore the
-        invalid child and simply increment to the next index.
+        Child returns a derived child extended key at the given index.  When
+        this extended key is a private extended key (as determined by the
+        IsPrivate function (TODO: implement IsPrivate)), a private extended key
+        will be derived. Otherwise, the derived extended key will also be a
+        public extended key.
+
+        When the index is greater than or equal to the HardenedKeyStart
+        constant, the derived extended key will be a hardened extended key. It
+        is only possible to derive a hardended extended key from a private
+        extended key. Consequently, this function will throw an exception if a
+        hardened child extended key is requested from a public extended key.
+
+        A hardened extended key is useful since, as previously mentioned, it
+        requires a parent private extended key to derive. In other words, normal
+        child extended public keys can be derived from a parent public extended
+        key (no knowledge of the parent private key) whereas hardened extended
+        keys may not be.
+
+        NOTE: There is an extremely small chance (< 1 in 2^127) the specific
+        child index does not derive to a usable child. An exception will happen
+        if this should occur, and the caller is expected to ignore the invalid
+        child and simply increment to the next index.
 
         There are four scenarios that could happen here:
         1) Private extended key -> Hardened child private extended key
@@ -365,8 +409,8 @@ class ExtendedKey:
             # starts with the secp256k1 compressed public key bytes.
             data[0] = ByteArray(self.pubKey)
         data[keyLen] = ByteArray(i, length=len(data)-keyLen)
-        
-        data |= i # ByteArray will handle the type conversion
+
+        data |= i # ByteArray will handle the type conversion.
 
         # Take the HMAC-SHA512 of the current key's chain code and the derived
         # data:
@@ -444,16 +488,16 @@ class ExtendedKey:
         )
     def deriveAccountKey(self, account):
         """
-        deriveAccountKey derives the extended key for an account according to the
-        hierarchy described by BIP0044 given the master node.
-                
+        deriveAccountKey derives the extended key for an account according to
+        the hierarchy described by BIP0044 given the master node.
+
         In particular this is the hierarchical deterministic extended key path:
           m/44'/<coin type>'/<account>'
 
         Args:
             account (int): Account number.
 
-        Returns: 
+        Returns:
             ExtendedKey: Account key.
         """
         # Enforce maximum account number.
@@ -464,13 +508,13 @@ class ExtendedKey:
         return self.child(account + HARDENED_KEY_START)
     def neuter(self):
         """
-        neuter returns a new extended public key from this extended private key.  The
-        same extended key will be returned unaltered if it is already an extended
-        public key.
+        neuter returns a new extended public key from this extended private key.
+        The same extended key will be returned unaltered if it is already an
+        extended public key.
 
         As the name implies, an extended public key does not have access to the
         private key, so it is not capable of signing transactions or deriving
-        child extended private keys.  However, it is capable of deriving further
+        child extended private keys. However, it is capable of deriving further
         child extended public keys.
 
         Returns:
@@ -480,7 +524,7 @@ class ExtendedKey:
         if not self.isPrivate:
             return self
 
-        # Convert it to an extended public key.  The key for the new extended
+        # Convert it to an extended public key. The key for the new extended
         # key will simply be the pubkey of the current extended private key.
         #
         # This is the function N((k,c)) -> (K, c) from [BIP32].
@@ -538,6 +582,9 @@ class ExtendedKey:
         Args:
             i (int): Child number.
             net (obj): Network parameters.
+
+        Returns:
+            Address: Child address.
         """
         child = self.child(i)
         return newAddressPubKeyHash(hash160(child.publicKey().serializeCompressed().b), net, STEcdsaSecp256k1).string()
@@ -546,7 +593,7 @@ class ExtendedKey:
         A PrivateKey structure that can be used for signatures.
 
         Returns:
-            PrivateKey: The private key structure.
+            secp256k1.PrivateKey: The private key structure.
         """
         return privKeyFromBytes(self.key)
     def publicKey(self):
@@ -554,7 +601,7 @@ class ExtendedKey:
         A PublicKey structure of the pubKey.
 
         Returns:
-            PublicKey: The public key structure.
+            secp256k1.PublicKey: The public key structure.
         """
         return Curve.parsePubKey(self.pubKey)
 
@@ -599,7 +646,7 @@ def decodeExtendedKey(net, pw, key):
     chainCode = payload[13:45]
     keyData = payload[45:78]
 
-    # The key data is a private key if it starts with 0x00.  Serialized
+    # The key data is a private key if it starts with 0x00. Serialized
     # compressed pubkeys either start with 0x02 or 0x03.
     isPrivate = keyData[0] == 0x00
     if isPrivate:
@@ -614,14 +661,14 @@ def decodeExtendedKey(net, pw, key):
         Curve.publicKey(keyData.int())
 
     return ExtendedKey(
-        privVer = privVersion, 
-        pubVer = pubVersion, 
+        privVer = privVersion,
+        pubVer = pubVersion,
         key = keyData,
         pubKey = "",
-        chainCode = chainCode, 
-        parentFP = parentFP, 
-        depth = depth, 
-        childNum = childNum, 
+        chainCode = chainCode,
+        parentFP = parentFP,
+        depth = depth,
+        childNum = childNum,
         isPrivate = isPrivate,
     )
 DEFAULT_KDF_PARAMS = {
@@ -633,6 +680,11 @@ DEFAULT_KDF_PARAMS = {
 def defaultKDFParams():
     """
     Default parameters for the key derivation function.
+
+    Returns:
+        str: hmac function name.
+        str: hmac hash type name.
+        int: Number of iterations.
     """
     d = DEFAULT_KDF_PARAMS
     return d["func"], d["hash_name"], d["iterations"]
@@ -695,7 +747,7 @@ class ScryptParams(object):
             "r": self.r,
             "p": self.p,
             "salt": self.salt,
-            "digest": self.digest,      
+            "digest": self.digest,
         }
     @staticmethod
     def __fromjson__(obj):
@@ -713,7 +765,7 @@ class SecretKey(object):
     def __init__(self, pw):
         """
         Args:
-            pw (byte-like): A password that deterministically generates the key. 
+            pw (byte-like): A password that deterministically generates the key.
         """
         super().__init__()
         salt = ByteArray(generateSeed(KEY_SIZE))
@@ -724,7 +776,7 @@ class SecretKey(object):
         self.keyParams = KDFParams(salt, digest)
     def params(self):
         """
-        The key params can be stored in plain text. They must be provided to 
+        The key params can be stored in plain text. They must be provided to
         `rekey` to regenerate a key.
 
         Returns:
@@ -737,6 +789,9 @@ class SecretKey(object):
 
         Args:
             thing (byte-like): The thing to encrypt.
+
+        Returns:
+            ByteArray: The thing, encrypted.
         """
         return self.key.encrypt(thing)
     def decrypt(self, thing):
@@ -745,12 +800,15 @@ class SecretKey(object):
 
         Args:
             thing (byte-like): The thing to decrypt.
+
+        Returns:
+            ByteArray: The thing, decrypted.
         """
         return self.key.decrypt(thing)
     @staticmethod
     def rekey(password, kp):
         """
-        Regenerate a key using its origin key parameters, as returned by 
+        Regenerate a key using its origin key parameters, as returned by
         `params`.
 
         Args:
@@ -775,14 +833,23 @@ class SecretKey(object):
 
 class TestCrypto(unittest.TestCase):
     def test_encryption(self):
+        '''
+        Test encryption and decryption.
+        '''
         a = SecretKey("abc".encode())
         aEnc = a.encrypt(b'dprv3n8wmhMhC7p7QuzHn4fYgq2d87hQYAxWH3RJ6pYFrd7LAV71RcBQWrFFmSG3yYWVKrJCbYTBGiniTvKcuuQmi1hA8duKaGM8paYRQNsD1P6')
         b = SecretKey.rekey("abc".encode(), a.params())
         aUnenc = b.decrypt(aEnc.bytes())
         self.assertTrue(a, aUnenc)
     def test_curve(self):
+        '''
+        Test curves. Unimplemented.
+        '''
         pass
     def test_priv_keys(self):
+        '''
+        Test private key parsing.
+        '''
         key = ByteArray("eaf02ca348c524e6392655ba4d29603cd1a7347d9d65cfe93ce1ebffdca22694")
         pk = privKeyFromBytes(key)
 
@@ -790,5 +857,3 @@ class TestCrypto(unittest.TestCase):
         # sig = txscript.signRFC6979(pk.key, inHash)
 
         # self.assertTrue(txscript.verifySig(pk.pub, inHash, sig.r, sig.s))
-
-
