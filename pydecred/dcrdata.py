@@ -346,22 +346,10 @@ class DcrDataException(Exception):
         self.name = name
         self.message = message
 
-class APIBlock:
-    def __init__(self, blockHash, height):
-        self.hash = blockHash
-        self.height = height
-    @staticmethod
-    def __fromjson__(obj):
-        return APIBlock(obj["hash"], obj["height"])
-    def __tojson__(self):
-        return {
-            "hash": self.blockHash,
-            "height": self.blockHeight,
-        }
-
-tinyjson.register(APIBlock, tag="dcrdata.APIBlock")
-
 class TicketInfo:
+    """
+    Ticket-related transaction information.
+    """
     def __init__(self, status, purchaseBlock, maturityHeight, expirationHeight,
                  lotteryBlock, vote, revocation):
          self.status = status
@@ -439,6 +427,12 @@ class UTXO(object):
         return UTXO.parse(obj)
     @staticmethod
     def parse(obj):
+        """
+        Parse the decoded JSON from dcrdata into a UTXO.
+
+        Args:
+            obj (dict): The dcrdata /api/tx response, decoded.
+        """
         utxo = UTXO(
             address = obj["address"],
             txid = obj["txid"],
@@ -454,29 +448,78 @@ class UTXO(object):
         )
         return utxo
     def parseScriptClass(self):
+        """
+        Set the script class.
+        """
         if self.scriptPubKey:
             self.scriptClass = txscript.getScriptClass(0, self.scriptPubKey)
     def confirm(self, block, tx, params):
+        """
+        This output has been mined. Set the block details.
+
+        Args:
+            block (msgblock.BlockHeader): The block header.
+            tx (dict): The dcrdata transaction.
+            params (obj): The network parameters.
+        """
         self.height = block.height
         self.maturity = block.height + params.CoinbaseMaturity if tx.looksLikeCoinbase() else None
         self.ts = block.timestamp
     def isSpendable(self, tipHeight):
+        """
+        isSpendable will be True if the UTXO is considered mature at the
+        specified height.
+
+        Args:
+            tipHeight (int): The current blockchain tip height.
+
+        Returns:
+            bool: True if mature.
+        """
         if self.isTicket():
             return False
         if self.maturity:
             return self.maturity <= tipHeight
         return True
     def key(self):
+        """
+        A unique ID for this UTXO.
+        """
         return UTXO.makeKey(self.txid, self.vout)
     @staticmethod
     def makeKey(txid, vout):
+        """
+        A unique ID for a UTXO.
+
+        Args:
+            txid (str): UTXO's transaction ID.
+            vout (int): UTXO's transaction output index.
+        """
         return txid + "#" + str(vout)
     def setTicketInfo(self, apiTinfo):
+        """
+        Set the ticket info. Only useful for tickets.
+
+        Args:
+            apiTinfo (dict): dcrdata /api/tinfo response.
+        """
         self.tinfo = TicketInfo.parse(apiTinfo)
         self.maturity = self.tinfo.maturityHeight
     def isTicket(self):
+        """
+        isTicket will be True if this is SSTX output.
+
+        Returns:
+            bool: True if this is an SSTX output.
+        """
         return self.scriptClass == txscript.StakeSubmissionTy
     def isLiveTicket(self):
+        """
+        isLiveTicket will return True if this is a live ticket.
+
+        Returns:
+            bool. True if this is a live ticket.
+        """
         return self.tinfo and self.tinfo.status in ("immature", "live")
 
 tinyjson.register(UTXO, tag="dcr.UTXO")
@@ -1065,12 +1108,11 @@ class DcrdataBlockchain(object):
     def purchaseTickets(self, keysource, utxosource, req):
         """
         Based on dcrwallet (*Wallet).purchaseTickets.
-        purchaseTickets indicates to the wallet that a ticket should be purchased
-        using all currently available funds.  The ticket address parameter in the
-        request can be nil in which case the ticket address associated with the
-        wallet instance will be used.  Also, when the spend limit in the request
-        is greater than or equal to 0, tickets that cost more than that limit
-        will return an error that not enough funds are available.
+        purchaseTickets indicates to the wallet that a ticket should be
+        purchased using any currently available funds. Also, when the spend
+        limit in the request is greater than or equal to 0, tickets that cost
+        more than that limit will return an error that not enough funds are
+        available.
         """
         self.updateTip()
         # account minConf is zero for regular outputs for now. Need to make that
@@ -1094,8 +1136,8 @@ class DcrdataBlockchain(object):
         # generating a ticket. The account balance is checked first
         # in case there is not enough money to generate the split
         # even without fees.
-        # TODO This can still sometimes fail if the split amount
-        # required plus fees for the split is larger than the
+        # TODO (copied from dcrwallet) This can still sometimes fail if the
+        # split amount required plus fees for the split is larger than the
         # balance we have, wasting an address. In the future,
         # address this better and prevent address burning.
 

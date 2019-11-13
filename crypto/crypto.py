@@ -99,8 +99,8 @@ class AddressPubKeyHash:
 
 class AddressSecpPubKey:
     """
-    AddressSecpPubKey represents and address, which is a pubkey hash and it's 
-    base-58 encoding. Argument pubkey should be a ByteArray corresponding the 
+    AddressSecpPubKey represents and address, which is a pubkey hash and it's
+    base-58 encoding. Argument pubkey should be a ByteArray corresponding the
     the serializedCompressed public key (33 bytes).
     """
     def __init__(self, serializedPubkey, net):
@@ -135,7 +135,7 @@ class AddressSecpPubKey:
         """
         A base-58 encoding of the pubkey.
 
-        Returns: 
+        Returns:
             str: The encoded address.
         """
         encoded = ByteArray(self.pubkeyID)
@@ -177,7 +177,7 @@ class AddressScriptHash(object):
         """
         A base-58 encoding of the pubkey hash.
 
-        Returns: 
+        Returns:
             str: The encoded address.
         """
         return encodeAddress(self.netID, self.scriptHash)
@@ -346,10 +346,10 @@ def b58CheckDecode(s):
 
 def newAddressPubKey(decoded, net):
     """
-    NewAddressPubKey returns a new Address. decoded must be 33 bytes. This 
+    NewAddressPubKey returns a new Address. decoded must be 33 bytes. This
     constructor takes the decoded pubkey such as would be decoded from a base58
-    string. The first byte indicates the signature suite. For compressed 
-    secp256k1 pubkeys, use AddressSecpPubKey directly. 
+    string. The first byte indicates the signature suite. For compressed
+    secp256k1 pubkeys, use AddressSecpPubKey directly.
     """
     if len(decoded) == 33:
         # First byte is the signature suite and ybit.
@@ -400,13 +400,13 @@ def newAddressPubKeyHash(pkHash, net, algo):
 def newAddressScriptHash(script, net):
     """
     newAddressScriptHash returns a new AddressScriptHash from a redeem script.
-    
+
     Args:
         script (ByteArray): the redeem script
         net (obj): the network parameters
 
     Returns:
-        AddressScriptHash: An address object. 
+        AddressScriptHash: An address object.
     """
     return newAddressScriptHashFromHash(hash160(script.b), net)
 
@@ -420,7 +420,7 @@ def newAddressScriptHashFromHash(scriptHash, net):
         net (obj): The network parameters.
 
     Returns:
-        AddressScriptHash: An address object. 
+        AddressScriptHash: An address object.
     """
     if len(scriptHash) != RIPEMD160_SIZE:
         raise Exception("incorrect script hash length")
@@ -743,8 +743,6 @@ class ExtendedKey:
         """
         return Curve.parsePubKey(self.pubKey)
 
-# tinyjson.register(ExtendedKey)
-
 def decodeExtendedKey(net, pw, key):
     """
     Decode an base58 ExtendedKey using the passphrase and network parameters.
@@ -969,16 +967,6 @@ class SecretKey(object):
             raise PasswordError("rekey digest check failed")
         return sk
 
-
-testAddrMagics = {
-    "pubKeyID":     (0x1386).to_bytes(2, byteorder="big"), # starts with Dk
-    "pkhEcdsaID":   (0x073f).to_bytes(2, byteorder="big"), # starts with Ds
-    "pkhEd25519ID": (0x071f).to_bytes(2, byteorder="big"), # starts with De
-    "pkhSchnorrID": (0x0701).to_bytes(2, byteorder="big"), # starts with DS
-    "scriptHashID": (0x071a).to_bytes(2, byteorder="big"), # starts with Dc
-    "privKeyID":    (0x22de).to_bytes(2, byteorder="big"), # starts with Pm
-}
-
 class TestCrypto(unittest.TestCase):
     def test_encryption(self):
         '''
@@ -991,24 +979,16 @@ class TestCrypto(unittest.TestCase):
         self.assertTrue(a, aUnenc)
     def test_addr_pubkey(self):
         from tinydecred.pydecred import mainnet
-        hexKeys = [
-            "033b26959b2e1b0d88a050b111eeebcf776a38447f7ae5806b53c9b46e07c267ad",
-            "0389ced3eaee84d5f0d0e166f6cd15f1bf6f429d1d13709393b418a6fb22d8be53",
-            "02a14a0023d7d8cbc5d39fa60f7e4dc4d5bf18a7031f52875fbca6bf837f68713f",
-            "03c3e3d7cde1c453a6283f5802a73d1cb3827cb4b007f58e3a52a36ce189934b6a",
-            "0254e17b230e782e591a9910794fdbf9943d500a47f2bf8446e1238f84e809bffc",
+        pairs = [
+            ("033b26959b2e1b0d88a050b111eeebcf776a38447f7ae5806b53c9b46e07c267ad", "DkRKjw7LmGCSzBwaUtjQLfb75Zcx9hH8yGNs3qPSwVzZuUKs7iu2e"),
+            ("0389ced3eaee84d5f0d0e166f6cd15f1bf6f429d1d13709393b418a6fb22d8be53", "DkRLLaJWkmH75iZGtQYE6FEf16zxeHr6TCAF59tGxhds4MFc2HqUS"),
+            ("02a14a0023d7d8cbc5d39fa60f7e4dc4d5bf18a7031f52875fbca6bf837f68713f", "DkM3hdWuKSSTm7Vq8WZx5f294vcZbPkAQYBDswkjmF1CFuWCRYxTr"),
+            ("03c3e3d7cde1c453a6283f5802a73d1cb3827cb4b007f58e3a52a36ce189934b6a", "DkRLn9vzsjK4ZYgDKy7JVYHKGvpZU5CYGK9H8zF2VCWbpTyVsEf4P"),
+            ("0254e17b230e782e591a9910794fdbf9943d500a47f2bf8446e1238f84e809bffc", "DkM37ymaat9j6oTFii1MZVpXrc4aRLEMHhTZrvrz8QY6BZ2HX843L"),
         ]
-        b58Keys = [
-            "DkRKjw7LmGCSzBwaUtjQLfb75Zcx9hH8yGNs3qPSwVzZuUKs7iu2e",
-            "DkRLLaJWkmH75iZGtQYE6FEf16zxeHr6TCAF59tGxhds4MFc2HqUS",
-            "DkM3hdWuKSSTm7Vq8WZx5f294vcZbPkAQYBDswkjmF1CFuWCRYxTr",
-            "DkRLn9vzsjK4ZYgDKy7JVYHKGvpZU5CYGK9H8zF2VCWbpTyVsEf4P",
-            "DkM37ymaat9j6oTFii1MZVpXrc4aRLEMHhTZrvrz8QY6BZ2HX843L",
-        ]
-        for hexKey, b58Key in zip(hexKeys, b58Keys):
-            pubkey = ByteArray(hexKey)
-            addr = AddressSecpPubKey(pubkey, mainnet)
-            self.assertEqual(addr.string(), b58Key)
+        for hexKey, addrStr in pairs:
+            addr = AddressSecpPubKey(ByteArray(hexKey), mainnet)
+            self.assertEqual(addr.string(), addrStr)
     def test_addr_pubkey_hash(self):
         from tinydecred.pydecred import mainnet
         pairs = [
@@ -1020,4 +1000,16 @@ class TestCrypto(unittest.TestCase):
         ]
         for pubkeyHash, addrStr in pairs:
             addr = AddressPubKeyHash(mainnet.PubKeyHashAddrID, ByteArray(pubkeyHash))
+            self.assertEqual(addr.string(), addrStr)
+    def test_addr_script_hash(self):
+        from tinydecred.pydecred import mainnet
+        pairs = [
+            ("52fdfc072182654f163f5f0f9a621d729566c74d", "Dcf2QjJ1pSnLwthhw1cwE55MVZNQVXDZWQT"),
+            ("10037c4d7bbb0407d1e2c64981855ad8681d0d86", "DcYvG3fPxHDZ5pzW8nj4rcYq5kM9XFxXpUy"),
+            ("d1e91e00167939cb6694d2c422acd208a0072939", "DcrbVYmhm5yX9mw9qdwUVWw6psUhPGrQJsT"),
+            ("487f6999eb9d18a44784045d87f3c67cf22746e9", "Dce4vLzzENaZT7D2Wq5crRZ4VwfYMDMWkD9"),
+            ("95af5a25367951baa2ff6cd471c483f15fb90bad", "Dcm73og7Hn9PigaNu59dHgKnNSP1myCQ39t"),
+        ]
+        for scriptHash, addrStr in pairs:
+            addr = newAddressScriptHashFromHash(ByteArray(scriptHash), mainnet)
             self.assertEqual(addr.string(), addrStr)
