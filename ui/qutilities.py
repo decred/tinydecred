@@ -42,11 +42,11 @@ class ThreadUtilities(object):
         self.threads = []
     def makeThread(self, func, callback=None, *args, **kwargs):
         """
-        Create and start a `SmartThread`. 
+        Create and start a `SmartThread`.
         A reference to the thread is stored in `self.threads` until it completes
 
         :param function func: The function to run in the thread
-        :param function callback: A function to call when the thread has completed. Any results returned by `func` will be passed as the first positional argument. 
+        :param function callback: A function to call when the thread has completed. Any results returned by `func` will be passed as the first positional argument.
         :param list args: Positional arguments to pass to `func`
         :param dict kwargs: Keyword arguments to pass to `func`
         """
@@ -70,10 +70,10 @@ class SmartThread(QtCore.QThread):
         """
         Args:
             func (function): The function to run in a separate thread.
-            callback (function): A function to receive the return value from 
-            `func`. 
+            callback (function): A function to receive the return value from
+            `func`.
             *args: optional positional arguements to pass to `func`.
-            qtConnectType: Signal synchronisity. 
+            qtConnectType: Signal synchronisity.
             **kwargs: optional keyword arguments to pass to `func`.
         """
         super().__init__()
@@ -95,7 +95,7 @@ class SmartThread(QtCore.QThread):
             self.returns = False
     def callitback(self):
         """
-        QThread Slot connected to the connect Signal. Send the value returned 
+        QThread Slot connected to the connect Signal. Send the value returned
         from `func` to the callback function.
         """
         self.callback(self.returns)
@@ -188,7 +188,7 @@ class QConsole(QtWidgets.QPlainTextEdit):
 
 class QToggle(QtWidgets.QAbstractButton):
     """
-    Implementation of a clean looking toggle switch translated from 
+    Implementation of a clean looking toggle switch translated from
     https://stackoverflow.com/a/38102598/1124661
     QAbstractButton::setDisabled to disable
     """
@@ -296,14 +296,14 @@ class QToggle(QtWidgets.QAbstractButton):
 
 def makeWidget(widgetClass, layoutDirection="vertical", parent=None):
     """
-    The creates a tuple of (widget, layout), with layout of type specified with 
+    The creates a tuple of (widget, layout), with layout of type specified with
     layout direction.
-    layout's parent will be widget. layout's alignment is set to top-left, and 
+    layout's parent will be widget. layout's alignment is set to top-left, and
     margins are set to 0 on both layout and widget
-    
+
     widgetClass (QtWidgets.QAbstractWidget:) The type of widget to make.
-    layoutDirection (str): optional. default "vertical". One of 
-        ("vertical","horizontal","grid"). Determines the type of layout applied 
+    layoutDirection (str): optional. default "vertical". One of
+        ("vertical","horizontal","grid"). Determines the type of layout applied
         to the widget.
     """
     widget = widgetClass(parent)
@@ -374,7 +374,7 @@ def makeLabel(s, fontSize, a=ALIGN_CENTER, **k):
     Args:
         s (str): The label text.
         fontSize (int): Pixel size of the label font.
-        a (Qt.QAlignment): The text alignment in the label. 
+        a (Qt.QAlignment): The text alignment in the label.
             default QtCore.Qt.AlignCenter
         **k: Additional keyword arguments to pass to setProperties.
     """
@@ -383,9 +383,9 @@ def makeLabel(s, fontSize, a=ALIGN_CENTER, **k):
     lbl.setAlignment(a)
     return lbl
 
-def setProperties(lbl, color=None, fontSize=None, fontFamily=None):
+def setProperties(lbl, color=None, fontSize=None, fontFamily=None, underline=False):
     """
-    A few common properties of QLabels. 
+    A few common properties of QLabels.
     """
     if color:
         palette =  lbl.palette()
@@ -399,12 +399,14 @@ def setProperties(lbl, color=None, fontSize=None, fontFamily=None):
         lbl.setFont(font)
     if fontFamily:
         font.setFamily(fontFamily)
+    if underline:
+        font.setUnderline(True)
     lbl.setFont(font)
     return lbl
 
 def pad(wgt, t, r, b, l):
     """
-    Add padding around the widget by wrapping it in another widget. 
+    Add padding around the widget by wrapping it in another widget.
     """
     w, lyt = makeWidget(QtWidgets.QWidget, HORIZONTAL)
     lyt.addWidget(wgt)
@@ -419,7 +421,7 @@ def clearLayout(layout, delete=False):
         layout (QAbstractLayout): Layout to clear
         delete (bool): Default False. Whether or not to delete the widget as well
     """
-    for i in reversed(range(layout.count())): 
+    for i in reversed(range(layout.count())):
         widget = layout.itemAt(i).widget()
         widget.setParent(None)
         if delete:
@@ -429,13 +431,43 @@ def clearLayout(layout, delete=False):
 def layoutWidgets(layout):
     """
     generator to iterate the widgets in a layout
-    
+
     Args:
         layout (QAbstractLayout): Layout to clear
         delete (bool): Default False. Whether or not to delete the widget as well.
     """
-    for i in range(layout.count()): 
+    for i in range(layout.count()):
         yield layout.itemAt(i).widget()
+
+def _setMouseDown(wgt, e):
+    if e.button() == QtCore.Qt.LeftButton:
+        wgt._mousedown = True
+
+def _releaseMouse(wgt, e):
+    if e.button() == QtCore.Qt.LeftButton and wgt._mousedown:
+        wgt._clickcb()
+        wgt._mousedown = False
+
+def _mouseMoved(wgt, e):
+    """
+    When the mouse is moved, check whether the mouse is within the bounds of
+    the widget. If not, set _mousedown to False. The user must click and
+    release without the mouse leaving the label to trigger the callback.
+    """
+    if wgt._mousedown == False:
+        return
+    qSize = wgt.size()
+    ePos = e.pos()
+    x, y = ePos.x(), ePos.y()
+    if x < 0 or y < 0 or x > qSize.width() or y > qSize.height():
+        wgt._mousedown = False
+
+def addClickHandler(wgt, cb):
+    wgt._mousedown = False
+    wgt._clickcb = cb
+    wgt.mousePressEvent = lambda e, w=wgt: _setMouseDown(wgt, e)
+    wgt.mouseReleaseEvent = lambda e, w=wgt: _releaseMouse(wgt, e)
+    wgt.mouseMoveEvent = lambda e, w=wgt: _mouseMoved(wgt, e)
 
 lightThemePalette = QtGui.QPalette()
 lightThemePalette.setColor(QtGui.QPalette.Window, QtGui.QColor("#ffffff"))

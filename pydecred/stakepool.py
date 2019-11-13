@@ -12,7 +12,7 @@ from tinydecred.crypto.bytearray import ByteArray
 def resultIsSuccess(res):
 	"""
 	JSON-decoded stake pool responses have a common base structure that enables
-	a universal success check. 
+	a universal success check.
 
 	Args:
 		res (object): The freshly-decoded-from-JSON response.
@@ -121,15 +121,15 @@ tinyjson.register(PoolStats)
 class StakePool(object):
 	"""
 	A StakePool is a voting service provider, uniquely defined by it's URL. The
-	StakePool class has methods for interacting with the VSP API. StakePool is 
-	JSON-serializable if used with tinyjson, so can be stored as part of an 
+	StakePool class has methods for interacting with the VSP API. StakePool is
+	JSON-serializable if used with tinyjson, so can be stored as part of an
 	Account in the wallet.
 	"""
 	def __init__(self, url, apiKey):
 		"""
 		Args:
 			url (string): The stake pool URL.
-			apiKey (string): The API key assigned to the VSP account during 
+			apiKey (string): The API key assigned to the VSP account during
 				registration.
 		"""
 		self.url = url
@@ -137,7 +137,7 @@ class StakePool(object):
 		# a call to StakePool.authorize before using the StakePool.
 		self.net = None
 		# The signingAddress (also called a votingAddress in other contexts) is
-		# the P2SH 1-of-2 multi-sig address that spends SSTX outputs. 
+		# the P2SH 1-of-2 multi-sig address that spends SSTX outputs.
 		self.signingAddress = None
 		self.apiKey = apiKey
 		self.lastConnection = 0
@@ -160,7 +160,7 @@ class StakePool(object):
 	@staticmethod
 	def providers(net):
 		"""
-		A static method to get the current Decred VSP list. 
+		A static method to get the current Decred VSP list.
 
 		Args:
 			net (string): The network name.
@@ -192,12 +192,12 @@ class StakePool(object):
 		return {"Authorization": "Bearer %s" % self.apiKey}
 	def validate(self, addr):
 		"""
-		Validate performs some checks that the PurchaseInfo provided by the 
-		stake pool API is valid for this given voting address. Exception is 
+		Validate performs some checks that the PurchaseInfo provided by the
+		stake pool API is valid for this given voting address. Exception is
 		raised on failure to validate.
 
 		Args:
-			addr (string): The base58-encoded pubkey address that the wallet 
+			addr (string): The base58-encoded pubkey address that the wallet
 				uses to vote.
 		"""
 		pi = self.purchaseInfo
@@ -219,11 +219,11 @@ class StakePool(object):
 			raise Exception("signing pubkey not found in redeem script")
 	def authorize(self, address, net):
 		"""
-		Authorize the stake pool for the provided address and network. Exception 
+		Authorize the stake pool for the provided address and network. Exception
 		is raised on failure to authorize.
 
 		Args:
-			address (string): The base58-encoded pubkey address that the wallet 
+			address (string): The base58-encoded pubkey address that the wallet
 				uses to vote.
 			net (object): The network parameters.
 		"""

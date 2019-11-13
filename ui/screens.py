@@ -45,12 +45,13 @@ def pixmapFromSvg(filename, w, h):
 class TinyDialog(QtWidgets.QFrame):
     """
     TinyDialog is a widget for handling Screen instances. This si the primary
-    window of the TinyDecred application. It has a fixed (tiny!) size. 
+    window of the TinyDecred application. It has a fixed (tiny!) size.
     """
     maxWidth = 525
     maxHeight = 375
     targetPadding = 15
     popSig = QtCore.pyqtSignal(Q.PyObj)
+    stackSig = QtCore.pyqtSignal(Q.PyObj)
     topMenuHeight = 26
     successSig = QtCore.pyqtSignal(str)
     errorSig = QtCore.pyqtSignal(str)
@@ -64,17 +65,19 @@ class TinyDialog(QtWidgets.QFrame):
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
         self.popSig.connect(self.pop_)
         self.pop = lambda w=None: self.popSig.emit(w)
+        self.stackSig.connect(self.stack_)
+        self.stack = lambda p: self.stackSig.emit(p)
 
         # Set the width and height explicitly. Keep it tiny.
-        screenGeo = app.qApp.primaryScreen().availableGeometry()            
+        screenGeo = app.qApp.primaryScreen().availableGeometry()
         self.w = self.maxWidth if screenGeo.width() >= self.maxWidth else screenGeo.width()
         self.h =  self.maxHeight if screenGeo.height() >= self.maxHeight else screenGeo.height()
         availPadX = (screenGeo.width() - self.w) / 2
         self.padX = self.targetPadding if availPadX >= self.targetPadding else availPadX
         self.setGeometry(
-            screenGeo.x() + screenGeo.width() - self.w - self.padX, 
-            screenGeo.y() + screenGeo.height() - self.h, 
-            self.w, 
+            screenGeo.x() + screenGeo.width() - self.w - self.padX,
+            screenGeo.y() + screenGeo.height() - self.h,
+            self.w,
             self.h
         )
 
@@ -82,7 +85,7 @@ class TinyDialog(QtWidgets.QFrame):
         self.showSuccess = lambda s: self.successSig.emit(s)
         self.errorSig.connect(self.showError_)
         self.showError = lambda s: self.errorSig.emit(s)
-        
+
         self.mainLayout = QtWidgets.QVBoxLayout(self)
         self.setFrameShape(QtWidgets.QFrame.Box)
         self.setLineWidth(1)
@@ -100,7 +103,7 @@ class TinyDialog(QtWidgets.QFrame):
         app.registerSignal(ui.WORKING_SIGNAL, lambda: self.working.setVisible(True))
         app.registerSignal(ui.DONE_SIGNAL, lambda: self.working.setVisible(False))
 
-        # If enabled by a Screen instance, the user can navigate back to the 
+        # If enabled by a Screen instance, the user can navigate back to the
         # previous screen.
         self.backIcon = ClickyLabel(self.backClicked)
         self.backIcon.setPixmap(pixmapFromSvg("back.svg", 20, 20))
@@ -142,7 +145,7 @@ class TinyDialog(QtWidgets.QFrame):
     def closeEvent(self, e):
         self.hide()
         e.ignore()
-    def stack(self, w):
+    def stack_(self, w):
         """
         Add the Screen instance to the stack, making it the displayed screen.
         """
@@ -158,7 +161,7 @@ class TinyDialog(QtWidgets.QFrame):
             w.stacked()
     def pop_(self, screen=None):
         """
-        Pop the top screen from the stack. If a Screen instance is provided, 
+        Pop the top screen from the stack. If a Screen instance is provided,
         only pop if that is the top screen.
 
         Args:
@@ -200,7 +203,7 @@ class TinyDialog(QtWidgets.QFrame):
         """
         Set the icons according to the Screen's settings.
 
-        Args: 
+        Args:
             top (Screen): The top screen.
         """
         self.backIcon.setVisible(top.isPoppable)
@@ -214,14 +217,14 @@ class TinyDialog(QtWidgets.QFrame):
             self.pop()
     def closeClicked(self):
         """
-        User has clicked close. Since TinyDecred is a system tray application, 
-        the window and it's application panel icon are hidden, but the 
-        application does not close. 
+        User has clicked close. Since TinyDecred is a system tray application,
+        the window and it's application panel icon are hidden, but the
+        application does not close.
         """
         self.hide()
     def backClicked(self):
         """
-        The clicked slot for the back icon. Pops the top screen. 
+        The clicked slot for the back icon. Pops the top screen.
         """
         self.pop()
     def showError_(self, msg):
@@ -268,14 +271,14 @@ class TinyDialog(QtWidgets.QFrame):
             painter.setPen(self.borderPen)
             painter.setFont(self.mainFont)
             # painter.setBrush(self.bgBrush)
-            
+
             pad = 15
             fullWidth = self.geometry().width()
 
             column = QtCore.QRect(0, 0, fullWidth - 4*pad, 10000)
 
             textBox = painter.boundingRect(
-                column, 
+                column,
                 self.textFlags,
                 self.msg
             )
@@ -287,11 +290,11 @@ class TinyDialog(QtWidgets.QFrame):
 
             w = textBox.width() + 2*pad
             pTop = TinyDialog.topMenuHeight + pad
-            
+
             painter.fillRect(lrPad, pTop, outerWidth, outerHeight, self.bgBrush)
             painter.drawRect(lrPad, pTop, outerWidth, outerHeight)
             painter.drawText(
-                QtCore.QRect(lrPad + pad, pTop + pad, w, 10000), 
+                QtCore.QRect(lrPad + pad, pTop + pad, w, 10000),
                 self.textFlags,
                 self.msg
             )
@@ -299,7 +302,7 @@ class TinyDialog(QtWidgets.QFrame):
 class Screen(QtWidgets.QWidget):
     """
     Screen is all the user sees in the main application window. All UI widgets
-    should inherit Screen. 
+    should inherit Screen.
     """
     def __init__(self, app):
         """
@@ -308,16 +311,16 @@ class Screen(QtWidgets.QWidget):
         """
         super().__init__()
         self.app = app
-        # isPoppable indicates whether this screen can be popped by the user 
+        # isPoppable indicates whether this screen can be popped by the user
         # when this screen is displayed.
         self.isPoppable = False
-        # canGoHome indicates whether the user can navigate directly to the 
-        # home page when this screen is displayed. 
+        # canGoHome indicates whether the user can navigate directly to the
+        # home page when this screen is displayed.
         self.canGoHome = True
         self.animations = {}
 
         # The layout the that child will use is actually a 2nd descendent of the
-        # primary Screen layout. Stretches are used to center a widget 
+        # primary Screen layout. Stretches are used to center a widget
         # regardless of size.
         vLayout = QtWidgets.QVBoxLayout(self)
         vLayout.addStretch(1)
@@ -333,17 +336,17 @@ class Screen(QtWidgets.QWidget):
         Run an animation if its trigger is registered. By default, no animations
         are attached to the screen.
 
-        Args: 
+        Args:
             ani (str): The animation trigger.
         """
         if ani in self.animations:
             return self.animations[ani].start()
     def setFadeIn(self, v):
         """
-        Set the screen to use a fade-in animation. 
+        Set the screen to use a fade-in animation.
 
         Args:
-            v (bool): If True, run the fade-in animation when its trigger is 
+            v (bool): If True, run the fade-in animation when its trigger is
                 received. False will disable the animation.
         """
         if v:
@@ -359,7 +362,7 @@ class Screen(QtWidgets.QWidget):
 
 class HomeScreen(Screen):
     """
-    The standard home screen for a TinyDecred account.  
+    The standard home screen for a TinyDecred account.
     """
     def __init__(self, app):
         """
@@ -376,7 +379,7 @@ class HomeScreen(Screen):
         self.balance = None
         self.stakeScreen = StakingScreen(app)
 
-        # Update the home screen when the balance signal is received. 
+        # Update the home screen when the balance signal is received.
         app.registerSignal(ui.BALANCE_SIGNAL, self.balanceUpdated)
         app.registerSignal(ui.SYNC_SIGNAL, self.setTicketStats)
 
@@ -387,7 +390,7 @@ class HomeScreen(Screen):
         # Display the current account balance.
         logo = QtWidgets.QLabel()
         logo.setPixmap(pixmapFromSvg(DCR.LOGO, 40, 40))
-        
+
         self.totalBalance = b = ClickyLabel(self.balanceClicked, "0.00")
         Q.setProperties(b, fontFamily="Roboto-Bold", fontSize=36)
         self.totalUnit = Q.makeLabel("DCR", 18, color="#777777")
@@ -398,12 +401,12 @@ class HomeScreen(Screen):
 
         self.statsLbl = Q.makeLabel("", 15)
 
-        tot, totLyt = Q.makeSeries(Q.HORIZONTAL, 
+        tot, totLyt = Q.makeSeries(Q.HORIZONTAL,
             self.totalBalance,
             self.totalUnit,
         )
 
-        bals, balsLyt = Q.makeSeries(Q.VERTICAL, 
+        bals, balsLyt = Q.makeSeries(Q.VERTICAL,
             tot,
             self.availBalance,
             self.statsLbl,
@@ -416,8 +419,8 @@ class HomeScreen(Screen):
             align=Q.ALIGN_LEFT,
         )
 
-        row, rowLyt = Q.makeSeries(Q.HORIZONTAL, 
-            logoCol, 
+        row, rowLyt = Q.makeSeries(Q.HORIZONTAL,
+            logoCol,
             Q.STRETCH,
             bals,
         )
@@ -437,7 +440,7 @@ class HomeScreen(Screen):
             new,
         )
 
-        col, colLyt = Q.makeSeries(Q.VERTICAL, 
+        col, colLyt = Q.makeSeries(Q.VERTICAL,
             header,
             self.address,
         )
@@ -511,7 +514,7 @@ class HomeScreen(Screen):
             self.setTicketStats()
     def setTicketStats(self):
         """
-        Set the staking statistics. 
+        Set the staking statistics.
         """
         acct = self.app.wallet.selectedAccount
         balance = self.balance
@@ -522,7 +525,7 @@ class HomeScreen(Screen):
             self.ticketStats = stats
     def spendClicked(self, e=None):
         """
-        Display a form to send funds to an address. A Qt Slot, but any event 
+        Display a form to send funds to an address. A Qt Slot, but any event
         parameter is ignored.
         """
         self.app.appWindow.stack(self.app.sendScreen)
@@ -579,10 +582,10 @@ class PasswordDialog(Screen):
         QToggle callback. Set plain text password field display.
 
         Args:
-            state (bool): The toggle switch state. 
+            state (bool): The toggle switch state.
             switch (QToggle): The toggle switch instance.
         """
-        if state: 
+        if state:
             self.pwInput.setEchoMode(QtWidgets.QLineEdit.Normal)
         else:
             self.pwInput.setEchoMode(QtWidgets.QLineEdit.Password)
@@ -593,19 +596,19 @@ class PasswordDialog(Screen):
         self.callback(self.pwInput.text())
     def withCallback(self, callback, *args, **kwargs):
         """
-        Sets the screens callback function, which will be called when the user 
-        presses the return key while the password field has focus. 
+        Sets the screens callback function, which will be called when the user
+        presses the return key while the password field has focus.
 
         Args:
             callback (func(str, ...)): A function to receive the users password.
-            *args: optional. Positional arguments to pass to the callback. The 
+            *args: optional. Positional arguments to pass to the callback. The
                 arguments are shifted and the password will be the zeroth
                 argument.
-            **kwargs: optional. Keyword arguments to pass through to the 
+            **kwargs: optional. Keyword arguments to pass through to the
                 callback.
 
         Returns:
-            The screen itself is returned as a convenience. 
+            The screen itself is returned as a convenience.
         """
         self.callback = lambda p, a=args, k=kwargs: callback(p, *a, **k)
         return self
@@ -619,7 +622,7 @@ class ClickyLabel(QtWidgets.QLabel):
         Args:
             callback (func): A callback function to be called when the label
                 is clicked.
-            *a: Any additional arguments are passed directly to the parent 
+            *a: Any additional arguments are passed directly to the parent
                 QLabel constructor.
         """
         super().__init__(*a)
@@ -635,7 +638,7 @@ class ClickyLabel(QtWidgets.QLabel):
     def mouseMoveEvent(self, e):
         """
         When the mouse is moved, check whether the mouse is within the bounds of
-        the label. If not, set mouseDown to False. The user must click and 
+        the label. If not, set mouseDown to False. The user must click and
         release without the mouse leaving the label to trigger the callback.
         """
         if self.mouseDown == False:
@@ -649,7 +652,7 @@ class ClickyLabel(QtWidgets.QLabel):
 class InitializationScreen(Screen):
     """
     A screen shown when no wallet file is detected. This screen offers options
-    for creating a new wallet or loading an existing wallet. 
+    for creating a new wallet or loading an existing wallet.
     """
     def __init__(self, app):
         """
@@ -679,7 +682,7 @@ class InitializationScreen(Screen):
         self.restoreBttn.clicked.connect(self.restoreClicked)
     def initClicked(self):
         """
-        Qt Slot for the new wallet button. Initializes the creation of a new 
+        Qt Slot for the new wallet button. Initializes the creation of a new
         wallet.
         """
         self.app.getPassword(self.initPasswordCallback)
@@ -719,7 +722,7 @@ class InitializationScreen(Screen):
             app.appWindow.showError("failed to create wallet")
     def loadClicked(self):
         """
-        The user has selected the "load from from" option. Prompt for a file 
+        The user has selected the "load from from" option. Prompt for a file
         location and load the wallet.
         """
         app = self.app
@@ -760,7 +763,7 @@ class InitializationScreen(Screen):
             app.getPassword(load, walletPath)
     def restoreClicked(self):
         """
-        User has selected to generate a wallet from a mnemonic seed. 
+        User has selected to generate a wallet from a mnemonic seed.
         """
         restoreScreen = MnemonicRestorer(self.app)
         self.app.appWindow.stack(restoreScreen)
@@ -777,7 +780,7 @@ def sendToAddress(wallet, val, addr):
 
 class SendScreen(Screen):
     """
-    A screen that displays a form to send funds to an address. 
+    A screen that displays a form to send funds to an address.
     """
     def __init__(self, app):
         """
@@ -817,7 +820,7 @@ class SendScreen(Screen):
     def sendClicked(self, e):
         """
         Qt slot for clicked signal from submit button. Send the amount specified
-        to the address specified. 
+        to the address specified.
         """
         val = float(self.valField.text())
         address = self.addressField.text()
@@ -841,7 +844,7 @@ class SendScreen(Screen):
 
 class WaitingScreen(Screen):
     """
-    Waiting screen displays a Spinner. 
+    Waiting screen displays a Spinner.
     """
     def __init__(self, app):
         """
@@ -856,7 +859,7 @@ class WaitingScreen(Screen):
 
 class MnemonicScreen(Screen):
     """
-    Display the mnemonic seed from wallet creation. 
+    Display the mnemonic seed from wallet creation.
     """
     def __init__(self, app, words):
         """
@@ -870,10 +873,10 @@ class MnemonicScreen(Screen):
         self.layout.setSpacing(10)
 
         # Some instructions for the user. It is critical that they copy the seed
-        # now, as it can't be regenerated. 
+        # now, as it can't be regenerated.
         self.lbl = Q.makeLabel(
             "Copy these words carefully and keep them somewhere secure. "
-            "You will not have this chance again.", 
+            "You will not have this chance again.",
             16)
         self.lbl.setWordWrap(True)
         self.layout.addWidget(self.lbl)
@@ -904,7 +907,7 @@ class MnemonicScreen(Screen):
 
 class MnemonicRestorer(Screen):
     """
-    A screen with a simple form for entering a mnemnic seed from which to 
+    A screen with a simple form for entering a mnemnic seed from which to
     generate a wallet.
     """
     def __init__(self, app):
@@ -925,6 +928,7 @@ class MnemonicRestorer(Screen):
 
         # A field to enter the seed words.
         self.edit = edit = QtWidgets.QTextEdit()
+        edit.setAcceptRichText(False)
         edit.setMaximumWidth(300)
         edit.setFixedHeight(225)
         edit.setStyleSheet("QLabel{border: 1px solid #777777; padding: 10px;}")
@@ -941,13 +945,13 @@ class MnemonicRestorer(Screen):
         button.clicked.connect(self.tryWords)
     def showEvent(self, e):
         """
-        QWidget method. Sets the focus in the QTextEdit. 
+        QWidget method. Sets the focus in the QTextEdit.
         """
         self.edit.setFocus()
     def tryWords(self, e):
         """
-        Qt Slot for the submit button clicked signal. Attempt to create a 
-        wallet with the provided words. 
+        Qt Slot for the submit button clicked signal. Attempt to create a
+        wallet with the provided words.
         """
         app = self.app
         words = self.edit.toPlainText().strip().split()
@@ -984,8 +988,8 @@ class MnemonicRestorer(Screen):
         Receives the result from wallet creation.
 
         Args:
-            ret (None or Wallet): The wallet if successfully created. None if 
-                failed. 
+            ret (None or Wallet): The wallet if successfully created. None if
+                failed.
         """
         app = self.app
         if wallet:
@@ -997,8 +1001,7 @@ class MnemonicRestorer(Screen):
 
 class StakingScreen(Screen):
     """
-    A screen with a simple form for entering a mnemnic seed from which to 
-    generate a wallet.
+    A screen with a form to purchase tickets.
     """
     def __init__(self, app):
         """
@@ -1010,6 +1013,7 @@ class StakingScreen(Screen):
         self.canGoHome = True
         self.layout.setSpacing(20)
         self.poolScreen = PoolScreen(app, self.poolAuthed)
+        self.accountScreen = PoolAccountScreen(app, self.poolScreen)
         self.balance = None
         self.wgt.setContentsMargins(5, 5, 5, 5)
         self.wgt.setMinimumWidth(400)
@@ -1020,7 +1024,7 @@ class StakingScreen(Screen):
         self.app.registerSignal(ui.BALANCE_SIGNAL, self.balanceSet)
         self.app.registerSignal(ui.SYNC_SIGNAL, self.setStats)
 
-        # ticket price is a single row reading `Ticket Price: XX.YY DCR`. 
+        # ticket price is a single row reading `Ticket Price: XX.YY DCR`.
         lbl = Q.makeLabel("Ticket Price: ", 16)
         self.lastPrice = None
         self.lastPriceStamp = 0
@@ -1029,7 +1033,7 @@ class StakingScreen(Screen):
         priceWgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, self.ticketPrice, unit)
         self.layout.addWidget(priceWgt)
 
-        # Current holdings is a single row that reads `Currently staking X 
+        # Current holdings is a single row that reads `Currently staking X
         # tickets worth YY.ZZ DCR`
         lbl = Q.makeLabel("Currently staking", 14)
         self.ticketCount = Q.makeLabel("", 18, fontFamily="Roboto-Bold")
@@ -1047,7 +1051,7 @@ class StakingScreen(Screen):
         affordWgt.setContentsMargins(0, 0, 0, 30)
         self.layout.addWidget(affordWgt)
 
-        # The actual purchase form. A box with a drop shadow that contains a 
+        # The actual purchase form. A box with a drop shadow that contains a
         # single row reading `Purchase [ ] tickets     [Buy Now]`.
         lbl = Q.makeLabel("Purchase", 16)
         lbl2 = Q.makeLabel("tickets", 16)
@@ -1066,6 +1070,15 @@ class StakingScreen(Screen):
         Q.addDropShadow(purchaseWgt)
         self.layout.addWidget(purchaseWgt)
 
+        # Navigate to account screen, to choose or add a different VSP account.
+        self.currentPool = Q.makeLabel("", 15)
+        lbl2 = ClickyLabel(self.stackAccounts, "change")
+        Q.setProperties(lbl2, underline=True, fontSize=15)
+        Q.addHoverColor(lbl2, "#f5ffff")
+        wgt, lyt = Q.makeSeries(Q.HORIZONTAL, self.currentPool, Q.STRETCH, lbl2)
+        lyt.setContentsMargins(0, 10, 0, 0)
+        self.layout.addWidget(wgt)
+
     def stacked(self):
         """
         stacked is called on screens when stacked by the TinyDialog.
@@ -1075,6 +1088,8 @@ class StakingScreen(Screen):
             self.app.appWindow.pop(self)
             self.app.appWindow.stack(self.poolScreen)
 
+    def stackAccounts(self):
+        self.app.appWindow.stack(self.accountScreen)
     def setStats(self):
         """
         Get the current ticket stats and update the display.
@@ -1083,6 +1098,9 @@ class StakingScreen(Screen):
         stats = acct.ticketStats()
         self.ticketCount.setText(str(stats.count))
         self.ticketValue.setText("%.2f" % (stats.value/1e8))
+        stakePool = acct.stakePool()
+        if stakePool:
+            self.currentPool.setText(stakePool.url)
 
     def blockchainConnected(self):
         """
@@ -1108,8 +1126,8 @@ class StakingScreen(Screen):
 
     def balanceSet(self, balance):
         """
-        Connected to the BALANCE_SIGNAL signal. Sets the balance and updates 
-        the display. 
+        Connected to the BALANCE_SIGNAL signal. Sets the balance and updates
+        the display.
 
         Args:
             balance (account.Balance): The current account balance.
@@ -1126,7 +1144,7 @@ class StakingScreen(Screen):
 
     def buyClicked(self, e=None):
         """
-        Connected to the "Buy Now" button clicked signal. Initializes the ticket 
+        Connected to the "Buy Now" button clicked signal. Initializes the ticket
         purchase routine.
         """
         qtyStr = self.ticketQty.text()
@@ -1140,7 +1158,7 @@ class StakingScreen(Screen):
             self.app.withUnlockedWallet(self.buyTickets, self.ticketsBought, qty)
         self.app.confirm("Are you sure you want to purchase %d ticket(s) for %.2f DCR? "
                          "Once purchased, these funds will be locked until your tickets vote or expire."
-                         % (qty, qty*self.lastPrice), 
+                         % (qty, qty*self.lastPrice),
                          step)
     def buyTickets(self, wallet, qty):
         """
@@ -1165,7 +1183,7 @@ class StakingScreen(Screen):
         return txs
     def ticketsBought(self, res):
         """
-        The final callback from a ticket purchase. If res evaluates True, it 
+        The final callback from a ticket purchase. If res evaluates True, it
         should be a list of purchased tickets.
         """
         if not res:
@@ -1202,7 +1220,7 @@ class PoolScreen(Screen):
         self.wgt.setContentsMargins(15, 0, 15, 0)
 
         # After the header, there are two rows that make up the form. The first
-        # row is a QLineEdit and a button that takes the pool URL. The second 
+        # row is a QLineEdit and a button that takes the pool URL. The second
         # row is a slightly larger QLineEdit for the API key.
         lbl = Q.makeLabel("Add a voting service provider", 16)
         wgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, Q.STRETCH)
@@ -1226,7 +1244,7 @@ class PoolScreen(Screen):
         lbl = Q.makeLabel("Don't have a VSP yet? Heres one.", 15, a=l)
         self.layout.addWidget(lbl)
 
-        # Display info for a randomly chosen pool (with some filtering), and a 
+        # Display info for a randomly chosen pool (with some filtering), and a
         # couple of links to aid in selecting a VSP..
         self.poolUrl = Q.makeLabel("", 16, a=l, fontFamily="Roboto-Medium")
         self.poolUrl.setOpenExternalLinks(True)
@@ -1251,7 +1269,7 @@ class PoolScreen(Screen):
         poolWgt.mouseReleaseEvent = self.poolClicked
         self.layout.addWidget(poolWgt)
 
-        # A button to select a different pool and a link to the master list on 
+        # A button to select a different pool and a link to the master list on
         # decred.org.
         btn1 = app.getButton(TINY, "show another")
         btn1.clicked.connect(self.randomizePool)
@@ -1265,13 +1283,13 @@ class PoolScreen(Screen):
         Get the current master list of VSPs from decred.org.
         """
         net = self.app.dcrdata.params
-        def getPools():
+        def get():
             try:
                 return StakePool.providers(net)
             except Exception as e:
                 log.error("error retrieving stake pools: %s" % e)
                 return False
-        self.app.makeThread(getPools, self.setPools)
+        self.app.makeThread(get, self.setPools)
 
     def setPools(self, pools):
         """
@@ -1349,7 +1367,7 @@ class PoolScreen(Screen):
         app.withUnlockedWallet(votingAddr, self.continueAuth)
     def continueAuth(self, res):
         """
-        Follows authPool in the pool authorization process. Send the wallet 
+        Follows authPool in the pool authorization process. Send the wallet
         voting address to the pool and authorize the response.
         """
         if not res:
@@ -1365,7 +1383,7 @@ class PoolScreen(Screen):
             except Exception as e:
                 # log.error("failed to set pool address: %s" % e)
                 # self.app.appWindow.showError("failed to set address")
-                # might be okay. 
+                # might be okay.
                 log.error("failed to authorize stake pool: %s" % e)
                 app.appWindow.showError("pool authorization failed")
             self.callback(False)
@@ -1386,12 +1404,145 @@ class PoolScreen(Screen):
         self.poolIp.setText(url)
         QtGui.QDesktopServices.openUrl(QtCore.QUrl(url))
 
+class PoolAccountScreen(Screen):
+    """
+    A screen that lists currently known VSP accounts, and allows adding new
+    accounts or changing the selected account.
+    """
+    def __init__(self, app, poolScreen):
+        """
+        Args:
+            app (TinyDecred): The TinyDecred application instance.
+        """
+        super().__init__(app)
+        self.isPoppable = True
+        self.canGoHome = True
+
+        self.pages = []
+        self.page = 0
+
+        self.poolScreen = poolScreen
+        self.app.registerSignal(ui.SYNC_SIGNAL, self.setPools)
+        self.wgt.setMinimumWidth(400)
+        self.wgt.setMinimumHeight(225)
+
+
+        lbl = Q.makeLabel("Accounts", 18)
+        self.layout.addWidget(lbl, 0, Q.ALIGN_LEFT)
+
+        wgt, self.poolsLyt = Q.makeWidget(QtWidgets.QWidget, Q.VERTICAL)
+        self.poolsLyt.setSpacing(10)
+        self.poolsLyt.setContentsMargins(5, 5, 5, 5)
+        self.layout.addWidget(wgt)
+
+        self.prevPg = app.getButton(TINY, "back")
+        self.prevPg.clicked.connect(self.pageBack)
+        self.nextPg = app.getButton(TINY, "next")
+        self.nextPg.clicked.connect(self.pageFwd)
+        self.pgNum = Q.makeLabel("", 15)
+
+        self.layout.addStretch(1)
+
+        self.pagination, _ = Q.makeSeries(Q.HORIZONTAL,
+            self.prevPg,
+            Q.STRETCH,
+            self.pgNum,
+            Q.STRETCH,
+            self.nextPg)
+        self.layout.addWidget(self.pagination)
+
+        btn = app.getButton(SMALL, "add new acccount")
+        btn.clicked.connect(self.addClicked)
+        self.layout.addWidget(btn)
+    def stacked(self):
+        """
+        stacked is called on screens when stacked by the TinyDialog.
+        """
+        self.setPools()
+    def pageBack(self):
+        """
+        Go back one page.
+        """
+        newPg = self.page + 1
+        if newPg > len(self.pages) - 1:
+            newPg = 0
+        self.page = newPg
+        self.setWidgets(self.pages[newPg])
+        self.setPgNum()
+    def pageFwd(self):
+        """
+        Go the the next displayed page.
+        """
+        newPg = self.page - 1
+        if newPg < 0:
+            newPg = len(self.pages) - 1
+        self.page = newPg
+        self.setWidgets(self.pages[newPg])
+        self.setPgNum()
+    def setPgNum(self):
+        """
+        Set the displayed page number.
+        """
+        self.pgNum.setText("%d/%d" % (self.page+1, len(self.pages)))
+    def setPools(self):
+        """
+        Reset the stake pools list from that active account and set the first
+        page.
+        """
+        acct = self.app.wallet.selectedAccount
+        if not acct:
+            log.error("no account selected")
+        pools = acct.stakePools
+        if len(pools) == 0:
+            return
+        self.pages = [pools[i*2:i*2+2] for i in range((len(pools)+1)//2)]
+        self.page = 0
+        self.setWidgets(self.pages[0])
+        self.pagination.setVisible(len(self.pages) > 1)
+        self.setPgNum()
+    def setWidgets(self, pools):
+        """
+        Set the displayed pool widgets.
+
+        Args:
+            pools list(StakePool): pools to display
+        """
+        Q.clearLayout(self.poolsLyt, delete=True)
+        for pool in pools:
+            ticketAddr = pool.purchaseInfo.ticketAddress
+            urlLbl = Q.makeLabel(pool.url, 16)
+            addrLbl = Q.makeLabel(ticketAddr, 14)
+            wgt, lyt = Q.makeSeries(Q.VERTICAL,
+                urlLbl, addrLbl, align=Q.ALIGN_LEFT)
+            wgt.setMinimumWidth(360)
+            lyt.setContentsMargins(5, 5, 5, 5)
+            Q.addDropShadow(wgt)
+            Q.addClickHandler(wgt, lambda p=pool: self.selectActivePool(p))
+            self.poolsLyt.addWidget(wgt, 1)
+
+    def selectActivePool(self, pool):
+        """
+        Set the current active pool.
+
+        Args:
+            pool (StakePool): The new active pool.
+        """
+        self.app.appWindow.showSuccess("new pool selected")
+        self.app.wallet.selectedAccount.setPool(pool)
+        self.setPools()
+
+    def addClicked(self, e=None):
+        """
+        The clicked slot for the add pool button. Stacks the pool screen.
+        """
+        self.app.appWindow.pop(self)
+        self.app.appWindow.stack(self.poolScreen)
 
 class ConfirmScreen(Screen):
     """
-    A screen that displays a custom prompt and calls a callback function 
-    conditionally on user affirmation. The two available buttons say "ok" and 
-    "no". Clicking "ok" triggers the callback. Clicking "no" simply pops this 
+    A screen that displays a custom prompt and calls a callback function
+    conditionally on user affirmation. The two available buttons say "ok" and
+    "no". Clicking "ok" triggers the callback. Clicking "no" simply pops this
     Screen.
     """
     def __init__(self, app):
@@ -1402,8 +1553,8 @@ class ConfirmScreen(Screen):
         super().__init__(app)
         self.isPoppable = True
         self.canGoHome = False
-        self.callback = None
 
+        self.callback = None
         self.prompt = Q.makeLabel("", 16)
         self.prompt.setWordWrap(True)
         self.layout.addWidget(self.prompt)
@@ -1419,7 +1570,7 @@ class ConfirmScreen(Screen):
         Set the prompts and callback and return self.
 
         Args:
-            prompt (string): The prompt for the users. 
+            prompt (string): The prompt for the users.
             callback (function): The function to call when the user clicks "ok".
 
         Returns:

@@ -10,6 +10,7 @@ from tinydecred.accounts import Account
 from tinydecred.util import tinyjson, helpers
 from tinydecred.crypto.crypto import AddressSecpPubKey
 from tinydecred.pydecred import txscript
+from tinydecred.pydecred.stakepool import StakePool
 
 log = helpers.getLogger("DCRACCT")
 
@@ -192,7 +193,8 @@ class DecredAccount(Account):
         Args: 
             pool (stakepool.StakePool): The stake pool object.
         """
-        self.stakePools = [pool] + [p for p in self.stakePools if p.url != pool.url]
+        assert isinstance(pool, StakePool)
+        self.stakePools = [pool] + [p for p in self.stakePools if p.apiKey != pool.apiKey]
     def hasPool(self):
         """
         hasPool will return True if the wallet has at least one pool set.
@@ -349,7 +351,7 @@ class DecredAccount(Account):
                     requestedTxs += 1
                     self.addTxid(addr, txid)
             addrs = self.generateGapAddresses()
-        log.info("%d address transactions sets fetched" % requestedTxs)
+        log.debug("%d address transactions sets fetched" % requestedTxs)
 
         # start with a search for all known addresses
         addresses = self.allAddresses()

@@ -204,10 +204,10 @@ class Account(object):
         self.netID = netID
         self.net = None
         setNetwork(self)
-        # For external addresses, the cursor can sit on the last seen address, 
+        # For external addresses, the cursor can sit on the last seen address,
         # so start the lastSeen at the 0th external address. This is necessary
-        # because the currentAddress method grabs the address at the current 
-        # cursor position, rather than the next. 
+        # because the currentAddress method grabs the address at the current
+        # cursor position, rather than the next.
         self.lastSeenExt = 0
         # For internal addresses, the cursor can sit below zero, since the
         # addresses are always retrieved with with nextInternalAddress.
@@ -448,21 +448,19 @@ class Account(object):
         txids = self.txs[addr]
         if txid not in txids:
             txids.append(txid)
-        try:
+        # Advance the cursors as necessary.
+        if addr in self.externalAddresses:
             extIdx = self.externalAddresses.index(addr)
             if extIdx > self.lastSeenExt:
                 diff = extIdx - self.lastSeenExt
                 self.lastSeenExt = extIdx
                 self.cursorExt = max(0, self.cursorExt-diff)
-        except ValueError:
-            try:
-                intIdx = self.internalAddresses.index(addr)
-                if intIdx > self.lastSeenInt:
-                    diff = intIdx - self.lastSeenInt
-                    self.lastSeenInt = intIdx
-                    self.cursorInt = max(0, self.cursorInt-diff)
-            except ValueError:
-                raise Exception("attempting to add transaction %s for unknown address %s" % (txid, addr))
+        elif addr in self.internalAddresses:
+            intIdx = self.internalAddresses.index(addr)
+            if intIdx > self.lastSeenInt:
+                diff = intIdx - self.lastSeenInt
+                self.lastSeenInt = intIdx
+                self.cursorInt = max(0, self.cursorInt-diff)
     def confirmTx(self, tx, blockHeight):
         """
         Confirm a transaction. Sets height for any unconfirmed UTXOs in the
@@ -535,11 +533,11 @@ class Account(object):
         """
         extAddrs = self.externalAddresses
         addr = CrazyAddress
-        # Though unlikely, if an out or range key is generated, the account will 
+        # Though unlikely, if an out or range key is generated, the account will
         # generate an additional address
         while addr == CrazyAddress:
-            # gap policy is to wrap. Wrapping brings the cursor back to index 1, 
-            # since the index zero is the last seen address. 
+            # gap policy is to wrap. Wrapping brings the cursor back to index 1,
+            # since the index zero is the last seen address.
             self.cursorExt += 1
             if self.cursorExt > self.gapLimit:
                 self.cursorExt = 1
@@ -557,11 +555,11 @@ class Account(object):
         """
         intAddrs = self.internalAddresses
         addr = CrazyAddress
-        # Though unlikely, if an out or range key is generated, the account will 
+        # Though unlikely, if an out or range key is generated, the account will
         # generate an additional address
         while addr == CrazyAddress:
-            # gap policy is to wrap. Wrapping brings the cursor back to index 1, 
-            # since the index zero is the last seen address. 
+            # gap policy is to wrap. Wrapping brings the cursor back to index 1,
+            # since the index zero is the last seen address.
             self.cursorInt += 1
             if self.cursorInt > self.gapLimit:
                 self.cursorInt = 1
@@ -572,7 +570,7 @@ class Account(object):
         return addr
     def lastSeen(self, addrs):
         """
-        Find the index of the last seen address in the list of addresses. 
+        Find the index of the last seen address in the list of addresses.
         The last seen address is taken as the last address for which there is an
         entry in the self.txs dict.
 
@@ -630,7 +628,7 @@ class Account(object):
         return filterCrazyAddress(a)
     def unseenAddrs(self):
         return filterCrazyAddress(
-            [a for a in self.internalAddresses if a not in self.txs] + 
+            [a for a in self.internalAddresses if a not in self.txs] +
             [a for a in self.externalAddresses if a not in self.txs])
     def currentAddress(self):
         """
@@ -1191,7 +1189,7 @@ class TestAccounts(unittest.TestCase):
         account.gapLimit = gapLimit
         listsAreEqual = lambda a, b: len(a) == len(b) and all(x == y  for x,y in zip(a,b))
         self.assertTrue(listsAreEqual(account.internalAddresses, internalAddrs[:gapLimit]))
-        # The external branch starts with the "last seen" at the zeroth address, so 
+        # The external branch starts with the "last seen" at the zeroth address, so
         # has one additional address to start.
         self.assertTrue(listsAreEqual(account.externalAddresses, externalAddrs[:gapLimit+1]))
 
@@ -1200,7 +1198,7 @@ class TestAccounts(unittest.TestCase):
         self.assertEqual(len(newAddrs), 1)
         self.assertEqual(newAddrs[0], internalAddrs[5])
 
-        # The zeroth external address is considered "seen", so this should not 
+        # The zeroth external address is considered "seen", so this should not
         # change anything.
         account.addTxid(externalAddrs[0], "somerandomtxid")
         newAddrs = account.generateGapAddresses()
@@ -1212,7 +1210,7 @@ class TestAccounts(unittest.TestCase):
         self.assertEqual(len(newAddrs), 1)
         self.assertEqual(externalAddrs[1], account.currentAddress())
 
-        # cursor should be at index 0, last seen 1, max index 6, so calling 
+        # cursor should be at index 0, last seen 1, max index 6, so calling
         # nextExternalAddress 5 time should put the cursor at index 6, which is
         # the gap limit.
         for i in range(5):

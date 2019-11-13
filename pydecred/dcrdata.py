@@ -70,7 +70,7 @@ class DcrdataPath(object):
                 return uri
             if all([x in kwargs for x in argList]):
                 return template % tuple(kwargs[x] for x in argList)
-        raise DcrDataException("ArgumentError", "Supplied arguments, %r, do not match any of the know call signatures, %r." % 
+        raise DcrDataException("ArgumentError", "Supplied arguments, %r, do not match any of the know call signatures, %r." %
             (args if args else kwargs, [argList for argList, _ in self.callSigns]))
     def __getattr__(self, key):
         if key in self.subpaths:
@@ -91,7 +91,7 @@ def getSocketURIs(uri):
     ps = fmt.format(prot, uri.netloc, "ps")
     return ws, ps
 
-# To Do: Get the full list here. 
+# To Do: Get the full list here.
 InsightPaths = [
     "/tx/send",
     "/insight/api/addr/{address}/utxo",
@@ -109,7 +109,7 @@ class DcrdataClient(object):
 
     def __init__(self, baseURI, emitter=None):
         """
-        Build the DcrdataPath tree. 
+        Build the DcrdataPath tree.
         """
         self.baseURI = baseURI.rstrip('/').rstrip("/api")
         self.baseApi = self.baseURI + "/api"
@@ -167,7 +167,7 @@ class DcrdataClient(object):
         return [entry[1] for entry in self.listEntries]
     def endpointGuide(self):
         """
-        Print on endpoint per line. 
+        Print on endpoint per line.
         Each line shows a translation from Python notation to a URL.
         """
         print("\n".join(["%s  ->  %s" % entry for entry in self.listEntries]))
@@ -239,7 +239,7 @@ class WebsocketClient(object):
     def __init__(self, path, emitter=None, exitObject=None, decoder=None, encoder=None):
         """
         See python `socketserver documentation  <https://docs.python.org/3/library/socketserver.html/>`_. for inherited attributes and methods.
-        
+
         Parameters
         ----------
         path: string
@@ -308,7 +308,7 @@ class WebsocketClient(object):
                     except OSError as e:
                         if(e.errno == 9):
                             #OSError: [Errno 9] Bad file descriptor
-                            pass # socket was closed 
+                            pass # socket was closed
                         break
                     if stringBuffer == "": # server probably closed socket
                         break
@@ -324,11 +324,11 @@ class WebsocketClient(object):
         if self.exitObject:
             self.emitter(self.exitObject)
         self.handlinBidness = False
-    def send(self, msg): 
+    def send(self, msg):
         if not self.socket:
             log.error("no socket")
-            return          
-        try: 
+            return
+        try:
             self.socket.send(self.encoder(msg))
         except Exception as e:
             log.error("Error while sending websocket message: %s" % formatTraceback(e))
@@ -362,7 +362,7 @@ class APIBlock:
 tinyjson.register(APIBlock, tag="dcrdata.APIBlock")
 
 class TicketInfo:
-    def __init__(self, status, purchaseBlock, maturityHeight, expirationHeight, 
+    def __init__(self, status, purchaseBlock, maturityHeight, expirationHeight,
                  lotteryBlock, vote, revocation):
          self.status = status
          self.purchaseBlock = purchaseBlock
@@ -400,11 +400,11 @@ tinyjson.register(TicketInfo, tag="dcr.TicketInfo")
 
 class UTXO(object):
     """
-    The UTXO is part of the wallet API. BlockChains create and parse UTXO 
+    The UTXO is part of the wallet API. BlockChains create and parse UTXO
     objects and fill fields as required by the Wallet.
     """
-    def __init__(self, address, txid, vout, ts=None, scriptPubKey=None, 
-                 height=-1, amount=0, satoshis=0, maturity=None, 
+    def __init__(self, address, txid, vout, ts=None, scriptPubKey=None,
+                 height=-1, amount=0, satoshis=0, maturity=None,
                  scriptClass=None, tinfo=None):
         self.address = address
         self.txid = txid
@@ -519,8 +519,8 @@ def checkOutput(output, fee):
         fee (float): The transaction fee rate (/kB).
 
     Returns:
-        There is not return value. If an output is deemed invalid, an exception 
-        is raised. 
+        There is not return value. If an output is deemed invalid, an exception
+        is raised.
     """
     if output.value < 0:
         raise Exception("transaction output amount is negative")
@@ -535,7 +535,7 @@ def checkOutput(output, fee):
 def hashFromHex(s):
     """
     Parse a transaction hash or block hash from a hexadecimal string.
-    
+
     Args:
         s (str): A byte-revesed, hexadecimal string encoded hash.
 
@@ -567,7 +567,7 @@ class DcrdataBlockchain(object):
         """
         self.db = KeyValueDatabase(dbPath)
         self.params = params
-        # The blockReceiver and addressReceiver will be set when the respective 
+        # The blockReceiver and addressReceiver will be set when the respective
         # subscribe* method is called.
         self.blockReceiver = None
         self.addressReceiver = None
@@ -587,7 +587,7 @@ class DcrdataBlockchain(object):
         Connect to dcrdata.
         """
         self.dcrdata = DcrdataClient(
-            self.datapath, 
+            self.datapath,
             emitter=self.pubsubSignal,
         )
         self.updateTip()
@@ -602,7 +602,7 @@ class DcrdataBlockchain(object):
         Subscribe to new block notifications.
 
         Args:
-            receiver (func(obj)): A function or method that accepts the block 
+            receiver (func(obj)): A function or method that accepts the block
                 notifications.
         """
         self.blockReceiver = receiver
@@ -613,7 +613,7 @@ class DcrdataBlockchain(object):
 
         Args:
             addrs (list(str)): List of base-58 encoded addresses.
-            receiver (func(obj)): A function or method that accepts the address 
+            receiver (func(obj)): A function or method that accepts the address
                 notifications.
         """
         log.debug("subscribing to addresses %s" % repr(addrs))
@@ -624,11 +624,11 @@ class DcrdataBlockchain(object):
         self.dcrdata.subscribeAddresses(addrs)
     def processNewUTXO(self, utxo):
         """
-        Processes an as-received blockchain utxo. 
+        Processes an as-received blockchain utxo.
         Check for coinbase or stakebase, and assign a maturity as necessary.
-        
+
         Args:
-            utxo UTXO: A new unspent transaction output from blockchain. 
+            utxo UTXO: A new unspent transaction output from blockchain.
 
         Returns:
             bool: True if no errors are encountered.
@@ -639,7 +639,7 @@ class DcrdataBlockchain(object):
             # This is a coinbase or stakebase transaction. Set the maturity.
             utxo.maturity = utxo.height + self.params.CoinbaseMaturity
         if utxo.isTicket():
-            # Mempool tickets will be returned from the utxo endpoint, but 
+            # Mempool tickets will be returned from the utxo endpoint, but
             # the tinfo endpoint is an error until mined.
             try:
                 rawTinfo = self.dcrdata.tx.tinfo(utxo.txid)
@@ -649,7 +649,7 @@ class DcrdataBlockchain(object):
         return utxo
     def UTXOs(self, addrs):
         """
-        UTXOs will produce any known UTXOs for the list of addresses. 
+        UTXOs will produce any known UTXOs for the list of addresses.
 
         Args:
             addrs (list(str)): List of base-58 encoded addresses.
@@ -698,10 +698,10 @@ class DcrdataBlockchain(object):
 
     def tx(self, txid):
         """
-        Get the MsgTx. Retreive it from the blockchain if necessary. 
+        Get the MsgTx. Retreive it from the blockchain if necessary.
 
         Args:
-            txid (str): A hex encoded transaction ID to fetch. 
+            txid (str): A hex encoded transaction ID to fetch.
 
         Returns:
             MsgTx: The transaction.
@@ -712,7 +712,7 @@ class DcrdataBlockchain(object):
                 encoded = ByteArray(txDB[hashKey])
                 return msgtx.MsgTx.deserialize(encoded)
             except database.NoValue:
-                try:                            
+                try:
                     # Grab the hex encoded transaction
                     txHex = self.dcrdata.tx.hex(txid)
                     if not txHex:
@@ -739,8 +739,8 @@ class DcrdataBlockchain(object):
             except database.NoValue:
                 # If the blockhash is not in the database, get it from dcrdata
                 decodedTx = self.dcrdata.tx(txid)
-                if ("block" not in decodedTx or 
-                   "blockhash" not in decodedTx["block"] or 
+                if ("block" not in decodedTx or
+                   "blockhash" not in decodedTx["block"] or
                    decodedTx["block"]["blockhash"] == ""):
                     return None
                 hexHash = decodedTx["block"]["blockhash"]
@@ -749,10 +749,10 @@ class DcrdataBlockchain(object):
                 return header
     def decodedTx(self, txid):
         """
-        decodedTx will produce a transaction as a Python dict. 
+        decodedTx will produce a transaction as a Python dict.
 
         Args:
-            txid (str): Hex-encoded transaction ID. 
+            txid (str): Hex-encoded transaction ID.
 
         Returns:
             dict: A Python dict with transaction information.
@@ -765,7 +765,7 @@ class DcrdataBlockchain(object):
         Args:
             bHash (str): The block hash of the block header.
 
-        Returns: 
+        Returns:
             BlockHeader: An object which implements the BlockHeader API.
         """
         with self.headerDB as headers:
@@ -784,7 +784,7 @@ class DcrdataBlockchain(object):
     def blockHeaderByHeight(self, height):
         """
         Get the block header by height. The blcck header is retreived from the
-        blockchain if necessary, in which case it is stored. 
+        blockchain if necessary, in which case it is stored.
 
         Args:
             height int: The block height
@@ -815,7 +815,7 @@ class DcrdataBlockchain(object):
         return self.dcrdata.stake.diff()["next"]
     def updateTip(self):
         """
-        Update the tip block. If the wallet is subscribed to block updates, 
+        Update the tip block. If the wallet is subscribed to block updates,
         this can be used sparingly.
         """
         try:
@@ -826,7 +826,7 @@ class DcrdataBlockchain(object):
         raise Exception("no tip data retrieved")
     def relayFee(self):
         """
-        Return the current transaction fee. 
+        Return the current transaction fee.
 
         Returns:
             int: Atoms per kB of encoded transaction.
@@ -850,12 +850,12 @@ class DcrdataBlockchain(object):
         Args:
             value int: The amount to send, in atoms.
             address str: The base-58 encoded address.
-            keysource func(str) -> PrivateKey: A function that returns the 
+            keysource func(str) -> PrivateKey: A function that returns the
                 private key for an address.
-            utxosource func(int, func(UTXO) -> bool) -> list(UTXO): A function 
-                that takes an amount in atoms, and an optional filtering 
-                function. utxosource returns a list of UTXOs that sum to >= the 
-                amount. If the filtering function is provided, UTXOs for which 
+            utxosource func(int, func(UTXO) -> bool) -> list(UTXO): A function
+                that takes an amount in atoms, and an optional filtering
+                function. utxosource returns a list of UTXOs that sum to >= the
+                amount. If the filtering function is provided, UTXOs for which
                 the  function return a falsey value will not be included in the
                 returned UTXO list.
             MsgTx: The newly created transaction on success, `False` on failure.
@@ -927,8 +927,8 @@ class DcrdataBlockchain(object):
         if not tx:
             # No tx found is an issue, so pass the exception.
             tx = self.tx(utxo.txid)
-        try:           
-            # No block found is not an error. 
+        try:
+            # No block found is not an error.
             if not block:
                 block = self.blockForTx(utxo.txid)
             utxo.confirm(block, tx, self.params)
@@ -938,7 +938,7 @@ class DcrdataBlockchain(object):
         return False
     def sendOutputs(self, outputs, keysource, utxosource, feeRate=None): # , minconf=1, randomizeChangeIdx=True):
         """
-        Send the `TxOut`s to the address. 
+        Send the `TxOut`s to the address.
 
         mostly based on:
           (dcrwallet/wallet/txauthor).NewUnsignedTransaction
@@ -947,19 +947,19 @@ class DcrdataBlockchain(object):
 
         Args:
             outputs (list(TxOut)): The transaction outputs to send.
-            keysource func(str) -> PrivateKey: A function that returns the 
+            keysource func(str) -> PrivateKey: A function that returns the
                 private key for an address.
-            utxosource func(int, func(UTXO) -> bool) -> list(UTXO): A function 
-                that takes an amount in atoms, and an optional filtering 
-                function. utxosource returns a list of UTXOs that sum to >= the 
-                amount. If the filtering function is provided, UTXOs for which 
+            utxosource func(int, func(UTXO) -> bool) -> list(UTXO): A function
+                that takes an amount in atoms, and an optional filtering
+                function. utxosource returns a list of UTXOs that sum to >= the
+                amount. If the filtering function is provided, UTXOs for which
                 the  function return a falsey value will not be included in the
                 returned UTXO list.
 
         Returns:
             MsgTx: The sent transaction.
             list(UTXO): The spent UTXOs.
-            list(UTXO): Length 1 array containing the new change UTXO. 
+            list(UTXO): Length 1 array containing the new change UTXO.
         """
         total = 0
         inputs = []
@@ -991,8 +991,8 @@ class DcrdataBlockchain(object):
                 opCodeClass = txscript.getP2PKHOpCode(txout.pkScript)
                 tree = wire.TxTreeRegular if opCodeClass == txscript.opNonstake else wire.TxTreeStake
                 op = msgtx.OutPoint(
-                    txHash=tx.hash(), 
-                    idx=utxo.vout, 
+                    txHash=tx.hash(),
+                    idx=utxo.vout,
                     tree=tree
                 )
                 txIn = msgtx.TxIn(previousOutPoint=op, valueIn=txout.value)
@@ -1045,7 +1045,7 @@ class DcrdataBlockchain(object):
                 pkScript = scripts[i]
                 sigScript = txin.signatureScript
                 scriptClass, addrs, numAddrs = txscript.extractPkScriptAddrs(0, pkScript, self.params)
-                script = txscript.signTxOutput(self.params, newTx, i, pkScript, 
+                script = txscript.signTxOutput(self.params, newTx, i, pkScript,
                     txscript.SigHashAll, keysource, sigScript, crypto.STEcdsaSecp256k1)
                 txin.signatureScript = script
             self.broadcast(newTx.txHex())
@@ -1068,12 +1068,12 @@ class DcrdataBlockchain(object):
         purchaseTickets indicates to the wallet that a ticket should be purchased
         using all currently available funds.  The ticket address parameter in the
         request can be nil in which case the ticket address associated with the
-        wallet instance will be used.  Also, when the spend limit in the request 
-        is greater than or equal to 0, tickets that cost more than that limit 
+        wallet instance will be used.  Also, when the spend limit in the request
+        is greater than or equal to 0, tickets that cost more than that limit
         will return an error that not enough funds are available.
         """
         self.updateTip()
-        # account minConf is zero for regular outputs for now. Need to make that 
+        # account minConf is zero for regular outputs for now. Need to make that
         # adjustable.
         # if req.minConf < 0:
         #     raise Exception("negative minconf")
@@ -1107,7 +1107,7 @@ class DcrdataBlockchain(object):
            raise Exception("ticket price %f above spend limit %f" % (ticketPrice, req.spendLimit))
 
         # Check that pool fees is zero, which will result in invalid zero-valued
-        # outputs. 
+        # outputs.
         if req.poolFees == 0:
             raise Exception("no pool fee specified")
 
@@ -1123,7 +1123,7 @@ class DcrdataBlockchain(object):
         if not req.votingAddress:
             raise Exception("voting address not set in purchaseTickets request")
 
-        # decode the string addresses. This is the P2SH multi-sig script 
+        # decode the string addresses. This is the P2SH multi-sig script
         # address, not the wallets voting address, which is only one of the two
         # pubkeys included in the redeem P2SH script.
         votingAddress = txscript.decodeAddress(req.votingAddress, self.params)
@@ -1172,8 +1172,6 @@ class DcrdataBlockchain(object):
         # immediately be consumed as tickets.
         splitTxAddr = keysource.internal()
 
-        print("splitTxAddr: %s" % splitTxAddr)
-
         # TODO: Don't reuse addresses
         # TODO: Consider wrapping. see dcrwallet implementation.
         splitPkScript = txscript.makePayToAddrScript(splitTxAddr, self.params)
@@ -1190,7 +1188,7 @@ class DcrdataBlockchain(object):
             userAmt = neededPerTicket - poolFeeAmt
             poolAmt = poolFeeAmt
 
-            # Pool amount.            
+            # Pool amount.
             splitOuts.append(msgtx.TxOut(
                 value =    poolAmt,
                 pkScript = splitPkScript,
@@ -1272,12 +1270,12 @@ class DcrdataBlockchain(object):
 
             txscript.signP2PKHMsgTx(ticket, forSigning, keysource, self.params)
 
-            # dcrwallet actually runs the pk scripts through the script 
-            # Engine as another validation step. Engine not implemented in 
+            # dcrwallet actually runs the pk scripts through the script
+            # Engine as another validation step. Engine not implemented in
             # Python yet.
             # validateMsgTx(op, ticket, creditScripts(forSigning))
 
-            # For now, don't allow any high fees (> 1000x default). Could later 
+            # For now, don't allow any high fees (> 1000x default). Could later
             # be a property of the account.
             if txscript.paysHighFees(eop.amt, ticket):
                 raise Exception("high fees detected")
