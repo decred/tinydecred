@@ -38,7 +38,7 @@ def setNetwork(acct):
     If the network does not match the loaded configuration network(s), raises an
     exception.
 
-    Arg:
+    Args:
         acct (Account): An account with a properly set coinID and netID.
     """
     # Set testnet to DCR for now. If more coins are added, a better solution
@@ -114,7 +114,7 @@ def coinTypes(params):
     parameters. At the moment, the parameters have not been upgraded for the new
     coin types.
 
-    Arg:
+    Args:
         params (obj): Network parameters.
 
     Returns
@@ -137,7 +137,7 @@ def checkBranchKeys(acctKey):
 
     The branch is 0 for external addresses and 1 for internal addresses.
 
-    Arg:
+    Args:
         acctKey (crypto.ExtendedKey): An account's extended key.
     """
     # Derive the external branch as the first child of the account key.
@@ -257,7 +257,7 @@ class Account(object):
         """
         Get the list of known txid for the provided address.
 
-        Arg:
+        Args:
             addr (str): Base-58 encoded address.
 
         Returns:
@@ -270,7 +270,7 @@ class Account(object):
         """
         Get the known unspent transaction outputs for an address.
 
-        Arg:
+        Args:
             addr (str): Base-58 encoded address.
 
         Returns:
@@ -291,7 +291,7 @@ class Account(object):
         """
         Add a UTXO.
 
-        Arg:
+        Args:
             utxo (UTXO): The UTXO to add.
         """
         self.utxos[utxo.key()] = utxo
@@ -313,7 +313,7 @@ class Account(object):
         Indicates whether the account has any UTXOs with this transaction ID, or
         has this transaction in mempool.
 
-        Arg:
+        Args:
             txid (str): The hex-encoded transaction ID.
 
         Returns:
@@ -324,7 +324,7 @@ class Account(object):
         """
         Search watched transaction ids for txid.
 
-        Arg:
+        Args:
             txid (str): The hex-encoded transaction ID.
 
         Returns:
@@ -338,7 +338,7 @@ class Account(object):
         """
         Get any UTXOs with the provided transaction ID.
 
-        Arg:
+        Args:
             txid (str): The hex-encoded transaction ID.
 
         Returns:
@@ -349,48 +349,48 @@ class Account(object):
         """
         Spend the UTXOs.
 
-        Arg:
+        Args:
             utxos list(UTXO): The UTXOs to spend.
         """
         for utxo in utxos:
             self.spendUTXO(utxo)
     def spendUTXO(self, utxo):
         """
-        Spend the UTXO.
+        Spend the UTXO. The UTXO is removed from the watched list and returned.
 
-        Arg:
+        Args:
             utxo (UTXO): The UTXO to spend.
 
         Returns:
-            list(UTXO): All UTXO minus the spent UTXO.
+            UTXO: The spent UTXO.
         """
         return self.utxos.pop(utxo.key(), None)
     def resolveUTXOs(self, blockchainUTXOs):
         """
         Populate self.utxos from blockchainUTXOs.
 
-        Arg:
+        Args:
             blockchainUTXOs dict(UTXO): dictionary of UTXOs to set self.utxos
                 to.
         """
         self.utxos = {u.key(): u for u in blockchainUTXOs}
     def spendTxidVout(self, txid, vout):
         """
-        Spend the UTXO.
+        Spend the UTXO. The UTXO is removed from the watched list and returned.
 
         Args:
             txid (str): The hex-encoded transaction ID.
             vout (int): The transaction output index.
 
         Returns:
-            list(UTXO): All UTXO minus the spent vout.
+            UTXO: The spent UTXO.
         """
         return self.utxos.pop(UTXO.makeKey(txid, vout), None)
     def addMempoolTx(self, tx):
         """
         Add a Transaction-implementing object to the mempool.
 
-        Arg:
+        Args:
             tx (Transaction): An object that implements the Transaction API
                 from tinydecred.api.
         """
@@ -432,7 +432,7 @@ class Account(object):
         Calculate the balance. The current height must be provided to separate
         UTXOs which are not mature.
 
-        Arg:
+        Args:
             tipHeight (int): The current best block height.
 
         Returns:
@@ -483,7 +483,7 @@ class Account(object):
         Generate addresses up to gap addresses after the cursor. Do not move the
         cursor.
 
-        Arg:
+        Args:
             gap (int): Number of addresses to generate past the current cursor.
         """
         if self.extPub is None:
@@ -550,7 +550,7 @@ class Account(object):
         Decode the private extended key for the account using the provided
         SecretKey.
 
-        Arg:
+        Args:
             pw (SecretKey): The secret key.
 
         Returns:
@@ -562,7 +562,7 @@ class Account(object):
         Decode the public extended key for the account using the provided
         SecretKey.
 
-        Arg:
+        Args:
             pw (SecretKey): The secret key.
 
         Returns:
@@ -963,6 +963,9 @@ def addressForPubkeyBytes(b, net):
     Args:
         b (bytes): Public key bytes.
         net (obj): Network the address will be used on.
+
+    Returns:
+        crypto.Address: A pubkey-hash address.
     '''
     return crypto.newAddressPubKeyHash(crypto.hash160(b), net, crypto.STEcdsaSecp256k1).string()
 
