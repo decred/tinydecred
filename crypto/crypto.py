@@ -107,7 +107,7 @@ def hash160(b):
     """
     A RIPEMD160 hash of the blake256 hash of the input.
 
-    Arg:
+    Args:
         b (byte-like): The bytes to hash.
 
     Returns:
@@ -121,7 +121,7 @@ def checksum(input):
     """
     A checksum.
 
-    Arg:
+    Args:
         input (byte-like): Bytes to obtain a checksum for.
 
     Returns:
@@ -133,7 +133,7 @@ def sha256ChecksumByte(input):
     """
     This checksum byte is used for the PGP-based mnemonic seed checksum word.
 
-    Arg:
+    Args:
         input (byte-like): Bytes to obtain a checksum for.
 
     Returns:
@@ -196,7 +196,7 @@ def hashH(b):
     """
     The BLAKE256 hash as a ByteArray.
 
-    Arg:
+    Args:
         b (byte-like): The thing to hash.
 
     Returns:
@@ -209,7 +209,7 @@ def privKeyFromBytes(pk):
     PrivKeyFromBytes creates a PrivateKey for the secp256k1 curve based on
     the provided byte-encoding.
 
-    Arg:
+    Args:
         pk (ByteArray): The private key bytes.
 
     Returns:
@@ -223,7 +223,7 @@ def b58CheckDecode(s):
     Decode the base-58 encoded address, parsing the version bytes and the pubkey
     hash. An exception is raised if the checksum is invalid or missing.
 
-    Arg:
+    Args:
         s (str): The base-58 encoded address.
 
     Returns:
@@ -494,7 +494,7 @@ class ExtendedKey:
         In particular this is the hierarchical deterministic extended key path:
           m/44'/<coin type>'/<account>'
 
-        Arg:
+        Args:
             account (int): Account number.
 
         Returns:
@@ -584,7 +584,7 @@ class ExtendedKey:
             net (obj): Network parameters.
 
         Returns:
-            str: Child address.
+            Address: Child address.
         """
         child = self.child(i)
         return newAddressPubKeyHash(hash160(child.publicKey().serializeCompressed().b), net, STEcdsaSecp256k1).string()
@@ -764,7 +764,7 @@ class SecretKey(object):
     """
     def __init__(self, pw):
         """
-        Arg:
+        Args:
             pw (byte-like): A password that deterministically generates the key.
         """
         super().__init__()
@@ -787,7 +787,7 @@ class SecretKey(object):
         """
         Encrypt the input using the key.
 
-        Arg:
+        Args:
             thing (byte-like): The thing to encrypt.
 
         Returns:
@@ -798,11 +798,11 @@ class SecretKey(object):
         """
         Decrypt the input using the key.
 
-        Arg:
+        Args:
             thing (byte-like): The thing to decrypt.
 
         Returns:
-            ByteArray: The thing, dencrypted.
+            ByteArray: The thing, decrypted.
         """
         return self.key.decrypt(thing)
     @staticmethod
@@ -811,7 +811,7 @@ class SecretKey(object):
         Regenerate a key using its origin key parameters, as returned by
         `params`.
 
-        Arg:
+        Args:
             kp (KDFParams): The key parameters from the original generation
                 of the key being regenerated.
 
