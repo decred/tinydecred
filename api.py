@@ -49,7 +49,7 @@ class UTXO:
         """
         Determine whether this UTXO is currently spendable.
 
-        Arg:
+        Args:
             tipHeight (int): The height of the best block.
         """
         raise Unimplemented("isSpendable not implemented")
@@ -97,7 +97,7 @@ class Blockchain:
         """
         Subscribe to new block notifications.
 
-        Arg:
+        Args:
             receiver (func(obj)): A function or method that accepts the block
                 notifications.
         """
@@ -116,7 +116,7 @@ class Blockchain:
         """
         UTXOs will produce any known UTXOs for the list of addresses.
 
-        Arg:
+        Args:
             addrs (list(str)): List of base-58 encoded addresses.
         """
         raise Unimplemented("UTXOs not implemented")
@@ -125,7 +125,7 @@ class Blockchain:
         tx will produce a transaction object which implements the Transaction
         API.
 
-        Arg:
+        Args:
             txid (str): Hex-encoded transaction ID.
 
         Returns:
@@ -137,7 +137,7 @@ class Blockchain:
         """
         blockHeader will produce a blockHeader implements the BlockHeader API.
 
-        Arg:
+        Args:
             bHash (str): The block hash of the block header.
 
         Returns:
@@ -148,7 +148,7 @@ class Blockchain:
         """
         The blockHeader for the best block at the provided height.
 
-        Arg:
+        Args:
             height (int): The height of the block header.
 
         Returns:
@@ -191,7 +191,7 @@ class BlockHeader:
         """
         De-serialize the bytes into a BlockHeader.
 
-        Arg:
+        Args:
             b (ByteArray): A serialized block header.
         """
         raise Unimplemented("deserialize not implemented")
@@ -228,7 +228,7 @@ class Transaction:
     def __eq__(self, tx):
         """
         Check equality of this transaction with another.
-        Arg:
+        Args:
             tx (Transaction): Another object, presumably of the same class.
         """
         raise Unimplemented("__eq__ not implemented")
@@ -262,7 +262,7 @@ class Transaction:
         Create a Transaction-implementing object from a serialized transaction,
         such as that produced by serialize.
 
-        Arg:
+        Args:
             b (ByteArray): The serialized transaction.
         """
         raise Unimplemented("deserialize not implemented")
@@ -297,7 +297,7 @@ class Signals:
         """
         A receiver for balance updates.
 
-        Arg:
+        Args:
             balance (Balance): The updated balance.
         """
         raise Unimplemented("Signals not implemented")
@@ -357,7 +357,7 @@ class KeySource:
         """
         Retreive the private key for a base-58 encoded address.
 
-        Arg:
+        Args:
             addr (str): An address.
 
         Returns:
