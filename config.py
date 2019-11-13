@@ -47,7 +47,7 @@ def tinyNetConfig(netName):
         netName (str): Network name. `mainnet`, `simnet`, etc.
 
     Returns:
-        JSON: The network parameters.
+        dict: The network parameters.
     """
     if netName == MAINNET:
         return MainnetConfig
