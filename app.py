@@ -38,8 +38,8 @@ def tryExecute(f, *a, **k):
 
     Args:
         f (func): The function.
-        *a (value tuple): Optional positional arguments.
-        **k (kw tuple): Optional keyword arguments.
+        *a (tuple): Optional positional arguments.
+        **k (dict): Optional keyword arguments.
 
     Returns:
         value or bool: `False` on failure, the function's return value on
@@ -155,7 +155,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
             self.appWindow.stack(initScreen)
 
         # Connect to dcrdata in a QThread.
-        self.makeThread(self.initDCR, self.setDCR)
+        self.makeThread(self.initDCR, self._setDCR)
     def waiting(self):
         """
         Stack the waiting screen.
@@ -169,8 +169,8 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         Args:
             f (func): A function to run in a separate thread.
             cb (func): A callback to receive the return values from f.
-            *args (value tuple): Positional arguments passed to f.
-            **kwargs (kw tuple): Keyword arguments passed directly to f.
+            *args (tuple): Positional arguments passed to f.
+            **kwargs (dict): Keyword arguments passed directly to f.
         """
         cb = cb if cb else lambda *a, **k: None
         self.waiting()
@@ -199,10 +199,10 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         Args:
             f (func): A function that will receive the user's password
                 and any other provided arguments.
-            *args (value tuple): Positional arguments passed to f. The position
+            *args (tuple): Positional arguments passed to f. The position
                 of the args will be shifted by 1 position with the user's
                 password inserted at position 0.
-            **kwargs (kw tuple): Keyword arguments passed directly to f.
+            **kwargs (dict): Keyword arguments passed directly to f.
         """
         self.appWindow.stack(self.pwDialog.withCallback(f, *args, **kwargs))
     def walletFilename(self):
@@ -258,7 +258,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         Get the setting using recursive keys.
 
         Args:
-            *keys (value tuple): Key strings.
+            *keys (tuple): Key strings.
 
         Returns:
             mixed: Value of setting for *keys.
@@ -269,7 +269,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         Get the network-specific setting using recursive keys.
 
         Args:
-            *keys (value tuple): Key strings.
+            *keys (tuple): Key strings.
 
         Returns:
             mixed: Value of network setting for *keys.
@@ -296,8 +296,8 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
             sig (str): A notification identifier registered with the
                 signalRegistry.
             cb (func): Consumer defined callback.
-            *a (value tuple): Positional arguments passed to cb.
-            **k (kw tuple): Keyword arguments passed directly to cb.
+            *a (tuple): Positional arguments passed to cb.
+            **k (dict): Keyword arguments passed directly to cb.
         """
         if sig not in self.signalRegistry:
             self.signalRegistry[sig] = []
@@ -310,8 +310,8 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         Args:
             sig (str): A notification identifier registered with the
                 signalRegistry.
-            *sigA (value tuple): Positional arguments passed to cb.
-            **sigK (kw tuple): Keyword arguments passed directly to cb.
+            *sigA (tuple): Positional arguments passed to cb.
+            **sigK (dict): Keyword arguments passed directly to cb.
         """
         sr = self.signalRegistry
         if sig not in sr:
@@ -339,7 +339,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         Set the current wallet.
 
         Args:
-            wallet (Wallet obj): The wallet to use.
+            wallet (Wallet): The wallet to use.
         """
         self.wallet = wallet
         self.emitSignal(ui.BALANCE_SIGNAL, wallet.balance())
@@ -355,8 +355,8 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
             f (func(Wallet, ...)): A function to run with the wallet open. The
                 first argument provided to f will be the open wallet.
             cb (func): A callback to receive the return value from f.
-            *a (optional value tuple): Additional arguments to provide to f.
-            **k (optional kw tuple): Additional keyword arguments to provide to
+            *a (optional tuple): Additional arguments to provide to f.
+            **k (optional dict): Additional keyword arguments to provide to
                 f.
         """
         # step 1 receives the user password.
@@ -393,7 +393,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
     def doneSyncing(self, res):
         """
         The wallet sync is complete. Close and lock the wallet. Any arguments
-            are ignored.
+        are ignored.
         """
         self.emitSignal(ui.DONE_SIGNAL)
         self.wallet.unlock()
@@ -420,10 +420,9 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         except Exception as e:
             log.error("unable to initialize dcrdata connection at %s: %s" % (self.dcrdata.baseURI, formatTraceback(e)))
             return None
-    def setDCR(self, res):
+    def _setDCR(self, res):
         """
-        Callback to receive return value from initDCR. Any arguments are
-        ignored.
+        Callback to receive return value from initDCR.
         """
         if not res:
             self.appWindow.showError("No dcrdata connection available.")
