@@ -134,7 +134,7 @@ class DecredAccount(Account):
         to hook into the sync to authorize the stake pool.
 
         Args:
-            blockchainUTXOs (list(obj)): A list of Python objects decoded from
+            blockchainUTXOs (list(object)): A list of Python objects decoded from
                 dcrdata's JSON response from ...addr/utxo endpoint.
         """
         super().resolveUTXOs(blockchainUTXOs)
@@ -195,6 +195,14 @@ class DecredAccount(Account):
         """
         assert isinstance(pool, StakePool)
         self.stakePools = [pool] + [p for p in self.stakePools if p.apiKey != pool.apiKey]
+        bc = self.blockchain
+        addr = pool.purchaseInfo.ticketAddress
+        for txid in bc.txsForAddr(addr):
+            self.addTxid(addr, txid)
+        for utxo in bc.UTXOs([addr]):
+            self.addUTXO(utxo)
+        self.updateStakeStats()
+        self.signals.balance(self.calcBalance(self.blockchain.tip["height"]))
     def hasPool(self):
         """
         hasPool will return True if the wallet has at least one pool set.
@@ -307,7 +315,7 @@ class DecredAccount(Account):
         req = TicketRequest(
             minConf = 0,
             expiry = 0,
-            spendLimit = int(price*qty*1.1*1e8), # convert to atoms here
+            spendLimit = int(round(price*qty*1.1*1e8)), # convert to atoms here
             poolAddress = pi.poolAddress,
             votingAddress = pi.ticketAddress,
             ticketFee = 0, # use network default
@@ -376,6 +384,7 @@ class DecredAccount(Account):
             blockchain.subscribeAddresses(watchAddresses)
         # Signal the new balance.
         signals.balance(self.calcBalance(self.blockchain.tip["height"]))
+
         return True
 
-tinyjson.register(DecredAccount)
+tinyjson.register(DecredAccount, "DecredAccount")

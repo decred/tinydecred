@@ -44,7 +44,7 @@ def pixmapFromSvg(filename, w, h):
 
 class TinyDialog(QtWidgets.QFrame):
     """
-    TinyDialog is a widget for handling Screen instances. This si the primary
+    TinyDialog is a widget for handling Screen instances. This is the primary
     window of the TinyDecred application. It has a fixed (tiny!) size.
     """
     maxWidth = 525
@@ -130,7 +130,7 @@ class TinyDialog(QtWidgets.QFrame):
         self.msg = None
         self.borderPen = QtGui.QPen()
         self.borderPen.setWidth(1)
-        self.mainFont = QtGui.QFont("Roboto")
+        self.msgFont = QtGui.QFont("Roboto", 11)
         self.errorBrush = QtGui.QBrush(QtGui.QColor("#fff1f1"))
         self.successBrush = QtGui.QBrush(QtGui.QColor("#f1fff1"))
         self.bgBrush = self.successBrush
@@ -269,10 +269,10 @@ class TinyDialog(QtWidgets.QFrame):
         if self.msg:
             painter = QtGui.QPainter(self)
             painter.setPen(self.borderPen)
-            painter.setFont(self.mainFont)
+            painter.setFont(self.msgFont)
             # painter.setBrush(self.bgBrush)
 
-            pad = 15
+            pad = 5
             fullWidth = self.geometry().width()
 
             column = QtCore.QRect(0, 0, fullWidth - 4*pad, 10000)
@@ -457,6 +457,9 @@ class HomeScreen(Screen):
         spend.clicked.connect(self.spendClicked)
         optsLyt.addWidget(spend, 0, 0, Q.ALIGN_LEFT)
 
+        self.spinner = Spinner(self.app, 35)
+        optsLyt.addWidget(self.spinner, 0, 1, Q.ALIGN_RIGHT)
+
         # Open staking window. Button is initally hidden until sync is complete.
         self.stakeBttn = btn = app.getButton(SMALL, "Staking")
         btn.setVisible(False)
@@ -520,6 +523,7 @@ class HomeScreen(Screen):
         balance = self.balance
         stats = acct.ticketStats()
         if stats and balance and balance.total > 0:
+            self.spinner.setVisible(False)
             self.stakeBttn.setVisible(True)
             self.statsLbl.setText("%s%% staked" % helpers.formatNumber(stats.value/balance.total*100))
             self.ticketStats = stats
@@ -701,6 +705,8 @@ class InitializationScreen(Screen):
         else:
             def create():
                 try:
+                    app.dcrdata.connect()
+                    app.emitSignal(ui.BLOCKCHAIN_CONNECTED)
                     words, wallet = Wallet.create(app.walletFilename(), pw, cfg.net)
                     wallet.open(0, pw, app.dcrdata, app.blockchainSignals)
                     return words, wallet
@@ -751,7 +757,10 @@ class InitializationScreen(Screen):
                 else:
                     try:
                         appWalletPath = app.walletFilename()
+                        app.dcrdata.connect()
+                        app.emitSignal(ui.BLOCKCHAIN_CONNECTED)
                         wallet = Wallet.openFile(userPath, pw)
+                        wallet.open(0, pw, app.dcrdata, app.blockchainSignals)
                         # Save the wallet to the standard location.
                         wallet.path = appWalletPath
                         wallet.save()
@@ -773,7 +782,7 @@ def sendToAddress(wallet, val, addr):
     Send the value in DCR to the provided address.
     """
     try:
-        return wallet.sendToAddress(round(val*1e8), addr) # raw transaction
+        return wallet.sendToAddress(int(round(val*1e8)), addr) # raw transaction
     except Exception as e:
         log.error("failed to send: %s" % formatTraceback(e))
     return False
@@ -962,6 +971,8 @@ class MnemonicRestorer(Screen):
                 if pw:
                     def create():
                         try:
+                            app.dcrdata.connect()
+                            app.emitSignal(ui.BLOCKCHAIN_CONNECTED)
                             wallet = Wallet.createFromMnemonic(words, app.walletFilename(), pw, cfg.net)
                             wallet.open(0, pw, app.dcrdata, app.blockchainSignals)
                             return wallet
@@ -1247,8 +1258,13 @@ class PoolScreen(Screen):
         # Display info for a randomly chosen pool (with some filtering), and a
         # couple of links to aid in selecting a VSP..
         self.poolUrl = Q.makeLabel("", 16, a=l, fontFamily="Roboto-Medium")
-        self.poolUrl.setOpenExternalLinks(True)
-        self.poolUrl.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse);
+        self.poolUrl.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        Q.addClickHandler(self.poolUrl, self.poolClicked)
+        self.poolLink = Q.makeLabel("visit", 14, a=l)
+        self.poolLink.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+        Q.addHoverColor(self.poolLink, "#f3f9ff")
+        Q.addClickHandler(self.poolLink, self.linkClicked)
+
         scoreLbl = Q.makeLabel("score:", 14)
         self.score = Q.makeLabel("", 14)
         feeLbl = Q.makeLabel("fee:", 14)
@@ -1256,6 +1272,7 @@ class PoolScreen(Screen):
         usersLbl = Q.makeLabel("users:", 14)
         self.users = Q.makeLabel("", 14)
         stats, _ = Q.makeSeries( Q.HORIZONTAL,
+            self.poolLink, Q.STRETCH,
             scoreLbl, self.score, Q.STRETCH,
             feeLbl, self.fee, Q.STRETCH,
             usersLbl, self.users
@@ -1265,8 +1282,6 @@ class PoolScreen(Screen):
         lyt.setSpacing(10)
         Q.addDropShadow(poolWgt)
         Q.addHoverColor(poolWgt, "#f5ffff")
-        poolWgt.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
-        poolWgt.mouseReleaseEvent = self.poolClicked
         self.layout.addWidget(poolWgt)
 
         # A button to select a different pool and a link to the master list on
@@ -1303,9 +1318,7 @@ class PoolScreen(Screen):
         self.pools = pools
         tNow = int(time.time())
         # only save pools updated within the last day
-        self.pools = [p for p in pools if tNow - p["LastUpdated"] < 86400]
-        # sort by performance
-        self.pools.sort(key=self.scorePool, reverse=True)
+        self.pools = [p for p in pools if tNow - p["LastUpdated"] < 86400 and self.scorePool(p) > 95]
         self.randomizePool()
 
     def randomizePool(self, e=None):
@@ -1314,8 +1327,10 @@ class PoolScreen(Screen):
         is based purely on voting record, e.g. voted/(voted+missed). The sorting
         and some initial filtering was already performed in setPools.
         """
-        count = len(self.pools)//2+1
-        pools = self.pools[:count]
+        pools = self.pools
+        count = len(pools)
+        if count == 0:
+            log.warn("no stake pools returned from server")
         lastIdx = self.poolIdx
         if count == 1:
             self.poolIdx = 0
@@ -1354,55 +1369,37 @@ class PoolScreen(Screen):
             err("empty API key")
             return
         pool = StakePool(url, apiKey)
-        def votingAddr(wallet):
+        def registerPool(wallet):
             try:
                 addr = wallet.openAccount.votingAddress()
+                pool.authorize(addr, cfg.net)
+                app.appWindow.showSuccess("pool authorized")
                 wallet.openAccount.setPool(pool)
                 wallet.save()
-                return pool, addr, wallet.openAccount.net
+                return True
             except Exception as e:
-                log.error("error getting voting address: %s" % e)
-                err("failed to get voting address")
-                return None
-        app.withUnlockedWallet(votingAddr, self.continueAuth)
-    def continueAuth(self, res):
-        """
-        Follows authPool in the pool authorization process. Send the wallet
-        voting address to the pool and authorize the response.
-        """
-        if not res:
-            self.callback(False)
-            return
-        pool, addr, net = res
-        app = self.app
-        def setAddr():
-            try:
-                pool.authorize(addr, net)
-                app.appWindow.showSuccess("pool authorized")
-                self.callback(True)
-            except Exception as e:
-                # log.error("failed to set pool address: %s" % e)
-                # self.app.appWindow.showError("failed to set address")
-                # might be okay.
-                log.error("failed to authorize stake pool: %s" % e)
-                app.appWindow.showError("pool authorization failed")
-            self.callback(False)
-
-        self.app.waitThread(setAddr, None)
+                err("pool authorization failed")
+                log.error("pool registration error: %s" % formatTraceback(e))
+                return False
+        app.withUnlockedWallet(registerPool, self.callback)
     def showAll(self, e=None):
         """
-        Connected to the "see all" button clicked signal. Open the full
+        Connected to the "see all" button clicked signal. Open the fu
         decred.org VSP list in the browser.
         """
         QtGui.QDesktopServices.openUrl(QtCore.QUrl("https://decred.org/vsp/"))
-    def poolClicked(self, e=None):
+    def linkClicked(self):
         """
-        Callback from the clicked signal on the try-this-pool widget. Opens the
-        pools homepage in the users browser.
+        Callback from the clicked signal on the pool URL QLabel. Opens the
+        pool's homepage in the users browser.
         """
-        url = self.poolUrl.text()
-        self.poolIp.setText(url)
-        QtGui.QDesktopServices.openUrl(QtCore.QUrl(url))
+        QtGui.QDesktopServices.openUrl(QtCore.QUrl(self.poolUrl.text()))
+    def poolClicked(self):
+        """
+        Callback from the clicked signal on the try-this-pool widget. Sets the
+        url in the QLineEdit.
+        """
+        self.poolIp.setText(self.poolUrl.text())
 
 class PoolAccountScreen(Screen):
     """
@@ -1643,7 +1640,7 @@ class Spinner(QtWidgets.QLabel):
 
 def getTicketPrice(blockchain):
     try:
-        return blockchain.stakeDiff()
+        return blockchain.stakeDiff()/1e8
     except Exception as e:
         log.error("error fetching ticket price: %s" % e)
         return False

@@ -108,8 +108,10 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         self.loadSettings()
 
         # The initialized DcrdataBlockchain will not be connected, as that is a
-        # blocking operation. Connect will be called in a QThread in `initDCR`.
+        # blocking operation. It will be called when the wallet is open.
         self.dcrdata = DcrdataBlockchain(os.path.join(self.netDirectory(), "dcr.db"), cfg.net, self.getNetSetting("dcrdata"), skipConnect=True)
+
+        self.registerSignal(ui.WALLET_CONNECTED, self.syncWallet)
 
         # appWindow is the main application window. The TinyDialog class has
         # methods for organizing a stack of Screen widgets.
@@ -135,29 +137,18 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         # If there is a wallet file, prompt for a password to open the wallet.
         # Otherwise, show the initialization screen.
         if os.path.isfile(self.walletFilename()):
-            def openw(path, pw):
-                try:
-                    w = Wallet.openFile(path, pw)
-                    w.open(0, pw, self.dcrdata, self.blockchainSignals)
-                    self.appWindow.pop(self.pwDialog)
-                    return w
-                except Exception as e:
-                    log.warning("exception encountered while attempting to open wallet: %s" % formatTraceback(e))
-                    self.appWindow.showError("incorrect password")
             def login(pw):
                 if pw is None or pw == "":
                     self.appWindow.showError("you must enter a password to continue")
                 else:
                     path = self.walletFilename()
-                    self.waitThread(openw, self.finishOpen, path, pw)
+                    self.waitThread(self.openWallet, None, path, pw)
             self.getPassword(login)
         else:
             initScreen = screens.InitializationScreen(self)
             initScreen.setFadeIn(True)
             self.appWindow.stack(initScreen)
 
-        # Connect to dcrdata in a QThread.
-        self.makeThread(self.initDCR, self._setDCR)
     def waiting(self):
         """
         Stack the waiting screen.
@@ -180,7 +171,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
             self.appWindow.pop(self.waitingScreen)
             cb(*cba, **cbk)
         self.makeThread(tryExecute, unwaiting, f, *a, **k)
-    def finishOpen(self, wallet):
+    def openWallet(self, path, pw):
         """
         Callback for the initial wallet load. If the load failed, probably
         because of a bad password, the provided wallet will be None.
@@ -188,10 +179,17 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         Args:
             wallet (Wallet): The newly opened Wallet instance.
         """
-        if wallet == None:
-            return
-        self.setWallet(wallet)
-        self.home()
+        try:
+            self.dcrdata.connect()
+            self.emitSignal(ui.BLOCKCHAIN_CONNECTED)
+            w = Wallet.openFile(path, pw)
+            w.open(0, pw, self.dcrdata, self.blockchainSignals)
+            self.appWindow.pop(self.pwDialog)
+            self.setWallet(w)
+            self.home()
+        except Exception as e:
+            log.warning("exception encountered while attempting to open wallet: %s" % formatTraceback(e))
+            self.appWindow.showError("incorrect password")
     def getPassword(self, f, *args, **kwargs):
         """
         Calls the provided function with a user-provided password string as its
@@ -345,7 +343,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         """
         self.wallet = wallet
         self.emitSignal(ui.BALANCE_SIGNAL, wallet.balance())
-        self.tryInitSync()
+        self.emitSignal(ui.WALLET_CONNECTED)
     def withUnlockedWallet(self, f, cb, *a, **k):
         """
         Run the provided function with the wallet open. This is the preferred
@@ -388,12 +386,12 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         Call the callback function only if the user confirms the prompt.
         """
         self.appWindow.stack(self.confirmScreen.withPurpose(msg, cb))
-    def tryInitSync(self):
+    def syncWallet(self):
         """
         If conditions are right, start syncing the wallet.
         """
         wallet = self.wallet
-        if wallet and wallet.openAccount and self.dcrdata:
+        if wallet and wallet.openAccount:
             wallet.lock()
             self.emitSignal(ui.WORKING_SIGNAL)
             self.makeThread(wallet.sync, self.doneSyncing)
@@ -414,28 +412,6 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
             balance (Balance): The balance to pass to subscribed receivers.
         """
         self.emitSignal(ui.BALANCE_SIGNAL, balance)
-    def initDCR(self):
-        """
-        Connect to dcrdata.
-
-        Returns:
-            bool: True on success. On exception, returns None.
-        """
-        try:
-            self.dcrdata.connect()
-            return True
-        except Exception as e:
-            log.error("unable to initialize dcrdata connection at %s: %s" % (self.dcrdata.baseURI, formatTraceback(e)))
-            return None
-    def _setDCR(self, res):
-        """
-        Callback to receive return value from initDCR.
-        """
-        if not res:
-            self.appWindow.showError("No dcrdata connection available.")
-            return
-        self.emitSignal(ui.BLOCKCHAIN_CONNECTED)
-        self.tryInitSync()
     def getButton(self, size, text, tracked=True):
         """
         Get a button of the requested size.

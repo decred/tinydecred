@@ -80,7 +80,7 @@ def newMaster(seed, network):
 
     Args:
         seed (bytes-like): A random seed from which the extended key is made.
-        network (obj): an object with BIP32 hierarchical deterministic extended
+        network (object): an object with BIP32 hierarchical deterministic extended
             key magics as attributes `HDPrivateKeyID` and `HDPublicKeyID`.
 
     Returns:
@@ -126,7 +126,7 @@ def coinTypes(params):
     coin types.
 
     Args:
-        params (obj): Network parameters.
+        params (object): Network parameters.
 
     Returns
         int: Legacy coin type.
@@ -183,7 +183,7 @@ class Balance(object):
             "Balance(total=%.8f, available=%.8f)" %
             (self.total*1e-8, self.available*1e-8)
         )
-tinyjson.register(Balance)
+tinyjson.register(Balance, "Balance")
 
 UTXO = api.UTXO
 
@@ -733,7 +733,7 @@ class Account(object):
         privKey = branchKey.child(idx)
         return crypto.privKeyFromBytes(privKey.key)
 
-tinyjson.register(Account)
+tinyjson.register(Account, "wallet.Account")
 
 class AccountManager(object):
     """
@@ -844,7 +844,7 @@ class AccountManager(object):
         Args:
             acct (int): The acccount index, which is its position in the
                 accounts list.
-            net (obj): Network parameters.
+            net (object): Network parameters.
             pw (byte-like): A UTF-8-encoded user-supplied password for the
                 account.
 
@@ -869,7 +869,7 @@ class AccountManager(object):
 
         Args:
             acct (int): The account's index.
-            net (obj): Network parameters. Not used.
+            net (object): Network parameters. Not used.
             pw (SecretKey): The secret key.
 
         Returns:
@@ -886,7 +886,7 @@ class AccountManager(object):
 
         Args:
             acct (int): The account's index.
-            net (obj): Network parameters. Not used.
+            net (object): Network parameters. Not used.
             pw (SecretKey): The secret key.
 
         Returns:
@@ -897,7 +897,7 @@ class AccountManager(object):
         account = self.accounts[acct]
         return account.publicExtendedKey(cryptKeyPub)
 
-tinyjson.register(AccountManager)
+tinyjson.register(AccountManager, "AccountManager")
 
 
 def createNewAccountManager(seed, pubPassphrase, privPassphrase, chainParams, constructor=None):
@@ -912,7 +912,7 @@ def createNewAccountManager(seed, pubPassphrase, privPassphrase, chainParams, co
             such as address generation, without decrypting the private keys.
         privPassphrase (byte-like): A user-supplied password to protect the
             private the account private keys.
-        chainParams (obj): Network parameters.
+        chainParams (object): Network parameters.
 
     Returns:
         AccountManager: An initialized account manager.
@@ -1063,7 +1063,7 @@ def addressForPubkeyBytes(b, net):
 
     Args:
         b (bytes): Public key bytes.
-        net (obj): Network the address will be used on.
+        net (object): Network the address will be used on.
 
     Returns:
         crypto.Address: A pubkey-hash address.
@@ -1102,7 +1102,7 @@ class TestAccounts(unittest.TestCase):
         for n in range(20):
             acct.nextExternalAddress()
         v = 5
-        satoshis = v*1e8
+        satoshis = int(round(v*1e8))
         txid = "abcdefghijkl"
         vout = 2
         from tinydecred.pydecred import dcrdata

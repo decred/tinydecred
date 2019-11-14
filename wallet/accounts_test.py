@@ -15,7 +15,7 @@ def addressForPubkeyBytes(b, net):
 
     Args:
         b (bytes): Public key bytes.
-        net (obj): Network the address will be used on.
+        net (object): Network the address will be used on.
 
     Returns:
         crypto.Address: A pubkey-hash address.
@@ -54,7 +54,7 @@ class TestAccounts(unittest.TestCase):
         for n in range(20):
             acct.nextExternalAddress()
         v = 5
-        satoshis = v*1e8
+        satoshis = int(round(v*1e8))
         txid = "abcdefghijkl"
         vout = 2
         from tinydecred.pydecred import dcrdata

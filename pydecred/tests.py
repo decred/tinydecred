@@ -35,7 +35,7 @@ class TestSubsidyCache(unittest.TestCase):
                 wantWork =     0,
                 wantVote =     0,
                 wantTreasury = 0,
-            ), 
+            ),
             test(
                 name =         "height 0",
                 params =       mainnet,
@@ -45,7 +45,7 @@ class TestSubsidyCache(unittest.TestCase):
                 wantWork =     0,
                 wantVote =     0,
                 wantTreasury = 0,
-            ), 
+            ),
             test(
                 name =         "height 1 (initial payouts)",
                 params =       mainnet,
@@ -55,7 +55,7 @@ class TestSubsidyCache(unittest.TestCase):
                 wantWork =     168000000000000,
                 wantVote =     0,
                 wantTreasury = 0,
-            ), 
+            ),
             test(
                 name =         "height 2 (first non-special block prior voting start)",
                 params =       mainnet,
@@ -65,7 +65,7 @@ class TestSubsidyCache(unittest.TestCase):
                 wantWork =     1871749598,
                 wantVote =     0,
                 wantTreasury = 311958266,
-            ), 
+            ),
             test(
                 name =         "height 4094 (two blocks prior to voting start)",
                 params =       mainnet,
@@ -75,7 +75,7 @@ class TestSubsidyCache(unittest.TestCase):
                 wantWork =     1871749598,
                 wantVote =     0,
                 wantTreasury = 311958266,
-            ), 
+            ),
             test(
                 name =         "height 4095 (final block prior to voting start)",
                 params =       mainnet,
@@ -85,7 +85,7 @@ class TestSubsidyCache(unittest.TestCase):
                 wantWork =     1871749598,
                 wantVote =     187174959,
                 wantTreasury = 311958266,
-            ), 
+            ),
             test(
                 name =         "height 4096 (voting start), 5 votes",
                 params =       mainnet,
@@ -95,7 +95,7 @@ class TestSubsidyCache(unittest.TestCase):
                 wantWork =     1871749598,
                 wantVote =     187174959,
                 wantTreasury = 311958266,
-            ), 
+            ),
             test(
                 name =         "height 4096 (voting start), 4 votes",
                 params =       mainnet,
@@ -105,7 +105,7 @@ class TestSubsidyCache(unittest.TestCase):
                 wantWork =     1497399678,
                 wantVote =     187174959,
                 wantTreasury = 249566612,
-            ), 
+            ),
             test(
                 name =         "height 4096 (voting start), 3 votes",
                 params =       mainnet,
@@ -115,7 +115,7 @@ class TestSubsidyCache(unittest.TestCase):
                 wantWork =     1123049758,
                 wantVote =     187174959,
                 wantTreasury = 187174959,
-            ), 
+            ),
             test(
                 name =         "height 4096 (voting start), 2 votes",
                 params =       mainnet,
@@ -125,7 +125,7 @@ class TestSubsidyCache(unittest.TestCase):
                 wantWork =     0,
                 wantVote =     187174959,
                 wantTreasury = 0,
-            ), 
+            ),
             test(
                 name =         "height 6143 (final block prior to 1st reduction), 5 votes",
                 params =       mainnet,
@@ -135,7 +135,7 @@ class TestSubsidyCache(unittest.TestCase):
                 wantWork =     1871749598,
                 wantVote =     187174959,
                 wantTreasury = 311958266,
-            ), 
+            ),
             test(
                 name =         "height 6144 (1st block in 1st reduction), 5 votes",
                 params =       mainnet,
@@ -145,7 +145,7 @@ class TestSubsidyCache(unittest.TestCase):
                 wantWork =     1853217423,
                 wantVote =     185321742,
                 wantTreasury = 308869570,
-            ), 
+            ),
             test(
                 name =         "height 6144 (1st block in 1st reduction), 4 votes",
                 params =       mainnet,
@@ -155,7 +155,7 @@ class TestSubsidyCache(unittest.TestCase):
                 wantWork =     1482573938,
                 wantVote =     185321742,
                 wantTreasury = 247095656,
-            ), 
+            ),
             test(
                 name =         "height 12287 (last block in 1st reduction), 5 votes",
                 params =       mainnet,
@@ -165,7 +165,7 @@ class TestSubsidyCache(unittest.TestCase):
                 wantWork =     1853217423,
                 wantVote =     185321742,
                 wantTreasury = 308869570,
-            ), 
+            ),
             test(
                 name =         "height 12288 (1st block in 2nd reduction), 5 votes",
                 params =       mainnet,
@@ -175,7 +175,7 @@ class TestSubsidyCache(unittest.TestCase):
                 wantWork =     1834868736,
                 wantVote =     183486873,
                 wantTreasury = 305811456,
-            ), 
+            ),
             test(
                 name =         "height 307200 (1st block in 50th reduction), 5 votes",
                 params =       mainnet,
@@ -185,7 +185,7 @@ class TestSubsidyCache(unittest.TestCase):
                 wantWork =     1138096413,
                 wantVote =     113809641,
                 wantTreasury = 189682735,
-            ), 
+            ),
             test(
                 name =         "height 307200 (1st block in 50th reduction), 3 votes",
                 params =       mainnet,
@@ -195,7 +195,7 @@ class TestSubsidyCache(unittest.TestCase):
                 wantWork =     682857847,
                 wantVote =     113809641,
                 wantTreasury = 113809641,
-            ), 
+            ),
             test(
                 name =         "height 10911744 (first zero vote subsidy 1776th reduction), 5 votes",
                 params =       mainnet,
@@ -205,7 +205,7 @@ class TestSubsidyCache(unittest.TestCase):
                 wantWork =     9,
                 wantVote =     0,
                 wantTreasury = 1,
-            ), 
+            ),
             test(
                 name =         "height 10954752 (first zero treasury subsidy 1783rd reduction), 5 votes",
                 params =       mainnet,
@@ -215,7 +215,7 @@ class TestSubsidyCache(unittest.TestCase):
                 wantWork =     5,
                 wantVote =     0,
                 wantTreasury = 0,
-            ), 
+            ),
             test(
                 name =         "height 11003904 (first zero work subsidy 1791st reduction), 5 votes",
                 params =       mainnet,
@@ -225,7 +225,7 @@ class TestSubsidyCache(unittest.TestCase):
                 wantWork =     0,
                 wantVote =     0,
                 wantTreasury = 0,
-            ), 
+            ),
             test(
                 name =         "height 11010048 (first zero full subsidy 1792nd reduction), 5 votes",
                 params =       mainnet,
@@ -243,7 +243,7 @@ class TestSubsidyCache(unittest.TestCase):
             cache = SubsidyCache(t.params)
             fullSubsidyResult = cache.calcBlockSubsidy(t.height)
             self.assertEqual(fullSubsidyResult, t.wantFull, t.name)
-            
+
             # Ensure the PoW subsidy is the expected value.
             workResult = cache.calcWorkSubsidy(t.height, t.numVotes)
             self.assertEqual(workResult, t.wantWork, t.name)
@@ -251,7 +251,7 @@ class TestSubsidyCache(unittest.TestCase):
             # Ensure the vote subsidy is the expected value.
             voteResult = cache.calcStakeVoteSubsidy(t.height)
             self.assertEqual(voteResult, t.wantVote, t.name)
-            
+
             # Ensure the treasury subsidy is the expected value.
             treasuryResult = cache.calcTreasurySubsidy(t.height, t.numVotes)
             self.assertEqual(treasuryResult, t.wantTreasury, t.name)
@@ -1110,7 +1110,7 @@ class TestTxScript(unittest.TestCase):
             cachedHash = None,
         )
 
-        # Since the script engine is not implmented, hard code the keys and 
+        # Since the script engine is not implmented, hard code the keys and
         # check that the script signature is the same as produced by dcrd.
 
         # For compressed keys
@@ -1199,7 +1199,7 @@ class TestTxScript(unittest.TestCase):
         for opCode in (opcode.OP_SSGEN, opcode.OP_SSRTX, opcode.OP_SSTX):
             pkScript = txscript.payToStakePKHScript(addr, opcode.OP_SSTX)
             # Just looking to raise an exception for now.
-            txscript.signTxOutput(mainnet, tx, 0, pkScript, 
+            txscript.signTxOutput(mainnet, tx, 0, pkScript,
                 txscript.SigHashAll, keysource, None, crypto.STEcdsaSecp256k1)
 
 
@@ -1215,7 +1215,7 @@ class TestTxScript(unittest.TestCase):
                 self.scriptAddress = scriptAddress
                 self.f = f
                 self.net = net
-        
+
         addrPKH = crypto.newAddressPubKeyHash
         addrSH = crypto.newAddressScriptHash
         addrSHH = crypto.newAddressScriptHashFromHash
@@ -1257,7 +1257,7 @@ class TestTxScript(unittest.TestCase):
             scriptAddress = ByteArray("f15da1cb8d1bcb162c6ab446c95757a6e791c916"),
             f = lambda: addrPKH(
                 ByteArray("f15da1cb8d1bcb162c6ab446c95757a6e791c916"),
-                testnet, 
+                testnet,
                 crypto.STEcdsaSecp256k1
             ),
             net = testnet,
@@ -1459,7 +1459,7 @@ class TestTxScript(unittest.TestCase):
         for test in tests:
             # Decode addr and compare error against valid.
             err = None
-            try: 
+            try:
                 decoded = txscript.decodeAddress(test.addr, test.net)
             except Exception as e:
                 err = e
@@ -1485,7 +1485,7 @@ class TestTxScript(unittest.TestCase):
                 elif isinstance(decoded, crypto.AddressSecpPubKey):
                     # Ignore the error here since the script
                     # address is checked below.
-                    try: 
+                    try:
                         saddr = ByteArray(decoded.string())
                     except Exception:
                         saddr = test.saddr
@@ -1542,10 +1542,10 @@ class TestTxScript(unittest.TestCase):
 
         class test:
             def __init__(self, name="", script=b'', addrs=None, reqSigs=-1, scriptClass=-1, exception=None):
-                self.name = name 
-                self.script = script 
+                self.name = name
+                self.script = script
                 self.addrs = addrs if addrs else []
-                self.reqSigs = reqSigs 
+                self.reqSigs = reqSigs
                 self.scriptClass = scriptClass
                 self.exception = exception
         tests.append(test(
@@ -1709,11 +1709,11 @@ class TestTxScript(unittest.TestCase):
                 t.fail("extracted address length mismatch. expected %d, got %d" % (len(a), len(b)))
             for av, bv in zip(a, b):
                 if av.scriptAddress() != bv.scriptAddress():
-                    self.fail("scriptAddress mismatch. expected %s, got %s (%s)" % 
+                    self.fail("scriptAddress mismatch. expected %s, got %s (%s)" %
                         (av.scriptAddress().hex(), bv.scriptAddress().hex(), name))
 
         for i, t in enumerate(tests):
-            try: 
+            try:
                 scriptClass, addrs, reqSigs = txscript.extractPkScriptAddrs(scriptVersion, t.script, mainnet)
             except Exception as e:
                 if t.exception and t.exception in str(e):
@@ -1727,11 +1727,11 @@ class TestTxScript(unittest.TestCase):
             checkAddrs(t.addrs, addrs, t.name)
     def test_pay_to_addr_script(self):
         """
-        test_pay_to_addr_script ensures the PayToAddrScript function generates 
+        test_pay_to_addr_script ensures the PayToAddrScript function generates
         the correct scripts for the various types of addresses.
         """
         # 1MirQ9bwyQcGVJPwKUgapu5ouK2E2Ey4gX
-        p2pkhMain = crypto.newAddressPubKeyHash(ByteArray("e34cce70c86373273efcc54ce7d2a491bb4a0e84"), 
+        p2pkhMain = crypto.newAddressPubKeyHash(ByteArray("e34cce70c86373273efcc54ce7d2a491bb4a0e84"),
             mainnet, crypto.STEcdsaSecp256k1)
 
         # Taken from transaction:
@@ -1750,7 +1750,7 @@ class TestTxScript(unittest.TestCase):
             ByteArray("0411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3"),
             mainnet,
         )
-        # Set the pubkey compressed. See golang TestPayToAddrScript in 
+        # Set the pubkey compressed. See golang TestPayToAddrScript in
         # dcrd/tscript/standard_test.go
         p2pkUncompressedMain.pubkeyFormat = crypto.PKFCompressed
 
@@ -1759,7 +1759,7 @@ class TestTxScript(unittest.TestCase):
 
         bogusAddress = (
             ByteArray(0x0000),
-            ByteArray("e34cce70c86373273efcc54ce7d2a491bb4a0e84"), 
+            ByteArray("e34cce70c86373273efcc54ce7d2a491bb4a0e84"),
             crypto.STEcdsaSecp256k1
         )
 
@@ -1822,7 +1822,7 @@ class TestTxScript(unittest.TestCase):
     def test_script_class(self):
         """
         test_script_class ensures all the scripts in scriptClassTests have the expected
-        class.        
+        class.
         """
         scriptVersion = 0
         for test in scriptClassTests():
@@ -1905,7 +1905,7 @@ class TestDcrdata(unittest.TestCase):
         from tinydecred.crypto.secp256k1 import curve as Curve
         from tinydecred.crypto import rando
         with TemporaryDirectory() as tempDir:
-            blockchain = dcrdata.DcrdataBlockchain(os.path.join(tempDir, "db.db"), testnet, "https://testnet.decred.org")
+            blockchain = dcrdata.DcrdataBlockchain(os.path.join(tempDir, "db.db"), testnet, "https://testnet.dcrdata.org")
             blockchain.connect()
             def broadcast(txHex):
                 print("test skipping broadcast of transaction: %s" % txHex)
@@ -1971,7 +1971,7 @@ class TestDcrdata(unittest.TestCase):
             poolAddr = crypto.AddressPubKeyHash(testnet.PubKeyHashAddrID, pkHash)
             scriptHash = crypto.hash160("some script. doesn't matter".encode())
             scriptAddr = crypto.AddressScriptHash(testnet.ScriptHashAddrID, scriptHash)
-            ticketPrice = int(blockchain.stakeDiff()*1e8)
+            ticketPrice = self.stakeDiff()
             class request:
                 minConf = 0
                 expiry = 0
@@ -1997,7 +1997,7 @@ class TestStakePool(unittest.TestCase):
         stakePool = stakepool.StakePool(self.poolURL, self.apiKey)
         stakePool.authorize(self.signingAddress, testnet)
         return stakePool
-    def test_get_purchase_info(self):        
+    def test_get_purchase_info(self):
         stakePool = self.stakePool()
         pi = stakePool.getPurchaseInfo()
         print(pi.__tojson__())

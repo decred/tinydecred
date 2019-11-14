@@ -14,7 +14,7 @@ import sys
 import select
 import atexit
 import websocket
-from tinydecred.util import tinyjson, helpers, database, http
+from tinydecred.util import tinyjson, helpers, database, tinyhttp
 from tinydecred.crypto import crypto
 from tinydecred.crypto.bytearray import ByteArray
 from tinydecred.wallet.api import InsufficientFundsError
@@ -78,10 +78,10 @@ class DcrdataPath(object):
         raise DcrDataException("SubpathError", "No subpath %s found in datapath" % (key,))
 
     def __call__(self, *args, **kwargs):
-        return http.get(self.getCallsignPath(*args, **kwargs), headers=GET_HEADERS)
+        return tinyhttp.get(self.getCallsignPath(*args, **kwargs), headers=GET_HEADERS)
 
     def post(self, data):
-        return http.post(self.getCallsignPath(), data, headers=POST_HEADERS)
+        return tinyhttp.post(self.getCallsignPath(), data, headers=POST_HEADERS)
 
 def getSocketURIs(uri):
     uri = urlparse(uri)
@@ -122,7 +122,7 @@ class DcrdataClient(object):
         root = self.root = DcrdataPath()
         self.listEntries = []
         # /list returns a json list of enpoints with parameters in template format, base/A/{param}/B
-        endpoints = http.get(self.baseApi + "/list", headers=GET_HEADERS)
+        endpoints = tinyhttp.get(self.baseApi + "/list", headers=GET_HEADERS)
         endpoints += InsightPaths
 
         def getParam(part):
@@ -384,7 +384,7 @@ class TicketInfo:
             "revocation": self.revocation,
         }
 
-tinyjson.register(TicketInfo, tag="dcr.TicketInfo")
+tinyjson.register(TicketInfo, "TicketInfo")
 
 class UTXO(object):
     """
@@ -460,7 +460,7 @@ class UTXO(object):
         Args:
             block (msgblock.BlockHeader): The block header.
             tx (dict): The dcrdata transaction.
-            params (obj): The network parameters.
+            params (object): The network parameters.
         """
         self.height = block.height
         self.maturity = block.height + params.CoinbaseMaturity if tx.looksLikeCoinbase() else None
@@ -522,7 +522,7 @@ class UTXO(object):
         """
         return self.tinfo and self.tinfo.status in ("immature", "live")
 
-tinyjson.register(UTXO, tag="dcr.UTXO")
+tinyjson.register(UTXO, "dcr.UTXO")
 
 
 def makeOutputs(pairs, chain):
@@ -645,7 +645,7 @@ class DcrdataBlockchain(object):
         Subscribe to new block notifications.
 
         Args:
-            receiver (func(obj)): A function or method that accepts the block
+            receiver (func(object)): A function or method that accepts the block
                 notifications.
         """
         self.blockReceiver = receiver
@@ -656,7 +656,7 @@ class DcrdataBlockchain(object):
 
         Args:
             addrs (list(str)): List of base-58 encoded addresses.
-            receiver (func(obj)): A function or method that accepts the address
+            receiver (func(object)): A function or method that accepts the address
                 notifications.
         """
         log.debug("subscribing to addresses %s" % repr(addrs))
@@ -855,7 +855,7 @@ class DcrdataBlockchain(object):
         """
         return self.dcrdata.block.best()
     def stakeDiff(self):
-        return self.dcrdata.stake.diff()["next"]
+        return int(round(self.dcrdata.stake.diff()["next"]*1e8))
     def updateTip(self):
         """
         Update the tip block. If the wallet is subscribed to block updates,
@@ -1142,7 +1142,7 @@ class DcrdataBlockchain(object):
         # address this better and prevent address burning.
 
         # Calculate the current ticket price.
-        ticketPrice = int(self.stakeDiff()*1e8)
+        ticketPrice = self.stakeDiff()
 
         # Ensure the ticket price does not exceed the spend limit if set.
         if req.spendLimit > 0 and ticketPrice > req.spendLimit:

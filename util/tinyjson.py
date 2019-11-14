@@ -8,21 +8,15 @@ JSONDecodeError = json.JSONDecodeError
 
 _types = {}
 
-def clsKey(cls):
-    return cls.__qualname__
-
-def register(cls, tag=None):
+def register(cls, k):
     """
-    Registered types will be checked for compliance with the JSONMarshaller. 
-    When an object of a registered type is dump'ed, it's __tojson__ method 
+    Registered types will be checked for compliance with the JSONMarshaller.
+    When an object of a registered type is dump'ed, it's __tojson__ method
     will be called to retreive the JSON-compliant dict. A special attribute
     _jt_ is quietly added during encoding. When that JSON object
     is decoded with load, the type is converted using the static __fromjson__
     method.
     """
-    if not hasattr(cls, "__fromjson__") or not hasattr(cls, "__tojson__"):
-        raise KeyError("register: registered types must have a __fromjson__ method")
-    k = tag if tag else clsKey(cls)
     cls.__jsontag__ = k
     if k in _types:
         raise Exception("tinyjson: mutliple attempts to register class %s" % k)
@@ -38,26 +32,26 @@ def decoder(obj):
 
 def load(s):
 	"""
-	Turn the string into an object with the custon decoder. 
+	Turn the string into an object with the custon decoder.
 	"""
 	return json.loads(s, object_hook=decoder)
 
 def loadFile(filepath):
     """
     Load the JSON with a decoder. This method uses load, and therefore
-    the custom decoder which recognizes registered types. 
+    the custom decoder which recognizes registered types.
     """
     with open(filepath, 'r') as f:
         return load(f.read())
 
 class Encoder(json.JSONEncoder):
     """
-    A custom encoder that works with classes implementing the JSONMarshaller interface. 
-    A class implementing the JSONMarshaller interface will have two methods. 
+    A custom encoder that works with classes implementing the JSONMarshaller interface.
+    A class implementing the JSONMarshaller interface will have two methods.
     1. __fromjson__: @staticmethod. A method that will take a freshly decoded
-        dict and return an instance of its class. 
-    2. __tojson__: A method that returns an encodable version of itself, 
-        probably a dict.  
+        dict and return an instance of its class.
+    2. __tojson__: A method that returns an encodable version of itself,
+        probably a dict.
     """
     def default(self, obj):
         if hasattr(obj.__class__, "__jsontag__"):
@@ -69,7 +63,7 @@ class Encoder(json.JSONEncoder):
 
 def dump(thing, **kwargs):
     """
-    Encode the thing to JSON with the JSONCoder. 
+    Encode the thing to JSON with the JSONCoder.
     """
     return json.dumps(thing, cls=Encoder, **kwargs)
 

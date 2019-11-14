@@ -74,6 +74,16 @@ class ParameterRangeError(Exception):
     pass
 
 def encodeAddress(netID, k):
+    """
+    Base-58 encode the number, with the netID prepended byte-wise.
+
+    Args:
+        netID (byte-like): The addresses network encoding ID.
+        k (ByteArray): The pubkey or pubkey-hash or script-hash.
+
+    Returns:
+        string: Base-58 encoded address.
+    """
     b = ByteArray(netID)
     b += k
     b += checksum(b.b)
@@ -101,10 +111,30 @@ class AddressPubKeyHash:
         """
         return encodeAddress(self.netID, self.pkHash)
     def address(self):
+        """
+        Address returns the string encoding of a pay-to-pubkey-hash address.
+
+        Returns:
+            str: The encoded address.
+        """
         return self.string()
     def scriptAddress(self):
+        """
+        ScriptAddress returns the raw bytes of the address to be used when
+        inserting the address into a txout's script.
+
+        Returns:
+            ByteArray: The script address.
+        """
         return self.pkHash.copy()
     def hash160(self):
+        """
+        Hash160 returns the Hash160(data) where data is the data normally
+        hashed to 160 bits from the respective address type.
+
+        Returns:
+            ByteArray: The hash.
+        """
         return self.pkHash.copy()
 
 class AddressSecpPubKey:
@@ -169,8 +199,22 @@ class AddressSecpPubKey:
         """
         return encodeAddress(self.pubkeyHashID, hash160(self.serialize().bytes()))
     def scriptAddress(self):
+        """
+        ScriptAddress returns the raw bytes of the address to be used when
+        inserting the address into a txout's script.
+
+        Returns:
+            ByteArray: The script address.
+        """
         return self.serialize()
     def hash160(self):
+        """
+        Hash160 returns the Hash160(data) where data is the data normally
+        hashed to 160 bits from the respective address type.
+
+        Returns:
+            ByteArray: The hash.
+        """
         return hash160(self.serialize().bytes())
 
 class AddressScriptHash(object):
@@ -180,9 +224,6 @@ class AddressScriptHash(object):
     def __init__(self, netID, scriptHash):
         self.netID = netID
         self.scriptHash = scriptHash
-    @staticmethod
-    def fromScript(netID, script):
-        return AddressScriptHash(netID, hash160(script.b))
     def string(self):
         """
         A base-58 encoding of the pubkey hash.
@@ -194,11 +235,28 @@ class AddressScriptHash(object):
     def address(self):
         """
         Address returns the string encoding of a pay-to-script-hash address.
+
+        Returns:
+            str: The encoded address.
         """
         return self.string()
     def scriptAddress(self):
+        """
+        ScriptAddress returns the raw bytes of the address to be used when
+        inserting the address into a txout's script.
+
+        Returns:
+            ByteArray: The script address.
+        """
         return self.scriptHash.copy()
     def hash160(self):
+        """
+        Hash160 returns the Hash160(data) where data is the data normally
+        hashed to 160 bits from the respective address type.
+
+        Returns:
+            ByteArray: The hash.
+        """
         return self.scriptHash.copy()
 
 def hmacDigest(key, msg, digestmod=hashlib.sha512):
@@ -389,7 +447,7 @@ def newAddressPubKeyHash(pkHash, net, algo):
 
     Args:
         pkHash (ByteArray): The hash160 of the public key.
-        net (obj): The network parameters.
+        net (object): The network parameters.
         algo (int): The signature curve.
 
     Returns:
@@ -413,7 +471,7 @@ def newAddressScriptHash(script, net):
 
     Args:
         script (ByteArray): the redeem script
-        net (obj): the network parameters
+        net (object): the network parameters
 
     Returns:
         AddressScriptHash: An address object.
@@ -427,7 +485,7 @@ def newAddressScriptHashFromHash(scriptHash, net):
 
     Args:
         pkHash (ByteArray): The hash160 of the public key.
-        net (obj): The network parameters.
+        net (object): The network parameters.
 
     Returns:
         AddressScriptHash: An address object.
@@ -724,7 +782,7 @@ class ExtendedKey:
 
         Args:
             i (int): Child number.
-            net (obj): Network parameters.
+            net (object): Network parameters.
 
         Returns:
             Address: Child address.
@@ -861,7 +919,7 @@ class KDFParams(object):
         return p
     def __repr__(self):
         return repr(self.__tojson__())
-tinyjson.register(KDFParams)
+tinyjson.register(KDFParams, "KDFParams")
 
 class ScryptParams(object):
     """
@@ -896,7 +954,7 @@ class ScryptParams(object):
     def __repr__(self):
         return repr(self.__tojson__())
 
-tinyjson.register(ScryptParams)
+tinyjson.register(ScryptParams, "ScryptParams")
 
 class SecretKey(object):
     """

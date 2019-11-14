@@ -7,9 +7,7 @@ DcrdataClient.endpointList() for available enpoints.
 import urllib.request as urlrequest
 from urllib.parse import urlencode
 from tinydecred.util import tinyjson
-from tinydecred.util.helpers import formatTraceback, getLogger
-
-log = getLogger("HTTP")
+from tinydecred.util.helpers import formatTraceback
 
 def get(uri, **kwargs):
     return request(uri, **kwargs)
@@ -17,12 +15,12 @@ def get(uri, **kwargs):
 def post(uri, data, **kwargs):
     return request(uri, data, **kwargs)
 
-def request(uri, postData=None, headers=None, urlEncode=False):
+def request(uri, postData=None, headers=None, urlEncode=False, supressErr=False):
     try:
         headers = headers if headers else {}
         if postData:
             if urlEncode:
-                # encode the data in url query string form, without ?. 
+                # encode the data in url query string form, without ?.
                 encoded = urlencode(postData).encode("utf-8")
             else:
                 # encode the data as json.
@@ -40,5 +38,4 @@ def request(uri, postData=None, headers=None, urlEncode=False):
         except Exception as e:
             raise Exception("JSONError", "Failed to decode server response from path %s: %s : %s" % (uri, raw, formatTraceback(e)))
     except Exception as e:
-        log.error("error retrieving %s request for %s" % ("POST" if postData else "GET", uri, e))
         raise Exception("RequestError", "Error encountered in requesting path %s: %s" % (uri, formatTraceback(e)))

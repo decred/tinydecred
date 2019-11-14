@@ -30,23 +30,23 @@ def decodeBA(b, copy=False):
 
 class ByteArray(object):
 	"""
-	ByteArray is a bytearray manager that also implements tinyjson marshalling. 
-	It implements a subset of bytearray's bitwise operators and provides some 
-	convenience decodings on the fly, so operations work with various types of 
-	input.  Since bytearrays are mutable, ByteArray can also zero the internal 
+	ByteArray is a bytearray manager that also implements tinyjson marshalling.
+	It implements a subset of bytearray's bitwise operators and provides some
+	convenience decodings on the fly, so operations work with various types of
+	input.  Since bytearrays are mutable, ByteArray can also zero the internal
 	value without relying on garbage collection. An
-	important difference between ByteArray and bytearray is 
-	that an integer argument to ByteArray constructor will result in the 
-	shortest possible byte representation of the integer, where for 
-	bytearray an int argument results in a zero-valued bytearray of said 
-	length. To get a zero-valued or zero-padded ByteArray of length n, use the 
+	important difference between ByteArray and bytearray is
+	that an integer argument to ByteArray constructor will result in the
+	shortest possible byte representation of the integer, where for
+	bytearray an int argument results in a zero-valued bytearray of said
+	length. To get a zero-valued or zero-padded ByteArray of length n, use the
 	`length` keyword argument.
 
 
 	"""
 	def __init__(self, b=b'', copy=True, length=None):
 		"""
-		Set copy to False if you want to share the memory with another bytearray/ByteArray. 
+		Set copy to False if you want to share the memory with another bytearray/ByteArray.
 		If the type of b is not bytearray or ByteArray, copy has no effect.
 		"""
 		if length:
@@ -94,7 +94,7 @@ class ByteArray(object):
 			b[bLen-i-1] &= a[aLen-i-1] if i < aLen else 0
 		return b
 	def __iand__(self, a):
-		a, aLen, b, bLen = self.decode(a)		
+		a, aLen, b, bLen = self.decode(a)
 		for i in range(bLen):
 			b[bLen-i-1] &= a[aLen-i-1] if i < aLen else 0
 		return self
@@ -169,7 +169,7 @@ class ByteArray(object):
 		return b
 
 # register the ByteArray class with the json encoder/decoder.
-tinyjson.register(ByteArray)
+tinyjson.register(ByteArray, "ByteArray")
 
 class TestByteArray(unittest.TestCase):
 	def test_operators(self):

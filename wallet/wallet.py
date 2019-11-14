@@ -38,7 +38,7 @@ class Wallet(object):
     def __init__(self):
         """
         Args:
-            chain (obj): Network parameters to associate with the wallet. Should
+            chain (object): Network parameters to associate with the wallet. Should
                 probably move this to the account level.
         """
         # The path to the filesystem location of the encrypted wallet file.
@@ -81,7 +81,7 @@ class Wallet(object):
             path (str): Filepath to store wallet.
             password (str): User provided password. The password will be used to
                 both decrypt the wallet, and unlock any accounts created.
-            chain (obj): Network parameters for the zeroth account ExtendedKey.
+            chain (object): Network parameters for the zeroth account ExtendedKey.
             userSeed (ByteArray): A seed for wallet generate, likely generated
                 from a mnemonic seed word list.
 
@@ -118,7 +118,7 @@ class Wallet(object):
         Args:
             words (list(str)): mnemonic seed. Assumed to be PGP words.
             password (str): User password. Passed to Wallet.create.
-            chain (obj): Network parameters.
+            chain (object): Network parameters.
 
         Returns:
             Wallet: A wallet initialized from the seed parsed from `words`.
@@ -148,8 +148,8 @@ class Wallet(object):
         Set blockchain params and user defined callbacks for accounts.
 
         Args:
-            blockchain (obj): An api.Blockchain for accounts.
-            signals (obj): An api.Signals.
+            blockchain (object): An api.Blockchain for accounts.
+            signals (object): An api.Signals.
         """
         self.blockchain = blockchain
         self.signals = signals
@@ -190,8 +190,8 @@ class Wallet(object):
             acct (int): The account number to open.
             password (str): Wallet password. Should be the same as used to open
                 the wallet.
-            blockchain (obj): An api.Blockchain for the account.
-            signals (obj): An api.Signals.
+            blockchain (object): An api.Blockchain for the account.
+            signals (object): An api.Signals.
 
         Returns:
             Wallet: The wallet with the default account open.
@@ -320,4 +320,4 @@ class Wallet(object):
         self.save()
         return tx
 
-tinyjson.register(Wallet)
+tinyjson.register(Wallet, "wallet.Wallet")

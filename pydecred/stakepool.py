@@ -4,7 +4,7 @@ See LICENSE for details
 
 DcrdataClient.endpointList() for available enpoints.
 """
-from tinydecred.util import http, tinyjson
+from tinydecred.util import tinyhttp, tinyjson
 from tinydecred.pydecred import txscript
 from tinydecred.crypto import crypto
 from tinydecred.crypto.bytearray import ByteArray
@@ -53,7 +53,7 @@ class PurchaseInfo(object):
 	def __fromjson__(obj):
 		return PurchaseInfo(obj)
 
-tinyjson.register(PurchaseInfo)
+tinyjson.register(PurchaseInfo, "PurchaseInfo")
 
 class PoolStats(object):
 	"""
@@ -116,7 +116,7 @@ class PoolStats(object):
 	def __fromjson__(obj):
 		return PoolStats(obj)
 
-tinyjson.register(PoolStats)
+tinyjson.register(PoolStats, "PoolStats")
 
 class StakePool(object):
 	"""
@@ -168,7 +168,7 @@ class StakePool(object):
 		Returns:
 			list(object): The vsp list.
 		"""
-		vsps = http.get("https://api.decred.org/?c=gsd")
+		vsps = tinyhttp.get("https://api.decred.org/?c=gsd")
 		network = "testnet" if net.Name == "testnet3" else net.Name
 		return [vsp for vsp in vsps.values() if vsp["Network"] == network]
 	def apiPath(self, command):
@@ -202,7 +202,7 @@ class StakePool(object):
 		"""
 		pi = self.purchaseInfo
 		redeemScript = ByteArray(pi.script)
-		scriptAddr = crypto.AddressScriptHash.fromScript(self.net.ScriptHashAddrID, redeemScript)
+		scriptAddr = crypto.newAddressScriptHash(redeemScript, self.net)
 		if scriptAddr.string() != pi.ticketAddress:
 			raise Exception("ticket address mismatch. %s != %s" % (pi.ticketAddress, scriptAddr.string()))
 		# extract addresses
@@ -240,7 +240,7 @@ class StakePool(object):
 				raise e
 			# address is not set
 			data = { "UserPubKeyAddr": address }
-			res = http.post(self.apiPath("address"), data, headers=self.headers(), urlEncode=True)
+			res = tinyhttp.post(self.apiPath("address"), data, headers=self.headers(), urlEncode=True)
 			if resultIsSuccess(res):
 				self.getPurchaseInfo()
 				self.validate(address)
@@ -255,7 +255,7 @@ class StakePool(object):
 		"""
 		# An error is returned if the address isn't yet set
 		# {'status': 'error', 'code': 9, 'message': 'purchaseinfo error - no address submitted', 'data': None}
-		res = http.get(self.apiPath("getpurchaseinfo"), headers=self.headers())
+		res = tinyhttp.get(self.apiPath("getpurchaseinfo"), headers=self.headers())
 		if resultIsSuccess(res):
 			pi = PurchaseInfo(res["data"])
 			# check the script hash
@@ -270,7 +270,7 @@ class StakePool(object):
 		Returns:
 			Poolstats: The PoolStats object.
 		"""
-		res = http.get(self.apiPath("stats"), headers=self.headers())
+		res = tinyhttp.get(self.apiPath("stats"), headers=self.headers())
 		if resultIsSuccess(res):
 			self.stats = PoolStats(res["data"])
 			return self.stats
@@ -283,10 +283,10 @@ class StakePool(object):
 			bool: True on success. Exception raised on error.
 		"""
 		data = { "VoteBits": voteBits }
-		res = http.post(self.apiPath("voting"), data, headers=self.headers(), urlEncode=True)
+		res = tinyhttp.post(self.apiPath("voting"), data, headers=self.headers(), urlEncode=True)
 		if resultIsSuccess(res):
 			return True
 		raise Exception("unexpected response from 'voting': %s" % repr(res))
 
-tinyjson.register(StakePool)
+tinyjson.register(StakePool, "StakePool")
 
