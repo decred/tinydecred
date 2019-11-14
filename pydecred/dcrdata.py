@@ -17,7 +17,7 @@ import websocket
 from tinydecred.util import tinyjson, helpers, database, http
 from tinydecred.crypto import crypto
 from tinydecred.crypto.bytearray import ByteArray
-from tinydecred.api import InsufficientFundsError
+from tinydecred.wallet.api import InsufficientFundsError
 from tinydecred.pydecred import txscript, calc
 from tinydecred.pydecred.wire import msgtx, wire, msgblock
 from tinydecred.util.database import KeyValueDatabase

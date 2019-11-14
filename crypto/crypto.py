@@ -56,11 +56,21 @@ PKFUncompressed = 0
 # compressed public key.
 PKFCompressed = 1
 
+class CrazyKeyError(Exception):
+    """
+    Both derived public or private keys rely on treating the left 32-byte
+    sequence calculated above (Il) as a 256-bit integer that must be within the
+    valid range for a secp256k1 private key.  There is a small chance
+    (< 1 in 2^127) this condition will not hold, and in that case, a child
+    extended key can't be created for this index and the caller should simply
+    increment to the next index.
+    """
+    pass
+
 class ParameterRangeError(Exception):
-    pass
-class ZeroBytesError(Exception):
-    pass
-class PasswordError(Exception):
+    """
+    An input parameter is out of the acceptable range.
+    """
     pass
 
 def encodeAddress(netID, k):
@@ -561,14 +571,9 @@ class ExtendedKey:
         il = ilr[:len(ilr)//2]
         childChainCode = ilr[len(ilr)//2:]
 
-        # Both derived public or private keys rely on treating the left 32-byte
-        # sequence calculated above (Il) as a 256-bit integer that must be
-        # within the valid range for a secp256k1 private key.  There is a small
-        # chance (< 1 in 2^127) this condition will not hold, and in that case,
-        # a child extended key can't be created for this index and the caller
-        # should simply increment to the next index.
+        # See CrazyKeyError docs for an explanation of this condition.
         if il.int() >= Curve.N or il.iszero():
-            raise ParameterRangeError("ExtendedKey.child: generated Il outside valid range")
+            raise CrazyKeyError("ExtendedKey.child: generated Il outside valid range")
 
         # The algorithm used to derive the child key depends on whether or not
         # a private or public child is being derived.
@@ -686,7 +691,7 @@ class ExtendedKey:
             str: The encoded extended key.
         """
         if self.key.iszero():
-            raise ZeroBytesError("unexpected zero key")
+            raise Exception("unexpected zero key")
 
         childNumBytes = ByteArray(self.childNum, length=4)
         depthByte = ByteArray(self.depth % 256, length=1)
@@ -964,7 +969,7 @@ class SecretKey(object):
             raise Exception("unkown key derivation function")
         checkDigest = ByteArray(hashlib.sha256(sk.key.b).digest())
         if checkDigest != kp.digest:
-            raise PasswordError("rekey digest check failed")
+            raise Exception("rekey digest check failed")
         return sk
 
 class TestCrypto(unittest.TestCase):

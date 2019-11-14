@@ -8,7 +8,7 @@ from threading import Lock as Mutex
 from tinydecred.util import tinyjson, helpers
 from tinydecred.crypto import crypto, mnemonic
 from tinydecred.pydecred.account import DecredAccount
-from tinydecred.accounts import createNewAccountManager
+from tinydecred.wallet.accounts import createNewAccountManager
 
 log = helpers.getLogger("WLLT") # , logLvl=0)
 

@@ -90,7 +90,7 @@ RedeemP2PKSigScriptSize = 1 + 73
 P2SHPkScriptSize = 1 + 1 + 20 + 1
 
 # Many of these constants were pulled from the dcrd, and are left as mixed case
-# to maintain reference. 
+# to maintain reference.
 
 # DefaultRelayFeePerKb is the default minimum relay fee policy for a mempool.
 DefaultRelayFeePerKb = 1e4
@@ -183,7 +183,7 @@ hashH = crypto.hashH
 
 class Signature:
     """
-    The Signature class represents an ECDSA-algorithm signature. 
+    The Signature class represents an ECDSA-algorithm signature.
     """
     def __init__(self, r, s):
         self.r = r
@@ -193,7 +193,7 @@ class Signature:
         serialize returns the ECDSA signature in the more strict DER format.  Note
         that the serialized bytes returned do not include the appended hash type
         used in Decred signature scripts.
-                
+
         encoding/asn1 is broken so we hand roll this output:
         0x30 <length> 0x02 <length r> r 0x02 <length s> s
         """
@@ -202,7 +202,7 @@ class Signature:
         halforder = order>>1
         # low 'S' malleability breaker
         sigS = self.s
-        if sigS > halforder: 
+        if sigS > halforder:
             sigS = order - sigS
         # Ensure the encoded bytes for the r and s values are canonical and
         # thus suitable for DER encoding.
@@ -236,7 +236,7 @@ class ScriptTokenizer:
     complete, either due to successfully tokenizing the entire script or
     encountering a parse error.  In the case of failure, the Err function may be
     used to obtain the specific parse error.
-    
+
     Upon successfully parsing an opcode, the opcode and data associated with it
     may be obtained via the Opcode and Data functions, respectively.
     """
@@ -253,16 +253,16 @@ class ScriptTokenizer:
         successful.  It will not be successful if invoked when already at the end of
         the script, a parse failure is encountered, or an associated error already
         exists due to a previous parse failure.
-        
+
         In the case of a true return, the parsed opcode and data can be obtained with
         the associated functions and the offset into the script will either point to
         the next opcode or the end of the script if the final opcode was parsed.
-        
+
         In the case of a false return, the parsed opcode and data will be the last
         successfully parsed values (if any) and the offset into the script will
         either point to the failing opcode or the end of the script if the function
         was invoked when already at the end of the script.
-        
+
         Invoking this function when already at the end of the script is not
         considered an error and will simply return false.
         """
@@ -326,10 +326,10 @@ class ScriptTokenizer:
         # impossible.
         raise Exception("unreachable")
     def done(self):
-        """ 
-        Script parsing has completed 
-        
-        Returns: 
+        """
+        Script parsing has completed
+
+        Returns:
             bool: True if script parsing complete.
         """
         return self.err != None or self.offset >= len(self.script)
@@ -354,8 +354,8 @@ class ScriptTokenizer:
         return self.d
     def byteIndex(self):
         """
-        ByteIndex returns the current offset into the full script that will be 
-        parsed next and therefore also implies everything before it has already 
+        ByteIndex returns the current offset into the full script that will be
+        parsed next and therefore also implies everything before it has already
         been parsed.
 
         Returns:
@@ -385,15 +385,15 @@ class ExtendedOutPoint:
         self.pkScript = pkScript
 
 def checkScriptParses(scriptVersion, script):
-    """ 
-    checkScriptParses returns None when the script parses without error. 
-    
+    """
+    checkScriptParses returns None when the script parses without error.
+
     Args:
         scriptVersion (int): The script version.
         script (ByteArray): The script.
 
     Returns:
-        None or Exception: None on success. Exception is returned, not raised. 
+        None or Exception: None on success. Exception is returned, not raised.
     """
     tokenizer = ScriptTokenizer(scriptVersion, script)
     while tokenizer.next():
@@ -401,7 +401,7 @@ def checkScriptParses(scriptVersion, script):
     return tokenizer.err
 
 def finalOpcodeData(scriptVersion, script):
-    """ 
+    """
     finalOpcodeData returns the data associated with the final opcode in the
     script.  It will return nil if the script fails to parse.
 
@@ -446,7 +446,7 @@ def canonicalizeInt(val):
         b = ByteArray(0, length=len(b)+1) | b
     return b
 
-def hashToInt(h): 
+def hashToInt(h):
     """
     hashToInt converts a hash value to an integer. There is some disagreement
     about how this is done. [NSA] suggests that this is done in the obvious
@@ -482,7 +482,7 @@ def getScriptClass(version, script):
         version (int): The script version.
         script (ByteArray): The script.
 
-    Returns: 
+    Returns:
         int: The script class.
     """
     if version != DefaultScriptVersion:
@@ -494,7 +494,7 @@ def typeOfScript(scriptVersion, script):
     """
     scriptType returns the type of the script being inspected from the known
     standard types.
-        
+
     NOTE:  All scripts that are not version 0 are currently considered non
     standard.
     """
@@ -551,7 +551,7 @@ def extractScriptHash(pkScript):
     """
     extractScriptHash extracts the script hash from the passed script if it is a
     standard pay-to-script-hash script.  It will return nil otherwise.
-        
+
     NOTE: This function is only valid for version 0 opcodes.  Since the function
     does not accept a script version, the results are undefined for other script
     versions.
@@ -670,7 +670,7 @@ def isStakeSubmissionScript(scriptVersion, script):
     """
     isStakeSubmissionScript returns whether or not the passed script is a
     supported stake submission script.
-    
+
     NOTE: This function is only valid for version 0 scripts.  It will always
     return false for other script versions.
     """
@@ -688,7 +688,7 @@ def isStakeGenScript(scriptVersion, script):
     """
     isStakeGenScript returns whether or not the passed script is a supported
     stake generation script.
-    
+
     NOTE: This function is only valid for version 0 scripts.  It will always
     return false for other script versions.
     """
@@ -706,7 +706,7 @@ def isStakeRevocationScript(scriptVersion, script):
     """
     isStakeRevocationScript returns whether or not the passed script is a
     supported stake revocation script.
-    
+
     NOTE: This function is only valid for version 0 scripts.  It will always
     return false for other script versions.
     """
@@ -724,7 +724,7 @@ def isStakeChangeScript(scriptVersion, script):
     """
     isStakeChangeScript returns whether or not the passed script is a supported
     stake change script.
-    
+
     NOTE: This function is only valid for version 0 scripts.  It will always
     return false for other script versions.
     """
@@ -740,9 +740,9 @@ def isStakeChangeScript(scriptVersion, script):
 
 def getStakeOutSubclass(pkScript):
     """
-    getStakeOutSubclass extracts the subclass (P2PKH or P2SH) from a stake 
+    getStakeOutSubclass extracts the subclass (P2PKH or P2SH) from a stake
     output.
-    
+
     NOTE: This function is only valid for version 0 scripts.  Since the function
     does not accept a script version, the results are undefined for other script
     versions.
@@ -781,12 +781,12 @@ def extractMultisigScriptDetails(scriptVersion, script, extractPubKeys):
     extractMultisigScriptDetails attempts to extract details from the passed
     script if it is a standard multisig script.  The returned details struct will
     have the valid flag set to false otherwise.
-    
+
     The extract pubkeys flag indicates whether or not the pubkeys themselves
     should also be extracted and is provided because extracting them results in
     an allocation that the caller might wish to avoid.  The pubKeys member of
     the returned details struct will be nil when the flag is false.
-    
+
     NOTE: This function is only valid for version 0 scripts.  The returned
     details struct will always be empty and have the valid flag set to false for
     other script versions.
@@ -838,7 +838,7 @@ def isMultisigScript(scriptVersion, script):
     """
     isMultisigScript returns whether or not the passed script is a standard
     multisig script.
-    
+
     NOTE: This function is only valid for version 0 scripts.  It will always
     return false for other script versions.
     """
@@ -851,7 +851,7 @@ def isNullDataScript(scriptVersion, script):
     """
     isNullDataScript returns whether or not the passed script is a standard
     null data script.
-    
+
     NOTE: This function is only valid for version 0 scripts.  It will always
     return false for other script versions.
     """
@@ -886,14 +886,14 @@ def checkSStx(tx):
     checkSStx returns an error if a transaction is not a stake submission
     transaction.  It does some simple validation steps to make sure the number of
     inputs, number of outputs, and the input/output scripts are valid.
-    
+
     SStx transactions are specified as below.
     Inputs:
     untagged output 1 [index 0]
     untagged output 2 [index 1]
     ...
     untagged output MaxInputsPerSStx [index MaxInputsPerSStx-1]
-    
+
     Outputs:
     OP_SSTX tagged output [index 0]
     OP_RETURN push of input 1's address for reward receiving [index 1]
@@ -904,7 +904,7 @@ def checkSStx(tx):
     OP_RETURN push of input MaxInputsPerSStx's address for reward receiving
         [index (MaxInputsPerSStx*2)-2]
     OP_SSTXCHANGE tagged output [index (MaxInputsPerSStx*2)-1]
-    
+
     The output OP_RETURN pushes should be of size 20 bytes (standard address).
     """
     # Check to make sure there aren't too many inputs.
@@ -1231,7 +1231,7 @@ def nonceRFC6979(privKey, inHash, extra, version):
         bx += extra
     if len(version) == 16 and len(extra) != 32:
         bx += ByteArray(0, length=32)
-        bx += version 
+        bx += version
 
     # Step B
     v = ByteArray(bytearray([1]*holen))
@@ -1274,14 +1274,14 @@ def verifySig(pub, inHash, r, s):
     """
     verifySig verifies the signature in r, s of inHash using the public key, pub.
 
-    Args: 
+    Args:
         pub (PublicKey): The public key.
         inHash (byte-like): The thing being signed.
         r (int): The R-parameter of the ECDSA signature.
         s (int): The S-parameter of the ECDSA signature.
 
     Returns:
-        bool: True if the signature verifies the key. 
+        bool: True if the signature verifies the key.
     """
     # See [NSA] 3.4.2
     N = Curve.N
@@ -1421,7 +1421,7 @@ def rawTxInSignature(tx, idx, subScript, hashType, key):
     """
     rawTxInSignature returns the serialized ECDSA signature for the input idx of
     the given transaction, with hashType appended to it.
-    
+
     NOTE: This function is only valid for version 0 scripts.  Since the function
     does not accept a script version, the results are undefined for other script
     versions.
@@ -1437,7 +1437,7 @@ def calcSignatureHash(script, hashType, tx, idx, cachedPrefix):
     cached prefix parameter allows the caller to optimize the calculation by
     providing the prefix hash to be reused in the case of SigHashAll without the
     SigHashAnyOneCanPay flag set.
-    
+
     NOTE: This function is only valid for version 0 scripts.  Since the function
     does not accept a script version, the results are undefined for other script
     versions.
@@ -1681,7 +1681,7 @@ def paysHighFees(totalInput, tx):
     maxFee = calcMinRequiredTxRelayFee(1000*DefaultRelayFeePerKb, tx.serializeSize())
     return fee > maxFee
 
-def sigHashPrefixSerializeSize(hashType, txIns, txOuts, signIdx): 
+def sigHashPrefixSerializeSize(hashType, txIns, txOuts, signIdx):
     """
     sigHashPrefixSerializeSize returns the number of bytes the passed parameters
     would take when encoded with the format used by the prefix hash portion of
@@ -1758,7 +1758,7 @@ def extractPkScriptAddrs(version, pkScript, chainParams):
     signatures associated with the passed PkScript.  Note that it only works for
     'standard' transaction script types.  Any data such as public keys which are
     invalid are omitted from the results.
-    
+
     NOTE: This function only attempts to identify version 0 scripts.  The return
     value will indicate a nonstandard script type for other script versions along
     with an invalid script version error.
@@ -1919,7 +1919,7 @@ def mergeScripts(chainParams, tx, idx, pkScript, scriptClass, addresses, nRequir
     The return value is the best effort merging of the two scripts. Calling this
     function with addresses, class and nrequired that do not match pkScript is
     an error and results in undefined behaviour.
-        
+
     NOTE: This function is only valid for version 0 scripts.  Since the function
     does not accept a script version, the results are undefined for other script
     versions.
@@ -1981,7 +1981,7 @@ def signTxOutput(chainParams, tx, idx, pkScript, hashType, keysource, previousSc
     getScript. If previousScript is provided then the results in previousScript
     will be merged in a type-dependent manner with the newly generated.
     signature script.
-            
+
     NOTE: This function is only valid for version 0 scripts.  Since the function
     does not accept a script version, the results are undefined for other script
     versions.
@@ -2068,11 +2068,11 @@ def estimateInputSize(scriptSize):
       - the supplied script size
       - 4 bytes sequence
 
-    Args: 
+    Args:
         scriptSize int: Byte-length of the script.
 
     Returns:
-        int: Estimated size of the byte-encoded transaction input. 
+        int: Estimated size of the byte-encoded transaction input.
     """
     return 32 + 4 + 1 + 8 + 4 + 4 + wire.varIntSerializeSize(scriptSize) + scriptSize + 4
 
@@ -2084,11 +2084,11 @@ def estimateOutputSize(scriptSize):
       - the compact int representation of the script size
       - the supplied script size
 
-    Args: 
+    Args:
         scriptSize int: Byte-length of the script.
 
     Returns:
-        int: Estimated size of the byte-encoded transaction output. 
+        int: Estimated size of the byte-encoded transaction output.
     """
     return 8 + 2 + wire.varIntSerializeSize(scriptSize) + scriptSize
 
@@ -2096,11 +2096,11 @@ def sumOutputSerializeSizes(outputs): # outputs []*wire.TxOut) (serializeSize in
     """
     sumOutputSerializeSizes sums up the serialized size of the supplied outputs.
 
-    Args: 
+    Args:
         outputs list(TxOut): Transaction outputs.
 
-    Returns: 
-        int: Estimated size of the byte-encoded transaction outputs. 
+    Returns:
+        int: Estimated size of the byte-encoded transaction outputs.
     """
     serializeSize = 0
     for txOut in outputs:
@@ -2115,13 +2115,13 @@ def estimateSerializeSize(scriptSizes, txOuts, changeScriptSize):
     additional change output if changeScriptSize is greater than 0. Passing 0
     does not add a change output.
 
-    Args: 
+    Args:
         scriptSizes list(int): Pubkey script sizes
         txOuts list(TxOut): Transaction outputs.
         changeScriptSize int: Size of the change script.
 
-    Returns: 
-        int: Estimated size of the byte-encoded transaction outputs. 
+    Returns:
+        int: Estimated size of the byte-encoded transaction outputs.
     """
     # Generate and sum up the estimated sizes of the inputs.
     txInsSize = 0
@@ -2200,7 +2200,7 @@ def isUnspendable(amount, pkScript):
     isUnspendable returns whether the passed public key script is unspendable, or
     guaranteed to fail at execution.  This allows inputs to be pruned instantly
     when entering the UTXO set. In Decred, all zero value outputs are unspendable.
-    
+
     NOTE: This function is only valid for version 0 scripts.  Since the function
     does not accept a script version, the results are undefined for other script
     versions.
@@ -2269,7 +2269,7 @@ def stakePoolTicketFee(stakeDiff, relayFee, height, poolFee, subsidyCache, param
     to 100.00%. This all must be done with integers.
     See the included doc.go of this package for more information about the
     calculation of this fee.
-    """    
+    """
     # Shift the decimal two places, e.g. 1.00%
     # to 100. This assumes that the proportion
     # is already multiplied by 100 to give a

@@ -2,11 +2,11 @@
 Copyright (c) 2019, Brian Stafford
 See LICENSE for details
 
-The DecredAccount inherits from the tinydecred base Account and adds staking 
+The DecredAccount inherits from the tinydecred base Account and adds staking
 support.
 """
 
-from tinydecred.accounts import Account
+from tinydecred.wallet.accounts import Account
 from tinydecred.util import tinyjson, helpers
 from tinydecred.crypto.crypto import AddressSecpPubKey
 from tinydecred.pydecred import txscript
@@ -21,18 +21,18 @@ STAKE_BRANCH = 2
 
 class KeySource(object):
     """
-    Implements the KeySource API from tinydecred.api. Must provide access to 
+    Implements the KeySource API from tinydecred.api. Must provide access to
     internal addresses via the KeySource.internal method, and PrivateKeys for a
     specified address via the KeySource.priv method. This implementation just
     sets the passed functions to class properties with the required method
-    names. 
+    names.
     """
     def __init__(self, priv, internal):
         """
         Args:
             priv (func): func(address : string) -> PrivateKey. Retrieves the
                 associated with the specified address.
-            internal (func): func() -> address : string. Get a new internal 
+            internal (func): func() -> address : string. Get a new internal
                 address.
         """
         self.priv = priv
@@ -47,9 +47,9 @@ class TicketRequest:
         # I add the ability to change it.
         self.minConf = minConf
         # expiry can be set to some reasonable block height. This may be
-        # important when approaching the end of a ticket window. 
+        # important when approaching the end of a ticket window.
         self.expiry = expiry
-        # Price is calculated purely from the ticket count, price, and fees, but 
+        # Price is calculated purely from the ticket count, price, and fees, but
         # cannot go over spendLimit.
         self.spendLimit = spendLimit
         # The VSP fee payment address.
@@ -60,12 +60,12 @@ class TicketRequest:
         # ticketFee is the transaction fee rate to pay the miner for the ticket.
         # Set to zero to use wallet's network default fee rate.
         self.ticketFee = ticketFee
-        # poolFees are set by the VSP. If you don't set these correctly, the 
+        # poolFees are set by the VSP. If you don't set these correctly, the
         # VSP may not vote for you.
         self.poolFees = poolFees
-        # How many tickets to buy. 
+        # How many tickets to buy.
         self.count = count
-        # txFee is the transaction fee rate to pay the miner for the split 
+        # txFee is the transaction fee rate to pay the miner for the split
         # transaction required to fund the ticket.
         # Set to zero to use wallet's network default fee rate.
         self.txFee = txFee
@@ -80,7 +80,7 @@ class TicketStats:
         Args:
             count (int): How many tickets the account owns. No differentiation
                 is made between immature, live, missed, or expired tickets.
-            value (int): How much value is locked in the tickets counted in 
+            value (int): How much value is locked in the tickets counted in
                 count.
         """
         self.count = count
@@ -89,7 +89,7 @@ class TicketStats:
 class DecredAccount(Account):
     """
     DecredAccount is the Decred version of the base tinydecred Account.
-    Decred Account inherits Account, and adds the necessary functionality to 
+    Decred Account inherits Account, and adds the necessary functionality to
     handle staking.
     """
     def __init__(self, *a, **k):
@@ -134,8 +134,8 @@ class DecredAccount(Account):
         to hook into the sync to authorize the stake pool.
 
         Args:
-            blockchainUTXOs (list(obj)): A list of Python objects decoded from 
-                dcrdata's JSON response from ...addr/utxo endpoint. 
+            blockchainUTXOs (list(obj)): A list of Python objects decoded from
+                dcrdata's JSON response from ...addr/utxo endpoint.
         """
         super().resolveUTXOs(blockchainUTXOs)
         self.updateStakeStats()
@@ -151,7 +151,7 @@ class DecredAccount(Account):
             self.updateStakeStats()
     def addTicketAddresses(self, a):
         """
-        Add the ticket voting addresses from each known stake pool. 
+        Add the ticket voting addresses from each known stake pool.
 
         Args:
             a (list(string)): The ticket addresses will be appended to this
@@ -173,7 +173,7 @@ class DecredAccount(Account):
         return self.addTicketAddresses(super().watchAddrs())
     def votingKey(self):
         """
-        For now, the voting key is the zeroth child 
+        For now, the voting key is the zeroth child
         """
         return self.privKey.child(STAKE_BRANCH).child(0).privateKey()
     def votingAddress(self):
@@ -190,7 +190,7 @@ class DecredAccount(Account):
         """
         Set the specified pool as the default.
 
-        Args: 
+        Args:
             pool (stakepool.StakePool): The stake pool object.
         """
         assert isinstance(pool, StakePool)
@@ -202,7 +202,7 @@ class DecredAccount(Account):
         return self.stakePool() != None
     def stakePool(self):
         """
-        stakePool is the default stakepool.StakePool for the account. 
+        stakePool is the default stakepool.StakePool for the account.
 
         Returns:
             staekpool.StakePool: The default stake pool object.
@@ -230,7 +230,7 @@ class DecredAccount(Account):
             if self.caresAboutTxid(txid):
                 tx = self.blockchain.tx(txid)
                 self.confirmTx(tx, self.blockchain.tipHeight)
-        # "Spendable" balance can change as utxo's mature, so update the 
+        # "Spendable" balance can change as utxo's mature, so update the
         # balance at every block.
         self.signals.balance(self.calcBalance(self.blockchain.tipHeight))
     def addressSignal(self, addr, txid):
@@ -278,7 +278,7 @@ class DecredAccount(Account):
             value int: The amount to send, in atoms.
             address str: The base-58 encoded pubkey hash.
 
-        Returns: 
+        Returns:
             MsgTx: The newly created transaction on success, `False` on failure.
         """
         keysource = KeySource(
@@ -293,8 +293,8 @@ class DecredAccount(Account):
         return tx
     def purchaseTickets(self, qty, price):
         """
-        purchaseTickets completes the purchase of the specified tickets. The 
-        DecredAccount uses the blockchain to do the heavy lifting, but must 
+        purchaseTickets completes the purchase of the specified tickets. The
+        DecredAccount uses the blockchain to do the heavy lifting, but must
         prepare the TicketRequest and KeySource and gather some other account-
         related information.
         """
@@ -305,14 +305,14 @@ class DecredAccount(Account):
         pool = self.stakePool()
         pi = pool.purchaseInfo
         req = TicketRequest(
-            minConf = 0, 
-            expiry = 0, 
+            minConf = 0,
+            expiry = 0,
             spendLimit = int(price*qty*1.1*1e8), # convert to atoms here
-            poolAddress = pi.poolAddress, 
-            votingAddress = pi.ticketAddress, 
+            poolAddress = pi.poolAddress,
+            votingAddress = pi.ticketAddress,
             ticketFee = 0, # use network default
-            poolFees = pi.poolFees, 
-            count = qty, 
+            poolFees = pi.poolFees,
+            count = qty,
             txFee = 0, # use network default
         )
         txs, spentUTXOs, newUTXOs = self.blockchain.purchaseTickets(keysource, self.getUTXOs, req)
@@ -326,7 +326,7 @@ class DecredAccount(Account):
         self.tickets.extend([tx.txid() for tx in txs[1]])
         # Remove spent utxos from cache.
         self.spendUTXOs(spentUTXOs)
-        # Add new UTXOs to set. These may be replaced with network-sourced 
+        # Add new UTXOs to set. These may be replaced with network-sourced
         # UTXOs once the wallet receives an update from the BlockChain.
         for utxo in newUTXOs:
             self.addUTXO(utxo)
@@ -341,7 +341,7 @@ class DecredAccount(Account):
         signals.balance(self.balance)
         self.generateGapAddresses()
 
-        # First, look at addresses that have been generated but not seen. Run in 
+        # First, look at addresses that have been generated but not seen. Run in
         # loop until the gap limit is reached.
         requestedTxs = 0
         addrs = self.unseenAddrs()
@@ -355,7 +355,7 @@ class DecredAccount(Account):
 
         # start with a search for all known addresses
         addresses = self.allAddresses()
-        
+
         # Until the server stops returning UTXOs, keep requesting more addresses
         # to check.
         while True:
@@ -377,5 +377,5 @@ class DecredAccount(Account):
         # Signal the new balance.
         signals.balance(self.calcBalance(self.blockchain.tip["height"]))
         return True
-    
+
 tinyjson.register(DecredAccount)

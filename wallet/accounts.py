@@ -10,7 +10,7 @@ accounts module
 """
 import unittest
 from tinydecred.util import tinyjson, helpers
-from tinydecred import api
+from tinydecred.wallet import api
 from tinydecred.pydecred import nets, constants as DCR
 from tinydecred.crypto import crypto
 from tinydecred.crypto.rando import generateSeed
@@ -24,9 +24,15 @@ MAX_SECRET_INT = 115792089237316195423570985008687907852837564279074904382605163
 SALT_SIZE = 32
 DEFAULT_ACCOUNT_NAME = "default"
 
+# See CrazyKeyError docs. When an out-of-range key is created, a placeholder
+# is set for that child's position internally in Account.
 CrazyAddress = "CRAZYADDRESS"
 
 def filterCrazyAddress(addrs):
+    """
+    When addresses are read out in bulk, they should be filtered for the
+    CrazyAddress.
+    """
     return [a for a in addrs if a != CrazyAddress]
 
 # DefaultGapLimit is the default unused address gap limit defined by BIP0044.
@@ -210,7 +216,7 @@ class Account(object):
         # cursor position, rather than the next.
         self.lastSeenExt = 0
         # For internal addresses, the cursor can sit below zero, since the
-        # addresses are always retrieved with with nextInternalAddress.
+        # addresses are always retrieved with nextInternalAddress.
         self.lastSeenInt = -1
         self.externalAddresses = []
         self.internalAddresses = []
@@ -397,7 +403,7 @@ class Account(object):
 
         Args:
             requested (int): Required amount in atoms.
-            filter (func(UTXO) -> bool): Optional UTXO filtering function.
+            approve (func(UTXO) -> bool): Optional UTXO filtering function.
 
         Returns:
             list(UTXO): A list of UTXOs.
@@ -518,7 +524,7 @@ class Account(object):
                 addr = branchKey.deriveChildAddress(len(branchAddrs), self.net)
                 branchAddrs.append(addr)
                 return addr
-            except crypto.ParameterRangeError:
+            except crypto.CrazyKeyError:
                 log.warning("crazy address generated")
                 addr = CrazyAddress
                 branchAddrs.append(addr)

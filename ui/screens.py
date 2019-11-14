@@ -8,7 +8,7 @@ import random
 from PyQt5 import QtGui, QtCore, QtWidgets
 from tinydecred import config
 from tinydecred.ui import qutilities as Q, ui
-from tinydecred.wallet import Wallet
+from tinydecred.wallet.wallet import Wallet
 from tinydecred.util import helpers
 from tinydecred.pydecred import constants as DCR
 from tinydecred.pydecred.stakepool import StakePool

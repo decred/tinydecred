@@ -9,10 +9,10 @@ import os
 import sys
 from PyQt5 import QtGui, QtCore, QtWidgets
 from tinydecred import config
+from tinydecred.wallet.wallet import Wallet
 from tinydecred.util import helpers
 from tinydecred.pydecred import constants as DCR
 from tinydecred.pydecred.dcrdata import DcrdataBlockchain
-from tinydecred.wallet import Wallet
 from tinydecred.ui import screens, ui, qutilities as Q
 
 # the directory of the tinydecred package
@@ -211,7 +211,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         return self.getNetSetting(currentWallet)
     def sysTrayActivated(self, trigger):
         """
-        Qt Slot called when the user interacts with the system tray icon. Shows 
+        Qt Slot called when the user interacts with the system tray icon. Shows
         the window, creating an icon in the user's application panel that
         persists until the appWindow is minimized.
         """
@@ -331,7 +331,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         A Qt Slot used for routing signalRegistry signals.
 
         Args:
-            s (tuple): A tuple of (func, signal args, user args, signal kwargs, 
+            s (tuple): A tuple of (func, signal args, user args, signal kwargs,
                 user kwargs).
         """
         cb, sigA, a,  sigK, k = s
