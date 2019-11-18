@@ -11,7 +11,7 @@ from tinydecred.ui import qutilities as Q, ui
 from tinydecred.wallet.wallet import Wallet
 from tinydecred.util import helpers
 from tinydecred.pydecred import constants as DCR
-from tinydecred.pydecred.stakepool import StakePool
+from tinydecred.pydecred.vsp import VotingServiceProvider
 
 UI_DIR = os.path.dirname(os.path.realpath(__file__))
 log = helpers.getLogger("APPUI") # , logLvl=0)
@@ -1300,7 +1300,7 @@ class PoolScreen(Screen):
         net = self.app.dcrdata.params
         def get():
             try:
-                return StakePool.providers(net)
+                return VotingServiceProvider.providers(net)
             except Exception as e:
                 log.error("error retrieving stake pools: %s" % e)
                 return False
@@ -1368,7 +1368,7 @@ class PoolScreen(Screen):
         if not apiKey:
             err("empty API key")
             return
-        pool = StakePool(url, apiKey)
+        pool = VotingServiceProvider(url, apiKey)
         def registerPool(wallet):
             try:
                 addr = wallet.openAccount.votingAddress()
@@ -1502,7 +1502,7 @@ class PoolAccountScreen(Screen):
         Set the displayed pool widgets.
 
         Args:
-            pools list(StakePool): pools to display
+            pools list(VotingServiceProvider): pools to display
         """
         Q.clearLayout(self.poolsLyt, delete=True)
         for pool in pools:
@@ -1522,7 +1522,7 @@ class PoolAccountScreen(Screen):
         Set the current active pool.
 
         Args:
-            pool (StakePool): The new active pool.
+            pool (VotingServiceProvider): The new active pool.
         """
         self.app.appWindow.showSuccess("new pool selected")
         self.app.wallet.selectedAccount.setPool(pool)

@@ -228,7 +228,7 @@ def attackCost(ticketFraction=None, xcRate=None, blockHeight=None, roi=None,
     """
     Calculate the cost of attack, which is the minimum fiat value of equipment, tickets, and
     rental expenditures required to outpace the main chain.
-    
+
     The cost of attack can be calculated in direct mode or reverse mode, depending on the parameters provided.
     Provide a `nethash` and a `ticketPrice` to calculate in direct mode.
     Omit the `nethash` and `ticketPrice`, and instead provide an `roi` and `apy` to calculate in reverse mode.
@@ -276,7 +276,7 @@ def attackCost(ticketFraction=None, xcRate=None, blockHeight=None, roi=None,
 
     device = device if device else MODEL_DEVICE
     if nethash is None:
-        if roi is None: # mining ROI could be zero 
+        if roi is None: # mining ROI could be zero
             raise Exception("minimizeY: Either a nethash or an roi must be provided")
         nethash = ReverseEquations.networkHashrate(device, xcRate, roi, blockHeight, blockTime, powSplit)
     if rentability or rentalRatio:
@@ -309,7 +309,7 @@ def purePowAttackCost(xcRate=None, blockHeight=None, roi=None, blockTime=None,
     device = device if device else MODEL_DEVICE
     treasurySplit = treasurySplit if treasurySplit else NETWORK.TREASURY_SPLIT
     if nethash is None:
-        if roi is None: # mining ROI could be zero 
+        if roi is None: # mining ROI could be zero
             raise Exception("minimizeY: Either a nethash or an roi must be provided")
         nethash = ReverseEquations.networkHashrate(device, xcRate, roi, blockHeight, blockTime, 1-treasurySplit)
     if rentability or rentalRatio:
@@ -343,11 +343,9 @@ class SubsidyCache(object):
     calculations for blocks and votes, including the max potential subsidy for
     given block heights, the proportional proof-of-work subsidy, the proportional
     proof of stake per-vote subsidy, and the proportional treasury subsidy.
-    
-    It makes using of caching to avoid repeated calculations.
+
+    It makes use of caching to avoid repeated calculations.
     """
-    # The following fields are protected by the mtx mutex.
-    #
     # cache houses the cached subsidies keyed by reduction interval.
     #
     # cachedIntervals contains an ordered list of all cached intervals.  It is
@@ -367,7 +365,7 @@ class SubsidyCache(object):
         # be consider valid by consensus.
         #
         # totalProportions is the sum of the PoW, PoS, and Treasury proportions.
-        self.minVotesRequired = (params.TicketsPerBlock // 2) + 1 
+        self.minVotesRequired = (params.TicketsPerBlock // 2) + 1
         self.totalProportions = (params.WorkRewardProportion +
                 params.StakeRewardProportion + params.BlockTaxProportion)
 
@@ -387,8 +385,7 @@ class SubsidyCache(object):
 
         # Calculate the reduction interval associated with the requested height and
         # attempt to look it up in cache.  When it's not in the cache, look up the
-        # latest cached interval and subsidy while the mutex is still held for use
-        # below.
+        # latest cached interval and subsidy.
         reqInterval = height // self.params.SubsidyReductionInterval
         if reqInterval in self.cache:
             return self.cache[reqInterval]
@@ -472,14 +469,14 @@ class SubsidyCache(object):
         CalcStakeVoteSubsidy returns the subsidy for a single stake vote for a block.
         It is calculated as a proportion of the total subsidy and max potential
         number of votes per block.
-        
+
         Unlike the Proof-of-Work and Treasury subsidies, the subsidy that votes
         receive is not reduced when a block contains less than the maximum number of
         votes.  Consequently, this does not accept the number of votes.  However, it
         is important to note that blocks that do not receive the minimum required
         number of votes for a block to be valid by consensus won't actually produce
         any vote subsidy either since they are invalid.
-        
+
         This function is safe for concurrent access.
         """
         # Votes have no subsidy prior to the point voting begins.  The minus one
@@ -505,11 +502,11 @@ class SubsidyCache(object):
         a block.  It is calculated as a proportion of the total subsidy and further
         reduced proportionally depending on the number of votes once the height at
         which voting begins has been reached.
-        
+
         Note that passing a number of voters fewer than the minimum required for a
         block to be valid by consensus along with a height greater than or equal to
         the height at which voting begins will return zero.
-        
+
         This function is safe for concurrent access.
         """
         # The first two blocks have special subsidy rules.

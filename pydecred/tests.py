@@ -4,7 +4,7 @@ import json
 import time
 from tempfile import TemporaryDirectory
 from tinydecred.pydecred.calc import SubsidyCache
-from tinydecred.pydecred import mainnet, testnet, txscript, dcrdata, stakepool
+from tinydecred.pydecred import mainnet, testnet, txscript, dcrdata, vsp
 from tinydecred.pydecred.wire import wire, msgtx
 from tinydecred.crypto.bytearray import ByteArray
 from tinydecred.crypto import crypto, opcode
@@ -1971,7 +1971,7 @@ class TestDcrdata(unittest.TestCase):
             poolAddr = crypto.AddressPubKeyHash(testnet.PubKeyHashAddrID, pkHash)
             scriptHash = crypto.hash160("some script. doesn't matter".encode())
             scriptAddr = crypto.AddressScriptHash(testnet.ScriptHashAddrID, scriptHash)
-            ticketPrice = self.stakeDiff()
+            ticketPrice = blockchain.stakeDiff()
             class request:
                 minConf = 0
                 expiry = 0
@@ -1984,7 +1984,7 @@ class TestDcrdata(unittest.TestCase):
                 txFee = 0
             ticket, spent, newUTXOs = blockchain.purchaseTickets(KeySource(), utxosource, request())
 
-class TestStakePool(unittest.TestCase):
+class TestVSP(unittest.TestCase):
     def setUp(self):
         self.poolURL = "https://teststakepool.decred.org"
         self.apiKey = ""
@@ -1994,7 +1994,7 @@ class TestStakePool(unittest.TestCase):
             print(" no stake pool credentials provided. skipping stake pool test")
             raise unittest.SkipTest
     def stakePool(self):
-        stakePool = stakepool.StakePool(self.poolURL, self.apiKey)
+        stakePool = vsp.VotingServiceProvider(self.poolURL, self.apiKey)
         stakePool.authorize(self.signingAddress, testnet)
         return stakePool
     def test_get_purchase_info(self):

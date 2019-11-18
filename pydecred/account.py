@@ -8,9 +8,9 @@ support.
 
 from tinydecred.wallet.accounts import Account
 from tinydecred.util import tinyjson, helpers
-from tinydecred.crypto.crypto import AddressSecpPubKey
+from tinydecred.crypto.crypto import AddressSecpPubKey, CrazyKeyError
 from tinydecred.pydecred import txscript
-from tinydecred.pydecred.stakepool import StakePool
+from tinydecred.pydecred.vsp import VotingServiceProvider
 
 log = helpers.getLogger("DCRACCT")
 
@@ -31,7 +31,7 @@ class KeySource(object):
         """
         Args:
             priv (func): func(address : string) -> PrivateKey. Retrieves the
-                associated with the specified address.
+                private key associated with the specified address.
             internal (func): func() -> address : string. Get a new internal
                 address.
         """
@@ -102,6 +102,7 @@ class DecredAccount(Account):
         self.stakePools = []
         self.blockchain = None
         self.signals = None
+        self._votingKey = None
     def __tojson__(self):
         obj = super().__tojson__()
         return helpers.recursiveUpdate(obj, {
@@ -115,6 +116,29 @@ class DecredAccount(Account):
         acct.tickets = obj["tickets"]
         acct.stakePools = obj["stakePools"]
         return acct
+    def open(self, pw):
+        """
+        Open the Decred account. Runs the parent's method, then performs some
+        Decred-specific initialization.
+        """
+        super().open(pw)
+        # The voting key is the first non-crazy stake-branch child.
+        for i in range(3):
+            try:
+                self._votingKey = self.privKey.child(STAKE_BRANCH).child(i).privateKey()
+                return
+            except CrazyKeyError:
+                continue
+        # It is realistically impossible to reach here.
+        raise Exception("error finding voting key")
+    def close(self):
+        """
+        Close the Decred account. Runs the parent's method, then performs some
+        Decred-specific clean up.
+        """
+        super().close()
+        self._votingKey.key.zero()
+        self._votingKey = None
     def updateStakeStats(self):
         """
         Updates the stake stats object.
@@ -173,9 +197,9 @@ class DecredAccount(Account):
         return self.addTicketAddresses(super().watchAddrs())
     def votingKey(self):
         """
-        For now, the voting key is the zeroth child
+        For now, the voting key is the zeroth child.
         """
-        return self.privKey.child(STAKE_BRANCH).child(0).privateKey()
+        return self._votingKey
     def votingAddress(self):
         """
         The voting address is the pubkey address (not pubkey-hash) for the
@@ -191,9 +215,9 @@ class DecredAccount(Account):
         Set the specified pool as the default.
 
         Args:
-            pool (stakepool.StakePool): The stake pool object.
+            pool (vsp.VotingServiceProvider): The stake pool object.
         """
-        assert isinstance(pool, StakePool)
+        assert isinstance(pool, VotingServiceProvider)
         self.stakePools = [pool] + [p for p in self.stakePools if p.apiKey != pool.apiKey]
         bc = self.blockchain
         addr = pool.purchaseInfo.ticketAddress
@@ -210,10 +234,11 @@ class DecredAccount(Account):
         return self.stakePool() != None
     def stakePool(self):
         """
-        stakePool is the default stakepool.StakePool for the account.
+        stakePool is the default vsp.VotingServiceProvider for the
+        account.
 
         Returns:
-            staekpool.StakePool: The default stake pool object.
+            vsp.VotingServiceProvider: The default stake pool object.
         """
         if self.stakePools:
             return self.stakePools[0]
@@ -221,6 +246,9 @@ class DecredAccount(Account):
     def ticketStats(self):
         """
         A getter for the stakeStats.
+
+        Returns:
+            TicketStats: The staking stats.
         """
         return self.stakeStats
     def blockSignal(self, sig):

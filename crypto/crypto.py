@@ -139,9 +139,9 @@ class AddressPubKeyHash:
 
 class AddressSecpPubKey:
     """
-    AddressSecpPubKey represents and address, which is a pubkey hash and it's
-    base-58 encoding. Argument pubkey should be a ByteArray corresponding the
-    the serializedCompressed public key (33 bytes).
+    AddressSecpPubKey represents an address, which is a pubkey hash and its
+    base-58 encoding. Argument pubkey should be a ByteArray corresponding to the
+    serializedCompressed public key (33 bytes).
     """
     def __init__(self, serializedPubkey, net):
         pubkey = Curve.parsePubKey(serializedPubkey)
@@ -422,7 +422,7 @@ def newAddressPubKey(decoded, net):
     if len(decoded) == 33:
         # First byte is the signature suite and ybit.
         suite = decoded[0]
-        suite &= ~(1 << 7)
+        suite &= 127
         ybit = not (decoded[0]&(1<<7) == 0)
         toAppend = 0x02
         if ybit:

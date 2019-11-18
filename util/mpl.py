@@ -11,7 +11,7 @@ from matplotlib import font_manager as FontManager
 from mpl_toolkits.mplot3d import Axes3D # leave this even if the linter complains
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from tinydecred.util import helpers
-import tinydecred.ui as UI
+import tinydecred.ui.ui as UI
 from tinydecred.pydecred import constants as C
 
 
@@ -56,7 +56,7 @@ def getFont(font, size):
         MPL_FONTS[font] = {}
     if size not in MPL_FONTS[font]:
         MPL_FONTS[font][size] = FontManager.FontProperties(
-            fname=os.path.join(UI.PACKAGEDIR, "fonts", "%s.ttf" % font), 
+            fname=os.path.join(UI.PACKAGEDIR, "fonts", "%s.ttf" % font),
             size=size
         )
     return MPL_FONTS[font][size]
@@ -115,7 +115,7 @@ def setAxesFont(font, size, *axes):
 class TexWidget(FigureCanvas):
     """A Qt5 compatible widget with a Tex equation"""
     def __init__(self, equation, fontSize=20):
-        self.equation = equation    
+        self.equation = equation
         self.fig = Figure()
         self.fig.subplots_adjust(**NO_SUBPLOT_MARGINS)
         super().__init__(self.fig)

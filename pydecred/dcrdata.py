@@ -855,6 +855,12 @@ class DcrdataBlockchain(object):
         """
         return self.dcrdata.block.best()
     def stakeDiff(self):
+        """
+        Get the current stake difficulty a.k.a. ticket price.
+
+        Returns:
+            int: The ticket price.
+        """
         return int(round(self.dcrdata.stake.diff()["next"]*1e8))
     def updateTip(self):
         """
@@ -1113,6 +1119,21 @@ class DcrdataBlockchain(object):
         limit in the request is greater than or equal to 0, tickets that cost
         more than that limit will return an error that not enough funds are
         available.
+
+        Args:
+            keysource (account.KeySource): A source for private keys.
+            utxosource (func(int, filterFunc) -> list(UTXO)): A source for
+                UTXOs. The filterFunc is an optional function to filter UTXOs,
+                and is of the form func(UTXO) -> bool.
+            req (account.TicketRequest): The ticket data.
+
+        Returns:
+            tuple: First element is the split transaction. Second is a list of
+                generated tickets.
+            list (msgtx.TxOut): The outputs spent for the split transaction.
+            internalOutputs (msgtx.TxOut): New outputs that fund internal
+                addresses.
+
         """
         self.updateTip()
         # account minConf is zero for regular outputs for now. Need to make that
@@ -1225,8 +1246,6 @@ class DcrdataBlockchain(object):
         # paying themselves with the larger ticket commitment.
         splitOuts = []
         for i in range(req.count):
-            # No pool used.
-            # Stake pool used.
             userAmt = neededPerTicket - poolFeeAmt
             poolAmt = poolFeeAmt
 

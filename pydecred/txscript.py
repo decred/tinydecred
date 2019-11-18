@@ -2038,6 +2038,15 @@ def getP2PKHOpCode(pkScript):
     return opNonstake
 
 def spendScriptSize(pkScript):
+    """
+    Get the byte-length of the spend script.
+
+    Args:
+        pkScript (ByteArray): The pubkey script.
+
+    Returns:
+        int: Byte-length of script.
+    """
     # Unspent credits are currently expected to be either P2PKH or
     # P2PK, P2PKH/P2SH nested in a revocation/stakechange/vote output.
     scriptClass = getScriptClass(DefaultScriptVersion, pkScript)
@@ -2204,6 +2213,12 @@ def isUnspendable(amount, pkScript):
     NOTE: This function is only valid for version 0 scripts.  Since the function
     does not accept a script version, the results are undefined for other script
     versions.
+
+    Args:
+        pkScript (ByteArray): The pubkey script.
+
+    Returns:
+        bool: True is script is unspendable.
     """
     # The script is unspendable if starts with OP_RETURN or is guaranteed to
     # fail at execution due to being larger than the max allowed script size.
@@ -2221,6 +2236,13 @@ def isDustOutput(output, relayFeePerKb):
     isDustOutput determines whether a transaction output is considered dust.
     Transactions with dust outputs are not standard and are rejected by mempools
     with default policies.
+
+    Args:
+        output (wire.TxOut): The transaction output.
+        relayFeePerKb: Minimum transaction fee allowable.
+
+    Returns:
+        bool: True if output is a dust output.
     """
     # Unspendable outputs which solely carry data are not checked for dust.
     if getScriptClass(output.version, output.pkScript) == NullDataTy:
@@ -2240,6 +2262,14 @@ def estimateSerializeSizeFromScriptSizes(inputSizes, outputSizes, changeScriptSi
     worst-case sizes. The estimated size is incremented for an additional
     change output if changeScriptSize is greater than 0. Passing 0 does not
     add a change output.
+
+    Args:
+        intputSizes (list(int)): The sizes of the input scripts.
+        outputSizes (list(int)): The sizes of the output scripts.
+        changeScriptSize (int): The size of the change script.
+
+    Returns:
+        int: The estimated serialized transaction size.
     """
     # Generate and sum up the estimated sizes of the inputs.
     txInsSize = 0
@@ -2267,8 +2297,18 @@ def stakePoolTicketFee(stakeDiff, relayFee, height, poolFee, subsidyCache, param
     stakePoolTicketFee determines the stake pool ticket fee for a given ticket
     from the passed percentage. Pool fee as a percentage is truncated from 0.01%
     to 100.00%. This all must be done with integers.
-    See the included doc.go of this package for more information about the
-    calculation of this fee.
+
+    Args:
+        stakeDiff (int): The ticket price.
+        relayFee (int): Transaction fees.
+        height (int): Current block height.
+        poolFee (int): The pools fee, as percent.
+        subsidyCache (calc.SubsidyCache): A subsidy cache.
+        params (object): Network parameters.
+
+    Returns:
+        int: The stake pool ticket fee.
+
     """
     # Shift the decimal two places, e.g. 1.00%
     # to 100. This assumes that the proportion
@@ -2319,10 +2359,18 @@ def sstxNullOutputAmounts(amounts, changeAmounts, amountTicket):
     """
     sstxNullOutputAmounts takes an array of input amounts, change amounts, and a
     ticket purchase amount, calculates the adjusted proportion from the purchase
-    amount, stores it in an array, then returns the array.  That is, for any given
-    SStx, this function calculates the proportional outputs that any single user
-    should receive.
-    Returns: (1) Fees (2) Output Amounts
+    amount, stores it in an array, then returns the array.  That is, for any
+    given SStx, this function calculates the proportional outputs that any
+    single user should receive.
+
+    Args:
+        amounts (list(int)): Input values.
+        changeAmounts (list(int)): The change output values.
+        amountTicket: Ticket price.
+
+    Returns:
+        int: Ticket fees.
+        list(int): Adjusted output amounts.
     """
     lengthAmounts = len(amounts)
 
@@ -2356,6 +2404,18 @@ def makeTicket(params, inputPool, inputMain, addrVote, addrSubsidy, ticketCost, 
     makeTicket creates a ticket from a split transaction output. It can optionally
     create a ticket that pays a fee to a pool if a pool input and pool address are
     passed.
+
+    Args:
+        params (object): Network parameters.
+        inputPool (ExtendedOutPoint): The pool input's extended outpoint.
+        inputMain (ExtendedOutPoint): The wallet input's extended outpoint.
+        addrVote (Address): The voting address.
+        addrSubsidy (Address): Wallet's stake commitment address.
+        ticketCost (int): The ticket price.
+        addrPool (Address): The pool's commitment address.
+
+    Returns:
+        wire.MsgTx: The ticket.
     """
 
     mtx = msgtx.MsgTx.new()
