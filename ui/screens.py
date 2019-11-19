@@ -381,7 +381,7 @@ class HomeScreen(Screen):
 
         # Update the home screen when the balance signal is received.
         app.registerSignal(ui.BALANCE_SIGNAL, self.balanceUpdated)
-        app.registerSignal(ui.SYNC_SIGNAL, self.setTicketStats)
+        app.registerSignal(ui.SYNC_SIGNAL, self.walletSynced)
 
         layout = self.layout
         layout.setAlignment(Q.ALIGN_LEFT)
@@ -515,18 +515,24 @@ class HomeScreen(Screen):
         self.balance = bal
         if self.ticketStats:
             self.setTicketStats()
+    def walletSynced(self):
+        """
+        Connected to the ui.SYNC_SIGNAL. Remove loading spinner and set ticket
+        stats.
+        """
+        acct = self.app.wallet.selectedAccount
+        self.ticketStats = acct.ticketStats()
+        self.setTicketStats()
+        self.spinner.setVisible(False)
+        self.stakeBttn.setVisible(True)
     def setTicketStats(self):
         """
         Set the staking statistics.
         """
-        acct = self.app.wallet.selectedAccount
-        balance = self.balance
-        stats = acct.ticketStats()
-        if stats and balance and balance.total > 0:
-            self.spinner.setVisible(False)
-            self.stakeBttn.setVisible(True)
-            self.statsLbl.setText("%s%% staked" % helpers.formatNumber(stats.value/balance.total*100))
-            self.ticketStats = stats
+        staked = 0
+        if self.ticketStats and self.balance.total > 0:
+            staked = self.ticketStats.value/self.balance.total
+        self.statsLbl.setText("%s%% staked" % helpers.formatNumber(staked*100))
     def spendClicked(self, e=None):
         """
         Display a form to send funds to an address. A Qt Slot, but any event
