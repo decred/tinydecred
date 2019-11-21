@@ -1,4 +1,10 @@
-# TinyDecred
+tinydecred
+==========
+
+[![Build Status](https://github.com/decred/tinydecred/workflows/Build%20and%20Test/badge.svg)](https://github.com/decred/tinydecred/actions)
+[![ISC License](https://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
+
+## Overview
 
 A Python 3 Decred toolkit. The modules in TinyDecred can be used to integrate 
 Decred into Python projects. Everything needed to create wallets to send and
