@@ -1323,8 +1323,12 @@ class PoolScreen(Screen):
             return
         self.pools = pools
         tNow = int(time.time())
-        # only save pools updated within the last day
-        self.pools = [p for p in pools if tNow - p["LastUpdated"] < 86400 and self.scorePool(p) > 95]
+        # Only save pools updated within the last day, but allow bad pools for
+        # testing.
+        # TODO: Have 3 tinydecred network constants retreivable through cfg
+        #   instead of checking the network config's Name attribute.
+        if cfg.net.Name == "mainnet":
+            self.pools = [p for p in pools if tNow - p["LastUpdated"] < 86400 and self.scorePool(p) > 95]
         self.randomizePool()
 
     def randomizePool(self, e=None):
@@ -1354,6 +1358,8 @@ class PoolScreen(Screen):
         """
         Get the pools performance score, as a float percentage.
         """
+        if pool["Voted"] == 0:
+            return 0
         return pool["Voted"]/(pool["Voted"]+pool["Missed"])*100
 
     def authPool(self):

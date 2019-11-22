@@ -927,7 +927,7 @@ class DcrdataBlockchain(object):
             return True
         except Exception as e:
             log.error("broadcast error: %s" % e)
-        return False
+            raise e
     def pubsubSignal(self, sig):
         """
         Process a notifictation from the block explorer.

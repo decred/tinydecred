@@ -236,7 +236,8 @@ class VotingServiceProvider(object):
             self.getPurchaseInfo()
             self.validate(address)
         except Exception as e:
-            if "code" not in self.err or self.err["code"] != 9:
+            alreadyRegistered = isinstance(self.err, dict) and "code" in self.err and self.err["code"] == 9
+            if not alreadyRegistered:
                 # code 9 is address not set
                 raise e
             # address is not set

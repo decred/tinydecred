@@ -360,12 +360,6 @@ class DecredAccount(Account):
                 self.addMempoolTx(tx)
         # Store the txids.
         self.tickets.extend([tx.txid() for tx in txs[1]])
-        # Remove spent utxos from cache.
-        self.spendUTXOs(spentUTXOs)
-        # Add new UTXOs to set. These may be replaced with network-sourced
-        # UTXOs once the wallet receives an update from the BlockChain.
-        for utxo in newUTXOs:
-            self.addUTXO(utxo)
         return txs[1]
     def sync(self, blockchain, signals):
         """
