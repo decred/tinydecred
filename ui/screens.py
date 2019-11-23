@@ -461,8 +461,7 @@ class HomeScreen(Screen):
         optsLyt.addWidget(self.spinner, 0, 1, Q.ALIGN_RIGHT)
 
         # Open staking window. Button is initally hidden until sync is complete.
-        self.stakeBttn = btn = app.getButton(SMALL, "Staking")
-        btn.setVisible(False)
+        btn = app.getButton(SMALL, "Staking")
         btn.setMinimumWidth(110)
         btn.clicked.connect(self.openStaking)
         optsLyt.addWidget(btn, 0, 1, Q.ALIGN_RIGHT)
@@ -512,9 +511,9 @@ class HomeScreen(Screen):
         self.totalBalance.setText("{0:,.2f}".format(dcr))
         self.totalBalance.setToolTip("%.8f" % dcr)
         self.availBalance.setText("%s spendable" % availStr.rstrip('0').rstrip('.'))
+        staked = bal.staked/bal.total if bal.total > 0 else 0
+        self.statsLbl.setText("%s%% staked" % helpers.formatNumber(staked*100))
         self.balance = bal
-        if self.ticketStats:
-            self.setTicketStats()
     def walletSynced(self):
         """
         Connected to the ui.SYNC_SIGNAL. Remove loading spinner and set ticket
@@ -522,17 +521,7 @@ class HomeScreen(Screen):
         """
         acct = self.app.wallet.selectedAccount
         self.ticketStats = acct.ticketStats()
-        self.setTicketStats()
         self.spinner.setVisible(False)
-        self.stakeBttn.setVisible(True)
-    def setTicketStats(self):
-        """
-        Set the staking statistics.
-        """
-        staked = 0
-        if self.ticketStats and self.balance.total > 0:
-            staked = self.ticketStats.value/self.balance.total
-        self.statsLbl.setText("%s%% staked" % helpers.formatNumber(staked*100))
     def spendClicked(self, e=None):
         """
         Display a form to send funds to an address. A Qt Slot, but any event
@@ -945,10 +934,11 @@ class MnemonicRestorer(Screen):
         self.edit = edit = QtWidgets.QTextEdit()
         edit.setAcceptRichText(False)
         edit.setMaximumWidth(300)
-        edit.setFixedHeight(225)
+        edit.setFixedHeight(200)
         edit.setStyleSheet("QLabel{border: 1px solid #777777; padding: 10px;}")
         # edit.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse | QtCore.Qt.TextSelectableByKeyboard)
         row, lyt = Q.makeWidget(QtWidgets.QWidget, "horizontal")
+        row.setContentsMargins(2, 2, 2, 2)
         self.layout.addWidget(row)
         lyt.addStretch(1)
         lyt.addWidget(edit)
@@ -1039,7 +1029,6 @@ class StakingScreen(Screen):
         # Register for a few key signals.
         self.app.registerSignal(ui.BLOCKCHAIN_CONNECTED, self.blockchainConnected)
         self.app.registerSignal(ui.BALANCE_SIGNAL, self.balanceSet)
-        self.app.registerSignal(ui.SYNC_SIGNAL, self.setStats)
 
         # ticket price is a single row reading `Ticket Price: XX.YY DCR`.
         lbl = Q.makeLabel("Ticket Price: ", 16)
@@ -1151,6 +1140,7 @@ class StakingScreen(Screen):
         """
         self.balance = balance
         self.setBuyStats()
+        self.setStats()
 
     def setBuyStats(self):
         """

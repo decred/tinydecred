@@ -115,6 +115,7 @@ class DecredAccount(Account):
         acct = Account.__fromjson__(obj, cls=DecredAccount)
         acct.tickets = obj["tickets"]
         acct.stakePools = obj["stakePools"]
+        acct.updateStakeStats()
         return acct
     def open(self, pw):
         """
@@ -139,6 +140,20 @@ class DecredAccount(Account):
         super().close()
         self._votingKey.key.zero()
         self._votingKey = None
+    def calcBalance(self, tipHeight):
+        tot = 0
+        avail = 0
+        staked = 0
+        for utxo in self.utxoscan():
+            tot += utxo.satoshis
+            if utxo.isTicket():
+                staked += utxo.satoshis
+            if utxo.isSpendable(tipHeight):
+                avail += utxo.satoshis
+        self.balance.total = tot
+        self.balance.available = avail
+        self.balance.staked = staked
+        return self.balance
     def updateStakeStats(self):
         """
         Updates the stake stats object.
@@ -374,7 +389,7 @@ class DecredAccount(Account):
         # First, look at addresses that have been generated but not seen. Run in
         # loop until the gap limit is reached.
         requestedTxs = 0
-        addrs = self.unseenAddrs()
+        addrs = self.gapAddrs()
         while addrs:
             for addr in addrs:
                 for txid in blockchain.txsForAddr(addr):

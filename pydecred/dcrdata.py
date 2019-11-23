@@ -443,9 +443,9 @@ class UTXO(object):
             amount = obj["amount"] if "amount" in obj else 0,
             satoshis = obj["satoshis"] if "satoshis" in obj else 0,
             maturity = obj["maturity"] if "maturity" in obj else None,
-            scriptClass = obj["scriptClass"] if "scriptClass" in obj else None,
             tinfo = obj["tinfo"] if "tinfo" in obj else None,
         )
+        utxo.parseScriptClass()
         return utxo
     def parseScriptClass(self):
         """

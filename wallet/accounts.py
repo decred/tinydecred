@@ -164,24 +164,27 @@ class Balance(object):
     for this wallet. The `available` sum is the same, but without those which
     appear to be from immature coinbase or stakebase transactions.
     """
-    def __init__(self, total=0, available=0):
+    def __init__(self, total=0, available=0, staked=0):
         self.total = total
         self.available = available
+        self.staked = staked
     def __tojson__(self):
         return {
             "total": self.total,
             "available": self.available,
+            "staked": self.staked,
         }
     @staticmethod
     def __fromjson__(obj):
         return Balance(
             total = obj["total"],
-            available = obj["available"]
+            available = obj["available"],
+            staked = obj["staked"] if "staked" in obj else 0
         )
     def __repr__(self):
         return (
-            "Balance(total=%.8f, available=%.8f)" %
-            (self.total*1e-8, self.available*1e-8)
+            "Balance(total=%.8f, available=%.8f, staked=%.8f)" %
+            (self.total*1e-8, self.available*1e-8, self.staked*1e-8)
         )
 tinyjson.register(Balance, "Balance")
 
@@ -272,7 +275,7 @@ class Account(object):
         acct.balance = obj["balance"]
         acct.gapLimit = obj["gapLimit"]
         acct.lastSeenExt = acct.lastSeen(acct.externalAddresses)
-        acct.lastSeenInt = acct.lastSeen(acct.internalAddresses)
+        acct.lastSeenInt = acct.lastSeen(acct.internalAddresses, default=-1)
         setNetwork(acct)
         return acct
     def addrTxs(self, addr):
@@ -574,7 +577,7 @@ class Account(object):
                 self.nextBranchAddress(self.intPub, intAddrs)
             addr = intAddrs[idx]
         return addr
-    def lastSeen(self, addrs):
+    def lastSeen(self, addrs, default=0):
         """
         Find the index of the last seen address in the list of addresses.
         The last seen address is taken as the last address for which there is an
@@ -586,7 +589,7 @@ class Account(object):
         Returns:
             int: The highest index of all seen addresses in the list.
         """
-        lastSeen = -1
+        lastSeen = default
         for i, addr in enumerate(addrs):
             if addr in self.txs:
                 lastSeen = i
@@ -632,10 +635,11 @@ class Account(object):
         a = a.union(self.externalAddresses)
         a = a.union((a for a in self.internalAddresses if a not in self.txs))
         return filterCrazyAddress(a)
-    def unseenAddrs(self):
+    def gapAddrs(self):
         return filterCrazyAddress(
-            [a for a in self.internalAddresses if a not in self.txs] +
-            [a for a in self.externalAddresses if a not in self.txs])
+            self.internalAddresses[self.lastSeenInt:] +
+            self.externalAddresses[self.lastSeenExt:]
+        )
     def currentAddress(self):
         """
         Get the external address at the cursor. The cursor is not moved.
