@@ -85,7 +85,7 @@ class Blockchain:
         Args:
             db (KeyValueDatabase): A key-value database for storing blocks
                 and transactions.
-            params (obj): Network parameters.
+            params (object): Network parameters.
         """
         self.db = db
         self.params = params
@@ -98,7 +98,7 @@ class Blockchain:
         Subscribe to new block notifications.
 
         Args:
-            receiver (func(obj)): A function or method that accepts the block
+            receiver (func(object)): A function or method that accepts the block
                 notifications.
         """
         raise Unimplemented("subscribeBlocks not implemented")
@@ -108,7 +108,7 @@ class Blockchain:
 
         Args:
             addrs (list(str)): List of base-58 encoded addresses.
-            receiver (func(obj)): A function or method that accepts the address 
+            receiver (func(object)): A function or method that accepts the address
                 notifications.
         """
         raise Unimplemented("subscribeAddresses not implemented")
@@ -364,11 +364,11 @@ class KeySource:
             PrivateKey: Private key.
         """
         raise Unimplemented("KeySource not implemented")
-    def change(self):
+    def internal(self):
         """
-        Get a new change address.
+        Get a new internal address.
 
         Returns:
             str: A new base-58 encoded change address.
         """
-        raise Unimplemented("change not implemented")
+        raise Unimplemented("internal not implemented")

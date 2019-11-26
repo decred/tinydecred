@@ -18,6 +18,7 @@ from base58 import b58encode, b58decode
 KEY_SIZE = 32
 HASH_SIZE = 32
 BLAKE256_SIZE = 32
+RIPEMD160_SIZE = 20
 SERIALIZED_KEY_LENGTH = 4 + 1 + 4 + 4 + 32 + 33 # 78 bytes
 HARDENED_KEY_START = 2**31
 MAX_COIN_TYPE = HARDENED_KEY_START - 1
@@ -47,22 +48,60 @@ STEd25519 = 1
 # signature over the secp256k1 elliptic curve.
 STSchnorrSecp256k1 = 2
 
-class ParameterRangeError(Exception):
-    pass
-class ZeroBytesError(Exception):
-    pass
-class PasswordError(Exception):
+# PKFUncompressed indicates the pay-to-pubkey address format is an
+# uncompressed public key.
+PKFUncompressed = 0
+
+# PKFCompressed indicates the pay-to-pubkey address format is a
+# compressed public key.
+PKFCompressed = 1
+
+class CrazyKeyError(Exception):
+    """
+    Both derived public or private keys rely on treating the left 32-byte
+    sequence calculated above (Il) as a 256-bit integer that must be within the
+    valid range for a secp256k1 private key.  There is a small chance
+    (< 1 in 2^127) this condition will not hold, and in that case, a child
+    extended key can't be created for this index and the caller should simply
+    increment to the next index.
+    """
     pass
 
-class Address:
+class ParameterRangeError(Exception):
     """
-    Address represents an address, which is a pubkey hash and its base-58
-    encoding.
+    An input parameter is out of the acceptable range.
     """
-    def __init__(self, netID=None, pkHash=None, net=None):
+    pass
+
+def encodeAddress(netID, k):
+    """
+    Base-58 encode the number, with the netID prepended byte-wise.
+
+    Args:
+        netID (byte-like): The addresses network encoding ID.
+        k (ByteArray): The pubkey or pubkey-hash or script-hash.
+
+    Returns:
+        string: Base-58 encoded address.
+    """
+    b = ByteArray(netID)
+    b += k
+    b += checksum(b.b)
+    return b58encode(b.bytes()).decode()
+
+class AddressPubKeyHash:
+    """
+    AddressPubKeyHash represents an address based on a pubkey hash.
+    """
+    def __init__(self, netID=None, pkHash=None, sigType=STEcdsaSecp256k1):
+        if len(pkHash) != 20:
+            raise Exception("AddressPubKeyHash expected 20 bytes, got %d" % len(pkHash))
+        # For now, just reject anything except secp256k1
+        if sigType != STEcdsaSecp256k1:
+            raise Exception("unsupported signature type %v", self.sigType)
+        self.sigType = sigType
         self.netID = netID
         self.pkHash = pkHash
-        self.net = net
     def string(self):
         """
         A base-58 encoding of the pubkey hash.
@@ -70,23 +109,155 @@ class Address:
         Returns:
             str: The encoded address.
         """
-        b = ByteArray(self.netID)
-        b += self.pkHash
-        b += checksum(b.b)
-        x = b.int()
+        return encodeAddress(self.netID, self.pkHash)
+    def address(self):
+        """
+        Address returns the string encoding of a pay-to-pubkey-hash address.
 
-        answer = ""
+        Returns:
+            str: The encoded address.
+        """
+        return self.string()
+    def scriptAddress(self):
+        """
+        ScriptAddress returns the raw bytes of the address to be used when
+        inserting the address into a txout's script.
 
-        while x > 0:
-            m = x%RADIX
-            x = x//RADIX
-            answer += ALPHABET[m]
+        Returns:
+            ByteArray: The script address.
+        """
+        return self.pkHash.copy()
+    def hash160(self):
+        """
+        Hash160 returns the Hash160(data) where data is the data normally
+        hashed to 160 bits from the respective address type.
 
-        while len(answer) < len(b)*136//100:
-            answer += ALPHABET[0]
+        Returns:
+            ByteArray: The hash.
+        """
+        return self.pkHash.copy()
 
-        # reverse
-        return answer[::-1]
+class AddressSecpPubKey:
+    """
+    AddressSecpPubKey represents an address, which is a pubkey hash and its
+    base-58 encoding. Argument pubkey should be a ByteArray corresponding to the
+    serializedCompressed public key (33 bytes).
+    """
+    def __init__(self, serializedPubkey, net):
+        pubkey = Curve.parsePubKey(serializedPubkey)
+        # Set the format of the pubkey.  This probably should be returned
+        # from dcrec, but do it here to avoid API churn.  We already know the
+        # pubkey is valid since it parsed above, so it's safe to simply examine
+        # the leading byte to get the format.
+        fmt = serializedPubkey[0]
+        if fmt in (0x02, 0x03):
+            pkFormat = PKFCompressed
+        elif fmt == 0x04:
+            pkFormat = PKFUncompressed
+        else:
+            raise Exception("unknown pubkey format %d", fmt)
+        self.pubkeyFormat = pkFormat
+        self.netID = self.pubkeyID = net.PubKeyAddrID
+        self.pubkeyHashID = net.PubKeyHashAddrID
+        self.pubkey = pubkey
+    def serialize(self):
+        """
+        serialize returns the serialization of the public key according to the
+        format associated with the address.
+        """
+        fmt = self.pubkeyFormat
+        if fmt == PKFUncompressed:
+            return self.pubkey.serializeUncompressed()
+        elif fmt == PKFCompressed:
+            return self.pubkey.serializeCompressed()
+        raise Exception("unknown pubkey format")
+    def string(self):
+        """
+        A base-58 encoding of the pubkey.
+
+        Returns:
+            str: The encoded address.
+        """
+        encoded = ByteArray(self.pubkeyID)
+        buf = ByteArray(STEcdsaSecp256k1, length=1)
+        compressed = self.pubkey.serializeCompressed()
+        # set the y-bit if needed
+        if compressed[0] == 0x03:
+            buf[0] |= (1 << 7)
+        buf += compressed[1:]
+        encoded += buf
+        encoded += checksum(encoded.b)
+        return b58encode(encoded.bytes()).decode()
+    def address(self):
+        """
+        Address returns the string encoding of the public key as a
+        pay-to-pubkey-hash.  Note that the public key format (uncompressed,
+        compressed, etc) will change the resulting address.  This is expected since
+        pay-to-pubkey-hash is a hash of the serialized public key which obviously
+        differs with the format.  At the time of this writing, most Decred addresses
+        are pay-to-pubkey-hash constructed from the compressed public key.
+        """
+        return encodeAddress(self.pubkeyHashID, hash160(self.serialize().bytes()))
+    def scriptAddress(self):
+        """
+        ScriptAddress returns the raw bytes of the address to be used when
+        inserting the address into a txout's script.
+
+        Returns:
+            ByteArray: The script address.
+        """
+        return self.serialize()
+    def hash160(self):
+        """
+        Hash160 returns the Hash160(data) where data is the data normally
+        hashed to 160 bits from the respective address type.
+
+        Returns:
+            ByteArray: The hash.
+        """
+        return hash160(self.serialize().bytes())
+
+class AddressScriptHash(object):
+    """
+    AddressScriptHash is an Address for a pay-to-script-hash (P2SH) transaction.
+    """
+    def __init__(self, netID, scriptHash):
+        self.netID = netID
+        self.scriptHash = scriptHash
+    def string(self):
+        """
+        A base-58 encoding of the pubkey hash.
+
+        Returns:
+            str: The encoded address.
+        """
+        return encodeAddress(self.netID, self.scriptHash)
+    def address(self):
+        """
+        Address returns the string encoding of a pay-to-script-hash address.
+
+        Returns:
+            str: The encoded address.
+        """
+        return self.string()
+    def scriptAddress(self):
+        """
+        ScriptAddress returns the raw bytes of the address to be used when
+        inserting the address into a txout's script.
+
+        Returns:
+            ByteArray: The script address.
+        """
+        return self.scriptHash.copy()
+    def hash160(self):
+        """
+        Hash160 returns the Hash160(data) where data is the data normally
+        hashed to 160 bits from the respective address type.
+
+        Returns:
+            ByteArray: The hash.
+        """
+        return self.scriptHash.copy()
 
 def hmacDigest(key, msg, digestmod=hashlib.sha512):
     """
@@ -111,7 +282,7 @@ def hash160(b):
         b (byte-like): The bytes to hash.
 
     Returns:
-        ByteArray: A 20-byte hash.
+        byte-like: A 20-byte hash.
     """
     h = hashlib.new("ripemd160")
     h.update(blake_hash(b))
@@ -238,16 +409,45 @@ def b58CheckDecode(s):
     cksum =decoded[len(decoded)-4:]
     if checksum(decoded[:len(decoded)-4]) != cksum:
         raise Exception("checksum error")
-    payload = decoded[2 : len(decoded)-4]
+    payload = ByteArray(decoded[2 : len(decoded)-4])
     return payload, version
+
+def newAddressPubKey(decoded, net):
+    """
+    NewAddressPubKey returns a new Address. decoded must be 33 bytes. This
+    constructor takes the decoded pubkey such as would be decoded from a base58
+    string. The first byte indicates the signature suite. For compressed
+    secp256k1 pubkeys, use AddressSecpPubKey directly.
+    """
+    if len(decoded) == 33:
+        # First byte is the signature suite and ybit.
+        suite = decoded[0]
+        suite &= 127
+        ybit = not (decoded[0]&(1<<7) == 0)
+        toAppend = 0x02
+        if ybit:
+            toAppend = 0x03
+
+        if suite == STEcdsaSecp256k1:
+            b = ByteArray(toAppend) + decoded[1:]
+            return AddressSecpPubKey(b, net)
+        elif suite == STEd25519:
+            # return NewAddressEdwardsPubKey(decoded, net)
+            raise Exception("Edwards signatures not implemented")
+        elif suite == STSchnorrSecp256k1:
+            # return NewAddressSecSchnorrPubKey(append([]byte{toAppend}, decoded[1:]...), net)
+            raise Exception("Schnorr signatures not implemented")
+        else:
+            raise Exception("unknown address type %d" % suite)
+    raise Exception("unable to decode pubkey of length %d" % len(decoded))
 
 def newAddressPubKeyHash(pkHash, net, algo):
     """
-    newAddressPubKeyHash returns a new Address.
+    newAddressPubKeyHash returns a new AddressPubkeyHash.
 
     Args:
         pkHash (ByteArray): The hash160 of the public key.
-        net (obj): The network parameters.
+        net (object): The network parameters.
         algo (int): The signature curve.
 
     Returns:
@@ -256,12 +456,43 @@ def newAddressPubKeyHash(pkHash, net, algo):
     if algo == STEcdsaSecp256k1:
         netID = net.PubKeyHashAddrID
     elif algo == STEd25519:
-        netID = net.PKHEdwardsAddrID
+        # netID = net.PKHEdwardsAddrID
+        raise Exception("Edwards not implemented")
     elif algo == STSchnorrSecp256k1:
-        netID = net.PKHSchnorrAddrID
+        # netID = net.PKHSchnorrAddrID
+        raise Exception("Schnorr not implemented")
     else:
         raise Exception("unknown ECDSA algorithm")
-    return Address(netID, pkHash, net)
+    return AddressPubKeyHash(netID, pkHash)
+
+def newAddressScriptHash(script, net):
+    """
+    newAddressScriptHash returns a new AddressScriptHash from a redeem script.
+
+    Args:
+        script (ByteArray): the redeem script
+        net (object): the network parameters
+
+    Returns:
+        AddressScriptHash: An address object.
+    """
+    return newAddressScriptHashFromHash(hash160(script.b), net)
+
+def newAddressScriptHashFromHash(scriptHash, net):
+    """
+    newAddressScriptHashFromHash returns a new AddressScriptHash from an already
+    hash160'd script.
+
+    Args:
+        pkHash (ByteArray): The hash160 of the public key.
+        net (object): The network parameters.
+
+    Returns:
+        AddressScriptHash: An address object.
+    """
+    if len(scriptHash) != RIPEMD160_SIZE:
+        raise Exception("incorrect script hash length")
+    return AddressScriptHash(net.ScriptHashAddrID, scriptHash)
 
 class ExtendedKey:
     """
@@ -297,31 +528,6 @@ class ExtendedKey:
         self.depth = depth
         self.childNum = childNum
         self.isPrivate = isPrivate
-    # def __tojson__(self):
-    #     return {
-    #         "privVer": self.privVer,
-    #         "pubVer": self.pubVer,
-    #         "key": self.key,
-    #         "pubKey": self.pubKey,
-    #         "chainCode": self.chainCode,
-    #         "parentFP": self.parentFP,
-    #         "depth": self.depth,
-    #         "childNum": self.childNum,
-    #         "isPrivate": self.isPrivate,
-    #     }
-    # @staticmethod
-    # def __fromjson__(obj):
-    #     return ExtendedKey(
-    #         privVer = obj["privVer"],
-    #         pubVer = obj["pubVer"],
-    #         key = obj["key"],
-    #         pubKey = obj["pubKey"],
-    #         chainCode = obj["chainCode"],
-    #         parentFP = obj["parentFP"],
-    #         depth = obj["depth"],
-    #         childNum = obj["childNum"],
-    #         isPrivate = obj["isPrivate"],
-    #     )
     def deriveCoinTypeKey(self, coinType):
         """
         First two hardened child derivations in accordance with BIP0044.
@@ -423,14 +629,9 @@ class ExtendedKey:
         il = ilr[:len(ilr)//2]
         childChainCode = ilr[len(ilr)//2:]
 
-        # Both derived public or private keys rely on treating the left 32-byte
-        # sequence calculated above (Il) as a 256-bit integer that must be
-        # within the valid range for a secp256k1 private key.  There is a small
-        # chance (< 1 in 2^127) this condition will not hold, and in that case,
-        # a child extended key can't be created for this index and the caller
-        # should simply increment to the next index.
+        # See CrazyKeyError docs for an explanation of this condition.
         if il.int() >= Curve.N or il.iszero():
-            raise ParameterRangeError("ExtendedKey.child: generated Il outside valid range")
+            raise CrazyKeyError("ExtendedKey.child: generated Il outside valid range")
 
         # The algorithm used to derive the child key depends on whether or not
         # a private or public child is being derived.
@@ -548,7 +749,7 @@ class ExtendedKey:
             str: The encoded extended key.
         """
         if self.key.iszero():
-            raise ZeroBytesError("unexpected zero key")
+            raise Exception("unexpected zero key")
 
         childNumBytes = ByteArray(self.childNum, length=4)
         depthByte = ByteArray(self.depth % 256, length=1)
@@ -581,7 +782,7 @@ class ExtendedKey:
 
         Args:
             i (int): Child number.
-            net (obj): Network parameters.
+            net (object): Network parameters.
 
         Returns:
             Address: Child address.
@@ -604,8 +805,6 @@ class ExtendedKey:
             secp256k1.PublicKey: The public key structure.
         """
         return Curve.parsePubKey(self.pubKey)
-
-# tinyjson.register(ExtendedKey)
 
 def decodeExtendedKey(net, pw, key):
     """
@@ -720,7 +919,7 @@ class KDFParams(object):
         return p
     def __repr__(self):
         return repr(self.__tojson__())
-tinyjson.register(KDFParams)
+tinyjson.register(KDFParams, "KDFParams")
 
 class ScryptParams(object):
     """
@@ -755,7 +954,7 @@ class ScryptParams(object):
     def __repr__(self):
         return repr(self.__tojson__())
 
-tinyjson.register(ScryptParams)
+tinyjson.register(ScryptParams, "ScryptParams")
 
 class SecretKey(object):
     """
@@ -828,7 +1027,7 @@ class SecretKey(object):
             raise Exception("unkown key derivation function")
         checkDigest = ByteArray(hashlib.sha256(sk.key.b).digest())
         if checkDigest != kp.digest:
-            raise PasswordError("rekey digest check failed")
+            raise Exception("rekey digest check failed")
         return sk
 
 class TestCrypto(unittest.TestCase):
@@ -841,19 +1040,39 @@ class TestCrypto(unittest.TestCase):
         b = SecretKey.rekey("abc".encode(), a.params())
         aUnenc = b.decrypt(aEnc.bytes())
         self.assertTrue(a, aUnenc)
-    def test_curve(self):
-        '''
-        Test curves. Unimplemented.
-        '''
-        pass
-    def test_priv_keys(self):
-        '''
-        Test private key parsing.
-        '''
-        key = ByteArray("eaf02ca348c524e6392655ba4d29603cd1a7347d9d65cfe93ce1ebffdca22694")
-        pk = privKeyFromBytes(key)
-
-        inHash = ByteArray("00010203040506070809")
-        # sig = txscript.signRFC6979(pk.key, inHash)
-
-        # self.assertTrue(txscript.verifySig(pk.pub, inHash, sig.r, sig.s))
+    def test_addr_pubkey(self):
+        from tinydecred.pydecred import mainnet
+        pairs = [
+            ("033b26959b2e1b0d88a050b111eeebcf776a38447f7ae5806b53c9b46e07c267ad", "DkRKjw7LmGCSzBwaUtjQLfb75Zcx9hH8yGNs3qPSwVzZuUKs7iu2e"),
+            ("0389ced3eaee84d5f0d0e166f6cd15f1bf6f429d1d13709393b418a6fb22d8be53", "DkRLLaJWkmH75iZGtQYE6FEf16zxeHr6TCAF59tGxhds4MFc2HqUS"),
+            ("02a14a0023d7d8cbc5d39fa60f7e4dc4d5bf18a7031f52875fbca6bf837f68713f", "DkM3hdWuKSSTm7Vq8WZx5f294vcZbPkAQYBDswkjmF1CFuWCRYxTr"),
+            ("03c3e3d7cde1c453a6283f5802a73d1cb3827cb4b007f58e3a52a36ce189934b6a", "DkRLn9vzsjK4ZYgDKy7JVYHKGvpZU5CYGK9H8zF2VCWbpTyVsEf4P"),
+            ("0254e17b230e782e591a9910794fdbf9943d500a47f2bf8446e1238f84e809bffc", "DkM37ymaat9j6oTFii1MZVpXrc4aRLEMHhTZrvrz8QY6BZ2HX843L"),
+        ]
+        for hexKey, addrStr in pairs:
+            addr = AddressSecpPubKey(ByteArray(hexKey), mainnet)
+            self.assertEqual(addr.string(), addrStr)
+    def test_addr_pubkey_hash(self):
+        from tinydecred.pydecred import mainnet
+        pairs = [
+            ("e201ee2f37bcc0ba0e93f82322e48333a92b9355", "DsmZvWuokf5NzFwFfJk5cALZZBZivjkhMSQ"),
+            ("5643d59202de158b509544d40b32e85bfaf6243e", "DsYq2s8mwpM6vXLbjb8unhNmBXFofPzcrrv"),
+            ("c5fa0d15266e055eaf8ec7c4d7a679885266ef0d", "Dsj1iA5PBCU6Nmpe6jqucwfHK17WmSKd3uG"),
+            ("73612f7b7b1ed32ff44dded7a2cf87c206fabf8a", "DsbUyd4DueVNyvfh542kZDXNEGKByUAi1RV"),
+            ("a616bc09179e31e6d9e3abfcb16ac2d2baf45141", "Dsg76ttvZmTFchZ5mWRnAUg6UGfCyrq86ch"),
+        ]
+        for pubkeyHash, addrStr in pairs:
+            addr = AddressPubKeyHash(mainnet.PubKeyHashAddrID, ByteArray(pubkeyHash))
+            self.assertEqual(addr.string(), addrStr)
+    def test_addr_script_hash(self):
+        from tinydecred.pydecred import mainnet
+        pairs = [
+            ("52fdfc072182654f163f5f0f9a621d729566c74d", "Dcf2QjJ1pSnLwthhw1cwE55MVZNQVXDZWQT"),
+            ("10037c4d7bbb0407d1e2c64981855ad8681d0d86", "DcYvG3fPxHDZ5pzW8nj4rcYq5kM9XFxXpUy"),
+            ("d1e91e00167939cb6694d2c422acd208a0072939", "DcrbVYmhm5yX9mw9qdwUVWw6psUhPGrQJsT"),
+            ("487f6999eb9d18a44784045d87f3c67cf22746e9", "Dce4vLzzENaZT7D2Wq5crRZ4VwfYMDMWkD9"),
+            ("95af5a25367951baa2ff6cd471c483f15fb90bad", "Dcm73og7Hn9PigaNu59dHgKnNSP1myCQ39t"),
+        ]
+        for scriptHash, addrStr in pairs:
+            addr = newAddressScriptHashFromHash(ByteArray(scriptHash), mainnet)
+            self.assertEqual(addr.string(), addrStr)

@@ -143,3 +143,4 @@ StakeMajorityDivisor =    4
 OrganizationPkScript =        (0xa914cbb08d6ca783b533b2c7d24a51fbca92d937bf9987).to_bytes(23, byteorder="big")
 OrganizationPkScriptVersion = 0
 # BlockOneLedger =              BlockOneLedgerSimNet,
+BlockOneSubsidy = int(300000 * 1e8)

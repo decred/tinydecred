@@ -8,6 +8,8 @@ import re
 from tinydecred.util import helpers
 from PyQt5 import QtCore, QtWidgets, QtGui
 
+log = helpers.getLogger("QUTIL") # , logLvl=0)
+
 # Some colors,
 QT_WHITE = QtGui.QColor("white")
 WHITE_PALETTE = QtGui.QPalette(QT_WHITE)
@@ -40,11 +42,11 @@ class ThreadUtilities(object):
         self.threads = []
     def makeThread(self, func, callback=None, *args, **kwargs):
         """
-        Create and start a `SmartThread`. 
+        Create and start a `SmartThread`.
         A reference to the thread is stored in `self.threads` until it completes
 
         :param function func: The function to run in the thread
-        :param function callback: A function to call when the thread has completed. Any results returned by `func` will be passed as the first positional argument. 
+        :param function callback: A function to call when the thread has completed. Any results returned by `func` will be passed as the first positional argument.
         :param list args: Positional arguments to pass to `func`
         :param dict kwargs: Keyword arguments to pass to `func`
         """
@@ -68,10 +70,10 @@ class SmartThread(QtCore.QThread):
         """
         Args:
             func (function): The function to run in a separate thread.
-            callback (function): A function to receive the return value from 
-            `func`. 
+            callback (function): A function to receive the return value from
+            `func`.
             *args: optional positional arguements to pass to `func`.
-            qtConnectType: Signal synchronisity. 
+            qtConnectType: Signal synchronisity.
             **kwargs: optional keyword arguments to pass to `func`.
         """
         super().__init__()
@@ -86,15 +88,16 @@ class SmartThread(QtCore.QThread):
         """
         QThread method. Runs the func.
         """
-        # print("--SmartThread starting with %s" % self.func.__name__)
-        self.returns = self.func(*self.args, **self.kwargs)
-
+        try:
+            self.returns = self.func(*self.args, **self.kwargs)
+        except Exception as e:
+            log.error("exception encountered in QThread: %s" % helpers.formatTraceback(e))
+            self.returns = False
     def callitback(self):
         """
-        QThread Slot connected to the connect Signal. Send the value returned 
+        QThread Slot connected to the connect Signal. Send the value returned
         from `func` to the callback function.
         """
-        # print("--SmartThread finishing with %s" % self.callback.__name__)
         self.callback(self.returns)
 
 
@@ -185,7 +188,7 @@ class QConsole(QtWidgets.QPlainTextEdit):
 
 class QToggle(QtWidgets.QAbstractButton):
     """
-    Implementation of a clean looking toggle switch translated from 
+    Implementation of a clean looking toggle switch translated from
     https://stackoverflow.com/a/38102598/1124661
     QAbstractButton::setDisabled to disable
     """
@@ -293,14 +296,14 @@ class QToggle(QtWidgets.QAbstractButton):
 
 def makeWidget(widgetClass, layoutDirection="vertical", parent=None):
     """
-    The creates a tuple of (widget, layout), with layout of type specified with 
+    The creates a tuple of (widget, layout), with layout of type specified with
     layout direction.
-    layout's parent will be widget. layout's alignment is set to top-left, and 
+    layout's parent will be widget. layout's alignment is set to top-left, and
     margins are set to 0 on both layout and widget
-    
+
     widgetClass (QtWidgets.QAbstractWidget:) The type of widget to make.
-    layoutDirection (str): optional. default "vertical". One of 
-        ("vertical","horizontal","grid"). Determines the type of layout applied 
+    layoutDirection (str): optional. default "vertical". One of
+        ("vertical","horizontal","grid"). Determines the type of layout applied
         to the widget.
     """
     widget = widgetClass(parent)
@@ -317,9 +320,9 @@ def makeWidget(widgetClass, layoutDirection="vertical", parent=None):
     layout.setAlignment(ALIGN_TOP | ALIGN_LEFT)
     return widget, layout
 
-def makeSeries(layoutDirection, *widgets, align=None):
+def makeSeries(layoutDirection, *widgets, align=None, widget=QtWidgets.QWidget):
     align = align if align else QtCore.Qt.Alignment()
-    wgt, lyt = makeWidget(QtWidgets.QWidget, layoutDirection)
+    wgt, lyt = makeWidget(widget, layoutDirection)
     for w in widgets:
         if w == STRETCH:
             lyt.addStretch(1)
@@ -352,6 +355,18 @@ def setBackgroundColor(widget, color):
     p.setColor(QtGui.QPalette.Window, QtGui.QColor(color))
     widget.setPalette(p)
 
+def addDropShadow(wgt):
+    """
+    Add a white background and a drop shadow for the given widget.
+    """
+    effect = QtWidgets.QGraphicsDropShadowEffect()
+    effect.setBlurRadius(7)
+    effect.setXOffset(0)
+    effect.setYOffset(1)
+    effect.setColor(QtGui.QColor("#777777"))
+    setBackgroundColor(wgt, "white")
+    wgt.setGraphicsEffect(effect)
+
 def makeLabel(s, fontSize, a=ALIGN_CENTER, **k):
     """
     Create a QLabel and set the font size and alignment.
@@ -359,7 +374,7 @@ def makeLabel(s, fontSize, a=ALIGN_CENTER, **k):
     Args:
         s (str): The label text.
         fontSize (int): Pixel size of the label font.
-        a (Qt.QAlignment): The text alignment in the label. 
+        a (Qt.QAlignment): The text alignment in the label.
             default QtCore.Qt.AlignCenter
         **k: Additional keyword arguments to pass to setProperties.
     """
@@ -368,9 +383,9 @@ def makeLabel(s, fontSize, a=ALIGN_CENTER, **k):
     lbl.setAlignment(a)
     return lbl
 
-def setProperties(lbl, color=None, fontSize=None, fontFamily=None):
+def setProperties(lbl, color=None, fontSize=None, fontFamily=None, underline=False):
     """
-    A few common properties of QLabels. 
+    A few common properties of QLabels.
     """
     if color:
         palette =  lbl.palette()
@@ -384,144 +399,19 @@ def setProperties(lbl, color=None, fontSize=None, fontFamily=None):
         lbl.setFont(font)
     if fontFamily:
         font.setFamily(fontFamily)
+    if underline:
+        font.setUnderline(True)
     lbl.setFont(font)
+    return lbl
 
 def pad(wgt, t, r, b, l):
     """
-    Add padding around the widget by wrapping it in another widget. 
+    Add padding around the widget by wrapping it in another widget.
     """
     w, lyt = makeWidget(QtWidgets.QWidget, HORIZONTAL)
     lyt.addWidget(wgt)
     w.setContentsMargins(l, t, r, b)
     return w
-
-
-class QSimpleTable(QtWidgets.QTableWidget):
-    """
-    QSimpleTable is a simple table layout with reasonable default settings. 
-    """
-    def __init__(self, parent, *args, iconStacking=None, singleHeader=False, fontWeight=None, maxHeight=None, **kwargs):
-        super(QSimpleTable, self).__init__(parent)
-        self.singleHeader = singleHeader
-        self.iconStacking = iconStacking if iconStacking else QtWidgets.QStyleOptionViewItem.Left
-        self.headerFont = QtWidgets.QTableWidgetItem().font()
-        self.maxHeight = maxHeight
-        self.headerFont.setPixelSize(14)
-        self.headerFont.setWeight(fontWeight if fontWeight else QtGui.QFont.DemiBold)
-        self.setWordWrap(False)
-        self.setFocusPolicy(QtCore.Qt.NoFocus)
-        self.setProperty("table-type","plain")
-        self.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
-        self.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
-        self.horizontalHeader().setStretchLastSection(True)
-        self.verticalHeader().hide()
-        self.horizontalHeader().hide()
-        self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        if not maxHeight:
-            self.wheelEvent = lambda e: None
-        self.setRowCount(1)
-        self.resizeSelf()
-        self.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
-        if len(args):
-            self.setHeaders(*args)
-            self.offset = 1
-        else:
-            self.offset = 0
-
-    def viewOptions(self):
-        """
-        This will stack icons and text vertically?
-        """
-        option = QtWidgets.QTableWidget.viewOptions(self)
-        option.decorationAlignment = QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter
-        option.decorationPosition = self.iconStacking
-        return option
-
-    def setHeaders(self, *headers):
-        """Set the headers"""
-        self.setColumnCount(len(headers))
-        font = self.headerFont
-        for i, header in enumerate(headers):
-            if header:
-                item = QtWidgets.QTableWidgetItem(header)
-            else:
-                item = QtWidgets.QTableWidgetItem()
-            item.setTextAlignment(ALIGN_CENTER)
-            item.setFont(font)
-            self.setItem(0, i, item)
-
-    def clearTable(self, fromRow=None, resize=True):
-        """
-        Clear all but the header row.
-        """
-        startRow = self.offset
-        if fromRow:
-            fromRow += self.offset # To account for the headers
-            if fromRow < self.rowCount():
-                startRow = fromRow
-            else:
-                if resize:
-                    self.resizeSelf()
-                return
-        for i in reversed(range(startRow, self.rowCount())):
-            self.removeRow(i)
-        if resize:
-            self.resizeSelf()
-
-    def insertStuff(self, row, col, text=None, icon=None, rowSpan=1, colSpan=1, alignment=None, font=None, resize=True):
-        """
-        Insert the widget, offsetting row by 1 to account for the headers
-        text could also be an QtGui.QIcon
-        """
-        actualRow = row+self.offset
-        alignment = alignment if alignment else ALIGN_CENTER
-        if self.rowCount() < actualRow+rowSpan:
-            self.setRowCount(actualRow+rowSpan)
-        if self.columnCount() < col+colSpan:
-            self.setColumnCount(col+colSpan)
-        if self.singleHeader and self.columnCount() < col+1:
-            self.setColumnCount(col+1)
-            self.setSpan(0, 0, 1, col+1)
-        if isinstance(text, str):
-            text = QtWidgets.QTableWidgetItem(text)
-            text.setTextAlignment(alignment)
-        elif not text:
-            text = QtWidgets.QTableWidgetItem()
-        if isinstance(icon, QtGui.QIcon):
-            text.setIcon(icon)
-        if isinstance(text, QtWidgets.QWidget):
-            self.setCellWidget(actualRow, col, text)
-        else:
-            if font:
-                text.setFont(font)
-            self.setItem(actualRow, col, text)
-        if rowSpan > 1 or colSpan > 1:
-            self.setSpan(actualRow, col, rowSpan, colSpan)
-        if resize:
-            self.resizeSelf()
-        return text
-
-    def getItem(self, row, col):
-        """
-        Return the item at the given position, offsetting the row by 1 to account for the headers, or None if no item available
-        """
-        return self.item(row+1, col)
-
-    def resizeSelf(self):
-        rows = self.rowCount()
-        # scrollBarHeight = self.horizontalScrollBar().height()
-        # headerHeight = self.horizontalHeader().height()
-        rowTotalHeight = 0
-        for i in range(rows):
-            rowTotalHeight += self.verticalHeader().sectionSize(i)
-        if self.maxHeight and rowTotalHeight > self.maxHeight:
-            self.setFixedHeight(self.maxHeight)
-            self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
-        else:
-            self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-            self.setFixedHeight(rowTotalHeight)
-
 
 def clearLayout(layout, delete=False):
     """
@@ -531,7 +421,7 @@ def clearLayout(layout, delete=False):
         layout (QAbstractLayout): Layout to clear
         delete (bool): Default False. Whether or not to delete the widget as well
     """
-    for i in reversed(range(layout.count())): 
+    for i in reversed(range(layout.count())):
         widget = layout.itemAt(i).widget()
         widget.setParent(None)
         if delete:
@@ -541,13 +431,43 @@ def clearLayout(layout, delete=False):
 def layoutWidgets(layout):
     """
     generator to iterate the widgets in a layout
-    
+
     Args:
         layout (QAbstractLayout): Layout to clear
         delete (bool): Default False. Whether or not to delete the widget as well.
     """
-    for i in range(layout.count()): 
+    for i in range(layout.count()):
         yield layout.itemAt(i).widget()
+
+def _setMouseDown(wgt, e):
+    if e.button() == QtCore.Qt.LeftButton:
+        wgt._mousedown = True
+
+def _releaseMouse(wgt, e):
+    if e.button() == QtCore.Qt.LeftButton and wgt._mousedown:
+        wgt._clickcb()
+        wgt._mousedown = False
+
+def _mouseMoved(wgt, e):
+    """
+    When the mouse is moved, check whether the mouse is within the bounds of
+    the widget. If not, set _mousedown to False. The user must click and
+    release without the mouse leaving the label to trigger the callback.
+    """
+    if wgt._mousedown == False:
+        return
+    qSize = wgt.size()
+    ePos = e.pos()
+    x, y = ePos.x(), ePos.y()
+    if x < 0 or y < 0 or x > qSize.width() or y > qSize.height():
+        wgt._mousedown = False
+
+def addClickHandler(wgt, cb):
+    wgt._mousedown = False
+    wgt._clickcb = cb
+    wgt.mousePressEvent = lambda e, w=wgt: _setMouseDown(wgt, e)
+    wgt.mouseReleaseEvent = lambda e, w=wgt: _releaseMouse(wgt, e)
+    wgt.mouseMoveEvent = lambda e, w=wgt: _mouseMoved(wgt, e)
 
 lightThemePalette = QtGui.QPalette()
 lightThemePalette.setColor(QtGui.QPalette.Window, QtGui.QColor("#ffffff"))
@@ -570,7 +490,7 @@ QUTILITY_STYLE = """
 QPushButton[button-style-class=light]{
     background-color:white;
     border-radius:3px;
-    border-color:#777777;
+    border-color:#aaaaaa;
     border-width:1px;
     border-style:solid;
     color:#333333;
@@ -642,9 +562,9 @@ QComboBox::down-arrow {
 }
 QLineEdit {
     padding: 7px;
-    font-size: 16px;
+    font-size: 14px;
     line-height: 34px;
-    border: 1px solid #777777;
+    border: 1px solid #aaaaaa;
     border-radius: 2px;
 }
 QLineEdit:focus {

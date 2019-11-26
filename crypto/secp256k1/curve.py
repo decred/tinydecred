@@ -132,13 +132,14 @@ def randFieldElement(): # c elliptic.Curve, rand io.Reader) (k *big.Int, err err
 	k = k + 1
 	return k
 
-def generateKey(): # (*PrivateKey, error) {
+def generateKey():
 	"""
 	generateKey generates a public and private key pair.
 	"""
 	k = randFieldElement()
 	x, y = curve.scalarBaseMult(k)
-	return PrivateKey(curve, k, x, y)
+	b = ByteArray(k, length=32)
+	return PrivateKey(curve, b, x, y)
 
 class KoblitzCurve:
 	def __init__(self, P, N, B, Gx, Gy, BitSize, H, q, byteSize, lamda, beta, a1, b1, a2, b2):

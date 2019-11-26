@@ -2,11 +2,11 @@
 Copyright (c) 2019, The Decred developers
 
 This example script will prompt for a password and create a password-encrypted
-testnet wallet. The mnemonic seed and an address are printed. 
+testnet wallet. The mnemonic seed and an address are printed.
 """
 import os
 from getpass import getpass
-from tinydecred.wallet import Wallet
+from tinydecred.wallet.wallet import Wallet
 from tinydecred.pydecred import testnet
 from tinydecred.util.helpers import mkdir
 
@@ -19,4 +19,4 @@ mnemonicSeed, wallet = Wallet.create(walletPath, password, testnet)
 # Print the seed words and an address.
 print("Mnemonic seed\n-------------")
 print(" ".join(mnemonicSeed))
-print("Receive DCR at %s" % wallet.paymentAddress())
+print("Receive DCR at %s" % wallet.currentAddress())

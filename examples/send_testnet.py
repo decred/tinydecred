@@ -1,14 +1,14 @@
 """
 Copyright (c) 2019, The Decred developers
 
-This example script will send 1 DCR from a wallet as created with the 
-create_testnet_wallet.py example script to the return address from the testnet 
+This example script will send 1 DCR from a wallet as created with the
+create_testnet_wallet.py example script to the return address from the testnet
 faucet at https://faucet.decred.org/.
 Before running this script, send the wallet some DCR from the faucet.
 """
 import os
 from getpass import getpass
-from tinydecred.wallet import Wallet
+from tinydecred.wallet.wallet import Wallet
 from tinydecred.pydecred import testnet
 from tinydecred.pydecred.dcrdata import DcrdataBlockchain
 
@@ -37,7 +37,7 @@ value = int(1 * 1e8) # 1 DCR, atoms
 acct = 0 # Every wallet has a zeroth Decred account
 with wallet.open(acct, password, blockchain, Signals()):
 	wallet.sync()
-	try: 
+	try:
 		tx = wallet.sendToAddress(value, recipient)
 		# Print the transaction ID and a dcrdata link.
 		print("transaction ID: %s" % tx.id())
