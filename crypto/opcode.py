@@ -265,7 +265,7 @@ OP_PUBKEY              = 0xfe # 254 - bitcoin core internal
 OP_INVALIDOPCODE       = 0xff # 255 - bitcoin core internal
 
 def noFunc(opcode, engine):
-	raise Exception("opcode functions not implemented")
+    raise Exception("opcode functions not implemented")
 
 opcodeFalse = noFunc
 opcodePushData = noFunc
@@ -359,17 +359,17 @@ opcodeDisabled = noFunc
 
 
 class opcode:
-	"""
-	An opcode defines the information related to a txscript opcode.  opfunc, if
-	present, is the function to call to perform the opcode on the script.  The
-	current script is passed in as a slice with the first member being the opcode
-	itself.
-	"""
-	def __init__(self, value, name, length, opfunc):
-		self.value  = value # byte
-		self.name   = name # string
-		self.length = length # int
-		self.opfunc = opfunc # func(*opcode, []byte, *Engine) error
+    """
+    An opcode defines the information related to a txscript opcode.  opfunc, if
+    present, is the function to call to perform the opcode on the script.  The
+    current script is passed in as a slice with the first member being the opcode
+    itself.
+    """
+    def __init__(self, value, name, length, opfunc):
+        self.value  = value # byte
+        self.name   = name # string
+        self.length = length # int
+        self.opfunc = opfunc # func(*opcode, []byte, *Engine) error
 
 # opcodeArray holds details about all possible opcodes such as how many bytes
 # the opcode and any associated data should take, its human-readable name, and
@@ -659,4 +659,3 @@ opcodeArray[OP_PUBKEYHASH]   = opcode(OP_PUBKEYHASH, "OP_PUBKEYHASH", 1, opcodeI
 opcodeArray[OP_PUBKEY]       = opcode(OP_PUBKEY, "OP_PUBKEY", 1, opcodeInvalid)
 
 opcodeArray[OP_INVALIDOPCODE] = opcode(OP_INVALIDOPCODE, "OP_INVALIDOPCODE", 1, opcodeInvalid)
-

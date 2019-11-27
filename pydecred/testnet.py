@@ -9,9 +9,9 @@ https://github.com/decred/dcrd/blob/master/chaincfg/testnetparams.go
 Name = "testnet3"
 DefaultPort = "19108"
 DNSSeeds = [
-	("testnet-seed.decred.mindcry.org", True),
-	("testnet-seed.decred.netpurgatory.com", True),
-	("testnet-seed.decred.org", True)
+    ("testnet-seed.decred.mindcry.org", True),
+    ("testnet-seed.decred.netpurgatory.com", True),
+    ("testnet-seed.decred.org", True)
 ]
 
 GenesisHash = "a649dce53918caf422e9c711c858837e08d626ecfcd198969b24f7b634a49bac"

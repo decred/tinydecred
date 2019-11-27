@@ -31,10 +31,10 @@ def decoder(obj):
     return obj
 
 def load(s):
-	"""
-	Turn the string into an object with the custon decoder.
-	"""
-	return json.loads(s, object_hook=decoder)
+    """
+    Turn the string into an object with the custon decoder.
+    """
+    return json.loads(s, object_hook=decoder)
 
 def loadFile(filepath):
     """

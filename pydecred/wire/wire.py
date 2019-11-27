@@ -3,7 +3,7 @@ Copyright (c) 2019, Brian Stafford
 Copyright (c) 2019, The Decred developers
 See LICENSE for details
 
-Constants and common routines from the dcrd wire package. 
+Constants and common routines from the dcrd wire package.
 """
 from tinydecred.crypto.bytearray import ByteArray
 
@@ -85,90 +85,90 @@ TxSerializeOnlyWitness = 2
 DefaultPkScriptVersion = 0x0000
 
 def varIntSerializeSize(i):
-	"""
-	The value is small enough to be represented by itself, so it's
-	just 1 byte.
-	"""
-	if i < 0xfd:
-		return 1
+    """
+    The value is small enough to be represented by itself, so it's
+    just 1 byte.
+    """
+    if i < 0xfd:
+        return 1
 
-	# Discriminant 1 byte plus 2 bytes for the uint16.
-	if i <= MaxUint16:
-		return 3
+    # Discriminant 1 byte plus 2 bytes for the uint16.
+    if i <= MaxUint16:
+        return 3
 
-	# Discriminant 1 byte plus 4 bytes for the uint32.
-	if i <= MaxUint32:
-		return 5
+    # Discriminant 1 byte plus 4 bytes for the uint32.
+    if i <= MaxUint32:
+        return 5
 
-	# Discriminant 1 byte plus 8 bytes for the uint64.
-	return 9
+    # Discriminant 1 byte plus 8 bytes for the uint64.
+    return 9
 
 def writeVarInt(pver, val):
-	""" 
-	writeVarInt serializes val to w using a variable number of bytes depending
-	on its value.
-	"""
+    """
+    writeVarInt serializes val to w using a variable number of bytes depending
+    on its value.
+    """
 
-	if val < 0xfd:
-		return ByteArray(val, length=1) # will be length 1
+    if val < 0xfd:
+        return ByteArray(val, length=1) # will be length 1
 
-	if val <= MaxUint16:
-		b = ByteArray(0xfd)
-		b += ByteArray(val, length=2).littleEndian()
-		return b
+    if val <= MaxUint16:
+        b = ByteArray(0xfd)
+        b += ByteArray(val, length=2).littleEndian()
+        return b
 
-	if val <= MaxUint32:
-		b = ByteArray(0xfe)
-		b += ByteArray(val, length=4).littleEndian()
-		return b
+    if val <= MaxUint32:
+        b = ByteArray(0xfe)
+        b += ByteArray(val, length=4).littleEndian()
+        return b
 
-	b = ByteArray(0xff)
-	b += ByteArray(val, length=8).littleEndian()
-	return b
+    b = ByteArray(0xff)
+    b += ByteArray(val, length=8).littleEndian()
+    return b
 
 def writeVarBytes(pver, inBytes): #w io.Writer, pver uint32, bytes []byte) error {
-	"""
-	writeVarBytes serializes a variable length byte array to w as a varInt
-	containing the number of bytes, followed by the bytes themselves.
-	"""
-	slen = len(inBytes)
-	b = writeVarInt(pver, slen)
-	b += inBytes
-	return b
+    """
+    writeVarBytes serializes a variable length byte array to w as a varInt
+    containing the number of bytes, followed by the bytes themselves.
+    """
+    slen = len(inBytes)
+    b = writeVarInt(pver, slen)
+    b += inBytes
+    return b
 
 def readVarInt(b, pver): #r io.Reader, pver uint32) (uint64, error) {
-	"""
-	readVarInt reads a variable length integer from r and returns it as a uint64.
-	"""
-	discriminant = b.pop(1).int()
-	rv = 0
-	if discriminant == 0xff:
-		rv = b.pop(8).unLittle().int()
+    """
+    readVarInt reads a variable length integer from r and returns it as a uint64.
+    """
+    discriminant = b.pop(1).int()
+    rv = 0
+    if discriminant == 0xff:
+        rv = b.pop(8).unLittle().int()
 
-		# The encoding is not canonical if the value could have been
-		# encoded using fewer bytes.
-		minRv = 0x100000000
-		if rv < minRv:
-			raise Exception("ReadVarInt noncanon error: %d - %d <= %d" % (rv, discriminant, minRv))
-	elif discriminant == 0xfe:
-		rv = b.pop(4).unLittle().int()
+        # The encoding is not canonical if the value could have been
+        # encoded using fewer bytes.
+        minRv = 0x100000000
+        if rv < minRv:
+            raise Exception("ReadVarInt noncanon error: %d - %d <= %d" % (rv, discriminant, minRv))
+    elif discriminant == 0xfe:
+        rv = b.pop(4).unLittle().int()
 
-		# The encoding is not canonical if the value could have been
-		# encoded using fewer bytes.
-		minRv = 0x10000
-		if rv < minRv:
-			raise Exception("ReadVarInt noncanon error: %d - %d <= %d" % (rv, discriminant, minRv))
+        # The encoding is not canonical if the value could have been
+        # encoded using fewer bytes.
+        minRv = 0x10000
+        if rv < minRv:
+            raise Exception("ReadVarInt noncanon error: %d - %d <= %d" % (rv, discriminant, minRv))
 
-	elif discriminant == 0xfd:
-		rv = b.pop(2).unLittle().int()
+    elif discriminant == 0xfd:
+        rv = b.pop(2).unLittle().int()
 
-		# The encoding is not canonical if the value could have been
-		# encoded using fewer bytes.
-		minRv = 0xfd
-		if rv < minRv:
-			raise Exception("ReadVarInt noncanon error: %d - %d <= %d" % (rv, discriminant, minRv))
+        # The encoding is not canonical if the value could have been
+        # encoded using fewer bytes.
+        minRv = 0xfd
+        if rv < minRv:
+            raise Exception("ReadVarInt noncanon error: %d - %d <= %d" % (rv, discriminant, minRv))
 
-	else:
-		rv = discriminant
+    else:
+        rv = discriminant
 
-	return rv
+    return rv

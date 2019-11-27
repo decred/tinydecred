@@ -88,11 +88,11 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         # trackedCssItems are CSS-styled elements to be updated if dark mode is
         # enabled/disabled.
         self.trackedCssItems = []
-       	st = self.sysTray = QtWidgets.QSystemTrayIcon(QtGui.QIcon(DCR.FAVICON))
+        st = self.sysTray = QtWidgets.QSystemTrayIcon(QtGui.QIcon(DCR.FAVICON))
         self.contextMenu = ctxMenu = QtWidgets.QMenu()
         ctxMenu.addAction("minimize").triggered.connect(self.minimizeApp)
         ctxMenu.addAction("quit").triggered.connect(lambda *a: self.qApp.quit())
-       	st.setContextMenu(ctxMenu)
+        st.setContextMenu(ctxMenu)
         st.activated.connect(self.sysTrayActivated)
 
         # The signalRegistry maps a signal to any number of receivers. Signals
@@ -523,4 +523,3 @@ if __name__ == '__main__':
     log.info("configuration file at %s"  % config.CONFIG_PATH)
     log.info("data directory at %s" % config.DATA_DIR)
     runTinyDecred()
-
