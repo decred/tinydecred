@@ -1,5 +1,9 @@
-import unittest
+"""
+Copyright (c) 2019, the Decred developers
+See LICENSE for details
+"""
 
+import unittest
 from tinydecred.util import helpers
 from tinydecred.crypto.bytearray import ByteArray
 from tinydecred.crypto import crypto
