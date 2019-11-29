@@ -3,7 +3,7 @@ Copyright (c) 2019, Brian Stafford
 Copyright (c) 2019, The Decred developers
 See LICENSE for details
 
-PGP-based mnemonic seed generation. 
+PGP-based mnemonic seed generation.
 """
 from tinydecred.crypto.crypto import sha256ChecksumByte
 from tinydecred.crypto.bytearray import ByteArray
@@ -523,55 +523,55 @@ Yucatan"""
 
 
 def pgWords():
-	wordList = alternatingWords.split("\n")
-	idxMap = {}
-	for i, word in enumerate(wordList):
-		idxMap[word.lower()] = i
-	return wordList, idxMap
+    wordList = alternatingWords.split("\n")
+    idxMap = {}
+    for i, word in enumerate(wordList):
+        idxMap[word.lower()] = i
+    return wordList, idxMap
 
 def encode(seed):
-	"""
-	Encode the seed to a mnemonic seed.
+    """
+    Encode the seed to a mnemonic seed.
 
-	Args:
-		seed (ByteArray): The seed to encode.
+    Args:
+        seed (ByteArray): The seed to encode.
 
-	Returns:
-		list(str): A mnemonic seed.
-	"""
-	if isinstance(seed, ByteArray):
-		seed = seed.bytes()
-	wordList, _ = pgWords()
-	def byteToMnemonic(b, i):
-		bb = b * 2
-		if i%2 != 0:
-			bb += 1
-		return wordList[bb]
+    Returns:
+        list(str): A mnemonic seed.
+    """
+    if isinstance(seed, ByteArray):
+        seed = seed.bytes()
+    wordList, _ = pgWords()
+    def byteToMnemonic(b, i):
+        bb = b * 2
+        if i%2 != 0:
+            bb += 1
+        return wordList[bb]
 
-	words = [""]*(len(seed)+1)
-	for i, b in enumerate(seed):
-		words[i] = byteToMnemonic(b, i)
-	checksum = sha256ChecksumByte(seed)
-	words[len(words)-1] = byteToMnemonic(checksum, len(seed))
-	return words
+    words = [""]*(len(seed)+1)
+    for i, b in enumerate(seed):
+        words[i] = byteToMnemonic(b, i)
+    checksum = sha256ChecksumByte(seed)
+    words[len(words)-1] = byteToMnemonic(checksum, len(seed))
+    return words
 
 def decode(words):
-	"""
-	DecodeMnemonics returns the decoded value that is encoded by words.  Any
-	words that are whitespace are empty are skipped.
-	"""
-	_, byteMap = pgWords()
-	decoded = [0]*len(words)
-	idx = 0
-	for word in words:
-		word = word.strip().lower()
-		if word == "":
-			continue
-		if word not in byteMap:
-			raise Exception("unknown words in mnemonic key: %s" % word)
-		b = byteMap[word]
-		if int(b%2) != idx%2:
-			raise Exception("word %v is not valid at position %v, check for missing words" % (w, idx))
-		decoded[idx] = b // 2
-		idx += 1
-	return ByteArray(decoded[:idx])
+    """
+    DecodeMnemonics returns the decoded value that is encoded by words.  Any
+    words that are whitespace are empty are skipped.
+    """
+    _, byteMap = pgWords()
+    decoded = [0]*len(words)
+    idx = 0
+    for word in words:
+        word = word.strip().lower()
+        if word == "":
+            continue
+        if word not in byteMap:
+            raise Exception("unknown words in mnemonic key: %s" % word)
+        b = byteMap[word]
+        if int(b%2) != idx%2:
+            raise Exception("word %v is not valid at position %v, check for missing words" % (w, idx))
+        decoded[idx] = b // 2
+        idx += 1
+    return ByteArray(decoded[:idx])

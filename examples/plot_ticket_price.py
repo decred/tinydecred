@@ -1,17 +1,17 @@
 """
 Copyright (c) 2019, The Decred developers
 
-This example script will pull ticket price data from dcrdata and plot using 
+This example script will pull ticket price data from dcrdata and plot using
 matplotlib. The matplotlib package is not a tinydecred dependency, so it should
 be installed separately with `pip3 install matplotlib`.
 """
 from tinydecred.pydecred.dcrdata import DcrdataClient
 from tinydecred.util.helpers import mktime
 try:
-	from matplotlib import pyplot as plt
+    from matplotlib import pyplot as plt
 except ImportError:
-	print("matplotlib import error. Did you 'pip3 install matplotlib'?")
-	exit()
+    print("matplotlib import error. Did you 'pip3 install matplotlib'?")
+    exit()
 
 # Create a dcrdata client and grab the ticket price data.
 dcrdata = DcrdataClient("https://dcrdata.decred.org")
@@ -28,6 +28,6 @@ ax.set_xticklabels([str(year) for year in years])
 ax.set_xlabel("date")
 ax.set_ylabel("ticket price (DCR)")
 
-ax.plot(ticketPrice["x"], [atoms*1e-8 for atoms in ticketPrice["y"]], 
-	color="#222222")
+ax.plot(ticketPrice["x"], [atoms*1e-8 for atoms in ticketPrice["y"]],
+    color="#222222")
 plt.show()
