@@ -571,7 +571,7 @@ def decode(words):
             raise Exception("unknown words in mnemonic key: %s" % word)
         b = byteMap[word]
         if int(b%2) != idx%2:
-            raise Exception("word %v is not valid at position %v, check for missing words" % (w, idx))
+            raise Exception("word %v is not valid at position %v, check for missing words" % (word, idx))
         decoded[idx] = b // 2
         idx += 1
     return ByteArray(decoded[:idx])
