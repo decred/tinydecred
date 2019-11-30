@@ -383,6 +383,21 @@ def makeLabel(s, fontSize, a=ALIGN_CENTER, **k):
     lbl.setAlignment(a)
     return lbl
 
+
+def makeDropdown(choices):
+    """
+    Create a QComboBox populated with choices.
+
+    Args:
+        list(str/obj): The choices to display.
+    Returns:
+        QComboBox: An initiated QComboBox.
+    """
+    dd = QtWidgets.QComboBox()
+    dd.addItems(choices)
+    return dd
+
+
 def setProperties(lbl, color=None, fontSize=None, fontFamily=None, underline=False):
     """
     A few common properties of QLabels.
@@ -532,12 +547,12 @@ QPushButton[button-size-class=large]{
     font-size:20px;
 }
 QComboBox{
-    font-size:18px;
-    background-color:white;
+    font-size: 18px;
+    background-color: white;
     border: 1px solid gray;
-    padding-left:10px;
-    padding-right:15px;
-    font-weight:bold;
+    padding-left: 10px;
+    padding-right: 15px;
+    font-weight: bold;
 }
 QComboBox::drop-down {
     border-width: 1px;

@@ -287,6 +287,7 @@ class VotingServiceProvider(object):
         data = { "VoteBits": voteBits }
         res = tinyhttp.post(self.apiPath("voting"), data, headers=self.headers(), urlEncode=True)
         if resultIsSuccess(res):
+            self.purchaseInfo.voteBits = voteBits
             return True
         raise Exception("unexpected response from 'voting': %s" % repr(res))
 
