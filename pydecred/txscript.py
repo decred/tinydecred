@@ -1999,14 +1999,14 @@ def signTxOutput(chainParams, tx, idx, pkScript, hashType, keysource, previousSc
     if scriptClass == ScriptHashTy:
         raise Exception("ScriptHashTy signing unimplemented")
         # # TODO keep the sub addressed and pass down to merge.
-        realSigScript, _, _, _ = sign(privKey, chainParams, tx, idx, sigScript, hashType, sigType)
+        # realSigScript, _, _, _ = sign(privKey, chainParams, tx, idx, sigScript, hashType, sigType)
 
         # Append the p2sh script as the last push in the script.
-        script = ByteArray(b'')
-        script += realSigScript
-        script += addData(sigScript)
+        # script = ByteArray(b'')
+        # script += realSigScript
+        # script += addData(sigScript)
 
-        sigScript = script
+        # sigScript = script
         # # TODO keep a copy of the script for merging.
 
     # Merge scripts. with any previous data, if any.
