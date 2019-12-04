@@ -547,7 +547,7 @@ QPushButton[button-size-class=large]{
     font-size:20px;
 }
 QComboBox{
-    font-size: 18px;
+    font-size: 16px;
     background-color: white;
     border: 1px solid gray;
     padding-left: 10px;
@@ -560,8 +560,8 @@ QComboBox::drop-down {
     border-left-style:solid;
     background-color:transparent;
 }
-QComboBox::drop-down:hover {
-    background-color:#f1fff9;
+QComboBox QAbstractItemView {
+    selection-color: #33aa33;
 }
 QComboBox::down-arrow {
     width:0;
