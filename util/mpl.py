@@ -2,21 +2,25 @@
 Copyright (c) 2019, Brian Stafford
 See LICENSE for details
 """
+
 import os
 import time
+
 import matplotlib
-from matplotlib.figure import Figure
-# from matplotlib.patches import Circle, Wedge, Polygon, Ellipse, Rectangle
-from matplotlib import font_manager as FontManager
-from mpl_toolkits.mplot3d import Axes3D # leave this even if the linter complains
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from tinydecred.util import helpers
-import tinydecred.ui.ui as UI
+from matplotlib.figure import Figure
+from matplotlib import font_manager as FontManager
+# from matplotlib.patches import Circle, Wedge, Polygon, Ellipse, Rectangle
+
+from mpl_toolkits.mplot3d import Axes3D  # leave this even if the linter complains
+
 from tinydecred.pydecred import constants as C
+import tinydecred.ui.ui as UI
+from tinydecred.util import helpers
 
 
-MPL_COLOR = '#333333'
-matplotlib.rcParams['mathtext.fontset'] = 'cm'
+MPL_COLOR = "#333333"
+matplotlib.rcParams["mathtext.fontset"] = "cm"
 MPL_FONTS = {}
 NO_SUBPLOT_MARGINS = {
     "left": 0,
@@ -24,7 +28,7 @@ NO_SUBPLOT_MARGINS = {
     "bottom": 0,
     "top": 1,
     "wspace": 0,
-    "hspace": 0
+    "hspace": 0,
 }
 
 
@@ -32,13 +36,14 @@ def setDefaultAxesColor(color):
     """
     Set the default color axes labels and lines.
     """
-    matplotlib.rcParams['text.color'] = color
-    matplotlib.rcParams['axes.labelcolor'] = color
-    matplotlib.rcParams['xtick.color'] = color
-    matplotlib.rcParams['ytick.color'] = color
+    matplotlib.rcParams["text.color"] = color
+    matplotlib.rcParams["axes.labelcolor"] = color
+    matplotlib.rcParams["xtick.color"] = color
+    matplotlib.rcParams["ytick.color"] = color
 
 
 setDefaultAxesColor(MPL_COLOR)
+
 
 def setFrameColor(ax, color):
     """
@@ -56,8 +61,7 @@ def getFont(font, size):
         MPL_FONTS[font] = {}
     if size not in MPL_FONTS[font]:
         MPL_FONTS[font][size] = FontManager.FontProperties(
-            fname=os.path.join(UI.PACKAGEDIR, "fonts", "%s.ttf" % font),
-            size=size
+            fname=os.path.join(UI.PACKAGEDIR, "fonts", "%s.ttf" % font), size=size
         )
     return MPL_FONTS[font][size]
 
@@ -84,9 +88,10 @@ def getMonthTicks(start, end, increment, offset=0):
     def nextyearmonth(y, m):
         m += increment
         return normalize(y, m)
-    y, m = normalize(y, m+offset)
+
+    y, m = normalize(y, m + offset)
     tick = helpers.mktime(y, m)
-    end = end + C.DAY*120  # Make a few extra months worth.
+    end = end + C.DAY * 120  # Make a few extra months worth.
     while True:
         xTicks.append(tick)
         xLabels.append(time.strftime("%b '%y", time.gmtime(tick)))
@@ -114,6 +119,7 @@ def setAxesFont(font, size, *axes):
 
 class TexWidget(FigureCanvas):
     """A Qt5 compatible widget with a Tex equation"""
+
     def __init__(self, equation, fontSize=20):
         self.equation = equation
         self.fig = Figure()
@@ -123,7 +129,14 @@ class TexWidget(FigureCanvas):
         ax.axis("off")
         ax.set_xlim(left=0, right=1)
         ax.set_ylim(top=1, bottom=0)
-        text = ax.text(0.5, 0.5, equation, fontsize=fontSize, horizontalalignment="center", verticalalignment="center")
+        text = ax.text(
+            0.5,
+            0.5,
+            equation,
+            fontsize=fontSize,
+            horizontalalignment="center",
+            verticalalignment="center",
+        )
         self.updateText = lambda s: text.set_text(s)
         self.defaultColor = "white"
 

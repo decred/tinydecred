@@ -3,18 +3,22 @@ Copyright (c) 2019, the Decred developers
 See LICENSE for details
 """
 
+import os.path
 import unittest
-import os
+
 from tinydecred.util import database
 from tinydecred.util import helpers
+
 
 class TestDB(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         helpers.prepareLogger("TestDB")
+
     def test_database(self):
         from tempfile import TemporaryDirectory
         import time
+
         with TemporaryDirectory() as tempDir:
             # Create some test data.
             testPairs = [
@@ -30,7 +34,7 @@ class TestDB(unittest.TestCase):
                 kv[1] = kv[1].encode()
 
             # Open a key value db in the temp directory.
-            manager = database.KeyValueDatabase(os.path.join(tempDir, 'tmp.sqlite'))
+            manager = database.KeyValueDatabase(os.path.join(tempDir, "tmp.sqlite"))
             with manager.getBucket("test") as db:
 
                 # Ensure the db has zero length.
@@ -88,5 +92,5 @@ class TestDB(unittest.TestCase):
                 print("{} ms to insert {} values".format(num, elapsed))
                 self.assertRaises(database.NoValue, lambda: db["nonsense"])
             with manager.getBucket("inttest", datatypes=("INTEGER", "BLOB")) as db:
-                db[5] = b'asdf'
-                self.assertEqual(db[5], b'asdf')
+                db[5] = b"asdf"
+                self.assertEqual(db[5], b"asdf")
