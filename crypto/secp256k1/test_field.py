@@ -4,7 +4,9 @@ See LICENSE for details
 """
 
 import unittest
+
 from tinydecred.crypto.secp256k1 import field
+
 
 class TestField(unittest.TestCase):
     def test_set_int(self):
@@ -13,22 +15,24 @@ class TestField(unittest.TestCase):
         works as expected.
         """
         tests = [
-            (5, [5, 0, 0, 0, 0, 0, 0, 0, 0, 0]), # 2^26
-            (67108864, [67108864, 0, 0, 0, 0, 0, 0, 0, 0, 0]), # 2^26
-            (67108865, [67108865, 0, 0, 0, 0, 0, 0, 0, 0, 0]), # 2^26 + 1
-            (4294967295, [4294967295, 0, 0, 0, 0, 0, 0, 0, 0, 0]), # 2^32 - 1
+            (5, [5, 0, 0, 0, 0, 0, 0, 0, 0, 0]),  # 2^26
+            (67108864, [67108864, 0, 0, 0, 0, 0, 0, 0, 0, 0]),  # 2^26
+            (67108865, [67108865, 0, 0, 0, 0, 0, 0, 0, 0, 0]),  # 2^26 + 1
+            (4294967295, [4294967295, 0, 0, 0, 0, 0, 0, 0, 0, 0]),  # 2^32 - 1
         ]
 
         for i, v in tests:
             f = field.FieldVal()
             f.setInt(i)
             self.assertListEqual(v, f.n)
+
     def test_zero(self):
         """TestZero ensures that zeroing a field value zero works as expected."""
         f = field.FieldVal()
         f.setInt(2)
         f.zero()
         self.assertTrue(all((x == 0 for x in f.n)))
+
     def test_is_zero(self):
         """TestIsZero ensures that checking if a field IsZero works as expected."""
         f = field.FieldVal()
@@ -39,123 +43,322 @@ class TestField(unittest.TestCase):
 
         f.zero()
         self.assertTrue(f.isZero())
+
     def test_normalize(self):
         """
         TestNormalize ensures that normalizing the internal field words works as
         expected.
         """
         tests = [
-            [ # 0
+            [  # 0
                 [0x00000005, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                 [0x00000005, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             ],
             # 2^26
-            [ # 1
+            [  # 1
                 [0x04000000, 0x0, 0, 0, 0, 0, 0, 0, 0, 0],
                 [0x00000000, 0x1, 0, 0, 0, 0, 0, 0, 0, 0],
             ],
             # 2^26 + 1
-            [ # 2
+            [  # 2
                 [0x04000001, 0x0, 0, 0, 0, 0, 0, 0, 0, 0],
                 [0x00000001, 0x1, 0, 0, 0, 0, 0, 0, 0, 0],
             ],
             # 2^32 - 1
-            [ # 3
-                [0xffffffff, 0x00, 0, 0, 0, 0, 0, 0, 0, 0],
-                [0x03ffffff, 0x3f, 0, 0, 0, 0, 0, 0, 0, 0],
+            [  # 3
+                [0xFFFFFFFF, 0x00, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0x03FFFFFF, 0x3F, 0, 0, 0, 0, 0, 0, 0, 0],
             ],
             # 2^32
-            [ # 4
-                [0x04000000, 0x3f, 0, 0, 0, 0, 0, 0, 0, 0],
+            [  # 4
+                [0x04000000, 0x3F, 0, 0, 0, 0, 0, 0, 0, 0],
                 [0x00000000, 0x40, 0, 0, 0, 0, 0, 0, 0, 0],
             ],
             # 2^32 + 1
-            [ # 5
-                [0x04000001, 0x3f, 0, 0, 0, 0, 0, 0, 0, 0],
+            [  # 5
+                [0x04000001, 0x3F, 0, 0, 0, 0, 0, 0, 0, 0],
                 [0x00000001, 0x40, 0, 0, 0, 0, 0, 0, 0, 0],
             ],
             # 2^64 - 1
-            [ # 6
-                [0xffffffff, 0xffffffc0, 0xfc0, 0, 0, 0, 0, 0, 0, 0],
-                [0x03ffffff, 0x03ffffff, 0xfff, 0, 0, 0, 0, 0, 0, 0],
+            [  # 6
+                [0xFFFFFFFF, 0xFFFFFFC0, 0xFC0, 0, 0, 0, 0, 0, 0, 0],
+                [0x03FFFFFF, 0x03FFFFFF, 0xFFF, 0, 0, 0, 0, 0, 0, 0],
             ],
             # 2^64
-            [ # 7
-                [0x04000000, 0x03ffffff, 0x0fff, 0, 0, 0, 0, 0, 0, 0],
+            [  # 7
+                [0x04000000, 0x03FFFFFF, 0x0FFF, 0, 0, 0, 0, 0, 0, 0],
                 [0x00000000, 0x00000000, 0x1000, 0, 0, 0, 0, 0, 0, 0],
             ],
             # 2^64 + 1
-            [ # 8
-                [0x04000001, 0x03ffffff, 0x0fff, 0, 0, 0, 0, 0, 0, 0],
+            [  # 8
+                [0x04000001, 0x03FFFFFF, 0x0FFF, 0, 0, 0, 0, 0, 0, 0],
                 [0x00000001, 0x00000000, 0x1000, 0, 0, 0, 0, 0, 0, 0],
             ],
             # 2^96 - 1
-            [ # 9
-                [0xffffffff, 0xffffffc0, 0xffffffc0, 0x3ffc0, 0, 0, 0, 0, 0, 0],
-                [0x03ffffff, 0x03ffffff, 0x03ffffff, 0x3ffff, 0, 0, 0, 0, 0, 0],
+            [  # 9
+                [0xFFFFFFFF, 0xFFFFFFC0, 0xFFFFFFC0, 0x3FFC0, 0, 0, 0, 0, 0, 0],
+                [0x03FFFFFF, 0x03FFFFFF, 0x03FFFFFF, 0x3FFFF, 0, 0, 0, 0, 0, 0],
             ],
             # 2^96
-            [ # 10
-                [0x04000000, 0x03ffffff, 0x03ffffff, 0x3ffff, 0, 0, 0, 0, 0, 0],
+            [  # 10
+                [0x04000000, 0x03FFFFFF, 0x03FFFFFF, 0x3FFFF, 0, 0, 0, 0, 0, 0],
                 [0x00000000, 0x00000000, 0x00000000, 0x40000, 0, 0, 0, 0, 0, 0],
             ],
             # 2^128 - 1
-            [ # 11
-                [0xffffffff, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffc0, 0, 0, 0, 0, 0],
-                [0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0xffffff, 0, 0, 0, 0, 0],
+            [  # 11
+                [
+                    0xFFFFFFFF,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0xFFFFC0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                ],
+                [
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0xFFFFFF,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                ],
             ],
             # 2^128
-            [ # 12
-                [0x04000000, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x0ffffff, 0, 0, 0, 0, 0],
-                [0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x1000000, 0, 0, 0, 0, 0],
+            [  # 12
+                [
+                    0x04000000,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x0FFFFFF,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                ],
+                [
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x1000000,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                ],
             ],
             # 2^256 - 4294968273 (secp256k1 prime)
-            [ # 13
-                [0xfffffc2f, 0xffffff80, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0x3fffc0],
-                [0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x000000],
+            [  # 13
+                [
+                    0xFFFFFC2F,
+                    0xFFFFFF80,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0x3FFFC0,
+                ],
+                [
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x000000,
+                ],
             ],
             # Prime larger than P where both first and second words are larger
             # than P's first and second words
-            [ # 14
-                [0xfffffc30, 0xffffff86, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0x3fffc0],
-                [0x00000001, 0x00000006, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x000000],
+            [  # 14
+                [
+                    0xFFFFFC30,
+                    0xFFFFFF86,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0x3FFFC0,
+                ],
+                [
+                    0x00000001,
+                    0x00000006,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x000000,
+                ],
             ],
             # Prime larger than P where only the second word is larger
             # than P's second words.
-            [ # 15
-                [0xfffffc2a, 0xffffff87, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0x3fffc0],
-                [0x03fffffb, 0x00000006, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x000000],
+            [  # 15
+                [
+                    0xFFFFFC2A,
+                    0xFFFFFF87,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0x3FFFC0,
+                ],
+                [
+                    0x03FFFFFB,
+                    0x00000006,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x000000,
+                ],
             ],
             # 2^256 - 1
-            [ # 16
-                [0xffffffff, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0xffffffc0, 0x3fffc0],
-                [0x000003d0, 0x00000040, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x000000],
+            [  # 16
+                [
+                    0xFFFFFFFF,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0xFFFFFFC0,
+                    0x3FFFC0,
+                ],
+                [
+                    0x000003D0,
+                    0x00000040,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x000000,
+                ],
             ],
             # Prime with field representation such that the initial
             # reduction does not result in a carry to bit 256.
             #
             # 2^256 - 4294968273 (secp256k1 prime)
-            [ # 17
-                [0x03fffc2f, 0x03ffffbf, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x003fffff],
-                [0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000],
+            [  # 17
+                [
+                    0x03FFFC2F,
+                    0x03FFFFBF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x003FFFFF,
+                ],
+                [
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                ],
             ],
             # Prime larger than P that reduces to a value which is still
             # larger than P when it has a magnitude of 1 due to its first
             # word and does not result in a carry to bit 256.
             #
             # 2^256 - 4294968272 (secp256k1 prime + 1)
-            [ # 18
-                [0x03fffc30, 0x03ffffbf, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x003fffff],
-                [0x00000001, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000],
+            [  # 18
+                [
+                    0x03FFFC30,
+                    0x03FFFFBF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x003FFFFF,
+                ],
+                [
+                    0x00000001,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                ],
             ],
             # Prime larger than P that reduces to a value which is still
             # larger than P when it has a magnitude of 1 due to its second
             # word and does not result in a carry to bit 256.
             #
             # 2^256 - 4227859409 (secp256k1 prime + 0x4000000)
-            [ # 19
-                [0x03fffc2f, 0x03ffffc0, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x003fffff],
-                [0x00000000, 0x00000001, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000],
+            [  # 19
+                [
+                    0x03FFFC2F,
+                    0x03FFFFC0,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x003FFFFF,
+                ],
+                [
+                    0x00000000,
+                    0x00000001,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                ],
             ],
             # Prime larger than P that reduces to a value which is still
             # larger than P when it has a magnitude of 1 due to a carry to
@@ -164,32 +367,120 @@ class TestField(unittest.TestCase):
             # the low order word in the internal field representation.
             #
             # 2^256 * 5 - ((4294968273 - (977+1)) * 4)
-            [ # 20
-                [0x03ffffff, 0x03fffeff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x0013fffff],
-                [0x00001314, 0x00000040, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x000000000],
+            [  # 20
+                [
+                    0x03FFFFFF,
+                    0x03FFFEFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x0013FFFFF,
+                ],
+                [
+                    0x00001314,
+                    0x00000040,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x000000000,
+                ],
             ],
             # Prime larger than P that reduces to a value which is still
             # larger than P when it has a magnitude of 1 due to both a
             # carry to bit 256 and the first word.
-            [ # 21
-                [0x03fffc30, 0x03ffffbf, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x07ffffff, 0x003fffff],
-                [0x00000001, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000001],
+            [  # 21
+                [
+                    0x03FFFC30,
+                    0x03FFFFBF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x07FFFFFF,
+                    0x003FFFFF,
+                ],
+                [
+                    0x00000001,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000001,
+                ],
             ],
             # Prime larger than P that reduces to a value which is still
             # larger than P when it has a magnitude of 1 due to both a
             # carry to bit 256 and the second word.
             #
-            [ # 22
-                [0x03fffc2f, 0x03ffffc0, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x3ffffff, 0x07ffffff, 0x003fffff],
-                [0x00000000, 0x00000001, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x0000000, 0x00000000, 0x00000001],
+            [  # 22
+                [
+                    0x03FFFC2F,
+                    0x03FFFFC0,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x3FFFFFF,
+                    0x07FFFFFF,
+                    0x003FFFFF,
+                ],
+                [
+                    0x00000000,
+                    0x00000001,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x0000000,
+                    0x00000000,
+                    0x00000001,
+                ],
             ],
             # Prime larger than P that reduces to a value which is still
             # larger than P when it has a magnitude of 1 due to a carry to
             # bit 256 and the first and second words.
             #
-            [ # 23
-                [0x03fffc30, 0x03ffffc0, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x07ffffff, 0x003fffff],
-                [0x00000001, 0x00000001, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000001],
+            [  # 23
+                [
+                    0x03FFFC30,
+                    0x03FFFFC0,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x03FFFFFF,
+                    0x07FFFFFF,
+                    0x003FFFFF,
+                ],
+                [
+                    0x00000001,
+                    0x00000001,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000000,
+                    0x00000001,
+                ],
             ],
         ]
 
@@ -198,6 +489,7 @@ class TestField(unittest.TestCase):
             f.n = raw
             f.normalize()
             self.assertListEqual(normalized, f.n, msg="test %i" % i)
+
     def test_equals(self):
         """
         TestEquals ensures that checking two field values for equality via Equals
@@ -212,16 +504,27 @@ class TestField(unittest.TestCase):
             # 2^64 - 1 == 2^64 - 2?
             ("ffffffffffffffff", "fffffffffffffffe", False),
             # 0 == prime (mod prime)?
-            ("0", "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f", True),
+            (
+                "0",
+                "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
+                True,
+            ),
             # 1 == prime+1 (mod prime)?
-            ("1", "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30", True),
+            (
+                "1",
+                "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
+                True,
+            ),
         ]
         for i, (a, b, eq) in enumerate(tests):
             fa = field.FieldVal.fromHex(a).normalize()
             fb = field.FieldVal.fromHex(b).normalize()
             self.assertEqual(fa.equals(fb), eq, msg="test %i" % i)
+
     def test_negate(self):
-        """TestNegate ensures that negating field values via Negate works as expected."""
+        """
+        TestNegate ensures that negating field values via Negate works as expected.
+        """
         tests = [
             # secp256k1 prime (aka 0)
             ("0", "0"),
@@ -256,16 +559,27 @@ class TestField(unittest.TestCase):
             fa = field.FieldVal.fromHex(a).normalize().negate(1).normalize()
             fb = field.FieldVal.fromHex(b).normalize()
             self.assertTrue(fa.equals(fb), msg="test %i" % i)
+
     def test_add(self):
-        """ TestAdd ensures that adding two field values together via Add works as expected."""
+        """
+        TestAdd ensures that adding two field values together via Add works as expected.
+        """
         tests = [
             ("0", "1", "1"),
             ("1", "0", "1"),
             ("1", "1", "2"),
             # secp256k1 prime-1 + 1
-            ("fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e", "1", "0"),
+            (
+                "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e",
+                "1",
+                "0",
+            ),
             # secp256k1 prime + 1
-            ("fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f", "1", "1"),
+            (
+                "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
+                "1",
+                "1",
+            ),
             # Random samples.
             (
                 "2b2012f975404e5065b4292fb8bed0a5d315eacf24c74d8b27e73bcc5430edcc",
@@ -295,18 +609,34 @@ class TestField(unittest.TestCase):
             fres = field.FieldVal.fromHex(res).normalize()
             result = fa.add(fb).normalize()
             self.assertTrue(fres.equals(result), msg="test %i" % i)
+
     def test_add2(self):
-        """ TestAdd2 ensures that adding two field values together via Add2 works as expected."""
+        """
+        TestAdd2 ensures that adding two field values together via Add2 works as
+        expected.
+        """
         tests = [
             ("0", "1", "1"),
             ("1", "0", "1"),
             ("1", "1", "2"),
             # secp256k1 prime-1 + 1
-            ("fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e", "1", "0"),
+            (
+                "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e",
+                "1",
+                "0",
+            ),
             # secp256k1 prime + 1
-            ("fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f", "1", "1"),
+            (
+                "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
+                "1",
+                "1",
+            ),
             # close but over the secp256k1 prime
-            ("fffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000", "f1ffff000", "1ffff3d1"),
+            (
+                "fffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000",
+                "f1ffff000",
+                "1ffff3d1",
+            ),
             # Random samples.
             (
                 "ad82b8d1cc136e23e9fd77fe2c7db1fe5a2ecbfcbde59ab3529758334f862d28",
@@ -336,8 +666,11 @@ class TestField(unittest.TestCase):
             fres = field.FieldVal.fromHex(res).normalize()
             result = fa.add2(fa, fb).normalize()
             self.assertTrue(fres.equals(result), msg="test %i" % i)
+
     def test_mul(self):
-        """ TestMul ensures that multiplying two field valuess via Mul works as expected."""
+        """
+        TestMul ensures that multiplying two field valuess via Mul works as expected.
+        """
         tests = [
             ("0", "0", "0"),
             ("1", "0", "0"),
@@ -356,7 +689,11 @@ class TestField(unittest.TestCase):
                 "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2d",
             ),
             # secp256k1 prime * 3
-            ("fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f", "3", "0"),
+            (
+                "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
+                "3",
+                "0",
+            ),
             # secp256k1 prime-1 * 8
             (
                 "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e",
@@ -392,8 +729,11 @@ class TestField(unittest.TestCase):
             fres = field.FieldVal.fromHex(res).normalize()
             result = fa.mul(fb).normalize()
             self.assertTrue(fres.equals(result), msg="test %i" % i)
+
     def test_square(self):
-        """ TestSquare ensures that squaring field values via Square works as expected."""
+        """
+        TestSquare ensures that squaring field values via Square works as expected.
+        """
         tests = [
             # secp256k1 prime (aka 0)
             ("0", "0"),
@@ -426,6 +766,7 @@ class TestField(unittest.TestCase):
             f = field.FieldVal.fromHex(a).normalize().square().normalize()
             expected = field.FieldVal.fromHex(res).normalize()
             self.assertTrue(f.equals(expected), msg="test %i" % i)
+
     def test_string(self):
         """ TestStringer ensures the stringer returns the appropriate hex string."""
         tests = [
@@ -488,9 +829,9 @@ class TestField(unittest.TestCase):
                 "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
                 "0000000000000000000000000000000000000000000000000000000000000001",
             ),
-
             # # Invalid hex
-            # these are silently converted in go, but allowed to raise an exception in Python
+            # These are silently converted in go, but allowed to raise an exception
+            # in Python:
             # ("g", "0000000000000000000000000000000000000000000000000000000000000000"),
             # ("1h", "0000000000000000000000000000000000000000000000000000000000000000"),
             # ("i1", "0000000000000000000000000000000000000000000000000000000000000000"),
@@ -499,6 +840,7 @@ class TestField(unittest.TestCase):
         for i, (a, res) in enumerate(tests):
             f = field.FieldVal.fromHex(a)
             self.assertEqual(res, f.string(), msg="test %i" % i)
+
     def test_inverse(self):
         """
          TestInverse ensures that finding the multiplicative inverse via Inverse works

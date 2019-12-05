@@ -3,16 +3,18 @@ Copyright (c) 2019, Brian Stafford
 Copyright (c) 2019, The Decred developers
 See LICENSE for details
 """
+
 from base64 import b64decode
 from zlib import decompress as zdecompress
+
 from tinydecred.crypto.bytearray import ByteArray
 from tinydecred.crypto.secp256k1.bytepoints import secp256k1BytePoints
 
 # Constants used to make the code more readable.
-twoBitsMask   = 0x03
-fourBitsMask  = 0x0f
-sixBitsMask   = 0x3f
-eightBitsMask = 0xff
+twoBitsMask = 0x03
+fourBitsMask = 0x0F
+sixBitsMask = 0x3F
+eightBitsMask = 0xFF
 
 # Constants related to the field representation.
 # fieldWords is the number of words used to internally represent the
@@ -38,11 +40,11 @@ fieldMSBMask = (1 << fieldMSBBits) - 1
 
 # fieldPrimeWordZero is word zero of the secp256k1 prime in the
 # internal field representation.  It is used during negation.
-fieldPrimeWordZero = 0x3fffc2f
+fieldPrimeWordZero = 0x3FFFC2F
 
 # fieldPrimeWordOne is word one of the secp256k1 prime in the
 # internal field representation.  It is used during negation.
-fieldPrimeWordOne = 0x3ffffbf
+fieldPrimeWordOne = 0x3FFFFBF
 
 """
 fieldVal implements optimized fixed-precision arithmetic over the
@@ -77,13 +79,16 @@ doing sum(n[i] * 2^(26i)) like so:
     Sum: 0 + 0 + ... + 2^49 + 1 = 2^49 + 1
 """
 
+
 class FieldVal:
     def __init__(self):
         self.zero()
+
     def zero(self):
-        self.n = [0]*10
+        self.n = [0] * 10
+
     @staticmethod
-    def fromHex(hexString): # string) *fieldVal {
+    def fromHex(hexString):  # string) *fieldVal {
         """
          SetHex decodes the passed big-endian hex string into the internal field value
          representation.  Only the first 32-bytes are used.
@@ -97,34 +102,41 @@ class FieldVal:
         f = FieldVal()
         f.setBytes(b)
         return f
+
     @staticmethod
     def fromInt(i):
         f = FieldVal()
         return f.setInt(i)
+
     def setInt(self, i):
         self.zero()
         self.n[0] = i
         return self
+
     def equals(self, f):
         return all((x == y for x, y in zip(f.n, self.n)))
+
     def setBytes(self, b):
         b = ByteArray(b, length=32, copy=False)
-        self.n[0] = b[31] | b[30]<<8 | b[29]<<16 |    (b[28]&twoBitsMask)<<24
-        self.n[1] = b[28]>>2 | b[27]<<6 | b[26]<<14 | (b[25]&fourBitsMask)<<22
-        self.n[2] = b[25]>>4 | b[24]<<4 | b[23]<<12 | (b[22]&sixBitsMask)<<20
-        self.n[3] = b[22]>>6 | b[21]<<2 | b[20]<<10 | b[19]<<18
-        self.n[4] = b[18] | b[17]<<8 | b[16]<<16 |    (b[15]&twoBitsMask)<<24
-        self.n[5] = b[15]>>2 | b[14]<<6 | b[13]<<14 | (b[12]&fourBitsMask)<<22
-        self.n[6] = b[12]>>4 | b[11]<<4 | b[10]<<12 | (b[9]&sixBitsMask)<<20
-        self.n[7] = b[9]>>6 | b[8]<<2 | b[7]<<10 |    b[6]<<18
-        self.n[8] = b[5] | b[4]<<8 | b[3]<<16 | (b[2]&twoBitsMask)<<24
-        self.n[9] = b[2]>>2 | b[1]<<6 | b[0]<<14
+        self.n[0] = b[31] | b[30] << 8 | b[29] << 16 | (b[28] & twoBitsMask) << 24
+        self.n[1] = b[28] >> 2 | b[27] << 6 | b[26] << 14 | (b[25] & fourBitsMask) << 22
+        self.n[2] = b[25] >> 4 | b[24] << 4 | b[23] << 12 | (b[22] & sixBitsMask) << 20
+        self.n[3] = b[22] >> 6 | b[21] << 2 | b[20] << 10 | b[19] << 18
+        self.n[4] = b[18] | b[17] << 8 | b[16] << 16 | (b[15] & twoBitsMask) << 24
+        self.n[5] = b[15] >> 2 | b[14] << 6 | b[13] << 14 | (b[12] & fourBitsMask) << 22
+        self.n[6] = b[12] >> 4 | b[11] << 4 | b[10] << 12 | (b[9] & sixBitsMask) << 20
+        self.n[7] = b[9] >> 6 | b[8] << 2 | b[7] << 10 | b[6] << 18
+        self.n[8] = b[5] | b[4] << 8 | b[3] << 16 | (b[2] & twoBitsMask) << 24
+        self.n[9] = b[2] >> 2 | b[1] << 6 | b[0] << 14
+
     def isZero(self):
         return all((x == 0 for x in self.n))
+
     def set(self, f):
         self.n = [x for x in f.n]
         return self
-    def normalize(self): # *fieldVal {
+
+    def normalize(self):  # *fieldVal {
         """
         Normalize normalizes the internal field words into the desired range and
         performs fast modular reduction over the secp256k1 prime by making use of the
@@ -158,7 +170,7 @@ class FieldVal:
         t9 = f.n[9]
         m = t9 >> fieldMSBBits
         t9 = t9 & fieldMSBMask
-        t0 = f.n[0] + m*977
+        t0 = f.n[0] + m * 977
         t1 = (t0 >> fieldBase) + f.n[1] + (m << 6)
         t0 = t0 & fieldBaseMask
         t2 = (t1 >> fieldBase) + f.n[2]
@@ -195,19 +207,19 @@ class FieldVal:
             m &= 1
         else:
             m &= 0
-        if t2&t3&t4&t5&t6&t7&t8 == fieldBaseMask:
+        if t2 & t3 & t4 & t5 & t6 & t7 & t8 == fieldBaseMask:
             m &= 1
         else:
             m &= 0
-        if (((t0+977)>>fieldBase) + t1 + 64) > fieldBaseMask:
+        if (((t0 + 977) >> fieldBase) + t1 + 64) > fieldBaseMask:
             m &= 1
         else:
             m &= 0
-        if t9>>fieldMSBBits != 0:
+        if t9 >> fieldMSBBits != 0:
             m |= 1
         else:
             m |= 0
-        t0 = t0 + m*977
+        t0 = t0 + m * 977
         t1 = (t0 >> fieldBase) + t1 + (m << 6)
         t0 = t0 & fieldBaseMask
         t2 = (t1 >> fieldBase) + t2
@@ -226,7 +238,7 @@ class FieldVal:
         t7 = t7 & fieldBaseMask
         t9 = (t8 >> fieldBase) + t9
         t8 = t8 & fieldBaseMask
-        t9 = t9 & fieldMSBMask # Remove potential multiple of 2^256.
+        t9 = t9 & fieldMSBMask  # Remove potential multiple of 2^256.
 
         # Finally, set the normalized and reduced words.
         f.n[0] = t0
@@ -240,6 +252,7 @@ class FieldVal:
         f.n[8] = t8
         f.n[9] = t9
         return f
+
     def negate(self, magnitude):  # uint32) *fieldVal {
         """
         # Negate negates the field value.  The existing field value is modified.  The
@@ -249,7 +262,8 @@ class FieldVal:
         # f.Negate().AddInt(1) so that f = -f + 1.
         """
         return self.negateVal(self, magnitude)
-    def negateVal(self, val, magnitude): # val *fieldVal, magnitude uint32) *fieldVal {
+
+    def negateVal(self, val, magnitude):  # val *fieldVal, magnitude uint32) *fieldVal {
         """
         NegateVal negates the passed value and stores the result in f.  The caller
         must provide the magnitude of the passed value for a correct result.
@@ -275,19 +289,19 @@ class FieldVal:
         # multiple of the modulus is conguent to zero (mod m), the answer can
         # be shortcut by simply mulplying the magnitude by the modulus and
         # subtracting.  Keeping with the example, this would be (2*12)-19 = 5.
-        self.n[0] = (magnitude+1)*fieldPrimeWordZero - val.n[0]
-        self.n[1] = (magnitude+1)*fieldPrimeWordOne - val.n[1]
-        self.n[2] = (magnitude+1)*fieldBaseMask - val.n[2]
-        self.n[3] = (magnitude+1)*fieldBaseMask - val.n[3]
-        self.n[4] = (magnitude+1)*fieldBaseMask - val.n[4]
-        self.n[5] = (magnitude+1)*fieldBaseMask - val.n[5]
-        self.n[6] = (magnitude+1)*fieldBaseMask - val.n[6]
-        self.n[7] = (magnitude+1)*fieldBaseMask - val.n[7]
-        self.n[8] = (magnitude+1)*fieldBaseMask - val.n[8]
-        self.n[9] = (magnitude+1)*fieldMSBMask - val.n[9]
+        self.n[0] = (magnitude + 1) * fieldPrimeWordZero - val.n[0]
+        self.n[1] = (magnitude + 1) * fieldPrimeWordOne - val.n[1]
+        self.n[2] = (magnitude + 1) * fieldBaseMask - val.n[2]
+        self.n[3] = (magnitude + 1) * fieldBaseMask - val.n[3]
+        self.n[4] = (magnitude + 1) * fieldBaseMask - val.n[4]
+        self.n[5] = (magnitude + 1) * fieldBaseMask - val.n[5]
+        self.n[6] = (magnitude + 1) * fieldBaseMask - val.n[6]
+        self.n[7] = (magnitude + 1) * fieldBaseMask - val.n[7]
+        self.n[8] = (magnitude + 1) * fieldBaseMask - val.n[8]
+        self.n[9] = (magnitude + 1) * fieldMSBMask - val.n[9]
         return self
 
-    def add(self, val): # *fieldVal) *fieldVal {
+    def add(self, val):  # *fieldVal) *fieldVal {
         """
         Add adds the passed value to the existing field value and stores the result
         in f.
@@ -310,9 +324,11 @@ class FieldVal:
         self.n[8] += val.n[8]
         self.n[9] += val.n[9]
         return self
+
     def square(self):
         return self.squareVal(self)
-    def squareVal(self, val): # *fieldVal) *fieldVal {
+
+    def squareVal(self, val):  # *fieldVal) *fieldVal {
         """
         SquareVal squares the passed value and stores the result in f.  Note that
         this function can overflow if multiplying any of the individual words
@@ -331,75 +347,140 @@ class FieldVal:
         t0 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*1).
-        m = (m >> fieldBase) + 2*val.n[0]*val.n[1]
+        m = (m >> fieldBase) + 2 * val.n[0] * val.n[1]
         t1 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*2).
-        m = (m >> fieldBase) + 2*val.n[0]*val.n[2] + val.n[1]*val.n[1]
+        m = (m >> fieldBase) + 2 * val.n[0] * val.n[2] + val.n[1] * val.n[1]
         t2 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*3).
-        m = (m >> fieldBase) + 2*val.n[0]*val.n[3] + 2*val.n[1]*val.n[2]
+        m = (m >> fieldBase) + 2 * val.n[0] * val.n[3] + 2 * val.n[1] * val.n[2]
         t3 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*4).
-        m = (m >> fieldBase) + 2*val.n[0]*val.n[4] + 2*val.n[1]*val.n[3] + val.n[2]*val.n[2]
+        m = (
+            (m >> fieldBase)
+            + 2 * val.n[0] * val.n[4]
+            + 2 * val.n[1] * val.n[3]
+            + val.n[2] * val.n[2]
+        )
         t4 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*5).
-        m = (m >> fieldBase) + 2*val.n[0]*val.n[5] + 2*val.n[1]*val.n[4] + 2*val.n[2]*val.n[3]
+        m = (
+            (m >> fieldBase)
+            + 2 * val.n[0] * val.n[5]
+            + 2 * val.n[1] * val.n[4]
+            + 2 * val.n[2] * val.n[3]
+        )
         t5 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*6).
-        m = (m >> fieldBase) + 2*val.n[0]*val.n[6] + 2*val.n[1]*val.n[5] + 2*val.n[2]*val.n[4] + val.n[3]*val.n[3]
+        m = (
+            (m >> fieldBase)
+            + 2 * val.n[0] * val.n[6]
+            + 2 * val.n[1] * val.n[5]
+            + 2 * val.n[2] * val.n[4]
+            + val.n[3] * val.n[3]
+        )
         t6 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*7).
-        m = (m >> fieldBase) + 2*val.n[0]*val.n[7] + 2*val.n[1]*val.n[6] + 2*val.n[2]*val.n[5] + 2*val.n[3]*val.n[4]
+        m = (
+            (m >> fieldBase)
+            + 2 * val.n[0] * val.n[7]
+            + 2 * val.n[1] * val.n[6]
+            + 2 * val.n[2] * val.n[5]
+            + 2 * val.n[3] * val.n[4]
+        )
         t7 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*8).
-        m = (m >> fieldBase) + 2*val.n[0]*val.n[8] + 2*val.n[1]*val.n[7] + 2*val.n[2]*val.n[6] + 2*val.n[3]*val.n[5] + val.n[4]*val.n[4]
+        m = (
+            (m >> fieldBase)
+            + 2 * val.n[0] * val.n[8]
+            + 2 * val.n[1] * val.n[7]
+            + 2 * val.n[2] * val.n[6]
+            + 2 * val.n[3] * val.n[5]
+            + val.n[4] * val.n[4]
+        )
         t8 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*9).
-        m = (m >> fieldBase) + 2*val.n[0]*val.n[9] + 2*val.n[1]*val.n[8] + 2*val.n[2]*val.n[7] + 2*val.n[3]*val.n[6] + 2*val.n[4]*val.n[5]
+        m = (
+            (m >> fieldBase)
+            + 2 * val.n[0] * val.n[9]
+            + 2 * val.n[1] * val.n[8]
+            + 2 * val.n[2] * val.n[7]
+            + 2 * val.n[3] * val.n[6]
+            + 2 * val.n[4] * val.n[5]
+        )
         t9 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*10).
-        m = (m >> fieldBase) + 2*val.n[1]*val.n[9] + 2*val.n[2]*val.n[8] + 2*val.n[3]*val.n[7] + 2*val.n[4]*val.n[6] + val.n[5]*val.n[5]
+        m = (
+            (m >> fieldBase)
+            + 2 * val.n[1] * val.n[9]
+            + 2 * val.n[2] * val.n[8]
+            + 2 * val.n[3] * val.n[7]
+            + 2 * val.n[4] * val.n[6]
+            + val.n[5] * val.n[5]
+        )
         t10 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*11).
-        m = (m >> fieldBase) + 2*val.n[2]*val.n[9] + 2*val.n[3]*val.n[8] + 2*val.n[4]*val.n[7] + 2*val.n[5]*val.n[6]
+        m = (
+            (m >> fieldBase)
+            + 2 * val.n[2] * val.n[9]
+            + 2 * val.n[3] * val.n[8]
+            + 2 * val.n[4] * val.n[7]
+            + 2 * val.n[5] * val.n[6]
+        )
         t11 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*12).
-        m = (m >> fieldBase) + 2*val.n[3]*val.n[9] + 2*val.n[4]*val.n[8] + 2*val.n[5]*val.n[7] + val.n[6]*val.n[6]
+        m = (
+            (m >> fieldBase)
+            + 2 * val.n[3] * val.n[9]
+            + 2 * val.n[4] * val.n[8]
+            + 2 * val.n[5] * val.n[7]
+            + val.n[6] * val.n[6]
+        )
         t12 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*13).
-        m = (m >> fieldBase) + 2*val.n[4]*val.n[9] + 2*val.n[5]*val.n[8] + 2*val.n[6]*val.n[7]
+        m = (
+            (m >> fieldBase)
+            + 2 * val.n[4] * val.n[9]
+            + 2 * val.n[5] * val.n[8]
+            + 2 * val.n[6] * val.n[7]
+        )
         t13 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*14).
-        m = (m >> fieldBase) + 2*val.n[5]*val.n[9] + 2*val.n[6]*val.n[8] + val.n[7]*val.n[7]
+        m = (
+            (m >> fieldBase)
+            + 2 * val.n[5] * val.n[9]
+            + 2 * val.n[6] * val.n[8]
+            + val.n[7] * val.n[7]
+        )
         t14 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*15).
-        m = (m >> fieldBase) + 2*val.n[6]*val.n[9] + 2*val.n[7]*val.n[8]
+        m = (m >> fieldBase) + 2 * val.n[6] * val.n[9] + 2 * val.n[7] * val.n[8]
         t15 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*16).
-        m = (m >> fieldBase) + 2*val.n[7]*val.n[9] + val.n[8]*val.n[8]
+        m = (m >> fieldBase) + 2 * val.n[7] * val.n[9] + val.n[8] * val.n[8]
         t16 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*17).
-        m = (m >> fieldBase) + 2*val.n[8]*val.n[9]
+        m = (m >> fieldBase) + 2 * val.n[8] * val.n[9]
         t17 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*18).
-        m = (m >> fieldBase) + val.n[9]*val.n[9]
+        m = (m >> fieldBase) + val.n[9] * val.n[9]
         t18 = m & fieldBaseMask
 
         # What's left is for 2^(fieldBase*19).
@@ -433,25 +514,25 @@ class FieldVal:
         # of only n[0] because there are no more terms left to handle n[1].
         # This means there might be some magnitude left in the upper bits that
         # is handled below.
-        m = t0 + t10*15632
+        m = t0 + t10 * 15632
         t0 = m & fieldBaseMask
-        m = (m >> fieldBase) + t1 + t10*1024 + t11*15632
+        m = (m >> fieldBase) + t1 + t10 * 1024 + t11 * 15632
         t1 = m & fieldBaseMask
-        m = (m >> fieldBase) + t2 + t11*1024 + t12*15632
+        m = (m >> fieldBase) + t2 + t11 * 1024 + t12 * 15632
         t2 = m & fieldBaseMask
-        m = (m >> fieldBase) + t3 + t12*1024 + t13*15632
+        m = (m >> fieldBase) + t3 + t12 * 1024 + t13 * 15632
         t3 = m & fieldBaseMask
-        m = (m >> fieldBase) + t4 + t13*1024 + t14*15632
+        m = (m >> fieldBase) + t4 + t13 * 1024 + t14 * 15632
         t4 = m & fieldBaseMask
-        m = (m >> fieldBase) + t5 + t14*1024 + t15*15632
+        m = (m >> fieldBase) + t5 + t14 * 1024 + t15 * 15632
         t5 = m & fieldBaseMask
-        m = (m >> fieldBase) + t6 + t15*1024 + t16*15632
+        m = (m >> fieldBase) + t6 + t15 * 1024 + t16 * 15632
         t6 = m & fieldBaseMask
-        m = (m >> fieldBase) + t7 + t16*1024 + t17*15632
+        m = (m >> fieldBase) + t7 + t16 * 1024 + t17 * 15632
         t7 = m & fieldBaseMask
-        m = (m >> fieldBase) + t8 + t17*1024 + t18*15632
+        m = (m >> fieldBase) + t8 + t17 * 1024 + t18 * 15632
         t8 = m & fieldBaseMask
-        m = (m >> fieldBase) + t9 + t18*1024 + t19*68719492368
+        m = (m >> fieldBase) + t9 + t18 * 1024 + t19 * 68719492368
         t9 = m & fieldMSBMask
         m = m >> fieldMSBBits
 
@@ -469,9 +550,9 @@ class FieldVal:
         # to run in constant time.  The final result will be in the range
         # 0 <= result <= prime + (2^64 - c), so it is guaranteed to have a
         # magnitude of 1, but it is denormalized.
-        n = t0 + m*977
+        n = t0 + m * 977
         self.n[0] = n & fieldBaseMask
-        n = (n >> fieldBase) + t1 + m*64
+        n = (n >> fieldBase) + t1 + m * 64
         self.n[1] = n & fieldBaseMask
         self.n[2] = (n >> fieldBase) + t2
         self.n[3] = t3
@@ -483,7 +564,8 @@ class FieldVal:
         self.n[9] = t9
 
         return self
-    def mulInt(self, val): # uint) *fieldVal {
+
+    def mulInt(self, val):  # uint) *fieldVal {
         """
         MulInt multiplies the field value by the passed int and stores the result in
         f.  Note that this function can overflow if multiplying the value by any of
@@ -511,6 +593,7 @@ class FieldVal:
         self.n[9] *= val
 
         return self
+
     def mul(self, f):
         """
         Mul multiplies the passed value to the existing field value and stores the
@@ -523,7 +606,8 @@ class FieldVal:
         f.Mul(f2).AddInt(1) so that f = (f * f2) + 1.
         """
         return self.mul2(self, f)
-    def mul2(self, val, val2): # val *fieldVal, val2 *fieldVal) *fieldVal {
+
+    def mul2(self, val, val2):  # val *fieldVal, val2 *fieldVal) *fieldVal {
         """
         Mul2 multiplies the passed two field values together and stores the result
         result in f.  Note that this function can overflow if multiplying any of
@@ -543,75 +627,199 @@ class FieldVal:
         t0 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*1).
-        m = (m >> fieldBase) + val.n[0]*val2.n[1] + val.n[1]*val2.n[0]
+        m = (m >> fieldBase) + val.n[0] * val2.n[1] + val.n[1] * val2.n[0]
         t1 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*2).
-        m = (m >> fieldBase) + val.n[0]*val2.n[2] + val.n[1]*val2.n[1] + val.n[2]*val2.n[0]
+        m = (
+            (m >> fieldBase)
+            + val.n[0] * val2.n[2]
+            + val.n[1] * val2.n[1]
+            + val.n[2] * val2.n[0]
+        )
         t2 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*3).
-        m = (m >> fieldBase) + val.n[0]*val2.n[3] + val.n[1]*val2.n[2] + val.n[2]*val2.n[1] + val.n[3]*val2.n[0]
+        m = (
+            (m >> fieldBase)
+            + val.n[0] * val2.n[3]
+            + val.n[1] * val2.n[2]
+            + val.n[2] * val2.n[1]
+            + val.n[3] * val2.n[0]
+        )
         t3 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*4).
-        m = (m >> fieldBase) + val.n[0]*val2.n[4] + val.n[1]*val2.n[3] + val.n[2]*val2.n[2] + val.n[3]*val2.n[1] + val.n[4]*val2.n[0]
+        m = (
+            (m >> fieldBase)
+            + val.n[0] * val2.n[4]
+            + val.n[1] * val2.n[3]
+            + val.n[2] * val2.n[2]
+            + val.n[3] * val2.n[1]
+            + val.n[4] * val2.n[0]
+        )
         t4 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*5).
-        m = (m >> fieldBase) + val.n[0]*val2.n[5] + val.n[1]*val2.n[4] + val.n[2]*val2.n[3] + val.n[3]*val2.n[2] + val.n[4]*val2.n[1] + val.n[5]*val2.n[0]
+        m = (
+            (m >> fieldBase)
+            + val.n[0] * val2.n[5]
+            + val.n[1] * val2.n[4]
+            + val.n[2] * val2.n[3]
+            + val.n[3] * val2.n[2]
+            + val.n[4] * val2.n[1]
+            + val.n[5] * val2.n[0]
+        )
         t5 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*6).
-        m = (m >> fieldBase) + val.n[0]*val2.n[6] + val.n[1]*val2.n[5] + val.n[2]*val2.n[4] + val.n[3]*val2.n[3] + val.n[4]*val2.n[2] + val.n[5]*val2.n[1] + val.n[6]*val2.n[0]
+        m = (
+            (m >> fieldBase)
+            + val.n[0] * val2.n[6]
+            + val.n[1] * val2.n[5]
+            + val.n[2] * val2.n[4]
+            + val.n[3] * val2.n[3]
+            + val.n[4] * val2.n[2]
+            + val.n[5] * val2.n[1]
+            + val.n[6] * val2.n[0]
+        )
         t6 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*7).
-        m = (m >> fieldBase) + val.n[0]*val2.n[7] + val.n[1]*val2.n[6] + val.n[2]*val2.n[5] + val.n[3]*val2.n[4] + val.n[4]*val2.n[3] + val.n[5]*val2.n[2] + val.n[6]*val2.n[1] + val.n[7]*val2.n[0]
+        m = (
+            (m >> fieldBase)
+            + val.n[0] * val2.n[7]
+            + val.n[1] * val2.n[6]
+            + val.n[2] * val2.n[5]
+            + val.n[3] * val2.n[4]
+            + val.n[4] * val2.n[3]
+            + val.n[5] * val2.n[2]
+            + val.n[6] * val2.n[1]
+            + val.n[7] * val2.n[0]
+        )
         t7 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*8).
-        m = (m >> fieldBase) + val.n[0]*val2.n[8] + val.n[1]*val2.n[7] + val.n[2]*val2.n[6] + val.n[3]*val2.n[5] + val.n[4]*val2.n[4] + val.n[5]*val2.n[3] + val.n[6]*val2.n[2] + val.n[7]*val2.n[1] + val.n[8]*val2.n[0]
+        m = (
+            (m >> fieldBase)
+            + val.n[0] * val2.n[8]
+            + val.n[1] * val2.n[7]
+            + val.n[2] * val2.n[6]
+            + val.n[3] * val2.n[5]
+            + val.n[4] * val2.n[4]
+            + val.n[5] * val2.n[3]
+            + val.n[6] * val2.n[2]
+            + val.n[7] * val2.n[1]
+            + val.n[8] * val2.n[0]
+        )
         t8 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*9).
-        m = (m >> fieldBase) + val.n[0]*val2.n[9] + val.n[1]*val2.n[8] + val.n[2]*val2.n[7] + val.n[3]*val2.n[6] + val.n[4]*val2.n[5] + val.n[5]*val2.n[4] + val.n[6]*val2.n[3] + val.n[7]*val2.n[2] + val.n[8]*val2.n[1] + val.n[9]*val2.n[0]
+        m = (
+            (m >> fieldBase)
+            + val.n[0] * val2.n[9]
+            + val.n[1] * val2.n[8]
+            + val.n[2] * val2.n[7]
+            + val.n[3] * val2.n[6]
+            + val.n[4] * val2.n[5]
+            + val.n[5] * val2.n[4]
+            + val.n[6] * val2.n[3]
+            + val.n[7] * val2.n[2]
+            + val.n[8] * val2.n[1]
+            + val.n[9] * val2.n[0]
+        )
         t9 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*10).
-        m = (m >> fieldBase) + val.n[1]*val2.n[9] + val.n[2]*val2.n[8] + val.n[3]*val2.n[7] + val.n[4]*val2.n[6] + val.n[5]*val2.n[5] + val.n[6]*val2.n[4] + val.n[7]*val2.n[3] + val.n[8]*val2.n[2] + val.n[9]*val2.n[1]
+        m = (
+            (m >> fieldBase)
+            + val.n[1] * val2.n[9]
+            + val.n[2] * val2.n[8]
+            + val.n[3] * val2.n[7]
+            + val.n[4] * val2.n[6]
+            + val.n[5] * val2.n[5]
+            + val.n[6] * val2.n[4]
+            + val.n[7] * val2.n[3]
+            + val.n[8] * val2.n[2]
+            + val.n[9] * val2.n[1]
+        )
         t10 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*11).
-        m = (m >> fieldBase) + val.n[2]*val2.n[9] + val.n[3]*val2.n[8] + val.n[4]*val2.n[7] + val.n[5]*val2.n[6] + val.n[6]*val2.n[5] + val.n[7]*val2.n[4] + val.n[8]*val2.n[3] + val.n[9]*val2.n[2]
+        m = (
+            (m >> fieldBase)
+            + val.n[2] * val2.n[9]
+            + val.n[3] * val2.n[8]
+            + val.n[4] * val2.n[7]
+            + val.n[5] * val2.n[6]
+            + val.n[6] * val2.n[5]
+            + val.n[7] * val2.n[4]
+            + val.n[8] * val2.n[3]
+            + val.n[9] * val2.n[2]
+        )
         t11 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*12).
-        m = (m >> fieldBase) + val.n[3]*val2.n[9] + val.n[4]*val2.n[8] + val.n[5]*val2.n[7] + val.n[6]*val2.n[6] + val.n[7]*val2.n[5] + val.n[8]*val2.n[4] + val.n[9]*val2.n[3]
+        m = (
+            (m >> fieldBase)
+            + val.n[3] * val2.n[9]
+            + val.n[4] * val2.n[8]
+            + val.n[5] * val2.n[7]
+            + val.n[6] * val2.n[6]
+            + val.n[7] * val2.n[5]
+            + val.n[8] * val2.n[4]
+            + val.n[9] * val2.n[3]
+        )
         t12 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*13).
-        m = (m >> fieldBase) + val.n[4]*val2.n[9] + val.n[5]*val2.n[8] + val.n[6]*val2.n[7] + val.n[7]*val2.n[6] + val.n[8]*val2.n[5] + val.n[9]*val2.n[4]
+        m = (
+            (m >> fieldBase)
+            + val.n[4] * val2.n[9]
+            + val.n[5] * val2.n[8]
+            + val.n[6] * val2.n[7]
+            + val.n[7] * val2.n[6]
+            + val.n[8] * val2.n[5]
+            + val.n[9] * val2.n[4]
+        )
         t13 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*14).
-        m = (m >> fieldBase) + val.n[5]*val2.n[9] + val.n[6]*val2.n[8] + val.n[7]*val2.n[7] + val.n[8]*val2.n[6] + val.n[9]*val2.n[5]
+        m = (
+            (m >> fieldBase)
+            + val.n[5] * val2.n[9]
+            + val.n[6] * val2.n[8]
+            + val.n[7] * val2.n[7]
+            + val.n[8] * val2.n[6]
+            + val.n[9] * val2.n[5]
+        )
         t14 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*15).
-        m = (m >> fieldBase) + val.n[6]*val2.n[9] + val.n[7]*val2.n[8] + val.n[8]*val2.n[7] + val.n[9]*val2.n[6]
+        m = (
+            (m >> fieldBase)
+            + val.n[6] * val2.n[9]
+            + val.n[7] * val2.n[8]
+            + val.n[8] * val2.n[7]
+            + val.n[9] * val2.n[6]
+        )
         t15 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*16).
-        m = (m >> fieldBase) + val.n[7]*val2.n[9] + val.n[8]*val2.n[8] + val.n[9]*val2.n[7]
+        m = (
+            (m >> fieldBase)
+            + val.n[7] * val2.n[9]
+            + val.n[8] * val2.n[8]
+            + val.n[9] * val2.n[7]
+        )
         t16 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*17).
-        m = (m >> fieldBase) + val.n[8]*val2.n[9] + val.n[9]*val2.n[8]
+        m = (m >> fieldBase) + val.n[8] * val2.n[9] + val.n[9] * val2.n[8]
         t17 = m & fieldBaseMask
 
         # Terms for 2^(fieldBase*18).
-        m = (m >> fieldBase) + val.n[9]*val2.n[9]
+        m = (m >> fieldBase) + val.n[9] * val2.n[9]
         t18 = m & fieldBaseMask
 
         # What's left is for 2^(fieldBase*19).
@@ -645,25 +853,25 @@ class FieldVal:
         # of only n[0] because there are no more terms left to handle n[1].
         # This means there might be some magnitude left in the upper bits that
         # is handled below.
-        m = t0 + t10*15632
+        m = t0 + t10 * 15632
         t0 = m & fieldBaseMask
-        m = (m >> fieldBase) + t1 + t10*1024 + t11*15632
+        m = (m >> fieldBase) + t1 + t10 * 1024 + t11 * 15632
         t1 = m & fieldBaseMask
-        m = (m >> fieldBase) + t2 + t11*1024 + t12*15632
+        m = (m >> fieldBase) + t2 + t11 * 1024 + t12 * 15632
         t2 = m & fieldBaseMask
-        m = (m >> fieldBase) + t3 + t12*1024 + t13*15632
+        m = (m >> fieldBase) + t3 + t12 * 1024 + t13 * 15632
         t3 = m & fieldBaseMask
-        m = (m >> fieldBase) + t4 + t13*1024 + t14*15632
+        m = (m >> fieldBase) + t4 + t13 * 1024 + t14 * 15632
         t4 = m & fieldBaseMask
-        m = (m >> fieldBase) + t5 + t14*1024 + t15*15632
+        m = (m >> fieldBase) + t5 + t14 * 1024 + t15 * 15632
         t5 = m & fieldBaseMask
-        m = (m >> fieldBase) + t6 + t15*1024 + t16*15632
+        m = (m >> fieldBase) + t6 + t15 * 1024 + t16 * 15632
         t6 = m & fieldBaseMask
-        m = (m >> fieldBase) + t7 + t16*1024 + t17*15632
+        m = (m >> fieldBase) + t7 + t16 * 1024 + t17 * 15632
         t7 = m & fieldBaseMask
-        m = (m >> fieldBase) + t8 + t17*1024 + t18*15632
+        m = (m >> fieldBase) + t8 + t17 * 1024 + t18 * 15632
         t8 = m & fieldBaseMask
-        m = (m >> fieldBase) + t9 + t18*1024 + t19*68719492368
+        m = (m >> fieldBase) + t9 + t18 * 1024 + t19 * 68719492368
         t9 = m & fieldMSBMask
         m = m >> fieldMSBBits
 
@@ -681,9 +889,9 @@ class FieldVal:
         # to run in constant time.  The final result will be in the range
         # 0 <= result <= prime + (2^64 - c), so it is guaranteed to have a
         # magnitude of 1, but it is denormalized.
-        d = t0 + m*977
+        d = t0 + m * 977
         self.n[0] = d & fieldBaseMask
-        d = (d >> fieldBase) + t1 + m*64
+        d = (d >> fieldBase) + t1 + m * 64
         self.n[1] = d & fieldBaseMask
         self.n[2] = (d >> fieldBase) + t2
         self.n[3] = t3
@@ -694,7 +902,8 @@ class FieldVal:
         self.n[8] = t8
         self.n[9] = t9
         return self
-    def add2(self, val, val2): #val *fieldVal, val2 *fieldVal) *fieldVal {
+
+    def add2(self, val, val2):  # val *fieldVal, val2 *fieldVal) *fieldVal {
         """
         Add2 adds the passed two field values together and stores the result in f.
 
@@ -716,6 +925,7 @@ class FieldVal:
         self.n[8] = val.n[8] + val2.n[8]
         self.n[9] = val.n[9] + val2.n[9]
         return self
+
     def putBytes(self, b):
         """
         PutBytes unpacks the field value to a 32-byte big-endian value using the
@@ -735,35 +945,36 @@ class FieldVal:
         b[31] = f.n[0] & eightBitsMask
         b[30] = (f.n[0] >> 8) & eightBitsMask
         b[29] = (f.n[0] >> 16) & eightBitsMask
-        b[28] = (f.n[0]>>24)&twoBitsMask | (f.n[1]&sixBitsMask)<<2
+        b[28] = (f.n[0] >> 24) & twoBitsMask | (f.n[1] & sixBitsMask) << 2
         b[27] = (f.n[1] >> 6) & eightBitsMask
         b[26] = (f.n[1] >> 14) & eightBitsMask
-        b[25] = (f.n[1]>>22)&fourBitsMask | (f.n[2]&fourBitsMask)<<4
+        b[25] = (f.n[1] >> 22) & fourBitsMask | (f.n[2] & fourBitsMask) << 4
         b[24] = (f.n[2] >> 4) & eightBitsMask
         b[23] = (f.n[2] >> 12) & eightBitsMask
-        b[22] = (f.n[2]>>20)&sixBitsMask | (f.n[3]&twoBitsMask)<<6
+        b[22] = (f.n[2] >> 20) & sixBitsMask | (f.n[3] & twoBitsMask) << 6
         b[21] = (f.n[3] >> 2) & eightBitsMask
         b[20] = (f.n[3] >> 10) & eightBitsMask
         b[19] = (f.n[3] >> 18) & eightBitsMask
         b[18] = f.n[4] & eightBitsMask
         b[17] = (f.n[4] >> 8) & eightBitsMask
         b[16] = (f.n[4] >> 16) & eightBitsMask
-        b[15] = (f.n[4]>>24)&twoBitsMask | (f.n[5]&sixBitsMask)<<2
+        b[15] = (f.n[4] >> 24) & twoBitsMask | (f.n[5] & sixBitsMask) << 2
         b[14] = (f.n[5] >> 6) & eightBitsMask
         b[13] = (f.n[5] >> 14) & eightBitsMask
-        b[12] = (f.n[5]>>22)&fourBitsMask | (f.n[6]&fourBitsMask)<<4
+        b[12] = (f.n[5] >> 22) & fourBitsMask | (f.n[6] & fourBitsMask) << 4
         b[11] = (f.n[6] >> 4) & eightBitsMask
         b[10] = (f.n[6] >> 12) & eightBitsMask
-        b[9] = (f.n[6]>>20)&sixBitsMask | (f.n[7]&twoBitsMask)<<6
+        b[9] = (f.n[6] >> 20) & sixBitsMask | (f.n[7] & twoBitsMask) << 6
         b[8] = (f.n[7] >> 2) & eightBitsMask
         b[7] = (f.n[7] >> 10) & eightBitsMask
         b[6] = (f.n[7] >> 18) & eightBitsMask
         b[5] = f.n[8] & eightBitsMask
         b[4] = (f.n[8] >> 8) & eightBitsMask
         b[3] = (f.n[8] >> 16) & eightBitsMask
-        b[2] = (f.n[8]>>24)&twoBitsMask | (f.n[9]&sixBitsMask)<<2
+        b[2] = (f.n[8] >> 24) & twoBitsMask | (f.n[9] & sixBitsMask) << 2
         b[1] = (f.n[9] >> 6) & eightBitsMask
         b[0] = (f.n[9] >> 14) & eightBitsMask
+
     def bytes(self):
         """
         Bytes unpacks the field value to a 32-byte big-endian value.  See PutBytes
@@ -777,10 +988,12 @@ class FieldVal:
         b = ByteArray(0, length=32)
         self.putBytes(b)
         return b
+
     def string(self):
         """  String returns the field value as a human-readable hex string."""
         f = FieldVal().set(self).normalize()
         return f.bytes().hex()
+
     def inverse(self):
         """
         Inverse finds the modular multiplicative inverse of the field value.  The
@@ -804,7 +1017,19 @@ class FieldVal:
         # This has a cost of 258 field squarings and 33 field multiplications.
         f = self
         fv = FieldVal
-        a2, a3, a4, a10, a11, a21, a42, a45, a63, a1019, a1023 = fv(), fv(), fv(), fv(), fv(), fv(), fv(), fv(), fv(), fv(), fv()
+        a2, a3, a4, a10, a11, a21, a42, a45, a63, a1019, a1023 = (
+            fv(),
+            fv(),
+            fv(),
+            fv(),
+            fv(),
+            fv(),
+            fv(),
+            fv(),
+            fv(),
+            fv(),
+            fv(),
+        )
         a2.squareVal(f)
         a3.mul2(a2, f)
         a4.squareVal(a2)
@@ -816,84 +1041,88 @@ class FieldVal:
         a63.mul2(a42, a21)
         a1019.squareVal(a63).square().square().square().mul(a11)
         a1023.mul2(a1019, a4)
-        f.set(a63)                                     # f = a^(2^6 - 1)
-        f.square().square().square().square().square() # f = a^(2^11 - 32)
-        f.square().square().square().square().square() # f = a^(2^16 - 1024)
-        f.mul(a1023)                                   # f = a^(2^16 - 1)
-        f.square().square().square().square().square() # f = a^(2^21 - 32)
-        f.square().square().square().square().square() # f = a^(2^26 - 1024)
-        f.mul(a1023)                                   # f = a^(2^26 - 1)
-        f.square().square().square().square().square() # f = a^(2^31 - 32)
-        f.square().square().square().square().square() # f = a^(2^36 - 1024)
-        f.mul(a1023)                                   # f = a^(2^36 - 1)
-        f.square().square().square().square().square() # f = a^(2^41 - 32)
-        f.square().square().square().square().square() # f = a^(2^46 - 1024)
-        f.mul(a1023)                                   # f = a^(2^46 - 1)
-        f.square().square().square().square().square() # f = a^(2^51 - 32)
-        f.square().square().square().square().square() # f = a^(2^56 - 1024)
-        f.mul(a1023)                                   # f = a^(2^56 - 1)
-        f.square().square().square().square().square() # f = a^(2^61 - 32)
-        f.square().square().square().square().square() # f = a^(2^66 - 1024)
-        f.mul(a1023)                                   # f = a^(2^66 - 1)
-        f.square().square().square().square().square() # f = a^(2^71 - 32)
-        f.square().square().square().square().square() # f = a^(2^76 - 1024)
-        f.mul(a1023)                                   # f = a^(2^76 - 1)
-        f.square().square().square().square().square() # f = a^(2^81 - 32)
-        f.square().square().square().square().square() # f = a^(2^86 - 1024)
-        f.mul(a1023)                                   # f = a^(2^86 - 1)
-        f.square().square().square().square().square() # f = a^(2^91 - 32)
-        f.square().square().square().square().square() # f = a^(2^96 - 1024)
-        f.mul(a1023)                                   # f = a^(2^96 - 1)
-        f.square().square().square().square().square() # f = a^(2^101 - 32)
-        f.square().square().square().square().square() # f = a^(2^106 - 1024)
-        f.mul(a1023)                                   # f = a^(2^106 - 1)
-        f.square().square().square().square().square() # f = a^(2^111 - 32)
-        f.square().square().square().square().square() # f = a^(2^116 - 1024)
-        f.mul(a1023)                                   # f = a^(2^116 - 1)
-        f.square().square().square().square().square() # f = a^(2^121 - 32)
-        f.square().square().square().square().square() # f = a^(2^126 - 1024)
-        f.mul(a1023)                                   # f = a^(2^126 - 1)
-        f.square().square().square().square().square() # f = a^(2^131 - 32)
-        f.square().square().square().square().square() # f = a^(2^136 - 1024)
-        f.mul(a1023)                                   # f = a^(2^136 - 1)
-        f.square().square().square().square().square() # f = a^(2^141 - 32)
-        f.square().square().square().square().square() # f = a^(2^146 - 1024)
-        f.mul(a1023)                                   # f = a^(2^146 - 1)
-        f.square().square().square().square().square() # f = a^(2^151 - 32)
-        f.square().square().square().square().square() # f = a^(2^156 - 1024)
-        f.mul(a1023)                                   # f = a^(2^156 - 1)
-        f.square().square().square().square().square() # f = a^(2^161 - 32)
-        f.square().square().square().square().square() # f = a^(2^166 - 1024)
-        f.mul(a1023)                                   # f = a^(2^166 - 1)
-        f.square().square().square().square().square() # f = a^(2^171 - 32)
-        f.square().square().square().square().square() # f = a^(2^176 - 1024)
-        f.mul(a1023)                                   # f = a^(2^176 - 1)
-        f.square().square().square().square().square() # f = a^(2^181 - 32)
-        f.square().square().square().square().square() # f = a^(2^186 - 1024)
-        f.mul(a1023)                                   # f = a^(2^186 - 1)
-        f.square().square().square().square().square() # f = a^(2^191 - 32)
-        f.square().square().square().square().square() # f = a^(2^196 - 1024)
-        f.mul(a1023)                                   # f = a^(2^196 - 1)
-        f.square().square().square().square().square() # f = a^(2^201 - 32)
-        f.square().square().square().square().square() # f = a^(2^206 - 1024)
-        f.mul(a1023)                                   # f = a^(2^206 - 1)
-        f.square().square().square().square().square() # f = a^(2^211 - 32)
-        f.square().square().square().square().square() # f = a^(2^216 - 1024)
-        f.mul(a1023)                                   # f = a^(2^216 - 1)
-        f.square().square().square().square().square() # f = a^(2^221 - 32)
-        f.square().square().square().square().square() # f = a^(2^226 - 1024)
-        f.mul(a1019)                                   # f = a^(2^226 - 5)
-        f.square().square().square().square().square() # f = a^(2^231 - 160)
-        f.square().square().square().square().square() # f = a^(2^236 - 5120)
-        f.mul(a1023)                                   # f = a^(2^236 - 4097)
-        f.square().square().square().square().square() # f = a^(2^241 - 131104)
-        f.square().square().square().square().square() # f = a^(2^246 - 4195328)
-        f.mul(a1023)                                   # f = a^(2^246 - 4194305)
-        f.square().square().square().square().square() # f = a^(2^251 - 134217760)
-        f.square().square().square().square().square() # f = a^(2^256 - 4294968320)
-        return f.mul(a45)                              # f = a^(2^256 - 4294968275) = a^(p-2)
+        # fmt: off
+        f.set(a63)                                      # f = a^(2^6 - 1)
+        f.square().square().square().square().square()  # f = a^(2^11 - 32)
+        f.square().square().square().square().square()  # f = a^(2^16 - 1024)
+        f.mul(a1023)                                    # f = a^(2^16 - 1)
+        f.square().square().square().square().square()  # f = a^(2^21 - 32)
+        f.square().square().square().square().square()  # f = a^(2^26 - 1024)
+        f.mul(a1023)                                    # f = a^(2^26 - 1)
+        f.square().square().square().square().square()  # f = a^(2^31 - 32)
+        f.square().square().square().square().square()  # f = a^(2^36 - 1024)
+        f.mul(a1023)                                    # f = a^(2^36 - 1)
+        f.square().square().square().square().square()  # f = a^(2^41 - 32)
+        f.square().square().square().square().square()  # f = a^(2^46 - 1024)
+        f.mul(a1023)                                    # f = a^(2^46 - 1)
+        f.square().square().square().square().square()  # f = a^(2^51 - 32)
+        f.square().square().square().square().square()  # f = a^(2^56 - 1024)
+        f.mul(a1023)                                    # f = a^(2^56 - 1)
+        f.square().square().square().square().square()  # f = a^(2^61 - 32)
+        f.square().square().square().square().square()  # f = a^(2^66 - 1024)
+        f.mul(a1023)                                    # f = a^(2^66 - 1)
+        f.square().square().square().square().square()  # f = a^(2^71 - 32)
+        f.square().square().square().square().square()  # f = a^(2^76 - 1024)
+        f.mul(a1023)                                    # f = a^(2^76 - 1)
+        f.square().square().square().square().square()  # f = a^(2^81 - 32)
+        f.square().square().square().square().square()  # f = a^(2^86 - 1024)
+        f.mul(a1023)                                    # f = a^(2^86 - 1)
+        f.square().square().square().square().square()  # f = a^(2^91 - 32)
+        f.square().square().square().square().square()  # f = a^(2^96 - 1024)
+        f.mul(a1023)                                    # f = a^(2^96 - 1)
+        f.square().square().square().square().square()  # f = a^(2^101 - 32)
+        f.square().square().square().square().square()  # f = a^(2^106 - 1024)
+        f.mul(a1023)                                    # f = a^(2^106 - 1)
+        f.square().square().square().square().square()  # f = a^(2^111 - 32)
+        f.square().square().square().square().square()  # f = a^(2^116 - 1024)
+        f.mul(a1023)                                    # f = a^(2^116 - 1)
+        f.square().square().square().square().square()  # f = a^(2^121 - 32)
+        f.square().square().square().square().square()  # f = a^(2^126 - 1024)
+        f.mul(a1023)                                    # f = a^(2^126 - 1)
+        f.square().square().square().square().square()  # f = a^(2^131 - 32)
+        f.square().square().square().square().square()  # f = a^(2^136 - 1024)
+        f.mul(a1023)                                    # f = a^(2^136 - 1)
+        f.square().square().square().square().square()  # f = a^(2^141 - 32)
+        f.square().square().square().square().square()  # f = a^(2^146 - 1024)
+        f.mul(a1023)                                    # f = a^(2^146 - 1)
+        f.square().square().square().square().square()  # f = a^(2^151 - 32)
+        f.square().square().square().square().square()  # f = a^(2^156 - 1024)
+        f.mul(a1023)                                    # f = a^(2^156 - 1)
+        f.square().square().square().square().square()  # f = a^(2^161 - 32)
+        f.square().square().square().square().square()  # f = a^(2^166 - 1024)
+        f.mul(a1023)                                    # f = a^(2^166 - 1)
+        f.square().square().square().square().square()  # f = a^(2^171 - 32)
+        f.square().square().square().square().square()  # f = a^(2^176 - 1024)
+        f.mul(a1023)                                    # f = a^(2^176 - 1)
+        f.square().square().square().square().square()  # f = a^(2^181 - 32)
+        f.square().square().square().square().square()  # f = a^(2^186 - 1024)
+        f.mul(a1023)                                    # f = a^(2^186 - 1)
+        f.square().square().square().square().square()  # f = a^(2^191 - 32)
+        f.square().square().square().square().square()  # f = a^(2^196 - 1024)
+        f.mul(a1023)                                    # f = a^(2^196 - 1)
+        f.square().square().square().square().square()  # f = a^(2^201 - 32)
+        f.square().square().square().square().square()  # f = a^(2^206 - 1024)
+        f.mul(a1023)                                    # f = a^(2^206 - 1)
+        f.square().square().square().square().square()  # f = a^(2^211 - 32)
+        f.square().square().square().square().square()  # f = a^(2^216 - 1024)
+        f.mul(a1023)                                    # f = a^(2^216 - 1)
+        f.square().square().square().square().square()  # f = a^(2^221 - 32)
+        f.square().square().square().square().square()  # f = a^(2^226 - 1024)
+        f.mul(a1019)                                    # f = a^(2^226 - 5)
+        f.square().square().square().square().square()  # f = a^(2^231 - 160)
+        f.square().square().square().square().square()  # f = a^(2^236 - 5120)
+        f.mul(a1023)                                    # f = a^(2^236 - 4097)
+        f.square().square().square().square().square()  # f = a^(2^241 - 131104)
+        f.square().square().square().square().square()  # f = a^(2^246 - 4195328)
+        f.mul(a1023)                                    # f = a^(2^246 - 4194305)
+        f.square().square().square().square().square()  # f = a^(2^251 - 134217760)
+        f.square().square().square().square().square()  # f = a^(2^256 - 4294968320)
+        return f.mul(a45)      # f = a^(2^256 - 4294968275) = a^(p-2)
+        # fmt: on
+
 
 BytePoints = []
+
 
 def loadS256BytePoints():
     if len(secp256k1BytePoints) == 0:
@@ -923,13 +1152,14 @@ def loadS256BytePoints():
             col.append(py)
             col.append(pz)
             for j in range(10):
-                px.n[j] = ifunc(serialized[offset+3:offset-1:-1])
+                px.n[j] = ifunc(serialized[offset + 3 : offset - 1 : -1])
                 offset += 4
             for j in range(10):
-                py.n[j] = ifunc(serialized[offset+3:offset-1:-1])
+                py.n[j] = ifunc(serialized[offset + 3 : offset - 1 : -1])
                 offset += 4
             for j in range(10):
-                pz.n[j] = ifunc(serialized[offset+3:offset-1:-1])
+                pz.n[j] = ifunc(serialized[offset + 3 : offset - 1 : -1])
                 offset += 4
+
 
 loadS256BytePoints()

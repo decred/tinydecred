@@ -4,11 +4,15 @@ See LICENSE for details
 """
 
 import unittest
+
 from tinydecred.crypto.secp256k1 import curve
+
 
 class TestCurve(unittest.TestCase):
     def test_add_jacobian(self):
-        """ TestAddJacobian tests addition of points projected in Jacobian coordinates."""
+        """
+        TestAddJacobian tests addition of points projected in Jacobian coordinates.
+        """
         # x1, y1, z1 string // Coordinates (in hex) of first point to add
         # x2, y2, z2 string // Coordinates (in hex) of second point to add
         # x3, y3, z3 string // Coordinates (in hex) of expected point
@@ -77,7 +81,6 @@ class TestCurve(unittest.TestCase):
                 "b082b53702c466dcf6e984a35671756c506c67c2fcb8adb408c44dd0755c8f2a",
                 "16e3d537ae61fb1247eda4b4f523cfbaee5152c0d0d96b520376833c1e594464",
             ),
-
             # Addition with z1=z2 (!=1) different x values.
             (
                 "d3e5183c393c20e4f464acf144ce9ae8266a82b67f553af33eb37e88e7fd2718",
@@ -116,7 +119,6 @@ class TestCurve(unittest.TestCase):
                 "2b53702c466dcf6e984a35671756c506c67c2fcb8adb408c44dd125dc91cb988",
                 "6e3d537ae61fb1247eda4b4f523cfbaee5152c0d0d96b520376833c2e5944a11",
             ),
-
             # Addition with z1!=z2 and z2=1 different x values.
             (
                 "d3e5183c393c20e4f464acf144ce9ae8266a82b67f553af33eb37e88e7fd2718",
@@ -155,7 +157,6 @@ class TestCurve(unittest.TestCase):
                 "2b53702c466dcf6e984a35671756c506c67c2fcb8adb408c44dd125dc91cb988",
                 "6e3d537ae61fb1247eda4b4f523cfbaee5152c0d0d96b520376833c2e5944a11",
             ),
-
             # Addition with z1!=z2 and z2!=1 different x values.
             # P(x, y, z) + P(x, y, z) = 2P
             (
@@ -211,9 +212,18 @@ class TestCurve(unittest.TestCase):
 
             # Ensure the test data is using points that are actually on
             # the curve (or the point at infinity).
-            self.assertFalse(not z1.isZero() and not curve.isJacobianOnS256Curve(x1, y1, z1), msg="xyz1")
-            self.assertFalse(not z2.isZero() and not curve.isJacobianOnS256Curve(x2, y2, z2), msg="xyz1")
-            self.assertFalse(not z3.isZero() and not curve.isJacobianOnS256Curve(x3, y3, z3), msg="xyz1")
+            self.assertFalse(
+                not z1.isZero() and not curve.isJacobianOnS256Curve(x1, y1, z1),
+                msg="xyz1",
+            )
+            self.assertFalse(
+                not z2.isZero() and not curve.isJacobianOnS256Curve(x2, y2, z2),
+                msg="xyz1",
+            )
+            self.assertFalse(
+                not z3.isZero() and not curve.isJacobianOnS256Curve(x3, y3, z3),
+                msg="xyz1",
+            )
 
             # Add the two points.
             fv = curve.FieldVal
@@ -222,20 +232,16 @@ class TestCurve(unittest.TestCase):
             self.assertTrue(rx.equals(x3), msg="x-%i" % i)
             self.assertTrue(ry.equals(y3), msg="y-%i" % i)
             self.assertTrue(rz.equals(z3), msg="z-%i" % i)
+
     def test_double_jacobian(self):
-        """ TestDoubleJacobian tests doubling of points projected in Jacobian coordinates."""
+        """
+        TestDoubleJacobian tests doubling of points projected in Jacobian coordinates.
+        """
         # x1, y1, z1 string // Coordinates (in hex) of point to double
         #     x3, y3, z3 string // Coordinates (in hex) of expected point
         tests = [
             # Doubling a point at infinity is still infinity.
-            (
-                "0",
-                "0",
-                "0",
-                "0",
-                "0",
-                "0",
-            ),
+            ("0", "0", "0", "0", "0", "0",),
             # Doubling with z1=1.
             (
                 "34f9460f0e4f08393d192b3c5133a6ba099aa0ad9fd54ebccfacdfa239ff49c6",
@@ -276,8 +282,14 @@ class TestCurve(unittest.TestCase):
 
             # Ensure the test data is using points that are actually on
             # the curve (or the point at infinity).
-            self.assertFalse(not z1.isZero() and not curve.isJacobianOnS256Curve(x1, y1, z1), msg="1-%i" % i)
-            self.assertFalse(not z3.isZero() and not curve.isJacobianOnS256Curve(x3, y3, z3), msg="3-%i" % i)
+            self.assertFalse(
+                not z1.isZero() and not curve.isJacobianOnS256Curve(x1, y1, z1),
+                msg="1-%i" % i,
+            )
+            self.assertFalse(
+                not z3.isZero() and not curve.isJacobianOnS256Curve(x3, y3, z3),
+                msg="3-%i" % i,
+            )
             # Double the point.
             fv = curve.FieldVal
             rx, ry, rz = fv(), fv(), fv()
@@ -285,6 +297,7 @@ class TestCurve(unittest.TestCase):
             self.assertTrue(rx.equals(x3), msg="x-%i" % i)
             self.assertTrue(ry.equals(y3), msg="y-%i" % i)
             self.assertTrue(rz.equals(z3), msg="z-%i" % i)
+
     def test_base_mult(self):
         tests = [
             (
@@ -318,6 +331,7 @@ class TestCurve(unittest.TestCase):
             px, py = curve.curve.scalarBaseMult(curve.fromHex(k))
             self.assertEqual(px, curve.fromHex(x))
             self.assertEqual(py, curve.fromHex(y))
+
     def test_add_affine(self):
         """ TestAddAffine tests addition of points in affine coordinates."""
         tests = [
@@ -341,7 +355,6 @@ class TestCurve(unittest.TestCase):
                 "d74bf844b0862475103d96a611cf2d898447e288d34b360bc885cb8ce7c00575",
                 "131c670d414c4546b88ac3ff664611b1c38ceb1c21d76369d7a7a0969d61d97d",
             ),
-
             # Addition with different x values.
             (
                 "34f9460f0e4f08393d192b3c5133a6ba099aa0ad9fd54ebccfacdfa239ff49c6",
@@ -381,9 +394,18 @@ class TestCurve(unittest.TestCase):
 
             # Ensure the test data is using points that are actually on
             # the curve (or the point at infinity).
-            self.assertFalse(not (x1 == 0 and y1 == 0) and  not curve.curve.isAffineOnCurve(x1, y1), msg="xy1")
-            self.assertFalse(not (x2 == 0 and y2 == 0) and  not curve.curve.isAffineOnCurve(x2, y2), msg="xy2")
-            self.assertFalse(not (x3 == 0 and y3 == 0) and  not curve.curve.isAffineOnCurve(x3, y3), msg="xy3")
+            self.assertFalse(
+                not (x1 == 0 and y1 == 0) and not curve.curve.isAffineOnCurve(x1, y1),
+                msg="xy1",
+            )
+            self.assertFalse(
+                not (x2 == 0 and y2 == 0) and not curve.curve.isAffineOnCurve(x2, y2),
+                msg="xy2",
+            )
+            self.assertFalse(
+                not (x3 == 0 and y3 == 0) and not curve.curve.isAffineOnCurve(x3, y3),
+                msg="xy3",
+            )
 
             # Add the two points.
             rx, ry = curve.curve.add(x1, y1, x2, y2)
