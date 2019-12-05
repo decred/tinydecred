@@ -5,21 +5,25 @@ See LICENSE for details
 
 Cryptographic functions.
 """
+
 import hashlib
 import hmac
-from tinydecred.util import tinyjson
-from tinydecred.crypto.secp256k1.curve import curve as Curve, PublicKey, PrivateKey
-from tinydecred.crypto.rando import generateSeed
-from tinydecred.crypto.bytearray import ByteArray
-from blake256.blake256 import blake_hash
+
 from base58 import b58encode, b58decode
+from blake256.blake256 import blake_hash
+
+from tinydecred.crypto.bytearray import ByteArray
+from tinydecred.crypto.rando import generateSeed
+from tinydecred.crypto.secp256k1.curve import curve as Curve, PublicKey, PrivateKey
+from tinydecred.util import tinyjson
+
 
 KEY_SIZE = 32
 HASH_SIZE = 32
 BLAKE256_SIZE = 32
 RIPEMD160_SIZE = 20
-SERIALIZED_KEY_LENGTH = 4 + 1 + 4 + 4 + 32 + 33 # 78 bytes
-HARDENED_KEY_START = 2**31
+SERIALIZED_KEY_LENGTH = 4 + 1 + 4 + 4 + 32 + 33  # 78 bytes
+HARDENED_KEY_START = 2 ** 31
 MAX_COIN_TYPE = HARDENED_KEY_START - 1
 MAX_ACCOUNT_NUM = HARDENED_KEY_START - 2
 RADIX = 58
@@ -55,6 +59,7 @@ PKFUncompressed = 0
 # compressed public key.
 PKFCompressed = 1
 
+
 class CrazyKeyError(Exception):
     """
     Both derived public or private keys rely on treating the left 32-byte
@@ -64,13 +69,17 @@ class CrazyKeyError(Exception):
     extended key can't be created for this index and the caller should simply
     increment to the next index.
     """
+
     pass
+
 
 class ParameterRangeError(Exception):
     """
     An input parameter is out of the acceptable range.
     """
+
     pass
+
 
 def encodeAddress(netID, k):
     """
@@ -88,10 +97,12 @@ def encodeAddress(netID, k):
     b += checksum(b.b)
     return b58encode(b.bytes()).decode()
 
+
 class AddressPubKeyHash:
     """
     AddressPubKeyHash represents an address based on a pubkey hash.
     """
+
     def __init__(self, netID=None, pkHash=None, sigType=STEcdsaSecp256k1):
         if len(pkHash) != 20:
             raise Exception("AddressPubKeyHash expected 20 bytes, got %d" % len(pkHash))
@@ -101,6 +112,7 @@ class AddressPubKeyHash:
         self.sigType = sigType
         self.netID = netID
         self.pkHash = pkHash
+
     def string(self):
         """
         A base-58 encoding of the pubkey hash.
@@ -109,6 +121,7 @@ class AddressPubKeyHash:
             str: The encoded address.
         """
         return encodeAddress(self.netID, self.pkHash)
+
     def address(self):
         """
         Address returns the string encoding of a pay-to-pubkey-hash address.
@@ -117,6 +130,7 @@ class AddressPubKeyHash:
             str: The encoded address.
         """
         return self.string()
+
     def scriptAddress(self):
         """
         ScriptAddress returns the raw bytes of the address to be used when
@@ -126,6 +140,7 @@ class AddressPubKeyHash:
             ByteArray: The script address.
         """
         return self.pkHash.copy()
+
     def hash160(self):
         """
         Hash160 returns the Hash160(data) where data is the data normally
@@ -136,12 +151,14 @@ class AddressPubKeyHash:
         """
         return self.pkHash.copy()
 
+
 class AddressSecpPubKey:
     """
     AddressSecpPubKey represents an address, which is a pubkey hash and its
     base-58 encoding. Argument pubkey should be a ByteArray corresponding to the
     serializedCompressed public key (33 bytes).
     """
+
     def __init__(self, serializedPubkey, net):
         pubkey = Curve.parsePubKey(serializedPubkey)
         # Set the format of the pubkey.  This probably should be returned
@@ -159,6 +176,7 @@ class AddressSecpPubKey:
         self.netID = self.pubkeyID = net.PubKeyAddrID
         self.pubkeyHashID = net.PubKeyHashAddrID
         self.pubkey = pubkey
+
     def serialize(self):
         """
         serialize returns the serialization of the public key according to the
@@ -170,6 +188,7 @@ class AddressSecpPubKey:
         elif fmt == PKFCompressed:
             return self.pubkey.serializeCompressed()
         raise Exception("unknown pubkey format")
+
     def string(self):
         """
         A base-58 encoding of the pubkey.
@@ -182,11 +201,12 @@ class AddressSecpPubKey:
         compressed = self.pubkey.serializeCompressed()
         # set the y-bit if needed
         if compressed[0] == 0x03:
-            buf[0] |= (1 << 7)
+            buf[0] |= 1 << 7
         buf += compressed[1:]
         encoded += buf
         encoded += checksum(encoded.b)
         return b58encode(encoded.bytes()).decode()
+
     def address(self):
         """
         Address returns the string encoding of the public key as a
@@ -197,6 +217,7 @@ class AddressSecpPubKey:
         are pay-to-pubkey-hash constructed from the compressed public key.
         """
         return encodeAddress(self.pubkeyHashID, hash160(self.serialize().bytes()))
+
     def scriptAddress(self):
         """
         ScriptAddress returns the raw bytes of the address to be used when
@@ -206,6 +227,7 @@ class AddressSecpPubKey:
             ByteArray: The script address.
         """
         return self.serialize()
+
     def hash160(self):
         """
         Hash160 returns the Hash160(data) where data is the data normally
@@ -216,13 +238,16 @@ class AddressSecpPubKey:
         """
         return hash160(self.serialize().bytes())
 
+
 class AddressScriptHash(object):
     """
     AddressScriptHash is an Address for a pay-to-script-hash (P2SH) transaction.
     """
+
     def __init__(self, netID, scriptHash):
         self.netID = netID
         self.scriptHash = scriptHash
+
     def string(self):
         """
         A base-58 encoding of the pubkey hash.
@@ -231,6 +256,7 @@ class AddressScriptHash(object):
             str: The encoded address.
         """
         return encodeAddress(self.netID, self.scriptHash)
+
     def address(self):
         """
         Address returns the string encoding of a pay-to-script-hash address.
@@ -239,6 +265,7 @@ class AddressScriptHash(object):
             str: The encoded address.
         """
         return self.string()
+
     def scriptAddress(self):
         """
         ScriptAddress returns the raw bytes of the address to be used when
@@ -248,6 +275,7 @@ class AddressScriptHash(object):
             ByteArray: The script address.
         """
         return self.scriptHash.copy()
+
     def hash160(self):
         """
         Hash160 returns the Hash160(data) where data is the data normally
@@ -257,6 +285,7 @@ class AddressScriptHash(object):
             ByteArray: The hash.
         """
         return self.scriptHash.copy()
+
 
 def hmacDigest(key, msg, digestmod=hashlib.sha512):
     """
@@ -273,6 +302,7 @@ def hmacDigest(key, msg, digestmod=hashlib.sha512):
     h = hmac.new(key, msg=msg, digestmod=digestmod)
     return h.digest()
 
+
 def hash160(b):
     """
     A RIPEMD160 hash of the blake256 hash of the input.
@@ -287,6 +317,7 @@ def hash160(b):
     h.update(blake_hash(b))
     return ByteArray(h.digest())
 
+
 def checksum(input):
     """
     A checksum.
@@ -298,6 +329,7 @@ def checksum(input):
         bytes: A 4-byte checksum.
     """
     return blake_hash(blake_hash(input))[:4]
+
 
 def sha256ChecksumByte(input):
     """
@@ -312,6 +344,7 @@ def sha256ChecksumByte(input):
     v = hashlib.sha256(input).digest()
     return hashlib.sha256(v).digest()[0]
 
+
 def mac(key, msg):
     """
     SHA256-based message authentication code.
@@ -324,6 +357,7 @@ def mac(key, msg):
         ByteArray: The authentication hash.
     """
     return ByteArray(hmacDigest(key.bytes(), msg.bytes(), hashlib.sha256))
+
 
 def egcd(a, b):
     """
@@ -344,6 +378,7 @@ def egcd(a, b):
         g, y, x = egcd(b % a, a)
         return (g, x - (b // a) * y, y)
 
+
 def modInv(a, m):
     """
     Modular inverse based on https://stackoverflow.com/a/9758173/1124661.
@@ -358,9 +393,10 @@ def modInv(a, m):
     """
     g, x, y = egcd(a, m)
     if g != 1:
-        raise Exception('modular inverse does not exist')
+        raise Exception("modular inverse does not exist")
     else:
         return x % m
+
 
 def hashH(b):
     """
@@ -373,6 +409,7 @@ def hashH(b):
         ByteArray: The hash.
     """
     return ByteArray(blake_hash(b), length=BLAKE256_SIZE)
+
 
 def privKeyFromBytes(pk):
     """
@@ -387,6 +424,7 @@ def privKeyFromBytes(pk):
     """
     x, y = Curve.scalarBaseMult(pk.int())
     return PrivateKey(Curve, pk, x, y)
+
 
 def b58CheckDecode(s):
     """
@@ -405,11 +443,12 @@ def b58CheckDecode(s):
     if len(decoded) < 6:
         raise Exception("decoded lacking version/checksum")
     version = decoded[:2]
-    cksum =decoded[len(decoded)-4:]
-    if checksum(decoded[:len(decoded)-4]) != cksum:
+    cksum = decoded[len(decoded) - 4 :]
+    if checksum(decoded[: len(decoded) - 4]) != cksum:
         raise Exception("checksum error")
-    payload = ByteArray(decoded[2 : len(decoded)-4])
+    payload = ByteArray(decoded[2 : len(decoded) - 4])
     return payload, version
+
 
 def newAddressPubKey(decoded, net):
     """
@@ -422,7 +461,7 @@ def newAddressPubKey(decoded, net):
         # First byte is the signature suite and ybit.
         suite = decoded[0]
         suite &= 127
-        ybit = not (decoded[0]&(1<<7) == 0)
+        ybit = not (decoded[0] & (1 << 7) == 0)
         toAppend = 0x02
         if ybit:
             toAppend = 0x03
@@ -439,6 +478,7 @@ def newAddressPubKey(decoded, net):
         else:
             raise Exception("unknown address type %d" % suite)
     raise Exception("unable to decode pubkey of length %d" % len(decoded))
+
 
 def newAddressPubKeyHash(pkHash, net, algo):
     """
@@ -464,6 +504,7 @@ def newAddressPubKeyHash(pkHash, net, algo):
         raise Exception("unknown ECDSA algorithm")
     return AddressPubKeyHash(netID, pkHash)
 
+
 def newAddressScriptHash(script, net):
     """
     newAddressScriptHash returns a new AddressScriptHash from a redeem script.
@@ -476,6 +517,7 @@ def newAddressScriptHash(script, net):
         AddressScriptHash: An address object.
     """
     return newAddressScriptHashFromHash(hash160(script.b), net)
+
 
 def newAddressScriptHashFromHash(scriptHash, net):
     """
@@ -493,12 +535,25 @@ def newAddressScriptHashFromHash(scriptHash, net):
         raise Exception("incorrect script hash length")
     return AddressScriptHash(net.ScriptHashAddrID, scriptHash)
 
+
 class ExtendedKey:
     """
     ExtendedKey houses all the information needed to support a BIP0044
     hierarchical deterministic extended key.
     """
-    def __init__(self, privVer, pubVer, key, pubKey, chainCode, parentFP, depth, childNum, isPrivate):
+
+    def __init__(
+        self,
+        privVer,
+        pubVer,
+        key,
+        pubKey,
+        chainCode,
+        parentFP,
+        depth,
+        childNum,
+        isPrivate,
+    ):
         """
         Args:
             privVer (byte-like): Network version bytes for extended priv keys.
@@ -512,7 +567,9 @@ class ExtendedKey:
             childNum (int): Child number.
             isPrivate (bool): Whether the key is a private or public key.
         """
-        assert len(privVer) == 4 and len(pubVer) == 4, "Network version bytes of incorrect length"
+        assert (
+            len(privVer) == 4 and len(pubVer) == 4
+        ), "Network version bytes of incorrect length"
         self.privVer = ByteArray(privVer)
         self.pubVer = ByteArray(pubVer)
         self.key = ByteArray(key)
@@ -527,6 +584,7 @@ class ExtendedKey:
         self.depth = depth
         self.childNum = childNum
         self.isPrivate = isPrivate
+
     def deriveCoinTypeKey(self, coinType):
         """
         First two hardened child derivations in accordance with BIP0044.
@@ -539,12 +597,15 @@ class ExtendedKey:
             ExtendedKey: The coin-type key.
         """
         if coinType > MAX_COIN_TYPE:
-            raise ParameterRangeError("coinType too high. %i > %i" % (coinType, MAX_COIN_TYPE))
+            raise ParameterRangeError(
+                "coinType too high. %i > %i" % (coinType, MAX_COIN_TYPE)
+            )
 
         purpose = self.child(44 + HARDENED_KEY_START)
 
         # Derive the purpose key as a child of the master node.
         return purpose.child(coinType + HARDENED_KEY_START)
+
     def child(self, i):
         """
         Child returns a derived child extended key at the given index.  When
@@ -588,7 +649,9 @@ class ExtendedKey:
         # extended key.
         isChildHardened = i >= HARDENED_KEY_START
         if not self.isPrivate and isChildHardened:
-            raise ParameterRangeError("cannot generate hardened child from public extended key")
+            raise ParameterRangeError(
+                "cannot generate hardened child from public extended key"
+            )
 
         # The data used to derive the child key depends on whether or not the
         # child is hardened per [BIP32].
@@ -599,7 +662,7 @@ class ExtendedKey:
         # For normal children:
         #   serP(parentPubKey) || ser32(i)
         keyLen = 33
-        data = ByteArray(bytearray(keyLen+4))
+        data = ByteArray(bytearray(keyLen + 4))
 
         if isChildHardened:
             # Case #1.
@@ -613,9 +676,9 @@ class ExtendedKey:
             # either case, the data which is used to derive the child key
             # starts with the secp256k1 compressed public key bytes.
             data[0] = ByteArray(self.pubKey)
-        data[keyLen] = ByteArray(i, length=len(data)-keyLen)
+        data[keyLen] = ByteArray(i, length=len(data) - keyLen)
 
-        data |= i # ByteArray will handle the type conversion.
+        data |= i  # ByteArray will handle the type conversion.
 
         # Take the HMAC-SHA512 of the current key's chain code and the derived
         # data:
@@ -625,8 +688,8 @@ class ExtendedKey:
         # Split "I" into two 32-byte sequences Il and Ir where:
         #   Il = intermediate key used to derive the child
         #   Ir = child chain code
-        il = ilr[:len(ilr)//2]
-        childChainCode = ilr[len(ilr)//2:]
+        il = ilr[: len(ilr) // 2]
+        childChainCode = ilr[len(ilr) // 2 :]
 
         # See CrazyKeyError docs for an explanation of this condition.
         if il.int() >= Curve.N or il.iszero():
@@ -654,9 +717,11 @@ class ExtendedKey:
             # Calculate the corresponding intermediate public key for
             # intermediate private key.
 
-            x, y = Curve.scalarBaseMult(il.int()) # Curve.G as ECPointJacobian
+            x, y = Curve.scalarBaseMult(il.int())  # Curve.G as ECPointJacobian
             if x == 0 or y == 0:
-                raise ParameterRangeError("ExtendedKey.child: generated pt outside valid range")
+                raise ParameterRangeError(
+                    "ExtendedKey.child: generated pt outside valid range"
+                )
             # Convert the serialized compressed parent public key into X
             # and Y coordinates so it can be added to the intermediate
             # public key.
@@ -676,16 +741,17 @@ class ExtendedKey:
         parentFP = hash160(self.pubKey.b)[:4]
 
         return ExtendedKey(
-            privVer = self.privVer,
-            pubVer = self.pubVer,
-            key = childKey,
-            pubKey = "",
-            chainCode = childChainCode,
-            parentFP = parentFP,
-            depth = self.depth + 1,
-            childNum = i,
-            isPrivate = isPrivate,
+            privVer=self.privVer,
+            pubVer=self.pubVer,
+            key=childKey,
+            pubKey="",
+            chainCode=childChainCode,
+            parentFP=parentFP,
+            depth=self.depth + 1,
+            childNum=i,
+            isPrivate=isPrivate,
         )
+
     def deriveAccountKey(self, account):
         """
         deriveAccountKey derives the extended key for an account according to
@@ -702,10 +768,13 @@ class ExtendedKey:
         """
         # Enforce maximum account number.
         if account > MAX_ACCOUNT_NUM:
-            raise ParameterRangeError("deriveAccountKey: account number greater than MAX_ACCOUNT_NUM")
+            raise ParameterRangeError(
+                "deriveAccountKey: account number greater than MAX_ACCOUNT_NUM"
+            )
 
         # Derive the account key as a child of the coin type key.
         return self.child(account + HARDENED_KEY_START)
+
     def neuter(self):
         """
         neuter returns a new extended public key from this extended private key.
@@ -729,16 +798,17 @@ class ExtendedKey:
         #
         # This is the function N((k,c)) -> (K, c) from [BIP32].
         return ExtendedKey(
-            privVer = self.privVer,
-            pubVer = self.pubVer,
-            key = self.pubKey,
-            pubKey = self.pubKey,
-            chainCode = self.chainCode,
-            parentFP = self.parentFP,
-            depth = self.depth,
-            childNum = self.childNum,
-            isPrivate = False,
+            privVer=self.privVer,
+            pubVer=self.pubVer,
+            key=self.pubKey,
+            pubKey=self.pubKey,
+            chainCode=self.chainCode,
+            parentFP=self.parentFP,
+            depth=self.depth,
+            childNum=self.childNum,
+            isPrivate=False,
         )
+
     def string(self):
         """
         string returns the extended key as a base58-encoded string. See
@@ -756,7 +826,9 @@ class ExtendedKey:
         # The serialized format is:
         #   version (4) || depth (1) || parent fingerprint (4)) ||
         #   child num (4) || chain code (32) || key data (33) || checksum (4)
-        serializedBytes = ByteArray(bytearray(0)) # length serializedKeyLen + 4 after appending
+        serializedBytes = ByteArray(
+            bytearray(0)
+        )  # length serializedKeyLen + 4 after appending
         if self.isPrivate:
             serializedBytes += self.privVer
         else:
@@ -775,6 +847,7 @@ class ExtendedKey:
         checkSum = checksum(serializedBytes.b)[:4]
         serializedBytes += checkSum
         return b58encode(serializedBytes.bytes()).decode()
+
     def deriveChildAddress(self, i, net):
         """
         The base-58 encoded address for the i'th child.
@@ -787,7 +860,10 @@ class ExtendedKey:
             Address: Child address.
         """
         child = self.child(i)
-        return newAddressPubKeyHash(hash160(child.publicKey().serializeCompressed().b), net, STEcdsaSecp256k1).string()
+        return newAddressPubKeyHash(
+            hash160(child.publicKey().serializeCompressed().b), net, STEcdsaSecp256k1
+        ).string()
+
     def privateKey(self):
         """
         A PrivateKey structure that can be used for signatures.
@@ -796,6 +872,7 @@ class ExtendedKey:
             secp256k1.PrivateKey: The private key structure.
         """
         return privKeyFromBytes(self.key)
+
     def publicKey(self):
         """
         A PublicKey structure of the pubKey.
@@ -804,6 +881,7 @@ class ExtendedKey:
             secp256k1.PublicKey: The public key structure.
         """
         return Curve.parsePubKey(self.pubKey)
+
 
 def decodeExtendedKey(net, pw, key):
     """
@@ -817,7 +895,7 @@ def decodeExtendedKey(net, pw, key):
         ExtendedKey: The decoded key.
     """
     decoded = ByteArray(b58decode(pw.decrypt(key.bytes())))
-    if len(decoded) != SERIALIZED_KEY_LENGTH+4:
+    if len(decoded) != SERIALIZED_KEY_LENGTH + 4:
         raise Exception("decoded private key is wrong length")
 
     # The serialized format is:
@@ -825,8 +903,8 @@ def decodeExtendedKey(net, pw, key):
     #   child num (4) || chain code (32) || key data (33) || checksum (4)
 
     # Split the payload and checksum up and ensure the checksum matches.
-    payload = decoded[:len(decoded)-4]
-    checkSum = decoded[len(decoded)-4:]
+    payload = decoded[: len(decoded) - 4]
+    checkSum = decoded[len(decoded) - 4 :]
     if checkSum != checksum(payload.b)[:4]:
         raise Exception("wrong checksum")
 
@@ -859,21 +937,24 @@ def decodeExtendedKey(net, pw, key):
         Curve.publicKey(keyData.int())
 
     return ExtendedKey(
-        privVer = privVersion,
-        pubVer = pubVersion,
-        key = keyData,
-        pubKey = "",
-        chainCode = chainCode,
-        parentFP = parentFP,
-        depth = depth,
-        childNum = childNum,
-        isPrivate = isPrivate,
+        privVer=privVersion,
+        pubVer=pubVersion,
+        key=keyData,
+        pubKey="",
+        chainCode=chainCode,
+        parentFP=parentFP,
+        depth=depth,
+        childNum=childNum,
+        isPrivate=isPrivate,
     )
+
+
 DEFAULT_KDF_PARAMS = {
     "func": "pbkdf2_hmac",
     "iterations": 100000,
     "hash_name": "sha256",
 }
+
 
 def defaultKDFParams():
     """
@@ -887,10 +968,12 @@ def defaultKDFParams():
     d = DEFAULT_KDF_PARAMS
     return d["func"], d["hash_name"], d["iterations"]
 
+
 class KDFParams(object):
     """
     Parameters for the key derivation function, including the function used.
     """
+
     def __init__(self, salt, digest):
         func, hn, its = defaultKDFParams()
         self.kdfFunc = func
@@ -898,6 +981,7 @@ class KDFParams(object):
         self.salt = salt
         self.digest = digest
         self.iterations = its
+
     def __tojson__(self):
         return {
             "kdfFunc": self.kdfFunc,
@@ -906,25 +990,28 @@ class KDFParams(object):
             "digest": self.digest,
             "iterations": self.iterations,
         }
+
     @staticmethod
     def __fromjson__(obj):
-        p = KDFParams(
-            salt = obj["salt"],
-            digest = obj["digest"],
-        )
+        p = KDFParams(salt=obj["salt"], digest=obj["digest"],)
         p.iterations = obj["iterations"]
         p.hashName = obj["hashName"]
         p.kdfFunc = obj["kdfFunc"]
         return p
+
     def __repr__(self):
         return repr(self.__tojson__())
+
+
 tinyjson.register(KDFParams, "KDFParams")
+
 
 class ScryptParams(object):
     """
     A set of scrypt parameters. Can be stored and retreived in plain text to
     regenerate encryption keys.
     """
+
     def __init__(self, salt, digest, n, r, p):
         """
         Args:
@@ -939,6 +1026,7 @@ class ScryptParams(object):
         self.p = p
         self.salt = salt
         self.digest = digest
+
     def __tojson__(self):
         return {
             "n": self.n,
@@ -947,19 +1035,24 @@ class ScryptParams(object):
             "salt": self.salt,
             "digest": self.digest,
         }
+
     @staticmethod
     def __fromjson__(obj):
         return ScryptParams(obj["salt"], obj["digest"], obj["n"], obj["r"], obj["p"])
+
     def __repr__(self):
         return repr(self.__tojson__())
 
+
 tinyjson.register(ScryptParams, "ScryptParams")
+
 
 class SecretKey(object):
     """
     SecretKey is a password-derived key that can be used for encryption and
     decryption.
     """
+
     def __init__(self, pw):
         """
         Args:
@@ -969,9 +1062,12 @@ class SecretKey(object):
         salt = ByteArray(generateSeed(KEY_SIZE))
         b = lambda v: ByteArray(v).bytes()
         func, hashName, iterations = defaultKDFParams()
-        self.key = ByteArray(hashlib.pbkdf2_hmac(hashName, b(pw), salt.bytes(), iterations))
+        self.key = ByteArray(
+            hashlib.pbkdf2_hmac(hashName, b(pw), salt.bytes(), iterations)
+        )
         digest = ByteArray(hashlib.sha256(self.key.b).digest())
         self.keyParams = KDFParams(salt, digest)
+
     def params(self):
         """
         The key params can be stored in plain text. They must be provided to
@@ -981,6 +1077,7 @@ class SecretKey(object):
             KDFParams: The hash parameters and salt used to generate the key.
         """
         return self.keyParams
+
     def encrypt(self, thing):
         """
         Encrypt the input using the key.
@@ -992,6 +1089,7 @@ class SecretKey(object):
             ByteArray: The thing, encrypted.
         """
         return self.key.encrypt(thing)
+
     def decrypt(self, thing):
         """
         Decrypt the input using the key.
@@ -1003,6 +1101,7 @@ class SecretKey(object):
             ByteArray: The thing, decrypted.
         """
         return self.key.decrypt(thing)
+
     @staticmethod
     def rekey(password, kp):
         """
@@ -1021,7 +1120,9 @@ class SecretKey(object):
         b = lambda v: ByteArray(v).bytes()
         func = kp.kdfFunc
         if func == "pbkdf2_hmac":
-            sk.key = ByteArray(hashlib.pbkdf2_hmac(kp.hashName, b(password), b(kp.salt), kp.iterations))
+            sk.key = ByteArray(
+                hashlib.pbkdf2_hmac(kp.hashName, b(password), b(kp.salt), kp.iterations)
+            )
         else:
             raise Exception("unkown key derivation function")
         checkDigest = ByteArray(hashlib.sha256(sk.key.b).digest())

@@ -4,7 +4,9 @@ See LICENSE for details
 """
 
 import unittest
+
 from tinydecred.crypto.bytearray import ByteArray
+
 
 class TestByteArray(unittest.TestCase):
     def test_operators(self):
@@ -52,7 +54,7 @@ class TestByteArray(unittest.TestCase):
         a = makeA()
         a2 = ByteArray(zero)
         a2 |= a[2:]
-        self.assertTrue(not a is a2)
+        self.assertTrue(a is not a2)
         self.assertEqual(a, a2)
         self.assertEqual(a[2], 255)
 

@@ -3,6 +3,8 @@ Copyright (c) 2019, Brian Stafford
 Copyright (c) 2019, The Decred developers
 See LICENSE for details
 """
+
+# fmt: off
 OP_0                   = 0x00 # 0
 OP_FALSE               = 0x00 # 0 - AKA OP_0
 OP_DATA_1              = 0x01 # 1
@@ -264,8 +266,10 @@ OP_PUBKEYHASH          = 0xfd # 253 - bitcoin core internal
 OP_PUBKEY              = 0xfe # 254 - bitcoin core internal
 OP_INVALIDOPCODE       = 0xff # 255 - bitcoin core internal
 
+
 def noFunc(opcode, engine):
     raise Exception("opcode functions not implemented")
+
 
 opcodeFalse = noFunc
 opcodePushData = noFunc
@@ -357,7 +361,6 @@ opcodeInvalid = noFunc
 opcodeDisabled = noFunc
 
 
-
 class opcode:
     """
     An opcode defines the information related to a txscript opcode.  opfunc, if
@@ -365,16 +368,19 @@ class opcode:
     current script is passed in as a slice with the first member being the opcode
     itself.
     """
+
     def __init__(self, value, name, length, opfunc):
-        self.value  = value # byte
-        self.name   = name # string
-        self.length = length # int
-        self.opfunc = opfunc # func(*opcode, []byte, *Engine) error
+        self.value  = value   # byte
+        self.name   = name    # string
+        self.length = length  # int
+        self.opfunc = opfunc  # func(*opcode, []byte, *Engine) error
+
 
 # opcodeArray holds details about all possible opcodes such as how many bytes
 # the opcode and any associated data should take, its human-readable name, and
 # the handler function.
 opcodeArray = {}
+
 # Data push opcodes.
 opcodeArray[OP_FALSE]     = opcode(OP_FALSE, "OP_0", 1, opcodeFalse)
 opcodeArray[OP_DATA_1]    = opcode(OP_DATA_1, "OP_DATA_1", 2, opcodePushData)
@@ -480,17 +486,27 @@ opcodeArray[OP_VER]                 = opcode(OP_VER, "OP_VER", 1, opcodeReserved
 opcodeArray[OP_IF]                  = opcode(OP_IF, "OP_IF", 1, opcodeIf)
 opcodeArray[OP_NOTIF]               = opcode(OP_NOTIF, "OP_NOTIF", 1, opcodeNotIf)
 opcodeArray[OP_VERIF]               = opcode(OP_VERIF, "OP_VERIF", 1, opcodeReserved)
-opcodeArray[OP_VERNOTIF]            = opcode(OP_VERNOTIF, "OP_VERNOTIF", 1, opcodeReserved)
+opcodeArray[OP_VERNOTIF]            = opcode(
+    OP_VERNOTIF, "OP_VERNOTIF", 1, opcodeReserved
+)
 opcodeArray[OP_ELSE]                = opcode(OP_ELSE, "OP_ELSE", 1, opcodeElse)
 opcodeArray[OP_ENDIF]               = opcode(OP_ENDIF, "OP_ENDIF", 1, opcodeEndif)
 opcodeArray[OP_VERIFY]              = opcode(OP_VERIFY, "OP_VERIFY", 1, opcodeVerify)
 opcodeArray[OP_RETURN]              = opcode(OP_RETURN, "OP_RETURN", 1, opcodeReturn)
-opcodeArray[OP_CHECKLOCKTIMEVERIFY] = opcode(OP_CHECKLOCKTIMEVERIFY, "OP_CHECKLOCKTIMEVERIFY", 1, opcodeCheckLockTimeVerify)
-opcodeArray[OP_CHECKSEQUENCEVERIFY] = opcode(OP_CHECKSEQUENCEVERIFY, "OP_CHECKSEQUENCEVERIFY", 1, opcodeCheckSequenceVerify)
+opcodeArray[OP_CHECKLOCKTIMEVERIFY] = opcode(
+    OP_CHECKLOCKTIMEVERIFY, "OP_CHECKLOCKTIMEVERIFY", 1, opcodeCheckLockTimeVerify
+)
+opcodeArray[OP_CHECKSEQUENCEVERIFY] = opcode(
+    OP_CHECKSEQUENCEVERIFY, "OP_CHECKSEQUENCEVERIFY", 1, opcodeCheckSequenceVerify
+)
 
 # Stack opcodes.
-opcodeArray[OP_TOALTSTACK]   = opcode(OP_TOALTSTACK, "OP_TOALTSTACK", 1, opcodeToAltStack)
-opcodeArray[OP_FROMALTSTACK] = opcode(OP_FROMALTSTACK, "OP_FROMALTSTACK", 1, opcodeFromAltStack)
+opcodeArray[OP_TOALTSTACK]   = opcode(
+    OP_TOALTSTACK, "OP_TOALTSTACK", 1, opcodeToAltStack
+)
+opcodeArray[OP_FROMALTSTACK] = opcode(
+    OP_FROMALTSTACK, "OP_FROMALTSTACK", 1, opcodeFromAltStack
+)
 opcodeArray[OP_2DROP]        = opcode(OP_2DROP, "OP_2DROP", 1, opcode2Drop)
 opcodeArray[OP_2DUP]         = opcode(OP_2DUP, "OP_2DUP", 1, opcode2Dup)
 opcodeArray[OP_3DUP]         = opcode(OP_3DUP, "OP_3DUP", 1, opcode3Dup)
@@ -524,7 +540,9 @@ opcodeArray[OP_XOR]    = opcode(OP_XOR, "OP_XOR", 1, opcodeXor)
 
 # Bytewise comparison function opcodes for byte strings.
 opcodeArray[OP_EQUAL]       = opcode(OP_EQUAL, "OP_EQUAL", 1, opcodeEqual)
-opcodeArray[OP_EQUALVERIFY] = opcode(OP_EQUALVERIFY, "OP_EQUALVERIFY", 1, opcodeEqualVerify)
+opcodeArray[OP_EQUALVERIFY] = opcode(
+    OP_EQUALVERIFY, "OP_EQUALVERIFY", 1, opcodeEqualVerify
+)
 
 # Bitwise rotation opcodes for an int32 register derived from the stack.
 opcodeArray[OP_ROTR] = opcode(OP_ROTR, "OP_ROTR", 1, opcodeRotr)
@@ -538,7 +556,9 @@ opcodeArray[OP_2DIV]               = opcode(OP_2DIV, "OP_2DIV", 1, opcodeNop)
 opcodeArray[OP_NEGATE]             = opcode(OP_NEGATE, "OP_NEGATE", 1, opcodeNegate)
 opcodeArray[OP_ABS]                = opcode(OP_ABS, "OP_ABS", 1, opcodeAbs)
 opcodeArray[OP_NOT]                = opcode(OP_NOT, "OP_NOT", 1, opcodeNot)
-opcodeArray[OP_0NOTEQUAL]          = opcode(OP_0NOTEQUAL, "OP_0NOTEQUAL", 1, opcode0NotEqual)
+opcodeArray[OP_0NOTEQUAL]          = opcode(
+    OP_0NOTEQUAL, "OP_0NOTEQUAL", 1, opcode0NotEqual
+)
 opcodeArray[OP_ADD]                = opcode(OP_ADD, "OP_ADD", 1, opcodeAdd)
 opcodeArray[OP_SUB]                = opcode(OP_SUB, "OP_SUB", 1, opcodeSub)
 opcodeArray[OP_MUL]                = opcode(OP_MUL, "OP_MUL", 1, opcodeMul)
@@ -548,29 +568,57 @@ opcodeArray[OP_LSHIFT]             = opcode(OP_LSHIFT, "OP_LSHIFT", 1, opcodeLSh
 opcodeArray[OP_RSHIFT]             = opcode(OP_RSHIFT, "OP_RSHIFT", 1, opcodeRShift)
 opcodeArray[OP_BOOLAND]            = opcode(OP_BOOLAND, "OP_BOOLAND", 1, opcodeBoolAnd)
 opcodeArray[OP_BOOLOR]             = opcode(OP_BOOLOR, "OP_BOOLOR", 1, opcodeBoolOr)
-opcodeArray[OP_NUMEQUAL]           = opcode(OP_NUMEQUAL, "OP_NUMEQUAL", 1, opcodeNumEqual)
-opcodeArray[OP_NUMEQUALVERIFY]     = opcode(OP_NUMEQUALVERIFY, "OP_NUMEQUALVERIFY", 1, opcodeNumEqualVerify)
-opcodeArray[OP_NUMNOTEQUAL]        = opcode(OP_NUMNOTEQUAL, "OP_NUMNOTEQUAL", 1, opcodeNumNotEqual)
-opcodeArray[OP_LESSTHAN]           = opcode(OP_LESSTHAN, "OP_LESSTHAN", 1, opcodeLessThan)
-opcodeArray[OP_GREATERTHAN]        = opcode(OP_GREATERTHAN, "OP_GREATERTHAN", 1, opcodeGreaterThan)
-opcodeArray[OP_LESSTHANOREQUAL]    = opcode(OP_LESSTHANOREQUAL, "OP_LESSTHANOREQUAL", 1, opcodeLessThanOrEqual)
-opcodeArray[OP_GREATERTHANOREQUAL] = opcode(OP_GREATERTHANOREQUAL, "OP_GREATERTHANOREQUAL", 1, opcodeGreaterThanOrEqual)
+opcodeArray[OP_NUMEQUAL]           = opcode(
+    OP_NUMEQUAL, "OP_NUMEQUAL", 1, opcodeNumEqual
+)
+opcodeArray[OP_NUMEQUALVERIFY]     = opcode(
+    OP_NUMEQUALVERIFY, "OP_NUMEQUALVERIFY", 1, opcodeNumEqualVerify
+)
+opcodeArray[OP_NUMNOTEQUAL]        = opcode(
+    OP_NUMNOTEQUAL, "OP_NUMNOTEQUAL", 1, opcodeNumNotEqual
+)
+opcodeArray[OP_LESSTHAN]           = opcode(
+    OP_LESSTHAN, "OP_LESSTHAN", 1, opcodeLessThan
+)
+opcodeArray[OP_GREATERTHAN] = opcode(
+    OP_GREATERTHAN, "OP_GREATERTHAN", 1, opcodeGreaterThan
+)
+opcodeArray[OP_LESSTHANOREQUAL]    = opcode(
+    OP_LESSTHANOREQUAL, "OP_LESSTHANOREQUAL", 1, opcodeLessThanOrEqual
+)
+opcodeArray[OP_GREATERTHANOREQUAL] = opcode(
+    OP_GREATERTHANOREQUAL, "OP_GREATERTHANOREQUAL", 1, opcodeGreaterThanOrEqual
+)
 opcodeArray[OP_MIN]                = opcode(OP_MIN, "OP_MIN", 1, opcodeMin)
 opcodeArray[OP_MAX]                = opcode(OP_MAX, "OP_MAX", 1, opcodeMax)
 opcodeArray[OP_WITHIN]             = opcode(OP_WITHIN, "OP_WITHIN", 1, opcodeWithin)
 
 # Crypto opcodes.
-opcodeArray[OP_RIPEMD160]           = opcode(OP_RIPEMD160, "OP_RIPEMD160", 1, opcodeRipemd160)
+opcodeArray[OP_RIPEMD160]           = opcode(
+    OP_RIPEMD160, "OP_RIPEMD160", 1, opcodeRipemd160
+)
 opcodeArray[OP_SHA1]                = opcode(OP_SHA1, "OP_SHA1", 1, opcodeSha1)
 opcodeArray[OP_SHA256]              = opcode(OP_SHA256, "OP_SHA256", 1, opcodeSha256)
-opcodeArray[OP_BLAKE256]            = opcode(OP_BLAKE256, "OP_BLAKE256", 1, opcodeBlake256)
+opcodeArray[OP_BLAKE256]            = opcode(
+    OP_BLAKE256, "OP_BLAKE256", 1, opcodeBlake256
+)
 opcodeArray[OP_HASH160]             = opcode(OP_HASH160, "OP_HASH160", 1, opcodeHash160)
 opcodeArray[OP_HASH256]             = opcode(OP_HASH256, "OP_HASH256", 1, opcodeHash256)
-opcodeArray[OP_CODESEPARATOR]       = opcode(OP_CODESEPARATOR, "OP_CODESEPARATOR", 1, opcodeDisabled)
-opcodeArray[OP_CHECKSIG]            = opcode(OP_CHECKSIG, "OP_CHECKSIG", 1, opcodeCheckSig)
-opcodeArray[OP_CHECKSIGVERIFY]      = opcode(OP_CHECKSIGVERIFY, "OP_CHECKSIGVERIFY", 1, opcodeCheckSigVerify)
-opcodeArray[OP_CHECKMULTISIG]       = opcode(OP_CHECKMULTISIG, "OP_CHECKMULTISIG", 1, opcodeCheckMultiSig)
-opcodeArray[OP_CHECKMULTISIGVERIFY] = opcode(OP_CHECKMULTISIGVERIFY, "OP_CHECKMULTISIGVERIFY", 1, opcodeCheckMultiSigVerify)
+opcodeArray[OP_CODESEPARATOR]       = opcode(
+    OP_CODESEPARATOR, "OP_CODESEPARATOR", 1, opcodeDisabled
+)
+opcodeArray[OP_CHECKSIG]            = opcode(
+    OP_CHECKSIG, "OP_CHECKSIG", 1, opcodeCheckSig
+)
+opcodeArray[OP_CHECKSIGVERIFY]      = opcode(
+    OP_CHECKSIGVERIFY, "OP_CHECKSIGVERIFY", 1, opcodeCheckSigVerify
+)
+opcodeArray[OP_CHECKMULTISIG]       = opcode(
+    OP_CHECKMULTISIG, "OP_CHECKMULTISIG", 1, opcodeCheckMultiSig
+)
+opcodeArray[OP_CHECKMULTISIGVERIFY] = opcode(
+    OP_CHECKMULTISIGVERIFY, "OP_CHECKMULTISIGVERIFY", 1, opcodeCheckMultiSigVerify
+)
 
 # Reserved opcodes.
 opcodeArray[OP_NOP1]  = opcode(OP_NOP1, "OP_NOP1", 1, opcodeNop)
@@ -589,8 +637,12 @@ opcodeArray[OP_SSRTX]      = opcode(OP_SSRTX, "OP_SSRTX", 1, opcodeNop)
 opcodeArray[OP_SSTXCHANGE] = opcode(OP_SSTXCHANGE, "OP_SSTXCHANGE", 1, opcodeNop)
 
 # Alternative checksig opcode.
-opcodeArray[OP_CHECKSIGALT]       = opcode(OP_CHECKSIGALT, "OP_CHECKSIGALT", 1, opcodeCheckSigAlt)
-opcodeArray[OP_CHECKSIGALTVERIFY] = opcode(OP_CHECKSIGALTVERIFY, "OP_CHECKSIGALTVERIFY", 1, opcodeCheckSigAltVerify)
+opcodeArray[OP_CHECKSIGALT]       = opcode(
+    OP_CHECKSIGALT, "OP_CHECKSIGALT", 1, opcodeCheckSigAlt
+)
+opcodeArray[OP_CHECKSIGALTVERIFY] = opcode(
+    OP_CHECKSIGALTVERIFY, "OP_CHECKSIGALTVERIFY", 1, opcodeCheckSigAltVerify
+)
 
 # Undefined opcodes.
 opcodeArray[OP_UNKNOWN193] = opcode(OP_UNKNOWN193, "OP_UNKNOWN193", 1, opcodeNop)
@@ -652,10 +704,14 @@ opcodeArray[OP_UNKNOWN248] = opcode(OP_UNKNOWN248, "OP_UNKNOWN248", 1, opcodeNop
 
 # Bitcoin Core internal use opcode.  Defined here for completeness.
 opcodeArray[OP_INVALID249]   = opcode(OP_INVALID249, "OP_INVALID249", 1, opcodeInvalid)
-opcodeArray[OP_SMALLINTEGER] = opcode(OP_SMALLINTEGER, "OP_SMALLINTEGER", 1, opcodeInvalid)
+opcodeArray[OP_SMALLINTEGER] = opcode(
+    OP_SMALLINTEGER, "OP_SMALLINTEGER", 1, opcodeInvalid
+)
 opcodeArray[OP_PUBKEYS]      = opcode(OP_PUBKEYS, "OP_PUBKEYS", 1, opcodeInvalid)
 opcodeArray[OP_UNKNOWN252]   = opcode(OP_UNKNOWN252, "OP_UNKNOWN252", 1, opcodeInvalid)
 opcodeArray[OP_PUBKEYHASH]   = opcode(OP_PUBKEYHASH, "OP_PUBKEYHASH", 1, opcodeInvalid)
 opcodeArray[OP_PUBKEY]       = opcode(OP_PUBKEY, "OP_PUBKEY", 1, opcodeInvalid)
 
-opcodeArray[OP_INVALIDOPCODE] = opcode(OP_INVALIDOPCODE, "OP_INVALIDOPCODE", 1, opcodeInvalid)
+opcodeArray[OP_INVALIDOPCODE] = opcode(
+    OP_INVALIDOPCODE, "OP_INVALIDOPCODE", 1, opcodeInvalid
+)
