@@ -10,9 +10,10 @@ from tinydecred.crypto import crypto, mnemonic
 from tinydecred.pydecred.account import DecredAccount
 from tinydecred.wallet.accounts import createNewAccountManager
 
-log = helpers.getLogger("WLLT") # , logLvl=0)
+log = helpers.getLogger("WLLT")  # , logLvl=0)
 
 VERSION = "0.0.1"
+
 
 class Wallet(object):
     """
@@ -35,6 +36,7 @@ class Wallet(object):
     If the wallet is used in this way, the mutex will be locked and unlocked
     appropriately.
     """
+
     def __init__(self):
         """
         Args:
@@ -59,19 +61,22 @@ class Wallet(object):
         self.signals = None
         self.mtx = Mutex()
         self.version = None
+
     def __tojson__(self):
         return {
             "acctManager": self.acctManager,
             "version": self.version,
         }
+
     @staticmethod
     def __fromjson__(obj):
         w = Wallet()
         w.acctManager = obj["acctManager"]
         w.version = obj["version"]
         return w
+
     @staticmethod
-    def create(path, password, chain, userSeed = None):
+    def create(path, password, chain, userSeed=None):
         """
         Create a wallet, locked by `password`, for the network indicated by
         `chain`. The seed will be randomly generated, unless a `userSeed` is
@@ -99,7 +104,9 @@ class Wallet(object):
         pw = password.encode()
         # Create the keys and coin type account, using the seed, the public
         # password, private password and blockchain params.
-        wallet.acctManager = createNewAccountManager(seed, b'', pw, chain, constructor=DecredAccount)
+        wallet.acctManager = createNewAccountManager(
+            seed, b"", pw, chain, constructor=DecredAccount
+        )
         wallet.fileKey = crypto.SecretKey(pw)
         wallet.selectedAccount = wallet.acctManager.openAccount(0, password)
         wallet.close()
@@ -110,6 +117,7 @@ class Wallet(object):
             return wallet
         words = mnemonic.encode(seed)
         return words, wallet
+
     @staticmethod
     def createFromMnemonic(words, path, password, chain):
         """
@@ -130,6 +138,7 @@ class Wallet(object):
         if cs != cksum:
             raise Exception("bad checksum %r != %r" % (cs, cksum))
         return Wallet.create(path, password, chain, userSeed=userSeed)
+
     def save(self):
         """
         Save the encrypted wallet.
@@ -138,11 +147,9 @@ class Wallet(object):
             log.error("attempted to save a closed wallet")
             return
         encrypted = self.fileKey.encrypt(tinyjson.dump(self).encode()).hex()
-        w = tinyjson.dump({
-            "keyparams": self.fileKey.params(),
-            "wallet": encrypted,
-        })
+        w = tinyjson.dump({"keyparams": self.fileKey.params(), "wallet": encrypted})
         helpers.saveFile(self.path, w)
+
     def setAccountHandlers(self, blockchain, signals):
         """
         Set blockchain params and user defined callbacks for accounts.
@@ -153,6 +160,7 @@ class Wallet(object):
         """
         self.blockchain = blockchain
         self.signals = signals
+
     @staticmethod
     def openFile(path, password):
         """
@@ -170,17 +178,20 @@ class Wallet(object):
         """
         if not os.path.isfile(path):
             raise FileNotFoundError("no wallet found at %s" % path)
-        with open(path, 'r') as f:
+        with open(path, "r") as f:
             wrapper = tinyjson.load(f.read())
         pw = password.encode()
         keyParams = wrapper["keyparams"]
         fileKey = crypto.SecretKey.rekey(pw, keyParams)
-        wallet = tinyjson.load(fileKey.decrypt(bytes.fromhex(wrapper["wallet"])).decode())
+        wallet = tinyjson.load(
+            fileKey.decrypt(bytes.fromhex(wrapper["wallet"])).decode()
+        )
         wallet.path = path
         wallet.fileKey = fileKey
         wallet.selectedAccount = wallet.acctManager.openAccount(0, password)
         wallet.close()
         return wallet
+
     def open(self, acct, password, blockchain, signals):
         """
         Open an account. The Wallet is returned so that it can be used in
@@ -197,20 +208,25 @@ class Wallet(object):
             Wallet: The wallet with the default account open.
         """
         self.setAccountHandlers(blockchain, signals)
-        self.selectedAccount = self.openAccount = self.acctManager.openAccount(acct, password)
+        self.selectedAccount = self.openAccount = self.acctManager.openAccount(
+            acct, password
+        )
         return self
+
     def lock(self):
         """
         Lock the wallet for use. The preferred way to lock and unlock the wallet
         is indirectly through a contextual `with ... as` block.
         """
         self.mtx.acquire()
+
     def unlock(self):
         """
         Unlock the wallet for use. The preferred way to lock and unlock the
         wallet is indirectly through a contextual `with ... as` block.
         """
         self.mtx.release()
+
     def __enter__(self):
         """
         For use in a `with ... as` block. The returned value is assigned to the
@@ -222,6 +238,7 @@ class Wallet(object):
         self.users = u + 1
         self.lock()
         return self
+
     def __exit__(self, xType, xVal, xTB):
         """
         Executed at the end of the `with ... as` block. Decrement the user
@@ -234,6 +251,7 @@ class Wallet(object):
         self.unlock()
         if self.users == 0:
             self.close()
+
     def close(self):
         """
         Save the wallet and close any open account.
@@ -243,6 +261,7 @@ class Wallet(object):
         if self.openAccount:
             self.openAccount.close()
             self.openAccount = None
+
     def account(self, acct):
         """
         Open the account at index `acct`.
@@ -258,6 +277,7 @@ class Wallet(object):
         if len(aMgr.accounts) <= acct:
             raise Exception("requested unknown account number %i" % acct)
         return aMgr.account(acct)
+
     def getNewAddress(self):
         """
         Get the next unused external address.
@@ -270,6 +290,7 @@ class Wallet(object):
             self.blockchain.subscribeAddresses(a)
         self.save()
         return a
+
     def currentAddress(self):
         """
         Gets the payment address at the cursor.
@@ -278,6 +299,7 @@ class Wallet(object):
             str: The current external address.
         """
         return self.selectedAccount.currentAddress()
+
     def balance(self):
         """
         Get the balance of the currently selected account.
@@ -286,6 +308,7 @@ class Wallet(object):
             Balance: The current account's Balance object.
         """
         return self.selectedAccount.balance
+
     def sync(self):
         """
         Synchronize the UTXO set with the server. This should be the first
@@ -302,6 +325,7 @@ class Wallet(object):
         acct.sync(self.blockchain, self.signals)
         self.save()
         return True
+
     def sendToAddress(self, value, address, feeRate=None):
         """
         Send the value to the address.
@@ -319,5 +343,6 @@ class Wallet(object):
         self.signals.balance(acct.calcBalance(self.blockchain.tip["height"]))
         self.save()
         return tx
+
 
 tinyjson.register(Wallet, "wallet.Wallet")

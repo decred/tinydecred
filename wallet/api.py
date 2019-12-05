@@ -7,23 +7,29 @@ This module defines an API used by the wallet and implemented by each asset and
 node type.
 """
 
+
 class Unimplemented(Exception):
     """
     Unimplemented method.
     """
+
     pass
+
 
 class InsufficientFundsError(Exception):
     """
     Available account balance too low for requested funds.
     """
+
     pass
+
 
 class UTXO:
     """
     Blockchain-implementing classes must know how to create and handle utxo
     objects.
     """
+
     def __init__(self, address, txid, vout):
         """
         Args:
@@ -34,17 +40,20 @@ class UTXO:
         self.address = address
         self.txid = txid
         self.vout = vout
+
     def __tojson__(self):
         """
         UTXO must be json-encodable and registered with the tinyjson module.
         """
         raise Unimplemented("__tojson__ not implemented")
+
     @staticmethod
     def __fromjson__(obj):
         """
         Decode the UTXO from the json encoding as returned by __tojson__
         """
         raise Unimplemented("__fromjson__ not implemented")
+
     def isSpendable(self, tipHeight):
         """
         Determine whether this UTXO is currently spendable.
@@ -53,6 +62,7 @@ class UTXO:
             tipHeight (int): The height of the best block.
         """
         raise Unimplemented("isSpendable not implemented")
+
     def key(self):
         """
         Return a key that is unique to this UTXO.
@@ -61,6 +71,7 @@ class UTXO:
             str: A unique ID for this UTXO.
         """
         raise Unimplemented("key not implemented")
+
     @staticmethod
     def makeKey(txid, vout):
         """
@@ -75,11 +86,13 @@ class UTXO:
         """
         return txid + "#" + str(vout)
 
+
 class Blockchain:
     """
     The Blockchain class defines an API to be implemented for each supported
     asset.
     """
+
     def __init__(self, db, params):
         """
         Args:
@@ -93,6 +106,7 @@ class Blockchain:
         # subscribe* method is called.
         self.blockReceiver = None
         self.addressReceiver = None
+
     def subscribeBlocks(self, receiver):
         """
         Subscribe to new block notifications.
@@ -102,6 +116,7 @@ class Blockchain:
                 notifications.
         """
         raise Unimplemented("subscribeBlocks not implemented")
+
     def subscribeAddresses(self, addrs, receiver):
         """
         Subscribe to notifications for the provided addresses.
@@ -112,6 +127,7 @@ class Blockchain:
                 notifications.
         """
         raise Unimplemented("subscribeAddresses not implemented")
+
     def UTXOs(self, addrs):
         """
         UTXOs will produce any known UTXOs for the list of addresses.
@@ -120,6 +136,7 @@ class Blockchain:
             addrs (list(str)): List of base-58 encoded addresses.
         """
         raise Unimplemented("UTXOs not implemented")
+
     def tx(self, txid):
         """
         tx will produce a transaction object which implements the Transaction
@@ -133,6 +150,7 @@ class Blockchain:
                 API
         """
         raise Unimplemented("tx not implemented")
+
     def blockHeader(self, bHash):
         """
         blockHeader will produce a blockHeader implements the BlockHeader API.
@@ -144,6 +162,7 @@ class Blockchain:
             BlockHeader: An object which implements the BlockHeader API.
         """
         raise Unimplemented("blockHeader not implemented")
+
     def blockHeaderByHeight(self, height):
         """
         The blockHeader for the best block at the provided height.
@@ -155,11 +174,13 @@ class Blockchain:
             BlockHeader: An object which implements the BlockHeader API.
         """
         raise Unimplemented("blockHeaderByHeight not implemented")
+
     def bestBlock(self):
         """
         bestBlock will produce a decoded block as a Python dict.
         """
         raise Unimplemented("bestBlock not implemented")
+
     def sendToAddress(self, value, address, feeRate=None):
         """
         Send the amount in atoms to the specified address.
@@ -183,9 +204,11 @@ class BlockHeader:
     BlockHeader defines an API that must be implemented within Blockchain for
     block header objects.
     """
+
     def __init__(self, height, timestamp):
         self.height = height
         self.timestamp = timestamp
+
     @staticmethod
     def deserialize(b):
         """
@@ -195,6 +218,7 @@ class BlockHeader:
             b (ByteArray): A serialized block header.
         """
         raise Unimplemented("deserialize not implemented")
+
     def serialize(self):
         """
         Serialize the BlockHeader into a ByteArray.
@@ -203,6 +227,7 @@ class BlockHeader:
             ByteArray: The serialized block header.
         """
         raise Unimplemented("serialize not implemented")
+
     def blockHash(self):
         """
         A hash of the serialized block.
@@ -211,6 +236,7 @@ class BlockHeader:
             ByteArray: Hash of the serialized block header.
         """
         raise Unimplemented("blockHash not implemented")
+
     def id(self):
         """
         A string ID of the block, usually an encoding of the blockHash.
@@ -220,11 +246,13 @@ class BlockHeader:
         """
         raise Unimplemented("id not implemented")
 
+
 class Transaction:
     """
     Transaction defines an API that must be implemented within Blockchain for
     transaction objects.
     """
+
     def __eq__(self, tx):
         """
         Check equality of this transaction with another.
@@ -232,6 +260,7 @@ class Transaction:
             tx (Transaction): Another object, presumably of the same class.
         """
         raise Unimplemented("__eq__ not implemented")
+
     def txHash(self):
         """
         A hash of the serialized transaction.
@@ -240,6 +269,7 @@ class Transaction:
             ByteArray: The hashed transaction.
         """
         raise Unimplemented("txHash not implemented")
+
     def txid(self):
         """
         A transaction ID. Typically a string encoding of the txHash.
@@ -248,6 +278,7 @@ class Transaction:
             str: The transaction id.
         """
         raise Unimplemented("txid not implemented")
+
     def serialize(self):
         """
         Serialize the transaction into bytes according to it's network protocol.
@@ -256,6 +287,7 @@ class Transaction:
             ByteArray: The serialized transaction.
         """
         raise Unimplemented("serialize not implemented")
+
     @staticmethod
     def deserialize(b):
         """
@@ -267,20 +299,24 @@ class Transaction:
         """
         raise Unimplemented("deserialize not implemented")
 
+
 class Balance:
     """
     Balance defines an API for balance information.
     """
+
     def __init__(self, total=0, available=0):
         # The total is the sum of all transactions.
         self.total = total
         # The available is the amount available to spend immediately.
         self.available = available
+
     def __tojson__(self):
         """
         Balance must be json-encodable and registered with the tinyjson module.
         """
         raise Unimplemented("__tojson__ not implemented")
+
     @staticmethod
     def __fromjson__(obj):
         """
@@ -288,11 +324,13 @@ class Balance:
         """
         raise Unimplemented("__fromjson__ not implemented")
 
+
 class Signals:
     """
     Signals defines an API for receiving asynchronous updates from a wallet
     or Blockchain.
     """
+
     def balance(self, balance):
         """
         A receiver for balance updates.
@@ -302,10 +340,12 @@ class Signals:
         """
         raise Unimplemented("Signals not implemented")
 
+
 class PublicKey:
     """
     A public key structure.
     """
+
     def __init__(self, curve, x, y):
         """
         Args:
@@ -316,6 +356,7 @@ class PublicKey:
         self.curve = curve
         self.x = x
         self.y = y
+
     def serializeCompressed(self):
         """
         Compressed form of the private key serialization.
@@ -324,6 +365,7 @@ class PublicKey:
             ByteArray: Compressed public key.
         """
         raise Unimplemented("serializeCompressed not implemented")
+
     def serializeUncompressed(self):
         """
         Uncompressed form of the public key serialization.
@@ -333,11 +375,13 @@ class PublicKey:
         """
         raise Unimplemented("serializeUncompressed not implemented")
 
+
 class PrivateKey:
     """
     A private key structure. The associated public key information is stored as
     an attribute.
     """
+
     def __init__(self, curve, k, x, y):
         """
         Args:
@@ -349,10 +393,12 @@ class PrivateKey:
         self.key = k
         self.pub = PublicKey(curve, x, y)
 
+
 class KeySource:
     """
     KeySource defines an API for retrieving `PrivateKey`s and change addresses.
     """
+
     def priv(self, addr):
         """
         Retreive the private key for a base-58 encoded address.
@@ -364,6 +410,7 @@ class KeySource:
             PrivateKey: Private key.
         """
         raise Unimplemented("KeySource not implemented")
+
     def internal(self):
         """
         Get a new internal address.
