@@ -1452,9 +1452,9 @@ class AgendasScreen(Screen):
         self.voteSet = False
 
         self.app.registerSignal(ui.PURCHASEINFO_SIGNAL, self.setVote)
+        self.app.registerSignal(ui.BLOCKCHAIN_CONNECTED, self.setAgendas)
 
         self.accountScreen = accountScreen
-        self.app.makeThread(self.getAgendaInfosFunc(), self.setAgendas)
         self.wgt.setMinimumWidth(400)
         self.wgt.setMinimumHeight(225)
 
@@ -1488,13 +1488,6 @@ class AgendasScreen(Screen):
         """
         pass
 
-    def getAgendaInfosFunc(self):
-        def func():
-            try:
-                return VotingServiceProvider.getAgendasInfo(cfg.net)
-            except Exception as e:
-                log.error("error fetching vote info: %s" % e)
-        return func
     def pageBack(self):
         """
         Go back one page.
@@ -1523,11 +1516,11 @@ class AgendasScreen(Screen):
         """
         self.pgNum.setText("%d/%d" % (self.page+1, len(self.pages)))
 
-    def setAgendas(self, agendasInfo):
+    def setAgendas(self):
         """
         Set agendas from dcrdata.
         """
-        self.agendas = agendasInfo.agendas
+        self.agendas = self.app.dcrdata.dcrdata.getAgendasInfo().agendas
         self.pages = [self.agendas[i*2:i*2+2] for i in range((len(self.agendas)+1)//2)]
         self.page = 0
         self.setAgendaWidgets(self.pages[0])
@@ -1630,8 +1623,7 @@ class AgendasScreen(Screen):
             except Exception as e:
                 log.error("error changing vote: %s" % e)
                 self.app.appWindow.showError("unable to update vote choices: pool connection")
-            finally:
-                self.app.emitSignal(ui.DONE_SIGNAL)
+            self.app.emitSignal(ui.DONE_SIGNAL)
 
         self.app.makeThread(changeVote)
 

@@ -195,6 +195,16 @@ class DcrdataClient(object):
     def subscribeBlocks(self):
         ps = self.psClient()
         ps.send(Sub.newblock)
+
+    def getAgendasInfo(self):
+        """
+        The agendas info that are used for voting.
+
+        Returns:
+            AgendasInfo: the current agendas.
+        """
+        return AgendasInfo.parse(self.stake.vote.info())
+
     @staticmethod
     def timeStringToUnix(fmtStr):
         return calendar.timegm(time.strptime(fmtStr, DcrdataClient.timeFmt))
@@ -386,6 +396,113 @@ class TicketInfo:
         }
 
 tinyjson.register(TicketInfo, "TicketInfo")
+
+
+class AgendaChoices:
+    """
+    Agenda choices such as abstain, yes, no.
+    """
+    def __init__(self, ID, description, bits, isabstain,
+                 isno, count, progress):
+        self.id = ID
+        self.description = description
+        self.bits = bits
+        self.isabstain = isabstain
+        self.isno = isno
+        self.count = count
+        self.progress = progress
+
+    @staticmethod
+    def parse(obj):
+        return AgendaChoices(
+            ID=obj["id"],
+            description=obj["description"],
+            bits=obj["bits"],
+            isabstain=obj["isabstain"],
+            isno=obj["isno"],
+            count=obj["count"],
+            progress=obj["progress"],
+        )
+
+    @staticmethod
+    def __fromjson__(obj):
+        return AgendaChoices.parse(obj)
+
+
+tinyjson.register(AgendaChoices, "AgendaChoices")
+
+
+class Agenda:
+    """
+    An agenda with name, description, and AgendaChoices.
+    """
+    def __init__(self, ID, description, mask, starttime, expiretime,
+                 status, quorumprogress, choices):
+        self.id = ID
+        self.description = description
+        self.mask = mask
+        self.starttime = starttime
+        self.expiretime = expiretime
+        self.status = status
+        self.quorumprogress = quorumprogress
+        self.choices = choices
+
+    @staticmethod
+    def parse(obj):
+        return Agenda(
+            ID=obj["id"],
+            description=obj["description"],
+            mask=obj["mask"],
+            starttime=obj["starttime"],
+            expiretime=obj["expiretime"],
+            status=obj["status"],
+            quorumprogress=obj["quorumprogress"],
+            choices=[AgendaChoices.parse(choice) for choice in obj["choices"]],
+        )
+
+    @staticmethod
+    def __fromjson__(obj):
+        return AgendaChoices.parse(obj)
+
+
+tinyjson.register(Agenda, "Agenda")
+
+
+class AgendasInfo:
+    """
+    All current agenda information for the current network. agendas contains
+    a list of Agenda.
+    """
+    def __init__(self, currentheight, startheight, endheight, HASH,
+                 voteversion, quorum, totalvotes, agendas):
+        self.currentheight = currentheight
+        self.startheight = startheight
+        self.endheight = endheight
+        self.hash = HASH
+        self.voteversion = voteversion
+        self.quorum = quorum
+        self.totalvotes = totalvotes
+        self.agendas = agendas
+
+    @staticmethod
+    def parse(obj):
+        return AgendasInfo(
+            currentheight=obj["currentheight"],
+            startheight=obj["startheight"],
+            endheight=obj["endheight"],
+            HASH=obj["hash"],
+            voteversion=obj["voteversion"],
+            quorum=obj["quorum"],
+            totalvotes=obj["totalvotes"],
+            agendas=[Agenda.parse(agenda) for agenda in obj["agendas"]],
+        )
+
+    @staticmethod
+    def __fromjson__(obj):
+        return AgendasInfo.parse(obj)
+
+
+tinyjson.register(AgendasInfo, "AgendasInfo")
 
 
 class UTXO(object):
