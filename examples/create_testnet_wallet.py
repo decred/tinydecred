@@ -4,11 +4,13 @@ Copyright (c) 2019, The Decred developers
 This example script will prompt for a password and create a password-encrypted
 testnet wallet. The mnemonic seed and an address are printed.
 """
+
 import os
 from getpass import getpass
-from tinydecred.wallet.wallet import Wallet
+
 from tinydecred.pydecred import testnet
 from tinydecred.util.helpers import mkdir
+from tinydecred.wallet.wallet import Wallet
 
 # Create an encrypted, password-protected wallet file.
 password = getpass()
