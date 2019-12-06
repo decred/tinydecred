@@ -1015,20 +1015,11 @@ class FieldVal:
         # The secp256k1 prime - 2 is 2^256 - 4294968275.
 
         # This has a cost of 258 field squarings and 33 field multiplications.
+        # fmt: off
         f = self
         fv = FieldVal
         a2, a3, a4, a10, a11, a21, a42, a45, a63, a1019, a1023 = (
-            fv(),
-            fv(),
-            fv(),
-            fv(),
-            fv(),
-            fv(),
-            fv(),
-            fv(),
-            fv(),
-            fv(),
-            fv(),
+            fv(), fv(), fv(), fv(), fv(), fv(), fv(), fv(), fv(), fv(), fv(),
         )
         a2.squareVal(f)
         a3.mul2(a2, f)
@@ -1041,7 +1032,6 @@ class FieldVal:
         a63.mul2(a42, a21)
         a1019.squareVal(a63).square().square().square().mul(a11)
         a1023.mul2(a1019, a4)
-        # fmt: off
         f.set(a63)                                      # f = a^(2^6 - 1)
         f.square().square().square().square().square()  # f = a^(2^11 - 32)
         f.square().square().square().square().square()  # f = a^(2^16 - 1024)
