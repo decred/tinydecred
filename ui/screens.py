@@ -1450,9 +1450,10 @@ class AgendasScreen(Screen):
         self.page = 0
         self.ignoreVoteIndexChange = False
         self.voteSet = False
+        self.blockchain = None
 
         self.app.registerSignal(ui.PURCHASEINFO_SIGNAL, self.setVote)
-        self.app.registerSignal(ui.BLOCKCHAIN_CONNECTED, self.setAgendas)
+        self.app.registerSignal(ui.BLOCKCHAIN_CONNECTED, self.setBlockchain)
 
         self.accountScreen = accountScreen
         self.wgt.setMinimumWidth(400)
@@ -1516,11 +1517,18 @@ class AgendasScreen(Screen):
         """
         self.pgNum.setText("%d/%d" % (self.page+1, len(self.pages)))
 
+    def setBlockchain(self):
+        """
+        Set the dcrdata blockchain on connected signal. Then set agendas.
+        """
+        self.blockchain = self.app.dcrdata
+        self.setAgendas()
+
     def setAgendas(self):
         """
         Set agendas from dcrdata.
         """
-        self.agendas = self.app.dcrdata.dcrdata.getAgendasInfo().agendas
+        self.agendas = self.blockchain.getAgendasInfo().agendas
         self.pages = [self.agendas[i*2:i*2+2] for i in range((len(self.agendas)+1)//2)]
         self.page = 0
         self.setAgendaWidgets(self.pages[0])
@@ -1544,8 +1552,6 @@ class AgendasScreen(Screen):
             self.app.appWindow.showError("unable to set vote: no pools")
             return
         voteBits = pools[0].purchaseInfo.voteBits
-        # Don't trigger our func watching these indexes.
-        self.ignoreVoteIndexChange = True
         for dropdown in self.dropdowns:
             originalIdx = dropdown.currentIndex()
             index = 0
@@ -1562,7 +1568,6 @@ class AgendasScreen(Screen):
                     return
             if originalIdx != index:
                 dropdown.setCurrentIndex(index)
-        self.ignoreVoteIndexChange = False
         self.voteSet = True
 
     def setAgendaWidgets(self, agendas):
@@ -1589,7 +1594,8 @@ class AgendasScreen(Screen):
             voteBits = [choice.bits for choice in agenda.choices]
             choicesDropdown.voteBitsList = voteBits
             choicesDropdown.bitMask = agenda.mask
-            choicesDropdown.currentIndexChanged.connect(self.onChooseChoice)
+            choicesDropdown.lastIndex = 0
+            choicesDropdown.activated.connect(self.onChooseChoiceFunc(choicesDropdown))
 
             choicesWgt, _ = Q.makeSeries(Q.HORIZONTAL, choicesDropdown)
             wgt, lyt = Q.makeSeries(Q.VERTICAL, nameWgt, descriptionLbl, choicesWgt)
@@ -1598,34 +1604,43 @@ class AgendasScreen(Screen):
             Q.addDropShadow(wgt)
             self.agendasLyt.addWidget(wgt, 1)
 
-    def onChooseChoice(self, _):
+    def onChooseChoiceFunc(self, dropdown):
         """
-        Called when a user has changed their vote. Loops through the current
-        choices and formats the current voteBits
+        Called when a user has changed their vote. Changes the vote bits for
+        the dropdown's bit mask.
+
+        Args:
+            dropdown (obj): the drowdown related to this function.
+
+        Returns:
+            func: A function that is called upon the dropdown being activated.
         """
-        if self.ignoreVoteIndexChange:
-            return
-        acct = self.app.wallet.selectedAccount
-        pools = acct.stakePools
-        voteBits = pools[0].purchaseInfo.voteBits
-        maxuint16 = (1 << 16) - 1
-        for dropdown in self.dropdowns:
+        def func(idx):
+            if idx == dropdown.lastIndex:
+                return
+            acct = self.app.wallet.selectedAccount
+            pools = acct.stakePools
+            voteBits = pools[0].purchaseInfo.voteBits
+            maxuint16 = (1 << 16) - 1
             # Erase all choices.
             voteBits &= maxuint16 ^ dropdown.bitMask
             # Set the current choice.
             voteBits |= dropdown.voteBitsList[dropdown.currentIndex()]
 
-        def changeVote():
-            self.app.emitSignal(ui.WORKING_SIGNAL)
-            try:
-                pools[0].setVoteBits(voteBits)
-                self.app.appWindow.showSuccess("vote choices updated")
-            except Exception as e:
-                log.error("error changing vote: %s" % e)
-                self.app.appWindow.showError("unable to update vote choices: pool connection")
-            self.app.emitSignal(ui.DONE_SIGNAL)
+            def changeVote():
+                self.app.emitSignal(ui.WORKING_SIGNAL)
+                try:
+                    pools[0].setVoteBits(voteBits)
+                    self.app.appWindow.showSuccess("vote choices updated")
+                    dropdown.lastIndex = idx
+                except Exception as e:
+                    log.error("error changing vote: %s" % e)
+                    self.app.appWindow.showError("unable to update vote choices: pool connection")
+                    dropdown.setCurrentIndex(dropdown.lastIndex)
+                self.app.emitSignal(ui.DONE_SIGNAL)
 
-        self.app.makeThread(changeVote)
+            self.app.makeThread(changeVote)
+        return func
 
 
 

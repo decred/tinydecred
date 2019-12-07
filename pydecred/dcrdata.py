@@ -195,16 +195,6 @@ class DcrdataClient(object):
     def subscribeBlocks(self):
         ps = self.psClient()
         ps.send(Sub.newblock)
-
-    def getAgendasInfo(self):
-        """
-        The agendas info that are used for voting.
-
-        Returns:
-            AgendasInfo: the current agendas.
-        """
-        return AgendasInfo.parse(self.stake.vote.info())
-
     @staticmethod
     def timeStringToUnix(fmtStr):
         return calendar.timegm(time.strptime(fmtStr, DcrdataClient.timeFmt))
@@ -424,13 +414,6 @@ class AgendaChoices:
             progress=obj["progress"],
         )
 
-    @staticmethod
-    def __fromjson__(obj):
-        return AgendaChoices.parse(obj)
-
-
-tinyjson.register(AgendaChoices, "AgendaChoices")
-
 
 class Agenda:
     """
@@ -459,13 +442,6 @@ class Agenda:
             quorumprogress=obj["quorumprogress"],
             choices=[AgendaChoices.parse(choice) for choice in obj["choices"]],
         )
-
-    @staticmethod
-    def __fromjson__(obj):
-        return AgendaChoices.parse(obj)
-
-
-tinyjson.register(Agenda, "Agenda")
 
 
 class AgendasInfo:
@@ -496,13 +472,6 @@ class AgendasInfo:
             totalvotes=obj["totalvotes"],
             agendas=[Agenda.parse(agenda) for agenda in obj["agendas"]],
         )
-
-    @staticmethod
-    def __fromjson__(obj):
-        return AgendasInfo.parse(obj)
-
-
-tinyjson.register(AgendasInfo, "AgendasInfo")
 
 
 class UTXO(object):
@@ -769,6 +738,16 @@ class DcrdataBlockchain(object):
         """
         self.blockReceiver = receiver
         self.dcrdata.subscribeBlocks()
+
+    def getAgendasInfo(self):
+        """
+        The agendas info that is used for voting.
+
+        Returns:
+            AgendasInfo: the current agendas.
+        """
+        return AgendasInfo.parse(self.dcrdata.stake.vote.info())
+
     def subscribeAddresses(self, addrs, receiver=None):
         """
         Subscribe to notifications for the provided addresses.
