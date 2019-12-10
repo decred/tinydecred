@@ -6,6 +6,7 @@ The DecredAccount inherits from the tinydecred base Account and adds staking
 support.
 """
 
+import time
 from tinydecred.wallet.accounts import Account
 from tinydecred.util import tinyjson, helpers
 from tinydecred.crypto.crypto import AddressSecpPubKey, CrazyKeyError
@@ -115,6 +116,10 @@ class DecredAccount(Account):
         acct = Account.__fromjson__(obj, cls=DecredAccount)
         acct.tickets = obj["tickets"]
         acct.stakePools = obj["stakePools"]
+        # Temp fix for buck, as there will be no ID yet
+        for i in range(len(acct.stakePools)):
+            if acct.stakePools[i].ID < 0:
+                acct.stakePools[i].ID = i
         acct.updateStakeStats()
         return acct
     def open(self, pw):
@@ -225,15 +230,31 @@ class DecredAccount(Account):
             AddressSecpPubkey: The address object.
         """
         return AddressSecpPubKey(self.votingKey().pub.serializeCompressed(), self.net).string()
-    def setPool(self, pool):
+
+    def addPool(self, pool):
         """
-        Set the specified pool as the default.
+        Add the specified pool to the list of stakepools we can use.
 
         Args:
             pool (vsp.VotingServiceProvider): The stake pool object.
         """
         assert isinstance(pool, VotingServiceProvider)
-        self.stakePools = [pool] + [p for p in self.stakePools if p.apiKey != pool.apiKey]
+        # If this a new pool, give it an ID one more than the highest.
+        if pool.ID < 0:
+            pool.ID = 0
+            if len(self.stakePools) > 0:
+                pool.ID = max([p.ID for p in self.stakePools]) + 1
+        self.stakePools = [pool] + [p for p in self.stakePools if p.ID !=
+                                    pool.ID]
+
+    def setPool(self, pool):
+        """
+        Set the specified pool for use.
+
+        Args:
+            pool (vsp.VotingServiceProvider): The stake pool object.
+        """
+        assert isinstance(pool, VotingServiceProvider)
         bc = self.blockchain
         addr = pool.purchaseInfo.ticketAddress
         for txid in bc.txsForAddr(addr):
@@ -349,33 +370,56 @@ class DecredAccount(Account):
         prepare the TicketRequest and KeySource and gather some other account-
         related information.
         """
-        keysource = KeySource(
-            priv = self.getPrivKeyForAddress,
-            internal = self.nextInternalAddress,
-        )
         pool = self.stakePool()
+        allTxs = [[], []]
+
+        # If accountless, purchase tickets one at a time.
+        if pool.isAccountless:
+            for i in range(qty):
+                # TODO use a new voting address every time.
+                addr = self.votingAddress()
+                pool.authorize(addr, self.net)
+                self.setPool(pool)
+                self._purchaseTickets(pool, allTxs, 1, price)
+                # dcrdata needs some time inbetween requests. This should
+                # probably be randomized to increase privacy anyway.
+                if qty > 1 and i < qty:
+                    time.sleep(2)
+        else:
+            self._purchaseTickets(pool, allTxs, qty, price)
+        if allTxs[0]:
+            for tx in allTxs[0]:
+                # Add the split transactions
+                self.addMempoolTx(tx)
+        for txs in allTxs[1]:
+            # Add all tickets
+            for tx in txs:
+                self.addMempoolTx(tx)
+            # Store the txids.
+            self.tickets.extend([tx.txid() for tx in txs])
+        return allTxs[1]
+
+    def _purchaseTickets(self, pool, allTxs, qty, price):
+        keysource = KeySource(
+            priv=self.getPrivKeyForAddress,
+            internal=self.nextInternalAddress,
+        )
         pi = pool.purchaseInfo
         req = TicketRequest(
-            minConf = 0,
-            expiry = 0,
-            spendLimit = int(round(price*qty*1.1*1e8)), # convert to atoms here
-            poolAddress = pi.poolAddress,
-            votingAddress = pi.ticketAddress,
-            ticketFee = 0, # use network default
-            poolFees = pi.poolFees,
-            count = qty,
-            txFee = 0, # use network default
+            minConf=0,
+            expiry=0,
+            spendLimit=int(round(price*qty*1.1*1e8)), # convert to atoms here
+            poolAddress=pi.poolAddress,
+            votingAddress=pi.ticketAddress,
+            ticketFee=0, # use network default
+            poolFees=pi.poolFees,
+            count=qty,
+            txFee=0, # use network default
         )
         txs, spentUTXOs, newUTXOs = self.blockchain.purchaseTickets(keysource, self.getUTXOs, req)
-        if txs:
-            # Add the split transactions
-            self.addMempoolTx(txs[0])
-            # Add all tickets
-            for tx in txs[1]:
-                self.addMempoolTx(tx)
-        # Store the txids.
-        self.tickets.extend([tx.txid() for tx in txs[1]])
-        return txs[1]
+        allTxs[0].append(txs[0])
+        allTxs[1].append(txs[1])
+
     def sync(self, blockchain, signals):
         """
         Synchronize the UTXO set with the server. This should be the first

@@ -1242,6 +1242,8 @@ class PoolScreen(Screen):
                 validated.
         """
         super().__init__(app)
+        self.isAccountless = False
+        self.accountlessPools = []
         self.isPoppable = True
         self.canGoHome = True
         self.callback = callback
@@ -1267,6 +1269,7 @@ class PoolScreen(Screen):
         self.layout.addWidget(wgt)
         self.keyIp = edit = QtWidgets.QLineEdit()
         edit.setPlaceholderText("API key")
+        self.edit = edit
         self.keyIp.setContentsMargins(0, 0, 0, 30)
         self.layout.addWidget(edit)
         edit.returnPressed.connect(self.authPool)
@@ -1314,6 +1317,14 @@ class PoolScreen(Screen):
         wgt, _ = Q.makeSeries(Q.HORIZONTAL, btn1, Q.STRETCH, btn2)
         self.layout.addWidget(wgt)
 
+    def refreshAccountless(self):
+        if self.isAccountless:
+            self.edit.hide()
+        else:
+            self.edit.show()
+        self.randomizePool()
+
+
     def getPools(self):
         """
         Get the current master list of VSPs from decred.org.
@@ -1344,6 +1355,7 @@ class PoolScreen(Screen):
         #   instead of checking the network config's Name attribute.
         if cfg.net.Name == "mainnet":
             self.pools = [p for p in pools if tNow - p["LastUpdated"] < 86400 and self.scorePool(p) > 95]
+        self.accountlessPools = [p for p in pools if 3 in p["APIVersionsSupported"]]
         self.randomizePool()
 
     def randomizePool(self, e=None):
@@ -1352,7 +1364,10 @@ class PoolScreen(Screen):
         is based purely on voting record, e.g. voted/(voted+missed). The sorting
         and some initial filtering was already performed in setPools.
         """
-        pools = self.pools
+        if self.isAccountless:
+            pools = self.accountlessPools
+        else:
+            pools = self.pools
         count = len(pools)
         if count == 0:
             log.warn("no stake pools returned from server")
@@ -1392,25 +1407,31 @@ class PoolScreen(Screen):
             err("invalid pool address: %s" % url)
             return
         apiKey = self.keyIp.text()
-        if not apiKey:
-            err("empty API key")
-            return
+        if self.isAccountless:
+            apiKey = "accountless"
+        else:
+            if not apiKey:
+                err("empty API key")
+                return
         pool = VotingServiceProvider(url, apiKey)
+
         def registerPool(wallet):
             try:
                 addr = wallet.openAccount.votingAddress()
                 pool.authorize(addr, cfg.net)
                 app.appWindow.showSuccess("pool authorized")
-                wallet.openAccount.setPool(pool)
+                wallet.openAccount.addPool(pool)
+                if not self.isAccountless:
+                    wallet.openAccount.setPool(pool)
                 wallet.save()
-                # Notify that vote data should be updated.
-                self.app.emitSignal(ui.PURCHASEINFO_SIGNAL)
                 return True
             except Exception as e:
                 err("pool authorization failed")
                 log.error("pool registration error: %s" % formatTraceback(e))
                 return False
         app.withUnlockedWallet(registerPool, self.callback)
+
+
     def showAll(self, e=None):
         """
         Connected to the "see all" button clicked signal. Open the fu
@@ -1691,8 +1712,12 @@ class PoolAccountScreen(Screen):
             self.nextPg)
         self.layout.addWidget(self.pagination)
 
-        btn = app.getButton(SMALL, "add new acccount")
+        btn = app.getButton(SMALL, "add new account")
         btn.clicked.connect(self.addClicked)
+        self.layout.addWidget(btn)
+
+        btn = app.getButton(SMALL, "add new accountless")
+        btn.clicked.connect(self.addAccountlessClicked)
         self.layout.addWidget(btn)
     def stacked(self):
         """
@@ -1736,7 +1761,7 @@ class PoolAccountScreen(Screen):
         if len(pools) == 0:
             return
         # Refresh purchase info
-        pools[0].getPurchaseInfo()
+        pools[0].getPurchaseInfo(pools[0].votingAddresses[len(pools[0].votingAddresses) - 1])
         # Notify that vote data should be updated.
         self.app.emitSignal(ui.PURCHASEINFO_SIGNAL)
         self.pages = [pools[i*2:i*2+2] for i in range((len(pools)+1)//2)]
@@ -1753,7 +1778,10 @@ class PoolAccountScreen(Screen):
         """
         Q.clearLayout(self.poolsLyt, delete=True)
         for pool in pools:
-            ticketAddr = pool.purchaseInfo.ticketAddress
+            if pool.isAccountless:
+                ticketAddr = "accountless"
+            else:
+                ticketAddr = pool.purchaseInfo.ticketAddress
             urlLbl = Q.makeLabel(pool.url, 16)
             addrLbl = Q.makeLabel(ticketAddr, 14)
             wgt, lyt = Q.makeSeries(Q.VERTICAL,
@@ -1772,7 +1800,9 @@ class PoolAccountScreen(Screen):
             pool (VotingServiceProvider): The new active pool.
         """
         self.app.appWindow.showSuccess("new pool selected")
-        self.app.wallet.selectedAccount.setPool(pool)
+        self.app.wallet.selectedAccount.addPool(pool)
+        if not pool.isAccountless:
+            self.app.wallet.selectedAccount.setPool(pool)
         self.setPools()
 
     def addClicked(self, e=None):
@@ -1780,6 +1810,17 @@ class PoolAccountScreen(Screen):
         The clicked slot for the add pool button. Stacks the pool screen.
         """
         self.app.appWindow.pop(self)
+        self.poolScreen.isAccountless = False
+        self.poolScreen.refreshAccountless()
+        self.app.appWindow.stack(self.poolScreen)
+
+    def addAccountlessClicked(self, e=None):
+        """
+        The clicked slot for the add pool button. Stacks the pool screen.
+        """
+        self.app.appWindow.pop(self)
+        self.poolScreen.isAccountless = True
+        self.poolScreen.refreshAccountless()
         self.app.appWindow.stack(self.poolScreen)
 
 class ConfirmScreen(Screen):
