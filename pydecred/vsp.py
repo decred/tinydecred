@@ -9,6 +9,17 @@ from tinydecred.pydecred import txscript
 from tinydecred.crypto import crypto
 from tinydecred.crypto.bytearray import ByteArray
 
+
+# joe's test stakepool
+# TODO: remove
+dcrstakedinner = {'APIEnabled': True, 'APIVersionsSupported': [1, 2, 3],
+                  'Network': 'testnet', 'URL': 'https://www.dcrstakedinner.com',
+                  'Launched': 1543421580, 'LastUpdated': 1574655889,
+                  'Immature': 0, 'Live': 0, 'Voted': 0, 'Missed': 0,
+                  'PoolFees': 0.5, 'ProportionLive': 0, 'ProportionMissed': 0,
+                  'UserCount': 0, 'UserCountActive': 0, 'Version': '1.5.0-pre+dev'}
+
+
 def resultIsSuccess(res):
     """
     JSON-decoded stake pool responses have a common base structure that enables
@@ -140,23 +151,36 @@ class VotingServiceProvider(object):
         # The signingAddress (also called a votingAddress in other contexts) is
         # the P2SH 1-of-2 multi-sig address that spends SSTX outputs.
         self.signingAddress = None
+        self.isAccountless = apiKey == "accountless"
+        self.ID = -1
         self.apiKey = apiKey
         self.lastConnection = 0
         self.purchaseInfo = None
         self.stats = None
         self.err = None
+        self.votingAddresses = []
     def __tojson__(self):
         return {
             "url": self.url,
             "apiKey": self.apiKey,
             "purchaseInfo": self.purchaseInfo,
             "stats": self.stats,
+            "ID": self.ID,
+            "votingAddresses": self.votingAddresses,
         }
     @staticmethod
     def __fromjson__(obj):
         sp = VotingServiceProvider(obj["url"], obj["apiKey"])
+        # TODO: These if's can be removed. They are here in case these keys do
+        # not exist yet.
+        if "ID" in obj:
+            sp.ID = obj["ID"]
+        else:
+            sp.ID = -1
+
         sp.purchaseInfo = obj["purchaseInfo"]
         sp.stats = obj["stats"]
+        sp.votingAddresses = obj["votingAddresses"]
         return sp
     @staticmethod
     def providers(net):
@@ -170,6 +194,8 @@ class VotingServiceProvider(object):
             list(object): The vsp list.
         """
         vsps = tinyhttp.get("https://api.decred.org/?c=gsd")
+        # TODO remove adding dcrstakedinner
+        vsps["stakedinner"] = dcrstakedinner
         network = "testnet" if net.Name == "testnet3" else net.Name
         return [vsp for vsp in vsps.values() if vsp["Network"] == network]
     def apiPath(self, command):
@@ -191,6 +217,15 @@ class VotingServiceProvider(object):
             object: The headers as a Python object.
         """
         return {"Authorization": "Bearer %s" % self.apiKey}
+    def accountlessData(self, addr):
+        """
+        Make the API request headers.
+
+        Returns:
+            object: The headers as a Python object.
+        """
+        return {"UserPubKeyAddr": "%s" % addr}
+
     def validate(self, addr):
         """
         Validate performs some checks that the PurchaseInfo provided by the
@@ -218,6 +253,7 @@ class VotingServiceProvider(object):
                 break
         if not found:
             raise Exception("signing pubkey not found in redeem script")
+        self.votingAddresses.append(addr.string())
     def authorize(self, address, net):
         """
         Authorize the stake pool for the provided address and network. Exception
@@ -233,7 +269,7 @@ class VotingServiceProvider(object):
         # First try to get the purchase info directly.
         self.net = net
         try:
-            self.getPurchaseInfo()
+            self.getPurchaseInfo(address)
             self.validate(address)
         except Exception as e:
             alreadyRegistered = isinstance(self.err, dict) and "code" in self.err and self.err["code"] == 9
@@ -244,11 +280,11 @@ class VotingServiceProvider(object):
             data = { "UserPubKeyAddr": address }
             res = tinyhttp.post(self.apiPath("address"), data, headers=self.headers(), urlEncode=True)
             if resultIsSuccess(res):
-                self.getPurchaseInfo()
+                self.getPurchaseInfo(address)
                 self.validate(address)
             else:
                 raise Exception("unexpected response from 'address': %s" % repr(res))
-    def getPurchaseInfo(self):
+    def getPurchaseInfo(self, addr):
         """
         Get the purchase info from the stake pool API.
 
@@ -257,7 +293,15 @@ class VotingServiceProvider(object):
         """
         # An error is returned if the address isn't yet set
         # {'status': 'error', 'code': 9, 'message': 'purchaseinfo error - no address submitted', 'data': None}
-        res = tinyhttp.get(self.apiPath("getpurchaseinfo"), headers=self.headers())
+        if self.isAccountless:
+            # Accountless vsp gets purchaseinfo from api/purchaseticket
+            # endpoint.
+            res = tinyhttp.post(self.apiPath("purchaseticket"),
+                                self.accountlessData(addr), urlEncode=True)
+        else:
+            # An error is returned if the address isn't yet set
+            # {'status': 'error', 'code': 9, 'message': 'purchaseinfo error - no address submitted', 'data': None}
+            res = tinyhttp.get(self.apiPath("getpurchaseinfo"), headers=self.headers())
         if resultIsSuccess(res):
             pi = PurchaseInfo(res["data"])
             # check the script hash
@@ -287,6 +331,7 @@ class VotingServiceProvider(object):
         data = { "VoteBits": voteBits }
         res = tinyhttp.post(self.apiPath("voting"), data, headers=self.headers(), urlEncode=True)
         if resultIsSuccess(res):
+            self.purchaseInfo.voteBits = voteBits
             return True
         raise Exception("unexpected response from 'voting': %s" % repr(res))
 
