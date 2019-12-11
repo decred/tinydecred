@@ -1448,7 +1448,6 @@ class AgendasScreen(Screen):
         self.dropdowns = []
         self.pages = []
         self.page = 0
-        self.ignoreVoteIndexChange = False
         self.voteSet = False
         self.blockchain = None
 
@@ -1736,7 +1735,10 @@ class PoolAccountScreen(Screen):
         if len(pools) == 0:
             return
         # Refresh purchase info
-        pools[0].getPurchaseInfo()
+        try:
+            pools[0].updatePurchaseInfo()
+        except Exception as e:
+            log.error("error fetching purchase info: %s" % e)
         # Notify that vote data should be updated.
         self.app.emitSignal(ui.PURCHASEINFO_SIGNAL)
         self.pages = [pools[i*2:i*2+2] for i in range((len(pools)+1)//2)]
