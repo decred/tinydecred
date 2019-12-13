@@ -6,12 +6,12 @@ DcrdataClient.endpointList() for available enpoints.
 """
 import time
 from tinydecred.util import tinyhttp, tinyjson
-from tinydecred.pydecred import txscript
+from tinydecred.pydecred import txscript, constants
 from tinydecred.crypto import crypto
 from tinydecred.crypto.bytearray import ByteArray
 
-# The duration purchase info is good for. Equates to one hour in seconds.
-PURCHASE_INFO_LIFE = 60 * 60
+# The duration purchase info is good for.
+PURCHASE_INFO_LIFE = constants.HOUR
 
 def resultIsSuccess(res):
     """
