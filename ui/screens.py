@@ -1150,10 +1150,14 @@ class StakingScreen(Screen):
         self.layout.addWidget(wgt)
 
         # A button to view agendas and choose how to vote.
-        btn = app.getButton(TINY, "Voting")
-        btn.clicked.connect(self.stackAgendas)
-        agendasWgt, _ = Q.makeSeries(Q.HORIZONTAL, btn)
-        self.layout.addWidget(agendasWgt)
+        agendaBtn = app.getButton(TINY, "Voting")
+        agendaBtn.clicked.connect(self.stackAgendas)
+
+        # A button to revoke expired and missed tickets.
+        revokeBtn = app.getButton(TINY, "Revoke")
+        revokeBtn.clicked.connect(self.revokeTickets)
+        votingWgt, _ = Q.makeSeries(Q.HORIZONTAL, agendaBtn, revokeBtn)
+        self.layout.addWidget(votingWgt)
 
         # Affordability. A row that reads `You can afford X tickets`
         lbl = Q.makeLabel("You can afford ", 14)
@@ -1220,6 +1224,19 @@ class StakingScreen(Screen):
             self.app.appWindow.showError("cannot vote: pool not synced")
             return
         self.app.appWindow.stack(self.agendasScreen)
+
+    def revokeTickets(self):
+        def revoke(wallet):
+            try:
+                wallet.openAccount.revokeTickets()
+                return True
+            except Exception as e:
+                log.error("revoke tickets error: %s" % formatTraceback(e))
+                return False
+        self.app.withUnlockedWallet(revoke, self.revoked)
+
+    def revoked(self, success):
+        self.app.appWindow.showSuccess("revoke tickets")
 
     def setStats(self):
         """
