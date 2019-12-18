@@ -11,7 +11,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib import font_manager as FontManager
 
-from mpl_toolkits.mplot3d import Axes3D  # leave this even if the linter complains
+from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 (flake8 ignore)
 
 from tinydecred.pydecred import constants as C
 import tinydecred.ui.ui as UI

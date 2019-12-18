@@ -1317,8 +1317,8 @@ class TestTxScript(unittest.TestCase):
         tx = msgtx.MsgTx(
             serType=wire.TxSerializeFull,
             version=1,
-            txIn=[txIn,],
-            txOut=[msgtx.TxOut(version=wire.DefaultPkScriptVersion, value=1,),],
+            txIn=[txIn],
+            txOut=[msgtx.TxOut(version=wire.DefaultPkScriptVersion, value=1)],
             lockTime=0,
             expiry=0,
             cachedHash=None,
@@ -1687,9 +1687,9 @@ class TestTxScript(unittest.TestCase):
                 decoded = txscript.decodeAddress(test.addr, test.net)
             except Exception as e:
                 err = e
-            self.assertEqual(err == None, test.valid, "%s error: %s" % (test.name, err))
+            self.assertEqual(err is None, test.valid, "%s error: %s" % (test.name, err))
 
-            if err == None:
+            if err is None:
                 # Ensure the stringer returns the same address as theoriginal.
                 self.assertEqual(test.addr, decoded.string(), test.name)
 
@@ -1739,7 +1739,7 @@ class TestTxScript(unittest.TestCase):
             if not test.valid:
                 # If address is invalid, but a creation function exists,
                 # verify that it returns a nil addr and non-nil error.
-                if test.f != None:
+                if test.f is not None:
                     try:
                         test.f()
                         self.fail(
