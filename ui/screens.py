@@ -816,7 +816,8 @@ class InitializationScreen(Screen):
                         )
                         app.appWindow.showError(
                             "error opening this wallet."
-                            " password correct? correct network?")
+                            " password correct? correct network?"
+                        )
 
             app.getPassword(load, walletPath)
 
@@ -1291,8 +1292,7 @@ class StakingScreen(Screen):
         self.app.confirm(
             "Are you sure you want to purchase %d ticket(s) for %.2f DCR? "
             "Once purchased, these funds will be locked"
-            " until your tickets vote or expire."
-            % (qty, qty * self.lastPrice),
+            " until your tickets vote or expire." % (qty, qty * self.lastPrice),
             step,
         )
 

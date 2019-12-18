@@ -251,9 +251,7 @@ class QToggle(QtWidgets.QAbstractButton):
         )
         # QtGui.QBrush(QtGui.QColor(switchColor)) if switchColor else QtGui.QBrush(
         #     QtGui.QColor("#d5d5d5"))
-        self.switchBrush = (
-            self.slotBrush
-        )
+        self.switchBrush = self.slotBrush
         self.disabledBrush = (
             QtGui.QBrush(QtGui.QColor(disabledColor))
             if disabledColor
