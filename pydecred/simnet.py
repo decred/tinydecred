@@ -18,98 +18,97 @@ https://github.com/decred/dcrd/blob/master/chaincfg/simnetparams.go
 # specifically specified are used to create the network rather than following
 # normal discovery rules.  This is important as otherwise it would just turn
 # into another public testnet.
-Name =        "simnet"
+Name = "simnet"
 DefaultPort = "18555"
-DNSSeeds =    None # NOTE: There must NOT be any seeds.
+DNSSeeds = None  # NOTE: There must NOT be any seeds.
 
 # Chain parameters
-GenesisHash =              "5bec7567af40504e0994db3b573c186fffcc4edefe096ff2e58d00523bd7e8a6"
-PowLimit =                 2**255 - 1
-PowLimitBits =             0x207fffff
-ReduceMinDifficulty =      False
-MinDiffReductionTime =     0 # Does not apply since ReduceMinDifficulty fals
-GenerateSupported =        False
-MaximumBlockSizes =        [1310720]
-MaxTxSize =                1000000
-TargetTimePerBlock =       1 # one secon
-WorkDiffAlpha =            1
-WorkDiffWindowSize =       8
-WorkDiffWindows =          4
-TargetTimespan =           8 # TimePerBlock * WindowSize
+GenesisHash = "5bec7567af40504e0994db3b573c186fffcc4edefe096ff2e58d00523bd7e8a6"
+PowLimit = 2 ** 255 - 1
+PowLimitBits = 0x207FFFFF
+ReduceMinDifficulty = False
+MinDiffReductionTime = 0  # Does not apply since ReduceMinDifficulty fals
+GenerateSupported = False
+MaximumBlockSizes = [1310720]
+MaxTxSize = 1000000
+TargetTimePerBlock = 1  # one secon
+WorkDiffAlpha = 1
+WorkDiffWindowSize = 8
+WorkDiffWindows = 4
+TargetTimespan = 8  # TimePerBlock * WindowSize
 RetargetAdjustmentFactor = 4
 
 # Subsidy parameters.
-BaseSubsidy =              50000000000
-MulSubsidy =               100
-DivSubsidy =               101
+BaseSubsidy = 50000000000
+MulSubsidy = 100
+DivSubsidy = 101
 SubsidyReductionInterval = 128
-WorkRewardProportion =     6
-StakeRewardProportion =    3
-BlockTaxProportion =       1
+WorkRewardProportion = 6
+StakeRewardProportion = 3
+BlockTaxProportion = 1
 
 # Checkpoints ordered from oldest to newest.
-Checkpoints = None,
+Checkpoints = (None,)
 
 # Consensus rule change deployments.
 #
 # The miner confirmation window is defined as:
 #   target proof of work timespan / target proof of work spacing
-RuleChangeActivationQuorum =     160 # 10 % of RuleChangeActivationInterval * TicketsPerBlock
-RuleChangeActivationMultiplier = 3   # 75%
-RuleChangeActivationDivisor =    4
-RuleChangeActivationInterval =   320 # 320 seconds
+# 10% of RuleChangeActivationInterval * TicketsPerBlock
+RuleChangeActivationQuorum = 160
+RuleChangeActivationMultiplier = 3  # 75%
+RuleChangeActivationDivisor = 4
+RuleChangeActivationInterval = 320  # 320 seconds
 
-# Enforce current block version once majority of the network has
-# upgraded.
+# Enforce current block version once majority of the network has upgraded.
 # 51% (51 / 100)
-# Reject previous block versions once a majority of the network has
-# upgraded.
+# Reject previous block versions once a majority of the network has upgraded.
 # 75% (75 / 100)
 BlockEnforceNumRequired = 51
-BlockRejectNumRequired =  75
-BlockUpgradeNumToCheck =  100
+BlockRejectNumRequired = 75
+BlockUpgradeNumToCheck = 100
 
 # AcceptNonStdTxs is a mempool param to either accept and relay
 # non standard txs to the network or reject them
 AcceptNonStdTxs = True
 
 # Address encoding magics
-NetworkAddressPrefix = "S",
-PubKeyAddrID =         (0x276f).to_bytes(2, byteorder="big") # starts with Sk
-PubKeyHashAddrID =     (0x0e91).to_bytes(2, byteorder="big") # starts with Ss
-PKHEdwardsAddrID =     (0x0e71).to_bytes(2, byteorder="big") # starts with Se
-PKHSchnorrAddrID =     (0x0e53).to_bytes(2, byteorder="big") # starts with SS
-ScriptHashAddrID =     (0x0e6c).to_bytes(2, byteorder="big") # starts with Sc
-PrivateKeyID =         (0x2307).to_bytes(2, byteorder="big") # starts with Ps
+NetworkAddressPrefix = ("S",)
+PubKeyAddrID = (0x276F).to_bytes(2, byteorder="big")  # starts with Sk
+PubKeyHashAddrID = (0x0E91).to_bytes(2, byteorder="big")  # starts with Ss
+PKHEdwardsAddrID = (0x0E71).to_bytes(2, byteorder="big")  # starts with Se
+PKHSchnorrAddrID = (0x0E53).to_bytes(2, byteorder="big")  # starts with SS
+ScriptHashAddrID = (0x0E6C).to_bytes(2, byteorder="big")  # starts with Sc
+PrivateKeyID = (0x2307).to_bytes(2, byteorder="big")  # starts with Ps
 
 # BIP32 hierarchical deterministic extended key magics
-HDPrivateKeyID = (0x0420b903).to_bytes(4, byteorder="big") # starts with sprv
-HDPublicKeyID =  (0x0420bd3d).to_bytes(4, byteorder="big") # starts with spub
+HDPrivateKeyID = (0x0420B903).to_bytes(4, byteorder="big")  # starts with sprv
+HDPublicKeyID = (0x0420BD3D).to_bytes(4, byteorder="big")  # starts with spub
 
 # BIP44 coin type used in the hierarchical deterministic path for
 # address generation.
-SLIP0044CoinType = 1   # SLIP0044, Testnet (all coins)
-LegacyCoinType =   115 # ASCII for s, for backwards compatibility
+SLIP0044CoinType = 1  # SLIP0044, Testnet (all coins)
+LegacyCoinType = 115  # ASCII for s, for backwards compatibility
 
 # Decred PoS parameters
-MinimumStakeDiff =        20000
-TicketPoolSize =          64
-TicketsPerBlock =         5
-TicketMaturity =          16
-TicketExpiry =            384 # 6*TicketPoolSize
-CoinbaseMaturity =        16
-SStxChangeMaturity =      1
-TicketPoolSizeWeight =    4
-StakeDiffAlpha =          1
-StakeDiffWindowSize =     8
-StakeDiffWindows =        8
-StakeVersionInterval =    8 * 2 * 7
-MaxFreshStakePerBlock =   20            # 4*TicketsPerBlock
-StakeEnabledHeight =      16 + 16       # CoinbaseMaturity + TicketMaturity
-StakeValidationHeight =   16 + (64 * 2) # CoinbaseMaturity + TicketPoolSize*2
-StakeBaseSigScript =      (0xDEADBEEF).to_bytes(4, byteorder="big")
+MinimumStakeDiff = 20000
+TicketPoolSize = 64
+TicketsPerBlock = 5
+TicketMaturity = 16
+TicketExpiry = 384  # 6*TicketPoolSize
+CoinbaseMaturity = 16
+SStxChangeMaturity = 1
+TicketPoolSizeWeight = 4
+StakeDiffAlpha = 1
+StakeDiffWindowSize = 8
+StakeDiffWindows = 8
+StakeVersionInterval = 8 * 2 * 7
+MaxFreshStakePerBlock = 20  # 4*TicketsPerBlock
+StakeEnabledHeight = 16 + 16  # CoinbaseMaturity + TicketMaturity
+StakeValidationHeight = 16 + (64 * 2)  # CoinbaseMaturity + TicketPoolSize*2
+StakeBaseSigScript = (0xDEADBEEF).to_bytes(4, byteorder="big")
 StakeMajorityMultiplier = 3
-StakeMajorityDivisor =    4
+StakeMajorityDivisor = 4
 
 # Decred organization related parameters
 #
@@ -140,7 +139,9 @@ StakeMajorityDivisor =    4
 #   SkQkfkHZeBbMW8129tZ3KspEh1XBFC1btbkgzs6cjSyPbrgxzsKqk
 #
 # Organization address is ScuQxvveKGfpG1ypt6u27F99Anf7EW3cqhq
-OrganizationPkScript =        (0xa914cbb08d6ca783b533b2c7d24a51fbca92d937bf9987).to_bytes(23, byteorder="big")
+OrganizationPkScript = (0xA914CBB08D6CA783B533B2C7D24A51FBCA92D937BF9987).to_bytes(
+    23, byteorder="big"
+)
 OrganizationPkScriptVersion = 0
-# BlockOneLedger =              BlockOneLedgerSimNet,
+# BlockOneLedger = BlockOneLedgerSimNet,
 BlockOneSubsidy = int(300000 * 1e8)

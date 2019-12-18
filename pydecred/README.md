@@ -14,9 +14,9 @@ Network parameters are implemented as modules **mainnet**, **testnet**, and
 
 DcrdataClient is a dcrdata API client written in Python 3.
 
-The constructor takes a single argument, which is the path to a dcrdata server, including
-protocol, e.g. `https://explorer.dcrdata.org`. The available endpoints are gathered from
-the server when the client is created.
+The constructor takes a single argument, which is the path to a dcrdata server,
+including protocol, e.g. `https://explorer.dcrdata.org`. The available endpoints
+are gathered from the server when the client is created.
 
 ```
 from tinydecred.pydecred.dcrdata import DcrdataClient
@@ -36,7 +36,8 @@ You can print an endpoint guide to the console with  `client.endpointGuide()`,
 
 or a Python list of URLs is returned from `client.endpointList()`.
 
-Depending on the version of dcrdata they are running, different servers might have different sets of endpoints.
+Depending on the version of dcrdata they are running, different servers might
+have different sets of endpoints.
 
 ### Examples
 
@@ -53,7 +54,8 @@ dumpResponse( client.block.hash(blockhash) )
 # /block/hash/{blockhash}/verbose - Same thing, but more info.
 dumpResponse( client.block.hash.verbose(blockhash) )
 
-# /block/range/{idx0}/{idx}/{step}/size - Get the size of every 10th block from 299900 to 300000.
+# /block/range/{idx0}/{idx}/{step}/size - Get the size of every 10th block from
+# 299900 to 300000.
 idx0 = 299900
 idx = 300000
 step = 10
