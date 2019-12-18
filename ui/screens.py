@@ -677,7 +677,7 @@ class ClickyLabel(QtWidgets.QLabel):
         the label. If not, set mouseDown to False. The user must click and
         release without the mouse leaving the label to trigger the callback.
         """
-        if self.mouseDown == False:
+        if self.mouseDown is False:
             return
         qSize = self.size()
         ePos = e.pos()
@@ -815,8 +815,8 @@ class InitializationScreen(Screen):
                             % formatTraceback(e)
                         )
                         app.appWindow.showError(
-                            "error opening this wallet? password correct? correct network?"
-                        )
+                            "error opening this wallet."
+                            " password correct? correct network?")
 
             app.getPassword(load, walletPath)
 
@@ -1010,7 +1010,8 @@ class MnemonicRestorer(Screen):
         edit.setMaximumWidth(300)
         edit.setFixedHeight(200)
         edit.setStyleSheet("QLabel{border: 1px solid #777777; padding: 10px;}")
-        # edit.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse | QtCore.Qt.TextSelectableByKeyboard)
+        # edit.setTextInteractionFlags(
+        #     QtCore.Qt.TextSelectableByMouse | QtCore.Qt.TextSelectableByKeyboard)
         row, lyt = Q.makeWidget(QtWidgets.QWidget, "horizontal")
         row.setContentsMargins(2, 2, 2, 2)
         self.layout.addWidget(row)
@@ -1289,7 +1290,8 @@ class StakingScreen(Screen):
 
         self.app.confirm(
             "Are you sure you want to purchase %d ticket(s) for %.2f DCR? "
-            "Once purchased, these funds will be locked until your tickets vote or expire."
+            "Once purchased, these funds will be locked"
+            " until your tickets vote or expire."
             % (qty, qty * self.lastPrice),
             step,
         )
@@ -1951,8 +1953,9 @@ class ConfirmScreen(Screen):
             callback (function): The function to call when the user clicks "ok".
 
         Returns:
-            ConfirmScreen: This instance. Useful for using a patter like
-                app.appWindow.stack(confirmScreen.withPurpose("go ahead?", callbackFunc))
+            ConfirmScreen: This instance. Useful for using a pattern like
+                app.appWindow.stack(
+                    confirmScreen.withPurpose("go ahead?", callbackFunc))
         """
         self.prompt.setText(prompt)
         self.callback = callback

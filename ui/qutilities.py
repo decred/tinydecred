@@ -49,7 +49,9 @@ class ThreadUtilities(object):
         A reference to the thread is stored in `self.threads` until it completes
 
         :param function func: The function to run in the thread
-        :param function callback: A function to call when the thread has completed. Any results returned by `func` will be passed as the first positional argument.
+        :param function callback: A function to call when the thread has completed.
+            Any results returned by `func` will be passed as the first positional
+            argument.
         :param list args: Positional arguments to pass to `func`
         :param dict kwargs: Keyword arguments to pass to `func`
         """
@@ -126,7 +128,8 @@ class QConsole(QtWidgets.QPlainTextEdit):
             QtWidgets.QSizePolicy.MinimumExpanding,
             QtWidgets.QSizePolicy.MinimumExpanding,
         )
-        # self.console.keyPressEvent = lambda e: self.consoleScrollAction("key.press", e)
+        # self.console.keyPressEvent = lambda e: self.consoleScrollAction(
+        #     "key.press", e)
         self.document().setMaximumBlockCount(250)
         self.setReadOnly(True)
         self.consoleBar = self.verticalScrollBar()
@@ -246,9 +249,11 @@ class QToggle(QtWidgets.QAbstractButton):
             if slotColor
             else QtGui.QBrush(QtGui.QColor("#999999"))
         )
+        # QtGui.QBrush(QtGui.QColor(switchColor)) if switchColor else QtGui.QBrush(
+        #     QtGui.QColor("#d5d5d5"))
         self.switchBrush = (
             self.slotBrush
-        )  # QtGui.QBrush(QtGui.QColor(switchColor)) if switchColor else QtGui.QBrush(QtGui.QColor("#d5d5d5"))
+        )
         self.disabledBrush = (
             QtGui.QBrush(QtGui.QColor(disabledColor))
             if disabledColor
@@ -566,7 +571,7 @@ def _mouseMoved(wgt, e):
     the widget. If not, set _mousedown to False. The user must click and
     release without the mouse leaving the label to trigger the callback.
     """
-    if wgt._mousedown == False:
+    if wgt._mousedown is False:
         return
     qSize = wgt.size()
     ePos = e.pos()
