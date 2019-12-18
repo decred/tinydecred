@@ -1021,6 +1021,7 @@ class StakingScreen(Screen):
         self.layout.setSpacing(20)
         self.poolScreen = PoolScreen(app, self.poolAuthed)
         self.accountScreen = PoolAccountScreen(app, self.poolScreen)
+        self.agendasScreen = AgendasScreen(app, self.accountScreen)
         self.balance = None
         self.wgt.setContentsMargins(5, 5, 5, 5)
         self.wgt.setMinimumWidth(400)
@@ -1048,6 +1049,13 @@ class StakingScreen(Screen):
         unit = Q.makeLabel("DCR", 14)
         wgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, self.ticketCount, lbl2, self.ticketValue, unit)
         self.layout.addWidget(wgt)
+
+        # A button to view agendas and choose how to vote.
+        btn = app.getButton(TINY, "Voting")
+        btn.clicked.connect(self.stackAgendas)
+        agendasWgt, _ = Q.makeSeries(Q.HORIZONTAL, btn)
+        self.layout.addWidget(agendasWgt)
+
 
         # Affordability. A row that reads `You can afford X tickets`
         lbl = Q.makeLabel("You can afford ", 14)
@@ -1096,6 +1104,23 @@ class StakingScreen(Screen):
 
     def stackAccounts(self):
         self.app.appWindow.stack(self.accountScreen)
+    def stackAgendas(self):
+        acct = self.app.wallet.selectedAccount
+        if not acct:
+            log.error("no account selected")
+            self.app.appWindow.showError("cannot vote: no account")
+            return
+        pools = acct.stakePools
+        if len(pools) == 0:
+            self.app.appWindow.showError("cannot vote: no pools")
+            return
+        if len(self.agendasScreen.agendas) == 0:
+            self.app.appWindow.showError("cannot vote: could not fetch agendas")
+            return
+        if not self.agendasScreen.voteSet:
+            self.app.appWindow.showError("cannot vote: pool not synced")
+            return
+        self.app.appWindow.stack(self.agendasScreen)
     def setStats(self):
         """
         Get the current ticket stats and update the display.
@@ -1378,6 +1403,8 @@ class PoolScreen(Screen):
                 app.appWindow.showSuccess("pool authorized")
                 wallet.openAccount.setPool(pool)
                 wallet.save()
+                # Notify that vote data should be updated.
+                self.app.emitSignal(ui.PURCHASEINFO_SIGNAL)
                 return True
             except Exception as e:
                 err("pool authorization failed")
@@ -1402,6 +1429,219 @@ class PoolScreen(Screen):
         url in the QLineEdit.
         """
         self.poolIp.setText(self.poolUrl.text())
+
+
+class AgendasScreen(Screen):
+    """
+    A screen that lists current agendas and allows for vote configuration.
+    """
+    def __init__(self, app, accountScreen):
+        """
+        Args:
+            app (TinyDecred): The TinyDecred application instance.
+        """
+        super().__init__(app)
+        self.isPoppable = True
+        self.canGoHome = True
+
+        # Currently shown agenda dropdowns are saved here.
+        self.dropdowns = []
+        self.pages = []
+        self.page = 0
+        self.voteSet = False
+        self.blockchain = None
+
+        self.app.registerSignal(ui.PURCHASEINFO_SIGNAL, self.setVote)
+        self.app.registerSignal(ui.BLOCKCHAIN_CONNECTED, self.setBlockchain)
+
+        self.accountScreen = accountScreen
+        self.wgt.setMinimumWidth(400)
+        self.wgt.setMinimumHeight(225)
+
+        lbl = Q.makeLabel("Agendas", 18)
+        self.layout.addWidget(lbl, 0, Q.ALIGN_LEFT)
+
+        wgt, self.agendasLyt = Q.makeWidget(QtWidgets.QWidget, Q.VERTICAL)
+        self.agendasLyt.setSpacing(10)
+        self.agendasLyt.setContentsMargins(5, 5, 5, 5)
+        self.layout.addWidget(wgt)
+
+        prevPg = app.getButton(TINY, "back")
+        prevPg.clicked.connect(self.pageBack)
+        nextPg = app.getButton(TINY, "next")
+        nextPg.clicked.connect(self.pageFwd)
+        pgNum = Q.makeLabel("", 15)
+
+        self.layout.addStretch(1)
+
+        self.pagination, _ = Q.makeSeries(Q.HORIZONTAL,
+                                          prevPg,
+                                          Q.STRETCH,
+                                          pgNum,
+                                          Q.STRETCH,
+                                          nextPg)
+        self.layout.addWidget(self.pagination)
+
+    def stacked(self):
+        """
+        stacked is called on screens when stacked by the TinyDialog.
+        """
+        pass
+
+    def pageBack(self):
+        """
+        Go back one page.
+        """
+        newPg = self.page + 1
+        if newPg > len(self.pages) - 1:
+            newPg = 0
+        self.page = newPg
+        self.setAgendaWidgets(self.pages[newPg])
+        self.setPgNum()
+
+    def pageFwd(self):
+        """
+        Go the the next displayed page.
+        """
+        newPg = self.page - 1
+        if newPg < 0:
+            newPg = len(self.pages) - 1
+        self.page = newPg
+        self.setAgendaWidgets(self.pages[newPg])
+        self.setPgNum()
+
+    def setPgNum(self):
+        """
+        Set the displayed page number.
+        """
+        self.pgNum.setText("%d/%d" % (self.page+1, len(self.pages)))
+
+    def setBlockchain(self):
+        """
+        Set the dcrdata blockchain on connected signal. Then set agendas.
+        """
+        self.blockchain = self.app.dcrdata
+        self.setAgendas()
+
+    def setAgendas(self):
+        """
+        Set agendas from dcrdata.
+        """
+        self.agendas = self.blockchain.getAgendasInfo().agendas
+        self.pages = [self.agendas[i*2:i*2+2] for i in range((len(self.agendas)+1)//2)]
+        self.page = 0
+        self.setAgendaWidgets(self.pages[0])
+        self.pagination.setVisible(len(self.pages) > 1)
+
+    def setVote(self):
+        """
+        Set the users current vote choice.
+        """
+        self.voteSet = False
+        if len(self.agendas) == 0:
+            self.app.appWindow.showError("unable to set vote: no agendas")
+            return
+        acct = self.app.wallet.selectedAccount
+        if not acct:
+            log.error("no account selected")
+            self.app.appWindow.showError("unable to update votes: no account")
+            return
+        pools = acct.stakePools
+        if len(pools) == 0:
+            self.app.appWindow.showError("unable to set vote: no pools")
+            return
+        voteBits = pools[0].purchaseInfo.voteBits
+        for dropdown in self.dropdowns:
+            originalIdx = dropdown.currentIndex()
+            index = 0
+            if voteBits != 1:
+                bits = voteBits & dropdown.bitMask
+                for idx in range(len(dropdown.voteBitsList)):
+                    # Check if this flag is set.
+                    if bits == dropdown.voteBitsList[idx]:
+                        index = idx
+                        break
+                else:
+                    self.app.appWindow.showError("unable to set vote: vote " +
+                                                 "bit match not found")
+                    return
+            if originalIdx != index:
+                dropdown.setCurrentIndex(index)
+        self.voteSet = True
+
+    def setAgendaWidgets(self, agendas):
+        """
+        Set the displayed agenda widgets.
+        """
+        if len(agendas) == 0:
+            self.app.appWindow.showError("unable to set agendas")
+            return
+        Q.clearLayout(self.agendasLyt, delete=True)
+        for agenda in agendas:
+            nameLbl = Q.makeLabel(agenda.id, 16)
+            statusLbl = Q.makeLabel(agenda.status, 14)
+            descriptionLbl = Q.makeLabel(agenda.description, 14)
+            descriptionLbl.setMargin(10)
+            choices = [choice.id for choice in agenda.choices]
+            nameWgt, _ = Q.makeSeries(Q.HORIZONTAL, nameLbl,
+                                      Q.STRETCH, statusLbl)
+
+            # choicesDropdown is a dropdown menu that contains voting choices.
+            choicesDropdown = Q.makeDropdown(choices)
+            self.dropdowns.append(choicesDropdown)
+            # Vote bit indexes are the same as the dropdown's choice indexes.
+            voteBits = [choice.bits for choice in agenda.choices]
+            choicesDropdown.voteBitsList = voteBits
+            choicesDropdown.bitMask = agenda.mask
+            choicesDropdown.lastIndex = 0
+            choicesDropdown.activated.connect(self.onChooseChoiceFunc(choicesDropdown))
+
+            choicesWgt, _ = Q.makeSeries(Q.HORIZONTAL, choicesDropdown)
+            wgt, lyt = Q.makeSeries(Q.VERTICAL, nameWgt, descriptionLbl, choicesWgt)
+            wgt.setMinimumWidth(360)
+            lyt.setContentsMargins(5, 5, 5, 5)
+            Q.addDropShadow(wgt)
+            self.agendasLyt.addWidget(wgt, 1)
+
+    def onChooseChoiceFunc(self, dropdown):
+        """
+        Called when a user has changed their vote. Changes the vote bits for
+        the dropdown's bit mask.
+
+        Args:
+            dropdown (obj): the drowdown related to this function.
+
+        Returns:
+            func: A function that is called upon the dropdown being activated.
+        """
+        def func(idx):
+            if idx == dropdown.lastIndex:
+                return
+            acct = self.app.wallet.selectedAccount
+            pools = acct.stakePools
+            voteBits = pools[0].purchaseInfo.voteBits
+            maxuint16 = (1 << 16) - 1
+            # Erase all choices.
+            voteBits &= maxuint16 ^ dropdown.bitMask
+            # Set the current choice.
+            voteBits |= dropdown.voteBitsList[dropdown.currentIndex()]
+
+            def changeVote():
+                self.app.emitSignal(ui.WORKING_SIGNAL)
+                try:
+                    pools[0].setVoteBits(voteBits)
+                    self.app.appWindow.showSuccess("vote choices updated")
+                    dropdown.lastIndex = idx
+                except Exception as e:
+                    log.error("error changing vote: %s" % e)
+                    self.app.appWindow.showError("unable to update vote choices: pool connection")
+                    dropdown.setCurrentIndex(dropdown.lastIndex)
+                self.app.emitSignal(ui.DONE_SIGNAL)
+
+            self.app.makeThread(changeVote)
+        return func
+
+
 
 class PoolAccountScreen(Screen):
     """
@@ -1494,6 +1734,13 @@ class PoolAccountScreen(Screen):
         pools = acct.stakePools
         if len(pools) == 0:
             return
+        # Refresh purchase info
+        try:
+            pools[0].updatePurchaseInfo()
+        except Exception as e:
+            log.error("error fetching purchase info: %s" % e)
+        # Notify that vote data should be updated.
+        self.app.emitSignal(ui.PURCHASEINFO_SIGNAL)
         self.pages = [pools[i*2:i*2+2] for i in range((len(pools)+1)//2)]
         self.page = 0
         self.setWidgets(self.pages[0])

@@ -4,10 +4,14 @@ See LICENSE for details
 
 DcrdataClient.endpointList() for available enpoints.
 """
+import time
 from tinydecred.util import tinyhttp, tinyjson
-from tinydecred.pydecred import txscript
+from tinydecred.pydecred import txscript, constants
 from tinydecred.crypto import crypto
 from tinydecred.crypto.bytearray import ByteArray
+
+# The duration purchase info is good for.
+PURCHASE_INFO_LIFE = constants.HOUR
 
 def resultIsSuccess(res):
     """
@@ -39,6 +43,7 @@ class PurchaseInfo(object):
         self.ticketAddress = get("TicketAddress")
         self.voteBits = get("VoteBits")
         self.voteBitsVersion = get("VoteBitsVersion")
+        self.unixTimestamp = get("unixTimestamp", default=time.time())
     def __tojson__(self):
         # using upper-camelcase to match keys in api response
         return {
@@ -48,6 +53,7 @@ class PurchaseInfo(object):
             "TicketAddress": self.ticketAddress,
             "VoteBits": self.voteBits,
             "VoteBitsVersion": self.voteBitsVersion,
+            "unixTimestamp": self.unixTimestamp,
         }
     @staticmethod
     def __fromjson__(obj):
@@ -265,6 +271,12 @@ class VotingServiceProvider(object):
             return self.purchaseInfo
         self.err = res
         raise Exception("unexpected response from 'getpurchaseinfo': %r" % (res, ))
+    def updatePurchaseInfo(self):
+        '''
+        Update purchase info if older than PURCHASE_INFO_LIFE.
+        '''
+        if time.time() - self.purchaseInfo.unixTimestamp > PURCHASE_INFO_LIFE:
+            self.getPurchaseInfo()
     def getStats(self):
         """
         Get the stats from the stake pool API.
@@ -287,6 +299,7 @@ class VotingServiceProvider(object):
         data = { "VoteBits": voteBits }
         res = tinyhttp.post(self.apiPath("voting"), data, headers=self.headers(), urlEncode=True)
         if resultIsSuccess(res):
+            self.purchaseInfo.voteBits = voteBits
             return True
         raise Exception("unexpected response from 'voting': %s" % repr(res))
 

@@ -1,5 +1,6 @@
 """
 Copyright (c) 2019, Brian Stafford
+Copyright (c) 2019, the Decred developers
 See LICENSE for details
 
 DcrdataClient.endpointList() for available enpoints.
@@ -167,7 +168,7 @@ class DcrdataClient(object):
         return [entry[1] for entry in self.listEntries]
     def endpointGuide(self):
         """
-        Print on endpoint per line.
+        Print one endpoint per line.
         Each line shows a translation from Python notation to a URL.
         """
         print("\n".join(["%s  ->  %s" % entry for entry in self.listEntries]))
@@ -385,6 +386,93 @@ class TicketInfo:
         }
 
 tinyjson.register(TicketInfo, "TicketInfo")
+
+
+class AgendaChoices:
+    """
+    Agenda choices such as abstain, yes, no.
+    """
+    def __init__(self, ID, description, bits, isabstain,
+                 isno, count, progress):
+        self.id = ID
+        self.description = description
+        self.bits = bits
+        self.isabstain = isabstain
+        self.isno = isno
+        self.count = count
+        self.progress = progress
+
+    @staticmethod
+    def parse(obj):
+        return AgendaChoices(
+            ID=obj["id"],
+            description=obj["description"],
+            bits=obj["bits"],
+            isabstain=obj["isabstain"],
+            isno=obj["isno"],
+            count=obj["count"],
+            progress=obj["progress"],
+        )
+
+
+class Agenda:
+    """
+    An agenda with name, description, and AgendaChoices.
+    """
+    def __init__(self, ID, description, mask, starttime, expiretime,
+                 status, quorumprogress, choices):
+        self.id = ID
+        self.description = description
+        self.mask = mask
+        self.starttime = starttime
+        self.expiretime = expiretime
+        self.status = status
+        self.quorumprogress = quorumprogress
+        self.choices = choices
+
+    @staticmethod
+    def parse(obj):
+        return Agenda(
+            ID=obj["id"],
+            description=obj["description"],
+            mask=obj["mask"],
+            starttime=obj["starttime"],
+            expiretime=obj["expiretime"],
+            status=obj["status"],
+            quorumprogress=obj["quorumprogress"],
+            choices=[AgendaChoices.parse(choice) for choice in obj["choices"]],
+        )
+
+
+class AgendasInfo:
+    """
+    All current agenda information for the current network. agendas contains
+    a list of Agenda.
+    """
+    def __init__(self, currentheight, startheight, endheight, HASH,
+                 voteversion, quorum, totalvotes, agendas):
+        self.currentheight = currentheight
+        self.startheight = startheight
+        self.endheight = endheight
+        self.hash = HASH
+        self.voteversion = voteversion
+        self.quorum = quorum
+        self.totalvotes = totalvotes
+        self.agendas = agendas
+
+    @staticmethod
+    def parse(obj):
+        return AgendasInfo(
+            currentheight=obj["currentheight"],
+            startheight=obj["startheight"],
+            endheight=obj["endheight"],
+            HASH=obj["hash"],
+            voteversion=obj["voteversion"],
+            quorum=obj["quorum"],
+            totalvotes=obj["totalvotes"],
+            agendas=[Agenda.parse(agenda) for agenda in obj["agendas"]],
+        )
+
 
 class UTXO(object):
     """
@@ -650,6 +738,16 @@ class DcrdataBlockchain(object):
         """
         self.blockReceiver = receiver
         self.dcrdata.subscribeBlocks()
+
+    def getAgendasInfo(self):
+        """
+        The agendas info that is used for voting.
+
+        Returns:
+            AgendasInfo: the current agendas.
+        """
+        return AgendasInfo.parse(self.dcrdata.stake.vote.info())
+
     def subscribeAddresses(self, addrs, receiver=None):
         """
         Subscribe to notifications for the provided addresses.
@@ -665,6 +763,7 @@ class DcrdataBlockchain(object):
         elif self.addressReceiver == None:
             raise Exception("must set receiver to subscribe to addresses")
         self.dcrdata.subscribeAddresses(addrs)
+
     def processNewUTXO(self, utxo):
         """
         Processes an as-received blockchain utxo.
