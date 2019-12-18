@@ -8,7 +8,7 @@ import re
 from tinydecred.util import helpers
 from PyQt5 import QtCore, QtWidgets, QtGui
 
-log = helpers.getLogger("QUTIL") # , logLvl=0)
+log = helpers.getLogger("QUTIL")  # , logLvl=0)
 
 # Some colors,
 QT_WHITE = QtGui.QColor("white")
@@ -32,14 +32,17 @@ DARK_THEME = "dark"
 
 STRETCH = "stretch"
 
-PyObj = 'PyQt_PyObject'
+PyObj = "PyQt_PyObject"
+
 
 class ThreadUtilities(object):
     """
     Utilities for management of SmartThread objects.
     """
+
     def __init__(self):
         self.threads = []
+
     def makeThread(self, func, callback=None, *args, **kwargs):
         """
         Create and start a `SmartThread`.
@@ -61,12 +64,16 @@ class ThreadUtilities(object):
         self.threads.append(thread)
         return thread
 
+
 class SmartThread(QtCore.QThread):
     """
     SmartThread is a QThread extension. It adds little, but offers an
     alternative interface for creating the thread and callback handling.
     """
-    def __init__(self, func, callback, *args, qtConnectType=QtCore.Qt.AutoConnection, **kwargs):
+
+    def __init__(
+        self, func, callback, *args, qtConnectType=QtCore.Qt.AutoConnection, **kwargs
+    ):
         """
         Args:
             func (function): The function to run in a separate thread.
@@ -91,8 +98,11 @@ class SmartThread(QtCore.QThread):
         try:
             self.returns = self.func(*self.args, **self.kwargs)
         except Exception as e:
-            log.error("exception encountered in QThread: %s" % helpers.formatTraceback(e))
+            log.error(
+                "exception encountered in QThread: %s" % helpers.formatTraceback(e)
+            )
             self.returns = False
+
     def callitback(self):
         """
         QThread Slot connected to the connect Signal. Send the value returned
@@ -105,20 +115,30 @@ class QConsole(QtWidgets.QPlainTextEdit):
     """
     A widget for displaying console-style monospace output on a dark background.
     """
+
     def __init__(self, parent, *args, **kwargs):
         super(QConsole, self).__init__(parent)
         self.setStyleSheet("")
         self.args = args
         self.kwargs = kwargs
-        self.consoleState = helpers.Generic_class(scrollBottom = True)
-        self.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.MinimumExpanding)
+        self.consoleState = helpers.Generic_class(scrollBottom=True)
+        self.setSizePolicy(
+            QtWidgets.QSizePolicy.MinimumExpanding,
+            QtWidgets.QSizePolicy.MinimumExpanding,
+        )
         # self.console.keyPressEvent = lambda e: self.consoleScrollAction("key.press", e)
         self.document().setMaximumBlockCount(250)
         self.setReadOnly(True)
         self.consoleBar = self.verticalScrollBar()
-        self.consoleBar.rangeChanged.connect(lambda mx, mn: self.consoleScrollAction("range.changed", mx, mn))
-        self.consoleBar.sliderReleased.connect(lambda: self.consoleScrollAction("mouse.release"))
-        self.consoleBar.valueChanged.connect(lambda v: self.consoleScrollAction("value.changed", v))
+        self.consoleBar.rangeChanged.connect(
+            lambda mx, mn: self.consoleScrollAction("range.changed", mx, mn)
+        )
+        self.consoleBar.sliderReleased.connect(
+            lambda: self.consoleScrollAction("mouse.release")
+        )
+        self.consoleBar.valueChanged.connect(
+            lambda v: self.consoleScrollAction("value.changed", v)
+        )
         f = self.font()
         f.setFamily("RobotoMono-Regular")
         self.setFont(f)
@@ -126,15 +146,17 @@ class QConsole(QtWidgets.QPlainTextEdit):
             self.setPalette(kwargs["palette"])
             kwargs.pop("palette")
         self.setBackgroundVisible(True)
-        self.asciiStylePattern = r'((?:\033(?:\[95m|\[94m|\[92m|\[93m|\[91m|\[1m|\[4m|\[0m))+)'
+        self.asciiStylePattern = (
+            r"((?:\033(?:\[95m|\[94m|\[92m|\[93m|\[91m|\[1m|\[4m|\[0m))+)"
+        )
         self.htmlMap = {
-            "\x1b[95m" : "color:#6971a7;",
-            "\x1b[94m" : "color:#6a9fcf;",
-            "\x1b[92m" : "color:#8ae234;",
-            "\x1b[93m" : "color:#fce94f;",
-            "\x1b[91m" : "color:#ef2d35;",
-            "\x1b[1m" : "font-weight:bold;",
-            "\x1b[4m" : "text-decoration:underline;"
+            "\x1b[95m": "color:#6971a7;",
+            "\x1b[94m": "color:#6a9fcf;",
+            "\x1b[92m": "color:#8ae234;",
+            "\x1b[93m": "color:#fce94f;",
+            "\x1b[91m": "color:#ef2d35;",
+            "\x1b[1m": "font-weight:bold;",
+            "\x1b[4m": "text-decoration:underline;",
         }
 
     def append(self, text):
@@ -145,7 +167,7 @@ class QConsole(QtWidgets.QPlainTextEdit):
         spanCount = 0
         for match in matches:
             if match == "\x1b[0m":
-                text = text.replace("\x1b[0m", "</span>"*spanCount, 1)
+                text = text.replace("\x1b[0m", "</span>" * spanCount, 1)
                 spanCount = 0
             else:
                 styles = ""
@@ -155,7 +177,7 @@ class QConsole(QtWidgets.QPlainTextEdit):
                 if styles:
                     text = text.replace(match, '<span style="%s">' % styles, 1)
                     spanCount += 1
-        return super().appendHtml(text.replace("\n","<br />"))
+        return super().appendHtml(text.replace("\n", "<br />"))
 
     def keyPressEvent(self, e):
         super().keyPressEvent(e)
@@ -169,7 +191,8 @@ class QConsole(QtWidgets.QPlainTextEdit):
             if self.consoleState.scrollBottom:
                 self.consoleBar.setSliderPosition(mx)
         if action == "value.changed":
-            if mn == self.consoleBar.maximum(): # mn here is the current value, such as returned by sliderPosition
+            # mn is the current value, such as returned by sliderPosition
+            if mn == self.consoleBar.maximum():
                 self.consoleState.scrollBottom = True
             else:
                 self.consoleState.scrollBottom = False
@@ -179,7 +202,11 @@ class QConsole(QtWidgets.QPlainTextEdit):
             else:
                 self.consoleState.scrollBottom = False
         if mn == "key.press":
-            if action.key() in (QtCore.Qt.Key_End, QtCore.Qt.Key_Down, QtCore.Qt.Key_PageDown):
+            if action.key() in (
+                QtCore.Qt.Key_End,
+                QtCore.Qt.Key_Down,
+                QtCore.Qt.Key_PageDown,
+            ):
                 if self.consoleBar.maximum() == self.consoleBar.sliderPosition():
                     self.consoleState.scrollBottom = True
                 else:
@@ -192,15 +219,41 @@ class QToggle(QtWidgets.QAbstractButton):
     https://stackoverflow.com/a/38102598/1124661
     QAbstractButton::setDisabled to disable
     """
-    def __init__(self, parent, slotWidth=None, onColor=None, slotColor=None, switchColor=None, disabledColor=None, callback=None, linkedSetting=None, linkedDict=None):
+
+    def __init__(
+        self,
+        parent,
+        slotWidth=None,
+        onColor=None,
+        slotColor=None,
+        switchColor=None,
+        disabledColor=None,
+        callback=None,
+        linkedSetting=None,
+        linkedDict=None,
+    ):
         super(QToggle, self).__init__(parent)
         self.callback = callback
         self.linkedSetting = linkedSetting
         self.linkedDict = linkedDict
-        self.onBrush = QtGui.QBrush(QtGui.QColor(onColor)) if onColor else QtGui.QBrush(QtGui.QColor("#357f30"))
-        self.slotBrush = QtGui.QBrush(QtGui.QColor(slotColor)) if slotColor else QtGui.QBrush(QtGui.QColor("#999999"))
-        self.switchBrush = self.slotBrush # QtGui.QBrush(QtGui.QColor(switchColor)) if switchColor else QtGui.QBrush(QtGui.QColor("#d5d5d5"))
-        self.disabledBrush = QtGui.QBrush(QtGui.QColor(disabledColor)) if disabledColor else QtGui.QBrush(QtGui.QColor("#666666"))
+        self.onBrush = (
+            QtGui.QBrush(QtGui.QColor(onColor))
+            if onColor
+            else QtGui.QBrush(QtGui.QColor("#357f30"))
+        )
+        self.slotBrush = (
+            QtGui.QBrush(QtGui.QColor(slotColor))
+            if slotColor
+            else QtGui.QBrush(QtGui.QColor("#999999"))
+        )
+        self.switchBrush = (
+            self.slotBrush
+        )  # QtGui.QBrush(QtGui.QColor(switchColor)) if switchColor else QtGui.QBrush(QtGui.QColor("#d5d5d5"))
+        self.disabledBrush = (
+            QtGui.QBrush(QtGui.QColor(disabledColor))
+            if disabledColor
+            else QtGui.QBrush(QtGui.QColor("#666666"))
+        )
         self.state = False
         self.opacity = 0
         self.xPos = 8
@@ -209,7 +262,7 @@ class QToggle(QtWidgets.QAbstractButton):
         self.slotWidth = slotWidth if slotWidth else 38
         self.setFixedWidth(self.slotWidth)
         self.slotMargin = 3
-        #self.track
+        # self.track
         self.animation = QtCore.QPropertyAnimation(self, b"pqProp", self)
         self.setCursor(QtCore.Qt.PointingHandCursor)
 
@@ -223,17 +276,49 @@ class QToggle(QtWidgets.QAbstractButton):
         if self.isEnabled():
             painter.setBrush(self.switchBrush)
             painter.setOpacity(0.6 if self.state else 0.4)
-            painter.drawRoundedRect(QtCore.QRect(self.slotMargin, self.slotMargin, self.slotWidth-2*self.slotMargin, self.height()-2*self.slotMargin), 8.0, 8.0)
+            painter.drawRoundedRect(
+                QtCore.QRect(
+                    self.slotMargin,
+                    self.slotMargin,
+                    self.slotWidth - 2 * self.slotMargin,
+                    self.height() - 2 * self.slotMargin,
+                ),
+                8.0,
+                8.0,
+            )
             # painter.setBrush(self.switchBrush)
             painter.setOpacity(1.0)
-            painter.drawEllipse(QtCore.QRect(self.xPos-self.slotHeight/2, self.yPos-self.slotHeight/2, self.height(), self.height()))
+            painter.drawEllipse(
+                QtCore.QRect(
+                    self.xPos - self.slotHeight / 2,
+                    self.yPos - self.slotHeight / 2,
+                    self.height(),
+                    self.height(),
+                )
+            )
         else:
             painter.setBrush(self.disabledBrush)
             painter.setOpacity(1.0)
-            painter.drawRoundedRect(QtCore.QRect(self.slotMargin, self.slotMargin, self.slotWidth-2*self.slotMargin, self.height()-2*self.slotMargin), 8.0, 8.0)
+            painter.drawRoundedRect(
+                QtCore.QRect(
+                    self.slotMargin,
+                    self.slotMargin,
+                    self.slotWidth - 2 * self.slotMargin,
+                    self.height() - 2 * self.slotMargin,
+                ),
+                8.0,
+                8.0,
+            )
             painter.setOpacity(0.75)
             painter.setBrush(self.slotBrush)
-            painter.drawEllipse(QtCore.QRect(self.xPos-self.slotHeight/2, self.yPos-self.slotHeight/2, self.height(), self.height()))
+            painter.drawEllipse(
+                QtCore.QRect(
+                    self.xPos - self.slotHeight / 2,
+                    self.yPos - self.slotHeight / 2,
+                    self.height(),
+                    self.height(),
+                )
+            )
 
     def mouseReleaseEvent(self, e):
         """
@@ -243,13 +328,13 @@ class QToggle(QtWidgets.QAbstractButton):
             self.state = False if self.state else True
             self.switchBrush = self.onBrush if self.state else self.slotBrush
             if self.state:
-                self.animation.setStartValue(self.slotHeight/2)
+                self.animation.setStartValue(self.slotHeight / 2)
                 self.animation.setEndValue(self.width() - self.slotHeight)
                 self.animation.setDuration(120)
                 self.animation.start()
             else:
                 self.animation.setStartValue(self.xPos)
-                self.animation.setEndValue(self.slotHeight/2)
+                self.animation.setEndValue(self.slotHeight / 2)
                 self.animation.setDuration(120)
                 self.animation.start()
             if self.linkedSetting and self.linkedDict:
@@ -262,7 +347,10 @@ class QToggle(QtWidgets.QAbstractButton):
         """
         Required to be implemented and return the size of the widget.
         """
-        return QtCore.QSize(2 * (self.slotHeight + self.slotMargin), self.slotHeight + 2 * self.slotMargin)
+        return QtCore.QSize(
+            2 * (self.slotHeight + self.slotMargin),
+            self.slotHeight + 2 * self.slotMargin,
+        )
 
     def setOffset(self, o):
         """
@@ -291,8 +379,9 @@ class QToggle(QtWidgets.QAbstractButton):
             self.xPos = self.width() - self.slotHeight
         else:
             self.switchBrush = self.slotBrush
-            self.xPos = self.slotHeight/2
+            self.xPos = self.slotHeight / 2
         self.update()
+
 
 def makeWidget(widgetClass, layoutDirection="vertical", parent=None):
     """
@@ -319,6 +408,7 @@ def makeWidget(widgetClass, layoutDirection="vertical", parent=None):
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setAlignment(ALIGN_TOP | ALIGN_LEFT)
     return widget, layout
+
 
 def makeSeries(layoutDirection, *widgets, align=None, widget=QtWidgets.QWidget):
     align = align if align else QtCore.Qt.Alignment()
@@ -355,6 +445,7 @@ def setBackgroundColor(widget, color):
     p.setColor(QtGui.QPalette.Window, QtGui.QColor(color))
     widget.setPalette(p)
 
+
 def addDropShadow(wgt):
     """
     Add a white background and a drop shadow for the given widget.
@@ -366,6 +457,7 @@ def addDropShadow(wgt):
     effect.setColor(QtGui.QColor("#777777"))
     setBackgroundColor(wgt, "white")
     wgt.setGraphicsEffect(effect)
+
 
 def makeLabel(s, fontSize, a=ALIGN_CENTER, **k):
     """
@@ -403,7 +495,7 @@ def setProperties(lbl, color=None, fontSize=None, fontFamily=None, underline=Fal
     A few common properties of QLabels.
     """
     if color:
-        palette =  lbl.palette()
+        palette = lbl.palette()
         c = QtGui.QColor(color)
         palette.setColor(lbl.backgroundRole(), c)
         palette.setColor(lbl.foregroundRole(), c)
@@ -419,6 +511,7 @@ def setProperties(lbl, color=None, fontSize=None, fontFamily=None, underline=Fal
     lbl.setFont(font)
     return lbl
 
+
 def pad(wgt, t, r, b, l):
     """
     Add padding around the widget by wrapping it in another widget.
@@ -427,6 +520,7 @@ def pad(wgt, t, r, b, l):
     lyt.addWidget(wgt)
     w.setContentsMargins(l, t, r, b)
     return w
+
 
 def clearLayout(layout, delete=False):
     """
@@ -454,14 +548,17 @@ def layoutWidgets(layout):
     for i in range(layout.count()):
         yield layout.itemAt(i).widget()
 
+
 def _setMouseDown(wgt, e):
     if e.button() == QtCore.Qt.LeftButton:
         wgt._mousedown = True
+
 
 def _releaseMouse(wgt, e):
     if e.button() == QtCore.Qt.LeftButton and wgt._mousedown:
         wgt._clickcb()
         wgt._mousedown = False
+
 
 def _mouseMoved(wgt, e):
     """
@@ -477,12 +574,14 @@ def _mouseMoved(wgt, e):
     if x < 0 or y < 0 or x > qSize.width() or y > qSize.height():
         wgt._mousedown = False
 
+
 def addClickHandler(wgt, cb):
     wgt._mousedown = False
     wgt._clickcb = cb
     wgt.mousePressEvent = lambda e, w=wgt: _setMouseDown(wgt, e)
     wgt.mouseReleaseEvent = lambda e, w=wgt: _releaseMouse(wgt, e)
     wgt.mouseMoveEvent = lambda e, w=wgt: _mouseMoved(wgt, e)
+
 
 lightThemePalette = QtGui.QPalette()
 lightThemePalette.setColor(QtGui.QPalette.Window, QtGui.QColor("#ffffff"))
@@ -498,7 +597,6 @@ darkThemePalette.setColor(QtGui.QPalette.Text, QtGui.QColor("#ededed"))
 darkThemePalette.setColor(QtGui.QPalette.Button, QtGui.QColor("#666666"))
 darkThemePalette.setColor(QtGui.QPalette.ButtonText, QtGui.QColor("#efd7ec"))
 darkThemePalette.hoverColor = QtGui.QColor("#5d5d5d")
-
 
 
 QUTILITY_STYLE = """
