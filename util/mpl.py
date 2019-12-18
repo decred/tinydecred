@@ -10,7 +10,6 @@ import matplotlib
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib import font_manager as FontManager
-# from matplotlib.patches import Circle, Wedge, Polygon, Ellipse, Rectangle
 
 from mpl_toolkits.mplot3d import Axes3D  # leave this even if the linter complains
 

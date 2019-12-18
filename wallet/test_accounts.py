@@ -51,7 +51,8 @@ class TestAccounts(unittest.TestCase):
         pub = extKey.neuter()
         self.assertEqual(
             pub.string(),
-            "dpubZ9169KDAEUnyo8vdTJcpFWeaUEKH3G6detaXv46HxtQcENwxGBbRqbfTCJ9BUnWPCkE8WApKPJ4h7EAapnXCZq1a9AqWWzs1n31VdfwbrQk",
+            "dpubZ9169KDAEUnyo8vdTJcpFWeaUEKH3G6detaXv46HxtQcENwxGBbR"
+            "qbfTCJ9BUnWPCkE8WApKPJ4h7EAapnXCZq1a9AqWWzs1n31VdfwbrQk",
         )
 
     def test_accounts(self):
