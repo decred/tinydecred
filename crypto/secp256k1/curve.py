@@ -7,20 +7,23 @@ module curve
     Pure Python secp256k1 curve implementation. Based entirely on the Decred
     dcrd golang version.
 """
-from tinydecred.crypto.secp256k1.field import FieldVal, BytePoints
+
 from tinydecred.crypto.bytearray import ByteArray
 from tinydecred.crypto.rando import generateSeed
+from tinydecred.crypto.secp256k1.field import FieldVal, BytePoints
 
 COORDINATE_LEN = 32
 PUBKEY_COMPRESSED_LEN = COORDINATE_LEN + 1
 PUBKEY_LEN = 65
-PUBKEY_COMPRESSED  = 0x02 # 0x02 y_bit + x coord
-PUBKEY_UNCOMPRESSED = 0x04 # 0x04 x coord + y coord
+PUBKEY_COMPRESSED = 0x02  # 0x02 y_bit + x coord
+PUBKEY_UNCOMPRESSED = 0x04  # 0x04 x coord + y coord
 
 fieldOne = FieldVal.fromInt(1)
 
+
 def isEven(i):
     return i % 2 == 0
+
 
 def NAF(k):
     """
@@ -44,19 +47,19 @@ def NAF(k):
     """
     carry, curIsOne, nextIsOne = False, False, False
     # these default to zero
-    retPos  = ByteArray(0, length=len(k)+1)
-    retNeg  = ByteArray(0, length=len(k)+1)
-    for i in range(len(k)-1, -1, -1):
+    retPos = ByteArray(0, length=len(k) + 1)
+    retNeg = ByteArray(0, length=len(k) + 1)
+    for i in range(len(k) - 1, -1, -1):
         curByte = k[i]
         for j in range(8):
-            curIsOne = curByte&1 == 1
+            curIsOne = curByte & 1 == 1
             if j == 7:
                 if i == 0:
                     nextIsOne = False
                 else:
-                    nextIsOne = k[i-1]&1 == 1
+                    nextIsOne = k[i - 1] & 1 == 1
             else:
-                nextIsOne = curByte&2 == 2
+                nextIsOne = curByte & 2 == 2
             if carry:
                 if curIsOne:
                     # This bit is 1, so continue to carry
@@ -68,34 +71,36 @@ def NAF(k):
                         # Start carrying again since
                         # a new sequence of 1s is
                         # starting.
-                        retNeg[i+1] += 1 << j
+                        retNeg[i + 1] += 1 << j
                     else:
                         # Stop carrying since 1s have
                         # stopped.
                         carry = False
-                        retPos[i+1] += 1 << j
+                        retPos[i + 1] += 1 << j
             elif curIsOne:
                 if nextIsOne:
                     # If this is the start of at least 2
                     # consecutive 1s, set the current one
                     # to -1 and start carrying.
-                    retNeg[i+1] += 1 << j
+                    retNeg[i + 1] += 1 << j
                     carry = True
                 else:
                     # This is a singleton, not consecutive
                     # 1s.
-                    retPos[i+1] += 1 << j
+                    retPos[i + 1] += 1 << j
             curByte >>= 1
     if carry:
         retPos[0] = 1
         return retPos, retNeg
     return retPos[1:], retNeg[1:]
 
+
 class PublicKey:
     def __init__(self, curve, x, y):
         self.curve = curve
         self.x = x
         self.y = y
+
     def serializeCompressed(self):
         fmt = PUBKEY_COMPRESSED
         if not isEven(self.y):
@@ -104,6 +109,7 @@ class PublicKey:
         b += ByteArray(self.x, length=COORDINATE_LEN)
         assert len(b) == PUBKEY_COMPRESSED_LEN
         return b
+
     def serializeUncompressed(self):
         """
         serializeUncompressed serializes a public key in a 65-byte uncompressed
@@ -114,22 +120,25 @@ class PublicKey:
         b += ByteArray(self.y, length=32)
         return b
 
+
 class PrivateKey:
     def __init__(self, curve, k, x, y):
         self.key = k
         self.pub = PublicKey(curve, x, y)
 
-def randFieldElement(): # c elliptic.Curve, rand io.Reader) (k *big.Int, err error) {
+
+def randFieldElement():  # c elliptic.Curve, rand io.Reader) (k *big.Int, err error) {
     """
     randFieldElement returns a random element of the field underlying the given
     curve using the procedure given in [NSA] A.2.1.
     """
-    b = ByteArray(generateSeed(curve.BitSize//8+8))
+    b = ByteArray(generateSeed(curve.BitSize // 8 + 8))
     n = curve.N - 1
     k = b.int()
     k = k % n
     k = k + 1
     return k
+
 
 def generateKey():
     """
@@ -140,8 +149,11 @@ def generateKey():
     b = ByteArray(k, length=32)
     return PrivateKey(curve, b, x, y)
 
+
 class KoblitzCurve:
-    def __init__(self, P, N, B, Gx, Gy, BitSize, H, q, byteSize, lamda, beta, a1, b1, a2, b2):
+    def __init__(
+        self, P, N, B, Gx, Gy, BitSize, H, q, byteSize, lamda, beta, a1, b1, a2, b2
+    ):
         self.P = P
         self.N = N
         self.B = B
@@ -167,7 +179,6 @@ class KoblitzCurve:
         kb = ByteArray(k % self.N)
         diff = len(BytePoints) - len(kb)
 
-
         # Point Q = ∞ (point at infinity).
         qx, qy, qz = FieldVal(), FieldVal(), FieldVal()
 
@@ -177,9 +188,10 @@ class KoblitzCurve:
         # Each "digit" in the 8-bit window can be looked up using bytePoints
         # and added together.
         for i, bidx in enumerate(kb.b):
-            p = BytePoints[diff+i][bidx]
+            p = BytePoints[diff + i][bidx]
             self.addJacobian(qx, qy, qz, p[0], p[1], p[2], qx, qy, qz)
         return self.fieldJacobianToBigAffine(qx, qy, qz)
+
     def splitK(self, k):
         """
         splitK returns a balanced length-two representation of k and their signs.
@@ -209,6 +221,7 @@ class KoblitzCurve:
         k2 = tmp2 - tmp1
 
         return k1, k2
+
     def scalarMult(self, Bx, By, k):
         """
         scalarMult returns k*(Bx, By) where k is a big endian integer.
@@ -267,31 +280,31 @@ class KoblitzCurve:
         # at the cost of 1 possible extra doubling.
         for i in range(m):
             # Since we're going left-to-right, pad the front with 0s.
-            if i < m-k1Len:
+            if i < m - k1Len:
                 k1BytePos = 0
                 k1ByteNeg = 0
             else:
-                k1BytePos = k1PosNAF[i-(m-k1Len)]
-                k1ByteNeg = k1NegNAF[i-(m-k1Len)]
-            if i < m-k2Len:
+                k1BytePos = k1PosNAF[i - (m - k1Len)]
+                k1ByteNeg = k1NegNAF[i - (m - k1Len)]
+            if i < m - k2Len:
                 k2BytePos = 0
                 k2ByteNeg = 0
             else:
-                k2BytePos = k2PosNAF[i-(m-k2Len)]
-                k2ByteNeg = k2NegNAF[i-(m-k2Len)]
+                k2BytePos = k2PosNAF[i - (m - k2Len)]
+                k2ByteNeg = k2NegNAF[i - (m - k2Len)]
 
             for j in range(7, -1, -1):
                 # Q = 2 * Q
                 curve.doubleJacobian(qx, qy, qz, qx, qy, qz)
 
-                if k1BytePos&0x80 == 0x80:
+                if k1BytePos & 0x80 == 0x80:
                     curve.addJacobian(qx, qy, qz, p1x, p1y, p1z, qx, qy, qz)
-                elif k1ByteNeg&0x80 == 0x80:
+                elif k1ByteNeg & 0x80 == 0x80:
                     curve.addJacobian(qx, qy, qz, p1x, p1yNeg, p1z, qx, qy, qz)
 
-                if k2BytePos&0x80 == 0x80:
+                if k2BytePos & 0x80 == 0x80:
                     curve.addJacobian(qx, qy, qz, p2x, p2y, p2z, qx, qy, qz)
-                elif k2ByteNeg&0x80 == 0x80:
+                elif k2ByteNeg & 0x80 == 0x80:
                     curve.addJacobian(qx, qy, qz, p2x, p2yNeg, p2z, qx, qy, qz)
                 k1BytePos = k1BytePos << 1
                 k1ByteNeg = k1ByteNeg << 1
@@ -300,12 +313,14 @@ class KoblitzCurve:
 
         # Convert the Jacobian coordinate field values back to affine big.Ints.
         return curve.fieldJacobianToBigAffine(qx, qy, qz)
+
     def publicKey(self, k):
         """
         Create a public key from integer private key k.
         """
         x, y = self.scalarBaseMult(k)
         return PublicKey(self, x, y)
+
     def parsePubKey(self, pubKeyStr):
         """
         parsePubKey parses a public key for a koblitz curve from a bytestring into a
@@ -317,7 +332,7 @@ class KoblitzCurve:
 
         fmt = pubKeyStr[0]
         ybit = (fmt & 0x1) == 0x1
-        fmt &= 0xff^0x01
+        fmt &= 0xFF ^ 0x01
 
         ifunc = lambda b: int.from_bytes(b, byteorder="big")
 
@@ -331,12 +346,14 @@ class KoblitzCurve:
         elif pkLen == PUBKEY_COMPRESSED_LEN:
             # format is 0x2 | solution, <X coordinate>
             # solution determines which solution of the curve we use.
-            #/ y^2 = x^3 + Curve.B
+            # / y^2 = x^3 + Curve.B
             if PUBKEY_COMPRESSED != fmt:
-                raise Exception("invalid magic in compressed pubkey string: %d" % pubKeyStr[0])
+                raise Exception(
+                    "invalid magic in compressed pubkey string: %d" % pubKeyStr[0]
+                )
             x = ifunc(pubKeyStr[1:33])
             y = self.decompressPoint(x, ybit)
-        else: # wrong!
+        else:  # wrong!
             raise Exception("invalid pub key length %d" % len(pubKeyStr))
 
         if x > self.P:
@@ -346,6 +363,7 @@ class KoblitzCurve:
         if not self.isAffineOnCurve(x, y):
             raise Exception("pubkey [%d, %d] isn't on secp256k1 curve" % (x, y))
         return PublicKey(self, x, y)
+
     def decompressPoint(self, x, ybit):
         """
         decompressPoint decompresses a point on the given curve given the X point and
@@ -354,13 +372,13 @@ class KoblitzCurve:
         # TODO(oga) This will probably only work for secp256k1 due to
         # optimizations.
         # Y = +-sqrt(x^3 + B)
-        x3 = x**3 + self.B
+        x3 = x ** 3 + self.B
 
         # now calculate sqrt mod p of x2 + B
         # This code used to do a full sqrt based on tonelli/shanks,
         # but this was replaced by the algorithms referenced in
         # https://bitcointalk.org/index.php?topic=162805.msg1712294#msg1712294
-        y = pow(x3, self.q, self.P) #(x3**self.q) % self.P
+        y = pow(x3, self.q, self.P)  # (x3**self.q) % self.P
 
         if ybit == isEven(y):
             y = self.P - y
@@ -368,7 +386,7 @@ class KoblitzCurve:
             raise Exception("ybit doesn't match oddnes")
         return y
 
-    def addJacobian(self, x1, y1, z1, x2, y2, z2, x3, y3, z3): # *fieldVal) {
+    def addJacobian(self, x1, y1, z1, x2, y2, z2, x3, y3, z3):  # *fieldVal) {
         """
         addJacobian adds the passed Jacobian points (x1, y1, z1) and (x2, y2, z2)
         together and stores the result in (x3, y3, z3).
@@ -406,6 +424,7 @@ class KoblitzCurve:
         # None of the above assumptions are true, so fall back to generic
         # point addition.
         self.addGeneric(x1, y1, z1, x2, y2, z2, x3, y3, z3)
+
     def add(self, x1, y1, x2, y2):
         """
         add returns the sum of (x1,y1) and (x2,y2). Part of the elliptic.Curve
@@ -467,7 +486,6 @@ class KoblitzCurve:
                 self.doubleJacobian(x1, y1, z1, x3, y3, z3)
                 return
 
-
             # Since x1 == x2 and y1 == -y2, the sum is the point at
             # infinity per the group law.
             x3.setInt(0)
@@ -480,18 +498,20 @@ class KoblitzCurve:
         fv = FieldVal
         h, i, j, r, v = fv(), fv(), fv(), fv(), fv()
         negJ, neg2V, negX3 = fv(), fv(), fv()
-        h.set(x1).negate(1).add(x2)                # H = X2-X1 (mag: 3)
-        i.squareVal(h).mulInt(4)                  # I = 4*H^2 (mag: 4)
+        # fmt: off
+        h.set(x1).negate(1).add(x2)              # H = X2-X1 (mag: 3)
+        i.squareVal(h).mulInt(4)                 # I = 4*H^2 (mag: 4)
         j.mul2(h, i)                             # J = H*I (mag: 1)
-        r.set(y1).negate(1).add(y2).mulInt(2)      # r = 2*(Y2-Y1) (mag: 6)
-        v.mul2(x1, i)                             # V = X1*I (mag: 1)
-        negJ.set(j).negate(1)                     # negJ = -J (mag: 2)
-        neg2V.set(v).mulInt(2).negate(2)          # neg2V = -(2*V) (mag: 3)
-        x3.set(r).square().add(negJ).add(neg2V) # X3 = r^2-J-2*V (mag: 6)
-        negX3.set(x3).negate(6)                    # negX3 = -X3 (mag: 7)
-        j.mul(y1).mulInt(2).negate(2)              # J = -(2*Y1*J) (mag: 3)
-        y3.set(v).add(negX3).mul(r).add(j)     # Y3 = r*(V-X3)-2*Y1*J (mag: 4)
-        z3.set(h).mulInt(2)                       # Z3 = 2*H (mag: 6)
+        r.set(y1).negate(1).add(y2).mulInt(2)    # r = 2*(Y2-Y1) (mag: 6)
+        v.mul2(x1, i)                            # V = X1*I (mag: 1)
+        negJ.set(j).negate(1)                    # negJ = -J (mag: 2)
+        neg2V.set(v).mulInt(2).negate(2)         # neg2V = -(2*V) (mag: 3)
+        x3.set(r).square().add(negJ).add(neg2V)  # X3 = r^2-J-2*V (mag: 6)
+        negX3.set(x3).negate(6)                  # negX3 = -X3 (mag: 7)
+        j.mul(y1).mulInt(2).negate(2)            # J = -(2*Y1*J) (mag: 3)
+        y3.set(v).add(negX3).mul(r).add(j)       # Y3 = r*(V-X3)-2*Y1*J (mag: 4)
+        z3.set(h).mulInt(2)                      # Z3 = 2*H (mag: 6)
+        # fmt: on
 
         # Normalize the resulting field values to a magnitude of 1 as needed.
         x3.normalize()
@@ -547,25 +567,28 @@ class KoblitzCurve:
         fv = FieldVal
         a, b, c, d, e, f = fv(), fv(), fv(), fv(), fv(), fv()
         negX1, negY1, negE, negX3 = fv(), fv(), fv(), fv()
-        negX1.set(x1).negate(1)                # negX1 = -X1 (mag: 2)
-        negY1.set(y1).negate(1)                # negY1 = -Y1 (mag: 2)
-        a.set(negX1).add(x2)                  # A = X2-X1 (mag: 3)
-        b.squareVal(a)                        # B = A^2 (mag: 1)
-        c.set(negY1).add(y2)                  # C = Y2-Y1 (mag: 3)
-        d.squareVal(c)                        # D = C^2 (mag: 1)
-        e.mul2(x1, b)                         # E = X1*B (mag: 1)
-        negE.set(e).negate(1)                 # negE = -E (mag: 2)
-        f.mul2(x2, b)                         # F = X2*B (mag: 1)
-        x3.add2(e, f).negate(3).add(d)      # X3 = D-E-F (mag: 5)
-        negX3.set(x3).negate(5).normalize()    # negX3 = -X3 (mag: 1)
-        y3.set(y1).mul(f.add(negE)).negate(3) # Y3 = -(Y1*(F-E)) (mag: 4)
-        y3.add(e.add(negX3).mul(c))          # Y3 = C*(E-X3)+Y3 (mag: 5)
-        z3.mul2(z1, a)                        # Z3 = Z1*A (mag: 1)
+        # fmt: off
+        negX1.set(x1).negate(1)                 # negX1 = -X1 (mag: 2)
+        negY1.set(y1).negate(1)                 # negY1 = -Y1 (mag: 2)
+        a.set(negX1).add(x2)                    # A = X2-X1 (mag: 3)
+        b.squareVal(a)                          # B = A^2 (mag: 1)
+        c.set(negY1).add(y2)                    # C = Y2-Y1 (mag: 3)
+        d.squareVal(c)                          # D = C^2 (mag: 1)
+        e.mul2(x1, b)                           # E = X1*B (mag: 1)
+        negE.set(e).negate(1)                   # negE = -E (mag: 2)
+        f.mul2(x2, b)                           # F = X2*B (mag: 1)
+        x3.add2(e, f).negate(3).add(d)          # X3 = D-E-F (mag: 5)
+        negX3.set(x3).negate(5).normalize()     # negX3 = -X3 (mag: 1)
+        y3.set(y1).mul(f.add(negE)).negate(3)   # Y3 = -(Y1*(F-E)) (mag: 4)
+        y3.add(e.add(negX3).mul(c))             # Y3 = C*(E-X3)+Y3 (mag: 5)
+        z3.mul2(z1, a)                          # Z3 = Z1*A (mag: 1)
+        # fmt: on
 
         # Normalize the resulting field values to a magnitude of 1 as needed.
         x3.normalize()
         y3.normalize()
-    def addZ2EqualsOne(self, x1, y1, z1, x2, y2, x3, y3, z3): # *fieldVal) {
+
+    def addZ2EqualsOne(self, x1, y1, z1, x2, y2, x3, y3, z3):  # *fieldVal) {
         """
         addZ2EqualsOne adds two Jacobian points when the second point is already
         known to have a z value of 1 (and the z value for the first point is not 1)
@@ -599,9 +622,11 @@ class KoblitzCurve:
         z1z1, u2, s2 = fv(), fv(), fv()
         x1.normalize()
         y1.normalize()
-        z1z1.squareVal(z1)                        # Z1Z1 = Z1^2 (mag: 1)
-        u2.set(x2).mul(z1z1).normalize()         # U2 = X2*Z1Z1 (mag: 1)
-        s2.set(y2).mul(z1z1).mul(z1).normalize() # S2 = Y2*Z1*Z1Z1 (mag: 1)
+        # fmt: off
+        z1z1.squareVal(z1)                          # Z1Z1 = Z1^2 (mag: 1)
+        u2.set(x2).mul(z1z1).normalize()            # U2 = X2*Z1Z1 (mag: 1)
+        s2.set(y2).mul(z1z1).mul(z1).normalize()    # S2 = Y2*Z1*Z1Z1 (mag: 1)
+        # fmt: on
         if x1.equals(u2):
             if y1.equals(s2):
                 # Since x1 == x2 and y1 == y2, point doubling must be
@@ -621,27 +646,30 @@ class KoblitzCurve:
         # breakdown above.
         h, hh, i, j, r, rr, v = fv(), fv(), fv(), fv(), fv(), fv(), fv()
         negX1, negY1, negX3 = fv(), fv(), fv()
-        negX1.set(x1).negate(1)               # negX1 = -X1 (mag: 2)
-        h.add2(u2, negX1)                     # H = U2-X1 (mag: 3)
-        hh.squareVal(h)                       # HH = H^2 (mag: 1)
-        i.set(hh).mulInt(4)                   # I = 4 * HH (mag: 4)
-        j.mul2(h, i)                          # J = H*I (mag: 1)
-        negY1.set(y1).negate(1)               # negY1 = -Y1 (mag: 2)
-        r.set(s2).add(negY1).mulInt(2)        # r = 2*(S2-Y1) (mag: 6)
-        rr.squareVal(r)                       # rr = r^2 (mag: 1)
-        v.mul2(x1, i)                         # V = X1*I (mag: 1)
-        x3.set(v).mulInt(2).add(j).negate(3)  # X3 = -(J+2*V) (mag: 4)
-        x3.add(rr)                            # X3 = r^2+X3 (mag: 5)
-        negX3.set(x3).negate(5)               # negX3 = -X3 (mag: 6)
-        y3.set(y1).mul(j).mulInt(2).negate(2) # Y3 = -(2*Y1*J) (mag: 3)
-        y3.add(v.add(negX3).mul(r))           # Y3 = r*(V-X3)+Y3 (mag: 4)
-        z3.add2(z1, h).square()               # Z3 = (Z1+H)^2 (mag: 1)
-        z3.add(z1z1.add(hh).negate(2))        # Z3 = Z3-(Z1Z1+HH) (mag: 4)
+        # fmt: off
+        negX1.set(x1).negate(1)                 # negX1 = -X1 (mag: 2)
+        h.add2(u2, negX1)                       # H = U2-X1 (mag: 3)
+        hh.squareVal(h)                         # HH = H^2 (mag: 1)
+        i.set(hh).mulInt(4)                     # I = 4 * HH (mag: 4)
+        j.mul2(h, i)                            # J = H*I (mag: 1)
+        negY1.set(y1).negate(1)                 # negY1 = -Y1 (mag: 2)
+        r.set(s2).add(negY1).mulInt(2)          # r = 2*(S2-Y1) (mag: 6)
+        rr.squareVal(r)                         # rr = r^2 (mag: 1)
+        v.mul2(x1, i)                           # V = X1*I (mag: 1)
+        x3.set(v).mulInt(2).add(j).negate(3)    # X3 = -(J+2*V) (mag: 4)
+        x3.add(rr)                              # X3 = r^2+X3 (mag: 5)
+        negX3.set(x3).negate(5)                 # negX3 = -X3 (mag: 6)
+        y3.set(y1).mul(j).mulInt(2).negate(2)   # Y3 = -(2*Y1*J) (mag: 3)
+        y3.add(v.add(negX3).mul(r))             # Y3 = r*(V-X3)+Y3 (mag: 4)
+        z3.add2(z1, h).square()                 # Z3 = (Z1+H)^2 (mag: 1)
+        z3.add(z1z1.add(hh).negate(2))          # Z3 = Z3-(Z1Z1+HH) (mag: 4)
+        # fmt: on
 
         # Normalize the resulting field values to a magnitude of 1 as needed.
         x3.normalize()
         y3.normalize()
         z3.normalize()
+
     def doubleZ1EqualsOne(self, x1, y1, x3, y3, z3):
         """
         doubleZ1EqualsOne performs point doubling on the passed Jacobian point
@@ -675,6 +703,7 @@ class KoblitzCurve:
         # 6 field additions, and 5 integer multiplications.
         fv = FieldVal
         a, b, c, d, e, f = fv(), fv(), fv(), fv(), fv(), fv()
+        # fmt: off
         z3.set(y1).mulInt(2)                     # Z3 = 2*Y1 (mag: 2)
         a.squareVal(x1)                          # A = X1^2 (mag: 1)
         b.squareVal(y1)                          # B = Y1^2 (mag: 1)
@@ -689,6 +718,7 @@ class KoblitzCurve:
         f.set(x3).negate(18).add(d).normalize()  # F = D-X3 (mag: 1)
         y3.set(c).mulInt(8).negate(8)            # Y3 = -(8*C) (mag: 9)
         y3.add(f.mul(e))                         # Y3 = E*F+Y3 (mag: 10)
+        # fmt: on
 
         # Normalize the field values back to a magnitude of 1.
         x3.normalize()
@@ -748,12 +778,14 @@ class KoblitzCurve:
         # terms.
         fv = FieldVal
         z1z1, z2z2, u1, u2, s1, s2 = fv(), fv(), fv(), fv(), fv(), fv()
+        # fmt: off
         z1z1.squareVal(z1)                        # Z1Z1 = Z1^2 (mag: 1)
         z2z2.squareVal(z2)                        # Z2Z2 = Z2^2 (mag: 1)
         u1.set(x1).mul(z2z2).normalize()          # U1 = X1*Z2Z2 (mag: 1)
         u2.set(x2).mul(z1z1).normalize()          # U2 = X2*Z1Z1 (mag: 1)
         s1.set(y1).mul(z2z2).mul(z2).normalize()  # S1 = Y1*Z2*Z2Z2 (mag: 1)
         s2.set(y2).mul(z1z1).mul(z1).normalize()  # S2 = Y2*Z1*Z1Z1 (mag: 1)
+        # fmt: on
         if u1.equals(u2):
             if s1.equals(s2):
                 # Since x1 == x2 and y1 == y2, point doubling must be
@@ -773,6 +805,7 @@ class KoblitzCurve:
         # breakdown above.
         h, i, j, r, rr, v = fv(), fv(), fv(), fv(), fv(), fv()
         negU1, negS1, negX3 = fv(), fv(), fv()
+        # fmt: off
         negU1.set(u1).negate(1)               # negU1 = -U1 (mag: 2)
         h.add2(u2, negU1)                     # H = U2-U1 (mag: 3)
         i.set(h).mulInt(2).square()           # I = (2*H)^2 (mag: 2)
@@ -789,6 +822,7 @@ class KoblitzCurve:
         z3.add2(z1, z2).square()              # Z3 = (Z1+Z2)^2 (mag: 1)
         z3.add(z1z1.add(z2z2).negate(2))      # Z3 = Z3-(Z1Z1+Z2Z2) (mag: 4)
         z3.mul(h)                             # Z3 = Z3*H (mag: 1)
+        # fmt: on
 
         # Normalize the resulting field values to a magnitude of 1 as needed.
         x3.normalize()
@@ -825,25 +859,28 @@ class KoblitzCurve:
         # 6 field additions, and 5 integer multiplications.
         fv = FieldVal
         a, b, c, d, e, f = fv(), fv(), fv(), fv(), fv(), fv()
-        z3.mul2(y1, z1).mulInt(2)               # Z3 = 2*Y1*Z1 (mag: 2)
-        a.squareVal(x1)                         # A = X1^2 (mag: 1)
-        b.squareVal(y1)                         # B = Y1^2 (mag: 1)
-        c.squareVal(b)                          # C = B^2 (mag: 1)
-        b.add(x1).square()                      # B = (X1+B)^2 (mag: 1)
-        d.set(a).add(c).negate(2)               # D = -(A+C) (mag: 3)
-        d.add(b).mulInt(2)                      # D = 2*(B+D)(mag: 8)
-        e.set(a).mulInt(3)                      # E = 3*A (mag: 3)
-        f.squareVal(e)                          # F = E^2 (mag: 1)
-        x3.set(d).mulInt(2).negate(16)          # X3 = -(2*D) (mag: 17)
-        x3.add(f)                               # X3 = F+X3 (mag: 18)
-        f.set(x3).negate(18).add(d).normalize() # F = D-X3 (mag: 1)
-        y3.set(c).mulInt(8).negate(8)           # Y3 = -(8*C) (mag: 9)
-        y3.add(f.mul(e))                        # Y3 = E*F+Y3 (mag: 10)
+        # fmt: off
+        z3.mul2(y1, z1).mulInt(2)                   # Z3 = 2*Y1*Z1 (mag: 2)
+        a.squareVal(x1)                             # A = X1^2 (mag: 1)
+        b.squareVal(y1)                             # B = Y1^2 (mag: 1)
+        c.squareVal(b)                              # C = B^2 (mag: 1)
+        b.add(x1).square()                          # B = (X1+B)^2 (mag: 1)
+        d.set(a).add(c).negate(2)                   # D = -(A+C) (mag: 3)
+        d.add(b).mulInt(2)                          # D = 2*(B+D)(mag: 8)
+        e.set(a).mulInt(3)                          # E = 3*A (mag: 3)
+        f.squareVal(e)                              # F = E^2 (mag: 1)
+        x3.set(d).mulInt(2).negate(16)              # X3 = -(2*D) (mag: 17)
+        x3.add(f)                                   # X3 = F+X3 (mag: 18)
+        f.set(x3).negate(18).add(d).normalize()     # F = D-X3 (mag: 1)
+        y3.set(c).mulInt(8).negate(8)               # Y3 = -(8*C) (mag: 9)
+        y3.add(f.mul(e))                            # Y3 = E*F+Y3 (mag: 10)
+        # fmt: on
 
         # Normalize the field values back to a magnitude of 1.
         x3.normalize()
         y3.normalize()
         z3.normalize()
+
     def fieldJacobianToBigAffine(self, x, y, z):
         """
         fieldJacobianToBigAffine takes a Jacobian point (x, y, z) as field values and
@@ -854,11 +891,13 @@ class KoblitzCurve:
         # if the point needs to be converted to affine, go ahead and normalize
         # the point itself at the same time as the calculation is the same.
         zInv, tempZ = FieldVal(), FieldVal()
+        # fmt: off
         zInv.set(z).inverse()   # zInv = Z^-1
         tempZ.squareVal(zInv)   # tempZ = Z^-2
         x.mul(tempZ)            # X = X/Z^2 (mag: 1)
         y.mul(tempZ.mul(zInv))  # Y = Y/Z^3 (mag: 1)
         z.setInt(1)             # Z = 1 (mag: 1)
+        # fmt: on
 
         # Normalize the x and y values.
         x.normalize()
@@ -867,38 +906,54 @@ class KoblitzCurve:
         # Convert the field values for the now affine point to big.Ints.
         return ByteArray(x.bytes()).int(), ByteArray(y.bytes()).int()
 
+
 def fromHex(hx):
     return int(hx, 16)
+
 
 class Curve(KoblitzCurve):
     def __init__(self):
         bitSize = 256
         p = fromHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F")
         super().__init__(
-            P = p,
-            N = fromHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141"),
-            B = fromHex("0000000000000000000000000000000000000000000000000000000000000007"),
-            Gx = fromHex("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798"),
-            Gy = fromHex("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8"),
-            BitSize = bitSize,
-            H = 1,
-            q =  (p + 1) // 4, # new(big.Int).Div(new(big.Int).Add(secp256k1.P, big.NewInt(1)), big.NewInt(4)),
+            P=p,
+            N=fromHex(
+                "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141"
+            ),
+            B=fromHex(
+                "0000000000000000000000000000000000000000000000000000000000000007"
+            ),
+            Gx=fromHex(
+                "79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798"
+            ),
+            Gy=fromHex(
+                "483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8"
+            ),
+            BitSize=bitSize,
+            H=1,
+            q=(p + 1) // 4,
+            # new(big.Int).Div(new(big.Int).Add(secp256k1.P, big.NewInt(1)), big.NewInt(4)),
             # Provided for convenience since this gets computed repeatedly.
             # lambda is a reserved keyword in Python, so misspelling on purpose.
-            byteSize = bitSize / 8,
+            byteSize=bitSize / 8,
             # Next 6 constants are from Hal Finney's bitcointalk.org post:
             # https://bitcointalk.org/index.php?topic=3238.msg45565#msg45565
             # May he rest in peace.
             #
             # They have also been independently derived from the code in the
             # EndomorphismVectors function in gensecp256k1.go.
-            lamda = fromHex("5363AD4CC05C30E0A5261C028812645A122E22EA20816678DF02967C1B23BD72"),
-            beta = FieldVal.fromHex("7AE96A2B657C07106E64479EAC3434E99CF0497512F58995C1396C28719501EE"),
-            a1 = fromHex("3086D221A7D46BCDE86C90E49284EB15"),
-            b1 = fromHex("-E4437ED6010E88286F547FA90ABFE4C3"),
-            a2 = fromHex("114CA50F7A8E2F3F657C1108D9D44CFD8"),
-            b2 = fromHex("3086D221A7D46BCDE86C90E49284EB15"),
+            lamda=fromHex(
+                "5363AD4CC05C30E0A5261C028812645A122E22EA20816678DF02967C1B23BD72"
+            ),
+            beta=FieldVal.fromHex(
+                "7AE96A2B657C07106E64479EAC3434E99CF0497512F58995C1396C28719501EE"
+            ),
+            a1=fromHex("3086D221A7D46BCDE86C90E49284EB15"),
+            b1=fromHex("-E4437ED6010E88286F547FA90ABFE4C3"),
+            a2=fromHex("114CA50F7A8E2F3F657C1108D9D44CFD8"),
+            b2=fromHex("3086D221A7D46BCDE86C90E49284EB15"),
         )
+
     def bigAffineToField(self, x, y):
         """
         bigAffineToField takes an affine point (x, y) as big integers and converts
@@ -908,19 +963,22 @@ class Curve(KoblitzCurve):
         x3.setBytes(ByteArray(x).bytes())
         y3.setBytes(ByteArray(y).bytes())
         return x3, y3
+
     def isAffineOnCurve(self, x, y):
         """
         isAffineOnCurve returns boolean if the point (x,y) is on the
         secp256k1 curve.
         """
         # y² = x³ + b
-        y2 = y**2 % self.P
+        y2 = y ** 2 % self.P
 
-        x3 = (x**3 + self.B) % self.P
+        x3 = (x ** 3 + self.B) % self.P
 
         return y2 == x3
 
+
 curve = Curve()
+
 
 def isJacobianOnS256Curve(x, y, z):
     """

@@ -7,7 +7,10 @@ Based on dcrd txscript.
 """
 import math
 from tinydecred.crypto.bytearray import ByteArray
-from tinydecred.pydecred.wire import wire, msgtx # A couple of usefule serialization functions.
+from tinydecred.pydecred.wire import (
+    wire,
+    msgtx,
+)  # A couple of usefule serialization functions.
 from tinydecred.crypto import opcode, crypto
 from tinydecred.crypto.secp256k1.curve import curve as Curve
 
@@ -16,32 +19,32 @@ SHA256_SIZE = 32
 BLAKE256_SIZE = 32
 MAX_UINT64 = 18446744073709551615
 
-NonStandardTy      = 0  # None of the recognized forms.
-PubKeyTy           = 1  # Pay pubkey.
-PubKeyHashTy       = 2  # Pay pubkey hash.
-ScriptHashTy       = 3  # Pay to script hash.
-MultiSigTy         = 4  # Multi signature.
-NullDataTy         = 5  # Empty data-only (provably prunable).
-StakeSubmissionTy  = 6  # Stake submission.
-StakeGenTy         = 7  # Stake generation
-StakeRevocationTy  = 8  # Stake revocation.
-StakeSubChangeTy   = 9  # Change for stake submission tx.
-PubkeyAltTy        = 10 # Alternative signature pubkey.
-PubkeyHashAltTy    = 11 # Alternative signature pubkey hash.
+NonStandardTy = 0  # None of the recognized forms.
+PubKeyTy = 1  # Pay pubkey.
+PubKeyHashTy = 2  # Pay pubkey hash.
+ScriptHashTy = 3  # Pay to script hash.
+MultiSigTy = 4  # Multi signature.
+NullDataTy = 5  # Empty data-only (provably prunable).
+StakeSubmissionTy = 6  # Stake submission.
+StakeGenTy = 7  # Stake generation
+StakeRevocationTy = 8  # Stake revocation.
+StakeSubChangeTy = 9  # Change for stake submission tx.
+PubkeyAltTy = 10  # Alternative signature pubkey.
+PubkeyHashAltTy = 11  # Alternative signature pubkey hash.
 
 # DefaultScriptVersion is the default scripting language version
 # representing extended Decred script.
 DefaultScriptVersion = 0
 
 # Hash type bits from the end of a signature.
-SigHashAll          = 0x1
-SigHashNone         = 0x2
-SigHashSingle       = 0x3
+SigHashAll = 0x1
+SigHashNone = 0x2
+SigHashSingle = 0x3
 SigHashAnyOneCanPay = 0x80
 
 # sigHashMask defines the number of bits of the hash type which is used
 # to identify which outputs are signed.
-sigHashMask = 0x1f
+sigHashMask = 0x1F
 
 # SigHashSerializePrefix indicates the serialization does not include
 # any witness data.
@@ -57,9 +60,9 @@ SigHashOptimization = False
 varIntSerializeSize = wire.varIntSerializeSize
 
 # These are the constants specified for maximums in individual scripts.
-MaxOpsPerScript       = 255  # Max number of non-push operations.
-MaxPubKeysPerMultiSig = 20   # Multisig can't have more sigs than this.
-MaxScriptElementSize  = 2048 # Max bytes pushable to the stack.
+MaxOpsPerScript = 255  # Max number of non-push operations.
+MaxPubKeysPerMultiSig = 20  # Multisig can't have more sigs than this.
+MaxScriptElementSize = 2048  # Max bytes pushable to the stack.
 
 # P2PKHPkScriptSize is the size of a transaction output script that
 # pays to a compressed pubkey hash.  It is calculated as:
@@ -154,7 +157,7 @@ MaxInputsPerSStx = 64
 
 # MaxOutputsPerSStx is the maximum number of outputs allowed in an SStx;
 # you need +1 for the tagged SStx output.
-MaxOutputsPerSStx = MaxInputsPerSStx*2 + 1
+MaxOutputsPerSStx = MaxInputsPerSStx * 2 + 1
 
 # validSStxAddressOutPrefix is the valid prefix for a 30-byte
 # minimum OP_RETURN push for a commitment for an SStx.
@@ -181,13 +184,16 @@ defaultTicketFeeLimits = 0x5800
 mac = crypto.mac
 hashH = crypto.hashH
 
+
 class Signature:
     """
     The Signature class represents an ECDSA-algorithm signature.
     """
+
     def __init__(self, r, s):
         self.r = r
         self.s = s
+
     def serialize(self):
         """
         serialize returns the ECDSA signature in the more strict DER format.  Note
@@ -198,8 +204,8 @@ class Signature:
         0x30 <length> 0x02 <length r> r 0x02 <length s> s
         """
         # Curve order and halforder, used to tame ECDSA malleability (see BIP-0062)
-        order     = Curve.N
-        halforder = order>>1
+        order = Curve.N
+        halforder = order >> 1
         # low 'S' malleability breaker
         sigS = self.s
         if sigS > halforder:
@@ -222,11 +228,12 @@ class Signature:
         b[offset] = rb
         offset += len(rb)
         b[offset] = 0x02
-        offset +=1
+        offset += 1
         b[offset] = ByteArray(len(sb), length=1)
         offset += 1
         b[offset] = sb
         return b
+
 
 class ScriptTokenizer:
     """
@@ -240,13 +247,15 @@ class ScriptTokenizer:
     Upon successfully parsing an opcode, the opcode and data associated with it
     may be obtained via the Opcode and Data functions, respectively.
     """
+
     def __init__(self, version, script):
         self.script = script
         self.version = version
         self.offset = 0
         self.op = None
-        self.d = ByteArray(b'')
+        self.d = ByteArray(b"")
         self.err = None
+
     def next(self):
         """
         next attempts to parse the next opcode and returns whether or not it was
@@ -276,25 +285,31 @@ class ScriptTokenizer:
             # OP_0, and OP_[1-16] represent the data themselves.
             self.offset += 1
             self.op = op
-            self.d = ByteArray(b'')
+            self.d = ByteArray(b"")
             return True
         elif op.length > 1:
             # Data pushes of specific lengths -- OP_DATA_[1-75].
-            script = self.script[self.offset:]
+            script = self.script[self.offset :]
             if len(script) < op.length:
-                self.err = Exception("opcode %s requires %d bytes, but script only has %d remaining" % (op.name, op.length, len(script)))
+                self.err = Exception(
+                    "opcode %s requires %d bytes, but script only has %d remaining"
+                    % (op.name, op.length, len(script))
+                )
                 return False
 
             # Move the offset forward and set the opcode and data accordingly.
             self.offset += op.length
             self.op = op
-            self.d = script[1:op.length]
+            self.d = script[1 : op.length]
             return True
         elif op.length < 0:
             # Data pushes with parsed lengths -- OP_PUSHDATA{1,2,4}.
-            script = self.script[self.offset+1:]
+            script = self.script[self.offset + 1 :]
             if len(script) < -op.length:
-                self.err = Exception("opcode %s requires %d bytes, but script only has %d remaining" % (op.name, -op.length, len(script)))
+                self.err = Exception(
+                    "opcode %s requires %d bytes, but script only has %d remaining"
+                    % (op.name, -op.length, len(script))
+                )
                 return False
 
             # Next -length bytes are little endian length of data.
@@ -309,11 +324,14 @@ class ScriptTokenizer:
                 return False
 
             # Move to the beginning of the data.
-            script = script[-op.length:]
+            script = script[-op.length :]
 
             # Disallow entries that do not fit script or were sign extended.
             if dataLen > len(script) or dataLen < 0:
-                self.err = Exception("opcode %s pushes %d bytes, but script only has %d remaining" % (op.name, dataLen, len(script)))
+                self.err = Exception(
+                    "opcode %s pushes %d bytes, but script only has %d remaining"
+                    % (op.name, dataLen, len(script))
+                )
                 return False
 
             # Move the offset forward and set the opcode and data accordingly.
@@ -325,6 +343,7 @@ class ScriptTokenizer:
         # The only remaining case is an opcode with length zero which is
         # impossible.
         raise Exception("unreachable")
+
     def done(self):
         """
         Script parsing has completed
@@ -332,7 +351,8 @@ class ScriptTokenizer:
         Returns:
             bool: True if script parsing complete.
         """
-        return self.err != None or self.offset >= len(self.script)
+        return self.err is not None or self.offset >= len(self.script)
+
     def opcode(self):
         """
         The current step's opcode
@@ -343,6 +363,7 @@ class ScriptTokenizer:
         if self.op is None:
             return None
         return self.op.value
+
     def data(self):
         """
         Data returns the data associated with the most recently successfully parsed
@@ -352,6 +373,7 @@ class ScriptTokenizer:
             ByteArray: The data
         """
         return self.d
+
     def byteIndex(self):
         """
         ByteIndex returns the current offset into the full script that will be
@@ -363,13 +385,24 @@ class ScriptTokenizer:
         """
         return self.offset
 
+
 class Credit:
     """
     Credit is the type representing a transaction output which was spent or
     is still spendable by wallet.  A UTXO is an unspent Credit, but not all
     Credits are UTXOs.
     """
-    def __init__(self, op, blockMeta, amount, pkScript, received, fromCoinBase=False, hasExpiry=False):
+
+    def __init__(
+        self,
+        op,
+        blockMeta,
+        amount,
+        pkScript,
+        received,
+        fromCoinBase=False,
+        hasExpiry=False,
+    ):
         self.op = op
         self.blockMeta = blockMeta
         self.amount = amount
@@ -378,11 +411,13 @@ class Credit:
         self.fromCoinBase = fromCoinBase
         self.hasExpiry = hasExpiry
 
+
 class ExtendedOutPoint:
     def __init__(self, op, amt, pkScript):
         self.op = op
         self.amt = amt
         self.pkScript = pkScript
+
 
 def checkScriptParses(scriptVersion, script):
     """
@@ -399,6 +434,7 @@ def checkScriptParses(scriptVersion, script):
     while tokenizer.next():
         pass
     return tokenizer.err
+
 
 def finalOpcodeData(scriptVersion, script):
     """
@@ -420,9 +456,10 @@ def finalOpcodeData(scriptVersion, script):
     tokenizer = ScriptTokenizer(scriptVersion, script)
     while tokenizer.next():
         data = tokenizer.data()
-    if not tokenizer.err is None:
+    if tokenizer.err is not None:
         return None
     return data
+
 
 def canonicalizeInt(val):
     """
@@ -442,9 +479,10 @@ def canonicalizeInt(val):
     b = ByteArray(val)
     if len(b) == 0:
         b = ByteArray(0, length=1)
-    if (b[0]&0x80) != 0:
-        b = ByteArray(0, length=len(b)+1) | b
+    if (b[0] & 0x80) != 0:
+        b = ByteArray(0, length=len(b) + 1) | b
     return b
+
 
 def hashToInt(h):
     """
@@ -468,10 +506,11 @@ def hashToInt(h):
         h = h[:orderBytes]
 
     ret = int.from_bytes(h, byteorder="big")
-    excess = len(h)*8 - orderBits
+    excess = len(h) * 8 - orderBits
     if excess > 0:
         ret = ret >> excess
     return ret
+
 
 def getScriptClass(version, script):
     """
@@ -489,6 +528,7 @@ def getScriptClass(version, script):
         return NonStandardTy
 
     return typeOfScript(version, script)
+
 
 def typeOfScript(scriptVersion, script):
     """
@@ -527,8 +567,10 @@ def typeOfScript(scriptVersion, script):
         return StakeSubChangeTy
     return NonStandardTy
 
+
 def isPubKeyHashScript(script):
     return not extractPubKeyHash(script) is None
+
 
 def extractPubKeyHash(script):
     """
@@ -537,15 +579,18 @@ def extractPubKeyHash(script):
     """
     # A pay-to-pubkey-hash script is of the form:
     # OP_DUP OP_HASH160 <20-byte hash> OP_EQUALVERIFY OP_CHECKSIG
-    if (len(script) == 25 and
-        script[0] == opcode.OP_DUP and
-        script[1] == opcode.OP_HASH160 and
-        script[2] == opcode.OP_DATA_20 and
-        script[23] == opcode.OP_EQUALVERIFY and
-        script[24] == opcode.OP_CHECKSIG):
+    if (
+        len(script) == 25
+        and script[0] == opcode.OP_DUP
+        and script[1] == opcode.OP_HASH160
+        and script[2] == opcode.OP_DATA_20
+        and script[23] == opcode.OP_EQUALVERIFY
+        and script[24] == opcode.OP_CHECKSIG
+    ):
 
         return script[3:23]
     return None
+
 
 def extractScriptHash(pkScript):
     """
@@ -558,20 +603,24 @@ def extractScriptHash(pkScript):
     """
     # A pay-to-script-hash script is of the form:
     #  OP_HASH160 <20-byte scripthash> OP_EQUAL
-    if (len(pkScript) == 23 and
-        pkScript[0] == opcode.OP_HASH160 and
-        pkScript[1] == opcode.OP_DATA_20 and
-        pkScript[22] == opcode.OP_EQUAL):
+    if (
+        len(pkScript) == 23
+        and pkScript[0] == opcode.OP_HASH160
+        and pkScript[1] == opcode.OP_DATA_20
+        and pkScript[22] == opcode.OP_EQUAL
+    ):
 
         return pkScript[2:22]
     return None
+
 
 def isScriptHashScript(pkScript):
     """
     isScriptHashScript returns whether or not the passed script is a standard
     pay-to-script-hash script.
     """
-    return extractScriptHash(pkScript) != None
+    return extractScriptHash(pkScript) is not None
+
 
 def extractPubKey(script):
     """
@@ -585,6 +634,7 @@ def extractPubKey(script):
         return pubkey
     return extractUncompressedPubKey(script)
 
+
 def extractCompressedPubKey(script):
     """
     extractCompressedPubKey extracts a compressed public key from the passed
@@ -595,12 +645,15 @@ def extractCompressedPubKey(script):
     #  OP_DATA_33 <33-byte compresed pubkey> OP_CHECKSIG
 
     # All compressed secp256k1 public keys must start with 0x02 or 0x03.
-    if (len(script) == 35 and
-        script[34] == opcode.OP_CHECKSIG and
-        script[0] == opcode.OP_DATA_33 and
-        (script[1] == 0x02 or script[1] == 0x03)):
+    if (
+        len(script) == 35
+        and script[34] == opcode.OP_CHECKSIG
+        and script[0] == opcode.OP_DATA_33
+        and (script[1] == 0x02 or script[1] == 0x03)
+    ):
         return script[1:34]
     return None
+
 
 def extractUncompressedPubKey(script):
     """
@@ -612,13 +665,16 @@ def extractUncompressedPubKey(script):
     #  OP_DATA_65 <65-byte uncompressed pubkey> OP_CHECKSIG
 
     # All non-hybrid uncompressed secp256k1 public keys must start with 0x04.
-    if (len(script) == 67 and
-        script[66] == opcode.OP_CHECKSIG and
-        script[0] == opcode.OP_DATA_65 and
-        script[1] == 0x04):
+    if (
+        len(script) == 67
+        and script[66] == opcode.OP_CHECKSIG
+        and script[0] == opcode.OP_DATA_65
+        and script[1] == 0x04
+    ):
 
         return script[1:66]
     return None
+
 
 def isPubKeyScript(script):
     """
@@ -626,7 +682,7 @@ def isPubKeyScript(script):
     pay-to-compressed-secp256k1-pubkey or pay-to-uncompressed-secp256k1-pubkey
     script.
     """
-    return extractPubKey(script) != None
+    return extractPubKey(script) is not None
 
 
 def isStakeScriptHash(script, stakeOpcode):
@@ -634,7 +690,8 @@ def isStakeScriptHash(script, stakeOpcode):
     isStakeScriptHash returns whether or not the passed public key script is a
     standard pay-to-script-hash script tagged with the provided stake opcode.
     """
-    return extractStakeScriptHash(script, stakeOpcode) != None
+    return extractStakeScriptHash(script, stakeOpcode) is not None
+
 
 def extractStakeScriptHash(script, stakeOpcode):
     """
@@ -642,13 +699,16 @@ def extractStakeScriptHash(script, stakeOpcode):
     script if it is a standard pay-to-script-hash script tagged with the provided
     stake opcode. It will return None otherwise.
     """
-    if (len(script) == 24 and
-        script[0] == stakeOpcode and
-        script[1] == opcode.OP_HASH160 and
-        script[2] == opcode.OP_DATA_20 and
-        script[23] == opcode.OP_EQUAL):
+    if (
+        len(script) == 24
+        and script[0] == stakeOpcode
+        and script[1] == opcode.OP_HASH160
+        and script[2] == opcode.OP_DATA_20
+        and script[23] == opcode.OP_EQUAL
+    ):
         return script[3:23]
     return None
+
 
 def extractStakePubKeyHash(script, stakeOpcode):
     """
@@ -666,6 +726,7 @@ def extractStakePubKeyHash(script, stakeOpcode):
         return None
     return extractPubKeyHash(script[1:])
 
+
 def isStakeSubmissionScript(scriptVersion, script):
     """
     isStakeSubmissionScript returns whether or not the passed script is a
@@ -681,8 +742,11 @@ def isStakeSubmissionScript(scriptVersion, script):
     # The only supported stake submission scripts are pay-to-pubkey-hash and
     # pay-to-script-hash tagged with the stake submission opcode.
     stakeOpcode = opcode.OP_SSTX
-    return (extractStakePubKeyHash(script, stakeOpcode) != None or
-        extractStakeScriptHash(script, stakeOpcode) != None)
+    return (
+        extractStakePubKeyHash(script, stakeOpcode) is not None
+        or extractStakeScriptHash(script, stakeOpcode) is not None
+    )
+
 
 def isStakeGenScript(scriptVersion, script):
     """
@@ -699,8 +763,11 @@ def isStakeGenScript(scriptVersion, script):
     # The only supported stake generation scripts are pay-to-pubkey-hash and
     # pay-to-script-hash tagged with the stake submission opcode.
     stakeOpcode = opcode.OP_SSGEN
-    return (extractStakePubKeyHash(script, stakeOpcode) != None or
-        extractStakeScriptHash(script, stakeOpcode) != None)
+    return (
+        extractStakePubKeyHash(script, stakeOpcode) is not None
+        or extractStakeScriptHash(script, stakeOpcode) is not None
+    )
+
 
 def isStakeRevocationScript(scriptVersion, script):
     """
@@ -717,8 +784,11 @@ def isStakeRevocationScript(scriptVersion, script):
     # The only supported stake revocation scripts are pay-to-pubkey-hash and
     # pay-to-script-hash tagged with the stake submission opcode.
     stakeOpcode = opcode.OP_SSRTX
-    return (extractStakePubKeyHash(script, stakeOpcode) != None or
-        extractStakeScriptHash(script, stakeOpcode) != None)
+    return (
+        extractStakePubKeyHash(script, stakeOpcode) is not None
+        or extractStakeScriptHash(script, stakeOpcode) is not None
+    )
+
 
 def isStakeChangeScript(scriptVersion, script):
     """
@@ -735,8 +805,11 @@ def isStakeChangeScript(scriptVersion, script):
     # The only supported stake change scripts are pay-to-pubkey-hash and
     # pay-to-script-hash tagged with the stake submission opcode.
     stakeOpcode = opcode.OP_SSTXCHANGE
-    return (extractStakePubKeyHash(script, stakeOpcode) != None or
-        extractStakeScriptHash(script, stakeOpcode) != None)
+    return (
+        extractStakePubKeyHash(script, stakeOpcode) is not None
+        or extractStakeScriptHash(script, stakeOpcode) is not None
+    )
+
 
 def getStakeOutSubclass(pkScript):
     """
@@ -749,11 +822,16 @@ def getStakeOutSubclass(pkScript):
     """
     scriptVersion = 0
     err = checkScriptParses(scriptVersion, pkScript)
-    if err != None:
+    if err is not None:
         raise err
 
     scriptClass = typeOfScript(scriptVersion, pkScript)
-    isStake = scriptClass in (StakeSubmissionTy, StakeGenTy, StakeRevocationTy, StakeSubChangeTy)
+    isStake = scriptClass in (
+        StakeSubmissionTy,
+        StakeGenTy,
+        StakeRevocationTy,
+        StakeSubChangeTy,
+    )
 
     subClass = 0
     if isStake:
@@ -763,18 +841,22 @@ def getStakeOutSubclass(pkScript):
 
     return subClass
 
+
 class multiSigDetails(object):
     """
     multiSigDetails houses details extracted from a standard multisig script.
     """
+
     def __init__(self, pubkeys, numPubKeys, requiredSigs, valid):
         self.requiredSigs = requiredSigs
         self.numPubKeys = numPubKeys
         self.pubKeys = pubkeys
         self.valid = valid
 
+
 def invalidMSDetails():
     return multiSigDetails([], 0, [], False)
+
 
 def extractMultisigScriptDetails(scriptVersion, script, extractPubKeys):
     """
@@ -801,7 +883,7 @@ def extractMultisigScriptDetails(scriptVersion, script, extractPubKeys):
     # The script can't possibly be a multisig script if it doesn't end with
     # OP_CHECKMULTISIG or have at least two small integer pushes preceding it.
     # Fail fast to avoid more work below.
-    if len(script) < 3 or script[len(script)-1] != opcode.OP_CHECKMULTISIG:
+    if len(script) < 3 or script[len(script) - 1] != opcode.OP_CHECKMULTISIG:
         return invalidMSDetails()
     # The first opcode must be a small integer specifying the number of
     # signatures required.
@@ -830,9 +912,10 @@ def extractMultisigScriptDetails(scriptVersion, script, extractPubKeys):
 
     # There must only be a single opcode left unparsed which will be
     # OP_CHECKMULTISIG per the check above.
-    if len(tokenizer.script)-tokenizer.byteIndex() != 1:
+    if len(tokenizer.script) - tokenizer.byteIndex() != 1:
         return invalidMSDetails()
     return multiSigDetails(pubkeys, numPubkeys, requiredSigs, True)
+
 
 def isMultisigScript(scriptVersion, script):
     """
@@ -846,6 +929,7 @@ def isMultisigScript(scriptVersion, script):
     # public keys to avoid the allocation.
     details = extractMultisigScriptDetails(scriptVersion, script, False)
     return details.valid
+
 
 def isNullDataScript(scriptVersion, script):
     """
@@ -877,9 +961,15 @@ def isNullDataScript(scriptVersion, script):
     # OP_RETURN followed by data push up to MaxDataCarrierSize bytes.
     tokenizer = ScriptTokenizer(scriptVersion, script[1:])
 
-    return (tokenizer.next() and tokenizer.done() and
-        (isSmallInt(tokenizer.opcode()) or tokenizer.opcode() <= opcode.OP_PUSHDATA4) and
-        len(tokenizer.data()) <= MaxDataCarrierSize)
+    return (
+        tokenizer.next()
+        and tokenizer.done()
+        and (
+            isSmallInt(tokenizer.opcode()) or tokenizer.opcode() <= opcode.OP_PUSHDATA4
+        )
+        and len(tokenizer.data()) <= MaxDataCarrierSize
+    )
+
 
 def checkSStx(tx):
     """
@@ -928,12 +1018,16 @@ def checkSStx(tx):
 
     # Ensure that the first output is tagged OP_SSTX.
     if getScriptClass(tx.txOut[0].version, tx.txOut[0].pkScript) != StakeSubmissionTy:
-        raise Exception("First SStx output should have been OP_SSTX tagged, but it was not")
+        raise Exception(
+            "First SStx output should have been OP_SSTX tagged, but it was not"
+        )
 
     # Ensure that the number of outputs is equal to the number of inputs
     # + 1.
-    if (len(tx.txIn)*2 + 1) != len(tx.txOut):
-        raise Exception("The number of inputs in the SStx tx was not the number of outputs/2 - 1")
+    if (len(tx.txIn) * 2 + 1) != len(tx.txOut):
+        raise Exception(
+            "The number of inputs in the SStx tx was not the number of outputs/2 - 1"
+        )
 
     # Ensure that the rest of the odd outputs are 28-byte OP_RETURN pushes that
     # contain putative pubkeyhashes, and that the rest of the odd outputs are
@@ -943,19 +1037,29 @@ def checkSStx(tx):
         rawScript = tx.txOut[outTxIndex].pkScript
 
         # Check change outputs.
-        if outTxIndex%2 == 0 :
+        if outTxIndex % 2 == 0:
             if getScriptClass(scrVersion, rawScript) != StakeSubChangeTy:
-                raise Exception("SStx output at output index %d was not an sstx change output", outTxIndex)
+                raise Exception(
+                    "SStx output at output index %d was not an sstx change output",
+                    outTxIndex,
+                )
             continue
 
         # Else (odd) check commitment outputs.  The script should be a
         # NullDataTy output.
         if getScriptClass(scrVersion, rawScript) != NullDataTy:
-            raise Exception("SStx output at output index %d was not a NullData (OP_RETURN) push", outTxIndex)
+            raise Exception(
+                "SStx output at output index %d was not a NullData (OP_RETURN) push",
+                outTxIndex,
+            )
 
         # The length of the output script should be between 32 and 77 bytes long.
         if len(rawScript) < SStxPKHMinOutSize or len(rawScript) > SStxPKHMaxOutSize:
-            raise Exception("SStx output at output index %d was a NullData (OP_RETURN) push of the wrong size", outTxIndex)
+            raise Exception(
+                "SStx output at output index %d was a NullData (OP_RETURN) push"
+                " of the wrong size",
+                outTxIndex,
+            )
 
         # The OP_RETURN output script prefix should conform to the standard.
         outputScriptBuffer = rawScript.copy()
@@ -967,8 +1071,14 @@ def checkSStx(tx):
         pushLengthValid = (pushLen >= minPush) and (pushLen <= maxPush)
         # The first byte should be OP_RETURN, while the second byte should be a
         # valid push length.
-        if not (outputScriptPrefix[0] == validSStxAddressOutMinPrefix[0]) or not pushLengthValid:
-            raise Exception("sstx commitment at output idx %v had an invalid prefix", outTxIndex)
+        if (
+            not (outputScriptPrefix[0] == validSStxAddressOutMinPrefix[0])
+            or not pushLengthValid
+        ):
+            raise Exception(
+                "sstx commitment at output idx %v had an invalid prefix", outTxIndex
+            )
+
 
 # asSmallInt returns the passed opcode, which must be true according to
 # isSmallInt(), as an integer.
@@ -976,6 +1086,7 @@ def asSmallInt(op):
     if op == opcode.OP_0:
         return 0
     return int(op - (opcode.OP_1 - 1))
+
 
 def isSmallInt(op):
     """
@@ -987,6 +1098,7 @@ def isSmallInt(op):
     versions.
     """
     return op == opcode.OP_0 or (op >= opcode.OP_1 and op <= opcode.OP_16)
+
 
 def isStrictPubKeyEncoding(pubKey):
     """
@@ -1000,6 +1112,7 @@ def isStrictPubKeyEncoding(pubKey):
         # Uncompressed
         return True
     return False
+
 
 def payToAddrScript(addr):
     """
@@ -1031,7 +1144,10 @@ def payToAddrScript(addr):
         # return payToSchnorrPubKeyScript(addr.ScriptAddress())
         raise Exception("Schnorr signatures not implemented")
 
-    raise Exception("unable to generate payment script for unsupported address type %s" % type(addr))
+    raise Exception(
+        "unable to generate payment script for unsupported address type %s" % type(addr)
+    )
+
 
 def payToPubKeyHashScript(pkHash):
     """
@@ -1039,8 +1155,11 @@ def payToPubKeyHashScript(pkHash):
     specified address.
     """
     if len(pkHash) != 20:
-        raise Exception("cannot create script with pubkey hash length %d. expected length 20" % len(pkHash))
-    script = ByteArray(b'')
+        raise Exception(
+            "cannot create script with pubkey hash length %d. expected length 20"
+            % len(pkHash)
+        )
+    script = ByteArray(b"")
     script += opcode.OP_DUP
     script += opcode.OP_HASH160
     script += addData(pkHash)
@@ -1048,26 +1167,29 @@ def payToPubKeyHashScript(pkHash):
     script += opcode.OP_CHECKSIG
     return script
 
+
 def payToScriptHashScript(scriptHash):
     """
     payToScriptHashScript creates a new script to pay a transaction output to a
     script hash. It is expected that the input is a valid hash.
     """
-    script = ByteArray('')
+    script = ByteArray("")
     script += opcode.OP_HASH160
     script += addData(scriptHash)
     script += opcode.OP_EQUAL
     return script
+
 
 def payToPubKeyScript(serializedPubKey):
     """
     payToPubkeyScript creates a new script to pay a transaction output to a
     public key. It is expected that the input is a valid pubkey.
     """
-    script = ByteArray('')
+    script = ByteArray("")
     script += addData(serializedPubKey)
     script += opcode.OP_CHECKSIG
     return script
+
 
 def payToStakePKHScript(addr, stakeCode):
     script = ByteArray(stakeCode)
@@ -1078,12 +1200,14 @@ def payToStakePKHScript(addr, stakeCode):
     script += opcode.OP_CHECKSIG
     return script
 
+
 def payToStakeSHScript(addr, stakeCode):
     script = ByteArray(stakeCode)
     script += opcode.OP_HASH160
     script += addData(addr.scriptAddress())
     script += opcode.OP_EQUAL
     return script
+
 
 def payToSStx(addr):
     """
@@ -1096,17 +1220,22 @@ def payToSStx(addr):
     scriptType = PubKeyHashTy
     if isinstance(addr, crypto.AddressPubKeyHash):
         if addr.sigType != crypto.STEcdsaSecp256k1:
-            raise Exception("unable to generate payment script for "
-                            "unsupported digital signature algorithm")
+            raise Exception(
+                "unable to generate payment script for "
+                "unsupported digital signature algorithm"
+            )
     elif isinstance(addr, crypto.AddressScriptHash):
         scriptType = ScriptHashTy
     else:
-        raise Exception("unable to generate payment script for "
-                        "unsupported address type %s" % type(addr))
+        raise Exception(
+            "unable to generate payment script for "
+            "unsupported address type %s" % type(addr)
+        )
 
     if scriptType == PubKeyHashTy:
         return payToStakePKHScript(addr, opcode.OP_SSTX)
     return payToStakeSHScript(addr, opcode.OP_SSTX)
+
 
 def generateSStxAddrPush(addr, amount, limits):
     """
@@ -1118,12 +1247,17 @@ def generateSStxAddrPush(addr, amount, limits):
     scriptType = PubKeyHashTy
     if isinstance(addr, crypto.AddressPubKeyHash):
         if addr.sigType != crypto.STEcdsaSecp256k1:
-            raise Exception("unable to generate payment script for "
-                "unsupported digital signature algorithm")
+            raise Exception(
+                "unable to generate payment script for "
+                "unsupported digital signature algorithm"
+            )
     elif isinstance(addr, crypto.AddressScriptHash):
         scriptType = ScriptHashTy
     else:
-        raise Exception("unable to generate payment script for unsupported address type %s" % type(addr))
+        raise Exception(
+            "unable to generate payment script for unsupported address type %s"
+            % type(addr)
+        )
 
     # Concatenate the prefix, pubkeyhash, and amount.
     adBytes = addr.scriptAddress()
@@ -1138,6 +1272,7 @@ def generateSStxAddrPush(addr, amount, limits):
     script += addData(adBytes)
     return script
 
+
 def payToSStxChange(addr):
     """
     payToSStxChange creates a new script to pay a transaction output to a
@@ -1149,16 +1284,22 @@ def payToSStxChange(addr):
     scriptType = PubKeyHashTy
     if isinstance(addr, crypto.AddressPubKeyHash):
         if addr.sigType != crypto.STEcdsaSecp256k1:
-            raise Exception("unable to generate payment script for "
-                "unsupported digital signature algorithm")
+            raise Exception(
+                "unable to generate payment script for "
+                "unsupported digital signature algorithm"
+            )
     elif isinstance(addr, crypto.AddressScriptHash):
         scriptType = ScriptHashTy
     else:
-        raise Exception("unable to generate payment script for unsupported address type %s", type(addr))
+        raise Exception(
+            "unable to generate payment script for unsupported address type %s",
+            type(addr),
+        )
 
     if scriptType == PubKeyHashTy:
         return payToStakePKHScript(addr, opcode.OP_SSTXCHANGE)
     return payToStakeSHScript(addr, opcode.OP_SSTXCHANGE)
+
 
 def decodeAddress(addr, net):
     """
@@ -1183,9 +1324,11 @@ def decodeAddress(addr, net):
         return crypto.newAddressScriptHashFromHash(decoded, net)
     raise Exception("unknown network ID %s" % netID)
 
+
 def makePayToAddrScript(addrStr, chain):
     addr = decodeAddress(addrStr, chain)
     return payToAddrScript(addr)
+
 
 def int2octets(v, rolen):
     """ https://tools.ietf.org/html/rfc6979#section-2.3.3"""
@@ -1194,15 +1337,16 @@ def int2octets(v, rolen):
     # left pad with zeros if it's too short
     if len(out) < rolen:
         out2 = ByteArray(0, length=rolen)
-        out2[rolen-len(out)] = out
+        out2[rolen - len(out)] = out
         return out2
 
     # drop most significant bytes if it's too long
     if len(out) > rolen:
         out2 = ByteArray(0, length=rolen)
-        out2[0] = out[len(out)-rolen:]
+        out2[0] = out[len(out) - rolen :]
         return out2
     return out
+
 
 def bits2octets(bits, rolen):
     """ https://tools.ietf.org/html/rfc6979#section-2.3.4"""
@@ -1211,6 +1355,7 @@ def bits2octets(bits, rolen):
     if z2 < 0:
         return int2octets(z1, rolen)
     return int2octets(z2, rolen)
+
 
 def nonceRFC6979(privKey, inHash, extra, version):
     """
@@ -1234,13 +1379,13 @@ def nonceRFC6979(privKey, inHash, extra, version):
         bx += version
 
     # Step B
-    v = ByteArray(bytearray([1]*holen))
+    v = ByteArray(bytearray([1] * holen))
 
     # Step C (Go zeroes the all allocated memory)
     k = ByteArray(0, length=holen)
 
     # Step D
-    k = mac(k,  v + ByteArray(0x00, length=1) + bx)
+    k = mac(k, v + ByteArray(0x00, length=1) + bx)
 
     # Step E
     v = mac(k, v)
@@ -1254,10 +1399,10 @@ def nonceRFC6979(privKey, inHash, extra, version):
     # Step H
     while True:
         # Step H1
-        t = ByteArray(b'')
+        t = ByteArray(b"")
 
         # Step H2
-        while len(t)*8 < qlen:
+        while len(t) * 8 < qlen:
             v = mac(k, v)
             t += v
 
@@ -1299,7 +1444,6 @@ def verifySig(pub, inHash, r, s):
     u1 = (e * w) % N
     u2 = (r * w) % N
 
-
     x1, y1 = Curve.scalarBaseMult(u1)
     x2, y2 = Curve.scalarMult(pub.x, pub.y, u2)
     x, y = Curve.add(x1, y1, x2, y2)
@@ -1309,13 +1453,14 @@ def verifySig(pub, inHash, r, s):
     x = x % N
     return x == r
 
+
 def signRFC6979(privateKey, inHash):
     """
     signRFC6979 generates a deterministic ECDSA signature according to RFC 6979
     and BIP 62.
     """
     N = Curve.N
-    k = nonceRFC6979(privateKey, inHash, ByteArray(b''), ByteArray(b''))
+    k = nonceRFC6979(privateKey, inHash, ByteArray(b""), ByteArray(b""))
 
     inv = crypto.modInv(k, N)
     r = Curve.scalarBaseMult(k)[0] % N
@@ -1336,6 +1481,7 @@ def signRFC6979(privateKey, inHash):
 
     return Signature(r, s)
 
+
 def putVarInt(val):
     """
     putVarInt serializes the provided number to a variable-length integer and
@@ -1344,20 +1490,27 @@ def putVarInt(val):
     which must be at least large enough to handle the number of bytes returned by
     the varIntSerializeSize function or it will panic.
     """
-    if val < 0xfd:
+    if val < 0xFD:
         return ByteArray(val, length=1)
 
     if val <= wire.MaxUint16:
-        return reversed(ByteArray(0xfd, length=3)) | ByteArray(val, length=2).littleEndian()
+        return (
+            reversed(ByteArray(0xFD, length=3))
+            | ByteArray(val, length=2).littleEndian()
+        )
 
     if val <= wire.MaxUint32:
-        return reversed(ByteArray(0xfe, length=5)) | ByteArray(val, length=4).littleEndian()
+        return (
+            reversed(ByteArray(0xFE, length=5))
+            | ByteArray(val, length=4).littleEndian()
+        )
 
-    return reversed(ByteArray(0xff, length=9)) | ByteArray(val, length=8).littleEndian()
+    return reversed(ByteArray(0xFF, length=9)) | ByteArray(val, length=8).littleEndian()
+
 
 def addData(data):
     dataLen = len(data)
-    b = ByteArray(b'')
+    b = ByteArray(b"")
 
     # When the data consists of a single number that can be represented
     # by one of the "small integer" opcodes, use that opcode instead of
@@ -1366,7 +1519,7 @@ def addData(data):
         b += opcode.OP_0
         return b
     elif dataLen == 1 and data[0] <= 16:
-        b += opcode.OP_1-1+data[0]
+        b += opcode.OP_1 - 1 + data[0]
         return b
     elif dataLen == 1 and data[0] == 0x81:
         b += opcode.OP_1NEGATE
@@ -1377,11 +1530,11 @@ def addData(data):
     # Otherwise, choose the smallest possible OP_PUSHDATA# opcode that
     # can represent the length of the data.
     if dataLen < opcode.OP_PUSHDATA1:
-        b += (opcode.OP_DATA_1-1)+dataLen
-    elif dataLen <= 0xff:
+        b += (opcode.OP_DATA_1 - 1) + dataLen
+    elif dataLen <= 0xFF:
         b += opcode.OP_PUSHDATA1
         b += dataLen
-    elif dataLen <= 0xffff:
+    elif dataLen <= 0xFFFF:
         b += opcode.OP_PUSHDATA2
         b += ByteArray(dataLen).littleEndian()
     else:
@@ -1390,6 +1543,7 @@ def addData(data):
     # Append the actual data.
     b += data
     return b
+
 
 def signatureScript(tx, idx, subscript, hashType, privKey, compress):
     """
@@ -1417,6 +1571,7 @@ def signatureScript(tx, idx, subscript, hashType, privKey, compress):
 
     return script
 
+
 def rawTxInSignature(tx, idx, subScript, hashType, key):
     """
     rawTxInSignature returns the serialized ECDSA signature for the input idx of
@@ -1429,6 +1584,7 @@ def rawTxInSignature(tx, idx, subScript, hashType, key):
     sigHash = calcSignatureHash(subScript, hashType, tx, idx, None)
     sig = signRFC6979(key, sigHash).serialize()
     return sig + ByteArray(hashType)
+
 
 def calcSignatureHash(script, hashType, tx, idx, cachedPrefix):
     """
@@ -1454,7 +1610,10 @@ def calcSignatureHash(script, hashType, tx, idx, cachedPrefix):
     # is improper to use SigHashSingle on input indices that don't have a
     # corresponding output.
     if hashType & sigHashMask == SigHashSingle and idx >= len(tx.txOut):
-        raise Exception("attempt to sign single input at index %d >= %d outputs" % (idx, len(tx.txOut)))
+        raise Exception(
+            "attempt to sign single input at index %d >= %d outputs"
+            % (idx, len(tx.txOut))
+        )
 
     # Choose the inputs that will be committed to based on the signature
     # hash type.
@@ -1464,8 +1623,8 @@ def calcSignatureHash(script, hashType, tx, idx, cachedPrefix):
     # inputs.
     txIns = tx.txIn
     signTxInIdx = idx
-    if hashType&SigHashAnyOneCanPay != 0:
-        txIns = tx.txIn[idx : idx+1]
+    if hashType & SigHashAnyOneCanPay != 0:
+        txIns = tx.txIn[idx : idx + 1]
         signTxInIdx = 0
 
     # The prefix hash commits to the non-witness data depending on the
@@ -1513,10 +1672,13 @@ def calcSignatureHash(script, hashType, tx, idx, cachedPrefix):
     # SigHashAnyOneCanPay flag is not set.  In that case, the prefix hash
     # can be reused because only the witness data has been modified, so
     # the wasteful extra O(N^2) hash can be avoided.
-    prefixHash = ByteArray(b'')
-    if (SigHashOptimization and not cachedPrefix is None and
-        hashType&sigHashMask == SigHashAll and
-        (hashType&SigHashAnyOneCanPay).iszero()):
+    prefixHash = ByteArray(b"")
+    if (
+        SigHashOptimization
+        and cachedPrefix is not None
+        and hashType & sigHashMask == SigHashAll
+        and (hashType & SigHashAnyOneCanPay).iszero()
+    ):
 
         prefixHash = cachedPrefix
     else:
@@ -1537,14 +1699,16 @@ def calcSignatureHash(script, hashType, tx, idx, cachedPrefix):
         if requiredSigs == SigHashNone:
             txOuts = []
         elif requiredSigs == SigHashSingle:
-            txOuts = tx.txOut[:idx+1]
+            txOuts = tx.txOut[: idx + 1]
 
         expectedSize = sigHashPrefixSerializeSize(hashType, txIns, txOuts, idx)
 
-        prefixBuf = ByteArray(b'')
+        prefixBuf = ByteArray(b"")
 
         # Commit to the version and hash serialization type.
-        prefixBuf += ByteArray(tx.version | (SigHashSerializePrefix<<16), length=4).littleEndian()
+        prefixBuf += ByteArray(
+            tx.version | (SigHashSerializePrefix << 16), length=4
+        ).littleEndian()
 
         # Commit to the relevant transaction inputs.
         prefixBuf += putVarInt(len(txIns))
@@ -1552,14 +1716,17 @@ def calcSignatureHash(script, hashType, tx, idx, cachedPrefix):
             # Commit to the outpoint being spent.
             prevOut = txIn.previousOutPoint
             prefixBuf += prevOut.hash
-            prefixBuf += ByteArray(prevOut.index, length=4).littleEndian() # uint32
+            prefixBuf += ByteArray(prevOut.index, length=4).littleEndian()  # uint32
             prefixBuf += ByteArray(prevOut.tree, length=1)
 
             # Commit to the sequence.  In the case of SigHashNone
             # and SigHashSingle, commit to 0 for everything that is
             # not the input being signed instead.
             sequence = txIn.sequence
-            if ((hashType&sigHashMask) == SigHashNone or (hashType&sigHashMask) == SigHashSingle) and txInIdx != signTxInIdx:
+            if (
+                (hashType & sigHashMask) == SigHashNone
+                or (hashType & sigHashMask) == SigHashSingle
+            ) and txInIdx != signTxInIdx:
                 sequence = 0
             prefixBuf += ByteArray(sequence, length=4).littleEndian()
 
@@ -1574,9 +1741,9 @@ def calcSignatureHash(script, hashType, tx, idx, cachedPrefix):
             # corresponding to the input being signed instead.
             value = txOut.value
             pkScript = txOut.pkScript
-            if hashType&sigHashMask == SigHashSingle and txOutIdx != idx:
+            if hashType & sigHashMask == SigHashSingle and txOutIdx != idx:
                 value = MAX_UINT64
-                pkScript = b''
+                pkScript = b""
             prefixBuf += ByteArray(value, length=8).littleEndian()
             prefixBuf += ByteArray(txOut.version, length=2).littleEndian()
             prefixBuf += putVarInt(len(pkScript))
@@ -1586,7 +1753,10 @@ def calcSignatureHash(script, hashType, tx, idx, cachedPrefix):
         prefixBuf += ByteArray(tx.lockTime, length=4).littleEndian()
         prefixBuf += ByteArray(tx.expiry, length=4).littleEndian()
         if len(prefixBuf) != expectedSize:
-            raise Exception("incorrect prefix serialization size %i != %i" % (len(prefixBuf), expectedSize))
+            raise Exception(
+                "incorrect prefix serialization size %i != %i"
+                % (len(prefixBuf), expectedSize)
+            )
         prefixHash = hashH(prefixBuf.bytes())
 
     # The witness hash commits to the input witness data depending on
@@ -1609,10 +1779,10 @@ def calcSignatureHash(script, hashType, tx, idx, cachedPrefix):
     #    b) prevout pkscript (as unmodified bytes)
 
     expectedSize = sigHashWitnessSerializeSize(txIns, script)
-    witnessBuf = ByteArray(b'')
+    witnessBuf = ByteArray(b"")
 
     # Commit to the version and hash serialization type.
-    version = ByteArray(tx.version, length=4) | (SigHashSerializeWitness<<16)
+    version = ByteArray(tx.version, length=4) | (SigHashSerializeWitness << 16)
     witnessBuf += version.littleEndian()
 
     # Commit to the relevant transaction inputs.
@@ -1623,11 +1793,14 @@ def calcSignatureHash(script, hashType, tx, idx, cachedPrefix):
         # instead.
         commitScript = script
         if txInIdx != signTxInIdx:
-            commitScript = b''
+            commitScript = b""
         witnessBuf += putVarInt(len(commitScript))
         witnessBuf += commitScript
     if len(witnessBuf) != expectedSize:
-        raise Exception("incorrect witness serialization size %i != %i" % (len(witnessBuf), expectedSize))
+        raise Exception(
+            "incorrect witness serialization size %i != %i"
+            % (len(witnessBuf), expectedSize)
+        )
     witnessHash = hashH(witnessBuf.bytes())
 
     # The final signature hash (message to sign) is the hash of the
@@ -1636,12 +1809,13 @@ def calcSignatureHash(script, hashType, tx, idx, cachedPrefix):
     # 1) the hash type (as little-endian uint32)
     # 2) prefix hash (as produced by hash function)
     # 3) witness hash (as produced by hash function)
-    sigHashBuf = ByteArray(0, length=HASH_SIZE*2+4)
+    sigHashBuf = ByteArray(0, length=HASH_SIZE * 2 + 4)
     sigHashBuf[0] = ByteArray(hashType, length=4).littleEndian()
     sigHashBuf[4] = prefixHash
-    sigHashBuf[4+HASH_SIZE] = witnessHash
+    sigHashBuf[4 + HASH_SIZE] = witnessHash
     h = hashH(sigHashBuf.bytes())
     return h
+
 
 def signP2PKHMsgTx(msgtx, prevOutputs, keysource, params):
     """
@@ -1650,8 +1824,11 @@ def signP2PKHMsgTx(msgtx, prevOutputs, keysource, params):
     Only P2PKH outputs are supported at this point.
     """
     if len(prevOutputs) != len(msgtx.txIn):
-        raise Exception("Number of prevOutputs (%d) does not match number of tx inputs (%d)" %
-            len(prevOutputs), len(msgtx.TxIn))
+        raise Exception(
+            "Number of prevOutputs (%d) does not match number of tx inputs (%d)"
+            % len(prevOutputs),
+            len(msgtx.TxIn),
+        )
 
     for i, output in enumerate(prevOutputs):
         # Errors don't matter here, as we only consider the
@@ -1664,8 +1841,11 @@ def signP2PKHMsgTx(msgtx, prevOutputs, keysource, params):
             raise Exception("previous output address is not P2PKH")
 
         privKey = keysource.priv(apkh.string())
-        sigscript = signatureScript(msgtx, i, output.pkScript, SigHashAll, privKey, True)
+        sigscript = signatureScript(
+            msgtx, i, output.pkScript, SigHashAll, privKey, True
+        )
         msgtx.txIn[i].signatureScript = sigscript
+
 
 def paysHighFees(totalInput, tx):
     """
@@ -1678,8 +1858,9 @@ def paysHighFees(totalInput, tx):
         # Impossible to determine
         return False
 
-    maxFee = calcMinRequiredTxRelayFee(1000*DefaultRelayFeePerKb, tx.serializeSize())
+    maxFee = calcMinRequiredTxRelayFee(1000 * DefaultRelayFeePerKb, tx.serializeSize())
     return fee > maxFee
+
 
 def sigHashPrefixSerializeSize(hashType, txIns, txOuts, signIdx):
     """
@@ -1704,15 +1885,23 @@ def sigHashPrefixSerializeSize(hashType, txIns, txOuts, signIdx):
     """
     numTxIns = len(txIns)
     numTxOuts = len(txOuts)
-    size = (4 + varIntSerializeSize(numTxIns) + numTxIns*(HASH_SIZE+4+1+4) +
-        varIntSerializeSize(numTxOuts) + numTxOuts*(8+2) + 4 + 4)
+    size = (
+        4
+        + varIntSerializeSize(numTxIns)
+        + numTxIns * (HASH_SIZE + 4 + 1 + 4)
+        + varIntSerializeSize(numTxOuts)
+        + numTxOuts * (8 + 2)
+        + 4
+        + 4
+    )
     for txOutIdx, txOut in enumerate(txOuts):
         pkScript = txOut.pkScript
-        if hashType&sigHashMask == SigHashSingle and txOutIdx != signIdx:
-            pkScript = b''
+        if hashType & sigHashMask == SigHashSingle and txOutIdx != signIdx:
+            pkScript = b""
         size += varIntSerializeSize(len(pkScript))
         size += len(pkScript)
     return size
+
 
 def sigHashWitnessSerializeSize(txIns, signScript):
     """
@@ -1734,7 +1923,14 @@ def sigHashWitnessSerializeSize(txIns, signScript):
     # calculating the size per input, use (numTxIns - 1) as an
     # optimization.
     numTxIns = len(txIns)
-    return 4 + varIntSerializeSize(numTxIns) + (numTxIns - 1) + varIntSerializeSize(len(signScript)) +  len(signScript)
+    return (
+        4
+        + varIntSerializeSize(numTxIns)
+        + (numTxIns - 1)
+        + varIntSerializeSize(len(signScript))
+        + len(signScript)
+    )
+
 
 def pubKeyHashToAddrs(pkHash, params):
     """
@@ -1744,6 +1940,7 @@ def pubKeyHashToAddrs(pkHash, params):
     """
     return [crypto.newAddressPubKeyHash(pkHash, params, crypto.STEcdsaSecp256k1)]
 
+
 def scriptHashToAddrs(scriptHash, params):
     """
     scriptHashToAddrs is a convenience function to attempt to convert the passed
@@ -1751,6 +1948,7 @@ def scriptHashToAddrs(scriptHash, params):
     used to consolidate common code.
     """
     return [crypto.newAddressScriptHashFromHash(scriptHash, params)]
+
 
 def extractPkScriptAddrs(version, pkScript, chainParams):
     """
@@ -1791,7 +1989,9 @@ def extractPkScriptAddrs(version, pkScript, chainParams):
         addrs = []
         for encodedPK in details.pubKeys:
             pk = Curve.parsePubKey(encodedPK)
-            addrs.append(crypto.AddressSecpPubKey(pk.serializeCompressed(), chainParams))
+            addrs.append(
+                crypto.AddressSecpPubKey(pk.serializeCompressed(), chainParams)
+            )
         return MultiSigTy, addrs, details.requiredSigs
 
     # Check for stake submission script.  Only stake-submission-tagged
@@ -1833,14 +2033,19 @@ def extractPkScriptAddrs(version, pkScript, chainParams):
     # EVERYTHING AFTER TIHS IS UN-IMPLEMENTED
     raise Exception("unsupported script")
 
+
 def sign(chainParams, tx, idx, subScript, hashType, keysource, sigType):
-    scriptClass, addresses, nrequired = extractPkScriptAddrs(DefaultScriptVersion, subScript, chainParams)
+    scriptClass, addresses, nrequired = extractPkScriptAddrs(
+        DefaultScriptVersion, subScript, chainParams
+    )
 
     subClass = scriptClass
-    isStakeType = (scriptClass == StakeSubmissionTy or
-        scriptClass == StakeSubChangeTy or
-        scriptClass == StakeGenTy or
-        scriptClass == StakeRevocationTy)
+    isStakeType = (
+        scriptClass == StakeSubmissionTy
+        or scriptClass == StakeSubChangeTy
+        or scriptClass == StakeGenTy
+        or scriptClass == StakeRevocationTy
+    )
     if isStakeType:
         subClass = getStakeOutSubclass(subScript)
 
@@ -1865,7 +2070,8 @@ def sign(chainParams, tx, idx, subScript, hashType, keysource, sigType):
         raise Exception("alt signatures not implemented")
         # look up key for address
         # privKey = keysource.priv(addresses[0].string())
-        # script = signatureScriptAlt(tx, idx, subScript, hashType, key, compressed, sigType)
+        # script = signatureScriptAlt(
+        #     tx, idx, subScript, hashType, key, compressed, sigType)
         # return script, scriptClass, addresses, nrequired
 
     elif scriptClass == ScriptHashTy:
@@ -1879,23 +2085,66 @@ def sign(chainParams, tx, idx, subScript, hashType, keysource, sigType):
         # return script, scriptClass, addresses, nrequired
 
     elif scriptClass == StakeSubmissionTy:
-        return handleStakeOutSign(tx, idx, subScript, hashType, keysource, addresses, scriptClass, subClass, nrequired)
+        return handleStakeOutSign(
+            tx,
+            idx,
+            subScript,
+            hashType,
+            keysource,
+            addresses,
+            scriptClass,
+            subClass,
+            nrequired,
+        )
 
     elif scriptClass == StakeGenTy:
-        return handleStakeOutSign(tx, idx, subScript, hashType, keysource, addresses, scriptClass, subClass, nrequired)
+        return handleStakeOutSign(
+            tx,
+            idx,
+            subScript,
+            hashType,
+            keysource,
+            addresses,
+            scriptClass,
+            subClass,
+            nrequired,
+        )
 
     elif scriptClass == StakeRevocationTy:
-        return handleStakeOutSign(tx, idx, subScript, hashType, keysource, addresses, scriptClass, subClass, nrequired)
+        return handleStakeOutSign(
+            tx,
+            idx,
+            subScript,
+            hashType,
+            keysource,
+            addresses,
+            scriptClass,
+            subClass,
+            nrequired,
+        )
 
     elif scriptClass == StakeSubChangeTy:
-        return handleStakeOutSign(tx, idx, subScript, hashType, keysource, addresses, scriptClass, subClass, nrequired)
+        return handleStakeOutSign(
+            tx,
+            idx,
+            subScript,
+            hashType,
+            keysource,
+            addresses,
+            scriptClass,
+            subClass,
+            nrequired,
+        )
 
     elif scriptClass == NullDataTy:
         raise Exception("can't sign NULLDATA transactions")
 
     raise Exception("can't sign unknown transactions")
 
-def handleStakeOutSign(tx, idx, subScript, hashType, keysource, addresses, scriptClass, subClass, nrequired):
+
+def handleStakeOutSign(
+    tx, idx, subScript, hashType, keysource, addresses, scriptClass, subClass, nrequired
+):
     """
     # handleStakeOutSign is a convenience function for reducing code clutter in
     # sign. It handles the signing of stake outputs.
@@ -1911,7 +2160,18 @@ def handleStakeOutSign(tx, idx, subScript, hashType, keysource, addresses, scrip
         # return script, scriptClass, addresses, nrequired
     raise Exception("unknown subclass for stake output to sign")
 
-def mergeScripts(chainParams, tx, idx, pkScript, scriptClass, addresses, nRequired, sigScript, prevScript):
+
+def mergeScripts(
+    chainParams,
+    tx,
+    idx,
+    pkScript,
+    scriptClass,
+    addresses,
+    nRequired,
+    sigScript,
+    prevScript,
+):
     """
     mergeScripts merges sigScript and prevScript assuming they are both
     partial solutions for pkScript spending output idx of tx. class, addresses
@@ -1933,9 +2193,15 @@ def mergeScripts(chainParams, tx, idx, pkScript, scriptClass, addresses, nRequir
         # Nothing to merge if either the new or previous signature
         # scripts are empty or fail to parse.
 
-        if len(sigScript) == 0 or checkScriptParses(scriptVersion, sigScript) != None:
+        if (
+            len(sigScript) == 0
+            or checkScriptParses(scriptVersion, sigScript) is not None
+        ):
             return prevScript
-        if len(prevScript) == 0 or checkScriptParses(scriptVersion, prevScript) != None:
+        if (
+            len(prevScript) == 0
+            or checkScriptParses(scriptVersion, prevScript) is not None
+        ):
             return sigScript
 
         # Remove the last push in the script and then recurse.
@@ -1947,13 +2213,25 @@ def mergeScripts(chainParams, tx, idx, pkScript, scriptClass, addresses, nRequir
 
         # We already know this information somewhere up the stack,
         # therefore the error is ignored.
-        scriptClass, addresses, nrequired = extractPkScriptAddrs(DefaultScriptVersion, script, chainParams)
+        scriptClass, addresses, nrequired = extractPkScriptAddrs(
+            DefaultScriptVersion, script, chainParams
+        )
 
         # Merge
-        mergedScript = mergeScripts(chainParams, tx, idx, script, scriptClass, addresses, nrequired, sigScript, prevScript)
+        mergedScript = mergeScripts(
+            chainParams,
+            tx,
+            idx,
+            script,
+            scriptClass,
+            addresses,
+            nrequired,
+            sigScript,
+            prevScript,
+        )
 
         # Reappend the script and return the result.
-        finalScript = ByteArray(b'', length=0)
+        finalScript = ByteArray(b"", length=0)
         finalScript += mergedScript
         finalScript += addData(script)
         return finalScript
@@ -1972,7 +2250,10 @@ def mergeScripts(chainParams, tx, idx, pkScript, scriptClass, addresses, nRequir
             return sigScript
         return prevScript
 
-def signTxOutput(chainParams, tx, idx, pkScript, hashType, keysource, previousScript, sigType):
+
+def signTxOutput(
+    chainParams, tx, idx, pkScript, hashType, keysource, previousScript, sigType
+):
     """
     signTxOutput signs output idx of the given tx to resolve the script given in
     pkScript with a signature type of hashType. Any keys required will be
@@ -1987,19 +2268,24 @@ def signTxOutput(chainParams, tx, idx, pkScript, hashType, keysource, previousSc
     versions.
     """
 
-    sigScript, scriptClass, addresses, nrequired = sign(chainParams, tx, idx, pkScript, hashType, keysource, sigType)
+    sigScript, scriptClass, addresses, nrequired = sign(
+        chainParams, tx, idx, pkScript, hashType, keysource, sigType
+    )
 
-    isStakeType = (scriptClass == StakeSubmissionTy or
-        scriptClass == StakeSubChangeTy or
-        scriptClass == StakeGenTy or
-        scriptClass == StakeRevocationTy)
+    isStakeType = (
+        scriptClass == StakeSubmissionTy
+        or scriptClass == StakeSubChangeTy
+        or scriptClass == StakeGenTy
+        or scriptClass == StakeRevocationTy
+    )
     if isStakeType:
         scriptClass = getStakeOutSubclass(pkScript)
 
     if scriptClass == ScriptHashTy:
         raise Exception("ScriptHashTy signing unimplemented")
         # # TODO keep the sub addressed and pass down to merge.
-        # realSigScript, _, _, _ = sign(privKey, chainParams, tx, idx, sigScript, hashType, sigType)
+        # realSigScript, _, _, _ = sign(
+        #     privKey, chainParams, tx, idx, sigScript, hashType, sigType)
 
         # Append the p2sh script as the last push in the script.
         # script = ByteArray(b'')
@@ -2010,8 +2296,19 @@ def signTxOutput(chainParams, tx, idx, pkScript, hashType, keysource, previousSc
         # # TODO keep a copy of the script for merging.
 
     # Merge scripts. with any previous data, if any.
-    mergedScript = mergeScripts(chainParams, tx, idx, pkScript, scriptClass, addresses, nrequired, sigScript, previousScript)
+    mergedScript = mergeScripts(
+        chainParams,
+        tx,
+        idx,
+        pkScript,
+        scriptClass,
+        addresses,
+        nrequired,
+        sigScript,
+        previousScript,
+    )
     return mergedScript
+
 
 def getP2PKHOpCode(pkScript):
     """
@@ -2037,6 +2334,7 @@ def getP2PKHOpCode(pkScript):
         return opcode.OP_SSTXCHANGE
     return opNonstake
 
+
 def spendScriptSize(pkScript):
     """
     Get the byte-length of the spend script.
@@ -2060,9 +2358,12 @@ def spendScriptSize(pkScript):
         # types only but ignore P2SH script type since it can pay
         # to any script which the wallet may not recognize.
         if scriptClass != PubKeyHashTy:
-            raise Exception("unexpected nested script class for credit: %d" % scriptClass)
+            raise Exception(
+                "unexpected nested script class for credit: %d" % scriptClass
+            )
         return RedeemP2PKHSigScriptSize
     raise Exception("unimplemented: %s : %r" % (scriptClass, scriptClass))
+
 
 def estimateInputSize(scriptSize):
     """
@@ -2083,7 +2384,10 @@ def estimateInputSize(scriptSize):
     Returns:
         int: Estimated size of the byte-encoded transaction input.
     """
-    return 32 + 4 + 1 + 8 + 4 + 4 + wire.varIntSerializeSize(scriptSize) + scriptSize + 4
+    return (
+        32 + 4 + 1 + 8 + 4 + 4 + wire.varIntSerializeSize(scriptSize) + scriptSize + 4
+    )
+
 
 def estimateOutputSize(scriptSize):
     """
@@ -2101,7 +2405,8 @@ def estimateOutputSize(scriptSize):
     """
     return 8 + 2 + wire.varIntSerializeSize(scriptSize) + scriptSize
 
-def sumOutputSerializeSizes(outputs): # outputs []*wire.TxOut) (serializeSize int) {
+
+def sumOutputSerializeSizes(outputs):  # outputs []*wire.TxOut) (serializeSize int) {
     """
     sumOutputSerializeSizes sums up the serialized size of the supplied outputs.
 
@@ -2115,6 +2420,7 @@ def sumOutputSerializeSizes(outputs): # outputs []*wire.TxOut) (serializeSize in
     for txOut in outputs:
         serializeSize += txOut.serializeSize()
     return serializeSize
+
 
 def estimateSerializeSize(scriptSizes, txOuts, changeScriptSize):
     """
@@ -2144,11 +2450,15 @@ def estimateSerializeSize(scriptSizes, txOuts, changeScriptSize):
         changeSize = estimateOutputSize(changeScriptSize)
         outputCount += 1
     # 12 additional bytes are for version, locktime and expiry.
-    return (12 + (2 * wire.varIntSerializeSize(inputCount)) +
-        wire.varIntSerializeSize(outputCount) +
-        txInsSize +
-        sumOutputSerializeSizes(txOuts) +
-        changeSize)
+    return (
+        12
+        + (2 * wire.varIntSerializeSize(inputCount))
+        + wire.varIntSerializeSize(outputCount)
+        + txInsSize
+        + sumOutputSerializeSizes(txOuts)
+        + changeSize
+    )
+
 
 def calcMinRequiredTxRelayFee(relayFeePerKb, txSerializeSize):
     """
@@ -2173,12 +2483,14 @@ def calcMinRequiredTxRelayFee(relayFeePerKb, txSerializeSize):
     if fee == 0 and relayFeePerKb > 0:
         fee = relayFeePerKb
 
-    if fee < 0 or fee > MaxAmount: # dcrutil.MaxAmount:
+    if fee < 0 or fee > MaxAmount:  # dcrutil.MaxAmount:
         fee = MaxAmount
     return round(fee)
 
 
-def isDustAmount(amount, scriptSize, relayFeePerKb): #amount dcrutil.Amount, scriptSize int, relayFeePerKb dcrutil.Amount) bool {
+def isDustAmount(
+    amount, scriptSize, relayFeePerKb
+):  # amount dcrutil.Amount, scriptSize int, relayFeePerKb dcrutil.Amount) bool {
     """
     isDustAmount determines whether a transaction output value and script length would
     cause the output to be considered dust.  Transactions with dust outputs are
@@ -2202,7 +2514,8 @@ def isDustAmount(amount, scriptSize, relayFeePerKb): #amount dcrutil.Amount, scr
 
     # Dust is defined as an output value where the total cost to the network
     # (output size + input size) is greater than 1/3 of the relay fee.
-    return amount*1000/(3*totalSize) < relayFeePerKb
+    return amount * 1000 / (3 * totalSize) < relayFeePerKb
+
 
 def isUnspendable(amount, pkScript):
     """
@@ -2222,14 +2535,19 @@ def isUnspendable(amount, pkScript):
     """
     # The script is unspendable if starts with OP_RETURN or is guaranteed to
     # fail at execution due to being larger than the max allowed script size.
-    if (amount == 0 or len(pkScript) > MaxScriptSize or len(pkScript) > 0 and
-        pkScript[0] == opcode.OP_RETURN):
+    if (
+        amount == 0
+        or len(pkScript) > MaxScriptSize
+        or len(pkScript) > 0
+        and pkScript[0] == opcode.OP_RETURN
+    ):
 
         return True
 
     # The script is unspendable if it is guaranteed to fail at execution.
     scriptVersion = 0
-    return checkScriptParses(scriptVersion, pkScript) != None
+    return checkScriptParses(scriptVersion, pkScript) is not None
+
 
 def isDustOutput(output, relayFeePerKb):
     """
@@ -2253,6 +2571,7 @@ def isDustOutput(output, relayFeePerKb):
         return True
 
     return isDustAmount(output.value, len(output.pkScript), relayFeePerKb)
+
 
 def estimateSerializeSizeFromScriptSizes(inputSizes, outputSizes, changeScriptSize):
     """
@@ -2289,8 +2608,15 @@ def estimateSerializeSizeFromScriptSizes(inputSizes, outputSizes, changeScriptSi
         outputCount += 1
 
     # 12 additional bytes are for version, locktime and expiry.
-    return (12 + (2 * varIntSerializeSize(inputCount)) +
-        varIntSerializeSize(outputCount) + txInsSize + txOutsSize + changeSize)
+    return (
+        12
+        + (2 * varIntSerializeSize(inputCount))
+        + varIntSerializeSize(outputCount)
+        + txInsSize
+        + txOutsSize
+        + changeSize
+    )
+
 
 def stakePoolTicketFee(stakeDiff, relayFee, height, poolFee, subsidyCache, params):
     """
@@ -2326,9 +2652,9 @@ def stakePoolTicketFee(stakeDiff, relayFee, height, poolFee, subsidyCache, param
     # pool size (params.TicketPoolSize), so take the
     # ceiling of the ticket pool size divided by the
     # reduction interval.
-    adjs = int(math.ceil(params.TicketPoolSize /  params.SubsidyReductionInterval))
+    adjs = int(math.ceil(params.TicketPoolSize / params.SubsidyReductionInterval))
     subsidy = subsidyCache.calcStakeVoteSubsidy(height)
-    for i  in range(adjs):
+    for i in range(adjs):
         subsidy *= 100
         subsidy = subsidy // 101
 
@@ -2355,6 +2681,7 @@ def stakePoolTicketFee(stakeDiff, relayFee, height, poolFee, subsidyCache, param
 
     return num
 
+
 def sstxNullOutputAmounts(amounts, changeAmounts, amountTicket):
     """
     sstxNullOutputAmounts takes an array of input amounts, change amounts, and a
@@ -2375,7 +2702,7 @@ def sstxNullOutputAmounts(amounts, changeAmounts, amountTicket):
     lengthAmounts = len(amounts)
 
     if lengthAmounts != len(changeAmounts):
-       raise Exception("amounts was not equal in length to change amounts!")
+        raise Exception("amounts was not equal in length to change amounts!")
 
     if amountTicket <= 0:
         raise Exception("committed amount was too small!")
@@ -2391,7 +2718,10 @@ def sstxNullOutputAmounts(amounts, changeAmounts, amountTicket):
     for i in range(lengthAmounts):
         contrib = amounts[i] - changeAmounts[i]
         if contrib < 0:
-            raise Exception("change at idx %d spent more coins than allowed (have: %r, spent: %r)" % (i, amounts[i], changeAmounts[i]))
+            raise Exception(
+                "change at idx %d spent more coins than allowed (have: %r, spent: %r)"
+                % (i, amounts[i], changeAmounts[i])
+            )
         total += contrib
         contribAmounts.append(contrib)
 
@@ -2399,7 +2729,10 @@ def sstxNullOutputAmounts(amounts, changeAmounts, amountTicket):
 
     return fees, contribAmounts
 
-def makeTicket(params, inputPool, inputMain, addrVote, addrSubsidy, ticketCost, addrPool):
+
+def makeTicket(
+    params, inputPool, inputMain, addrVote, addrSubsidy, ticketCost, addrPool
+):
     """
     makeTicket creates a ticket from a split transaction output. It can optionally
     create a ticket that pays a fee to a pool if a pool input and pool address are
@@ -2436,37 +2769,30 @@ def makeTicket(params, inputPool, inputMain, addrVote, addrSubsidy, ticketCost, 
 
     pkScript = payToSStx(addrVote)
 
-    txOut = msgtx.TxOut(
-        value =    ticketCost,
-        pkScript = pkScript,
-    )
+    txOut = msgtx.TxOut(value=ticketCost, pkScript=pkScript,)
     mtx.addTxOut(txOut)
 
     # Obtain the commitment amounts.
-    _, amountsCommitted = sstxNullOutputAmounts([inputPool.amt, inputMain.amt], [0, 0], ticketCost)
+    _, amountsCommitted = sstxNullOutputAmounts(
+        [inputPool.amt, inputMain.amt], [0, 0], ticketCost
+    )
     userSubsidyNullIdx = 1
 
     # Zero value P2PKH addr.
-    zeroed = ByteArray(b'', length=20)
+    zeroed = ByteArray(b"", length=20)
     addrZeroed = crypto.newAddressPubKeyHash(zeroed, params, crypto.STEcdsaSecp256k1)
 
     # 2. Make an extra commitment to the pool.
     limits = defaultTicketFeeLimits
     pkScript = generateSStxAddrPush(addrPool, amountsCommitted[0], limits)
-    txout = msgtx.TxOut(
-        value =    0,
-        pkScript = pkScript,
-    )
+    txout = msgtx.TxOut(value=0, pkScript=pkScript,)
     mtx.addTxOut(txout)
 
     # Create a new script which pays to the provided address with an
     # SStx change tagged output.
     pkScript = payToSStxChange(addrZeroed)
 
-    txOut = msgtx.TxOut(
-        value =    0,
-        pkScript = pkScript,
-    )
+    txOut = msgtx.TxOut(value=0, pkScript=pkScript,)
     mtx.addTxOut(txOut)
 
     # 3. Create the commitment and change output paying to the user.
@@ -2474,20 +2800,16 @@ def makeTicket(params, inputPool, inputMain, addrVote, addrSubsidy, ticketCost, 
     # Create an OP_RETURN push containing the pubkeyhash to send rewards to.
     # Apply limits to revocations for fees while not allowing
     # fees for votes.
-    pkScript = generateSStxAddrPush(addrSubsidy, amountsCommitted[userSubsidyNullIdx], limits)
-    txout = msgtx.TxOut(
-        value =    0,
-        pkScript = pkScript,
+    pkScript = generateSStxAddrPush(
+        addrSubsidy, amountsCommitted[userSubsidyNullIdx], limits
     )
+    txout = msgtx.TxOut(value=0, pkScript=pkScript,)
     mtx.addTxOut(txout)
 
     # Create a new script which pays to the provided address with an
     # SStx change tagged output.
     pkScript = payToSStxChange(addrZeroed)
-    txOut = msgtx.TxOut(
-        value =    0,
-        pkScript = pkScript,
-    )
+    txOut = msgtx.TxOut(value=0, pkScript=pkScript,)
     mtx.addTxOut(txOut)
 
     # Make sure we generated a valid SStx.

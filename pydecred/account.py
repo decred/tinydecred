@@ -19,6 +19,7 @@ log = helpers.getLogger("DCRACCT")
 # https://github.com/decred/dcrstakepool/pull/514
 STAKE_BRANCH = 2
 
+
 class KeySource(object):
     """
     Implements the KeySource API from tinydecred.api. Must provide access to
@@ -27,6 +28,7 @@ class KeySource(object):
     sets the passed functions to class properties with the required method
     names.
     """
+
     def __init__(self, priv, internal):
         """
         Args:
@@ -38,11 +40,24 @@ class KeySource(object):
         self.priv = priv
         self.internal = internal
 
+
 class TicketRequest:
     """
     The TicketRequest is required to purchase tickets.
     """
-    def __init__(self, minConf, expiry, spendLimit, poolAddress, votingAddress, ticketFee, poolFees, count, txFee):
+
+    def __init__(
+        self,
+        minConf,
+        expiry,
+        spendLimit,
+        poolAddress,
+        votingAddress,
+        ticketFee,
+        poolFees,
+        count,
+        txFee,
+    ):
         # minConf is just a placeholder for now. Account minconf is 0 until
         # I add the ability to change it.
         self.minConf = minConf
@@ -75,6 +90,7 @@ class TicketStats:
     """
     TicketStats is basic information about the account's staking status.
     """
+
     def __init__(self, count=0, value=0):
         """
         Args:
@@ -86,12 +102,14 @@ class TicketStats:
         self.count = count
         self.value = value
 
+
 class DecredAccount(Account):
     """
     DecredAccount is the Decred version of the base tinydecred Account.
     Decred Account inherits Account, and adds the necessary functionality to
     handle staking.
     """
+
     def __init__(self, *a, **k):
         """
         All constructor aruments are passed directly to the parent Account.
@@ -103,13 +121,14 @@ class DecredAccount(Account):
         self.blockchain = None
         self.signals = None
         self._votingKey = None
+
     def __tojson__(self):
         obj = super().__tojson__()
-        return helpers.recursiveUpdate(obj, {
-            "tickets": self.tickets,
-            "stakePools": self.stakePools,
-        })
+        return helpers.recursiveUpdate(
+            obj, {"tickets": self.tickets, "stakePools": self.stakePools}
+        )
         return obj
+
     @staticmethod
     def __fromjson__(obj):
         acct = Account.__fromjson__(obj, cls=DecredAccount)
@@ -117,6 +136,7 @@ class DecredAccount(Account):
         acct.stakePools = obj["stakePools"]
         acct.updateStakeStats()
         return acct
+
     def open(self, pw):
         """
         Open the Decred account. Runs the parent's method, then performs some
@@ -132,6 +152,7 @@ class DecredAccount(Account):
                 continue
         # It is realistically impossible to reach here.
         raise Exception("error finding voting key")
+
     def close(self):
         """
         Close the Decred account. Runs the parent's method, then performs some
@@ -140,6 +161,7 @@ class DecredAccount(Account):
         super().close()
         self._votingKey.key.zero()
         self._votingKey = None
+
     def calcBalance(self, tipHeight):
         tot = 0
         avail = 0
@@ -154,6 +176,7 @@ class DecredAccount(Account):
         self.balance.available = avail
         self.balance.staked = staked
         return self.balance
+
     def updateStakeStats(self):
         """
         Updates the stake stats object.
@@ -181,6 +204,7 @@ class DecredAccount(Account):
         pool = self.stakePool()
         if pool:
             pool.authorize(self.votingAddress(), self.net)
+
     def addUTXO(self, utxo):
         """
         Add the UTXO. Update the stake stats if this is a ticket.
@@ -188,6 +212,7 @@ class DecredAccount(Account):
         super().addUTXO(utxo)
         if utxo.isTicket():
             self.updateStakeStats()
+
     def addTicketAddresses(self, a):
         """
         Add the ticket voting addresses from each known stake pool.
@@ -200,21 +225,25 @@ class DecredAccount(Account):
             if pool.purchaseInfo:
                 a.append(pool.purchaseInfo.ticketAddress)
         return a
+
     def allAddresses(self):
         """
         Overload the base class to add the voting address.
         """
         return self.addTicketAddresses(super().allAddresses())
+
     def watchAddrs(self):
         """
         Overload the base class to add the voting address.
         """
         return self.addTicketAddresses(super().watchAddrs())
+
     def votingKey(self):
         """
         For now, the voting key is the zeroth child.
         """
         return self._votingKey
+
     def votingAddress(self):
         """
         The voting address is the pubkey address (not pubkey-hash) for the
@@ -224,7 +253,10 @@ class DecredAccount(Account):
         Returns:
             AddressSecpPubkey: The address object.
         """
-        return AddressSecpPubKey(self.votingKey().pub.serializeCompressed(), self.net).string()
+        return AddressSecpPubKey(
+            self.votingKey().pub.serializeCompressed(), self.net
+        ).string()
+
     def setPool(self, pool):
         """
         Set the specified pool as the default.
@@ -233,7 +265,9 @@ class DecredAccount(Account):
             pool (vsp.VotingServiceProvider): The stake pool object.
         """
         assert isinstance(pool, VotingServiceProvider)
-        self.stakePools = [pool] + [p for p in self.stakePools if p.apiKey != pool.apiKey]
+        self.stakePools = [pool] + [
+            p for p in self.stakePools if p.apiKey != pool.apiKey
+        ]
         bc = self.blockchain
         addr = pool.purchaseInfo.ticketAddress
         for txid in bc.txsForAddr(addr):
@@ -242,11 +276,13 @@ class DecredAccount(Account):
             self.addUTXO(utxo)
         self.updateStakeStats()
         self.signals.balance(self.calcBalance(self.blockchain.tip["height"]))
+
     def hasPool(self):
         """
         hasPool will return True if the wallet has at least one pool set.
         """
-        return self.stakePool() != None
+        return self.stakePool() is not None
+
     def stakePool(self):
         """
         stakePool is the default vsp.VotingServiceProvider for the
@@ -258,6 +294,7 @@ class DecredAccount(Account):
         if self.stakePools:
             return self.stakePools[0]
         return None
+
     def ticketStats(self):
         """
         A getter for the stakeStats.
@@ -266,6 +303,7 @@ class DecredAccount(Account):
             TicketStats: The staking stats.
         """
         return self.stakeStats
+
     def blockSignal(self, sig):
         """
         Process a new block from the explorer.
@@ -284,6 +322,7 @@ class DecredAccount(Account):
         # "Spendable" balance can change as utxo's mature, so update the
         # balance at every block.
         self.signals.balance(self.calcBalance(self.blockchain.tipHeight))
+
     def addressSignal(self, addr, txid):
         """
         Process an address notification from the block explorer.
@@ -308,7 +347,9 @@ class DecredAccount(Account):
         # scan the outputs for any new UTXOs
         for vout, txout in enumerate(tx.txOut):
             try:
-                _, addresses, _ = txscript.extractPkScriptAddrs(0, txout.pkScript, self.net)
+                _, addresses, _ = txscript.extractPkScriptAddrs(
+                    0, txout.pkScript, self.net
+                )
             except Exception:
                 # log.debug("unsupported script %s" % txout.pkScript.hex())
                 continue
@@ -321,6 +362,7 @@ class DecredAccount(Account):
         if matches:
             # signal the balance update
             self.signals.balance(self.calcBalance(self.blockchain.tip["height"]))
+
     def sendToAddress(self, value, address, feeRate):
         """
         Send the value to the address.
@@ -333,15 +375,17 @@ class DecredAccount(Account):
             MsgTx: The newly created transaction on success, `False` on failure.
         """
         keysource = KeySource(
-            priv = self.getPrivKeyForAddress,
-            internal = self.nextInternalAddress,
+            priv=self.getPrivKeyForAddress, internal=self.nextInternalAddress,
         )
-        tx, spentUTXOs, newUTXOs = self.blockchain.sendToAddress(value, address, keysource, self.getUTXOs, feeRate)
+        tx, spentUTXOs, newUTXOs = self.blockchain.sendToAddress(
+            value, address, keysource, self.getUTXOs, feeRate
+        )
         self.addMempoolTx(tx)
         self.spendUTXOs(spentUTXOs)
         for utxo in newUTXOs:
             self.addUTXO(utxo)
         return tx
+
     def purchaseTickets(self, qty, price):
         """
         purchaseTickets completes the purchase of the specified tickets. The
@@ -350,23 +394,24 @@ class DecredAccount(Account):
         related information.
         """
         keysource = KeySource(
-            priv = self.getPrivKeyForAddress,
-            internal = self.nextInternalAddress,
+            priv=self.getPrivKeyForAddress, internal=self.nextInternalAddress,
         )
         pool = self.stakePool()
         pi = pool.purchaseInfo
         req = TicketRequest(
-            minConf = 0,
-            expiry = 0,
-            spendLimit = int(round(price*qty*1.1*1e8)), # convert to atoms here
-            poolAddress = pi.poolAddress,
-            votingAddress = pi.ticketAddress,
-            ticketFee = 0, # use network default
-            poolFees = pi.poolFees,
-            count = qty,
-            txFee = 0, # use network default
+            minConf=0,
+            expiry=0,
+            spendLimit=int(round(price * qty * 1.1 * 1e8)),  # convert to atoms here
+            poolAddress=pi.poolAddress,
+            votingAddress=pi.ticketAddress,
+            ticketFee=0,  # use network default
+            poolFees=pi.poolFees,
+            count=qty,
+            txFee=0,  # use network default
         )
-        txs, spentUTXOs, newUTXOs = self.blockchain.purchaseTickets(keysource, self.getUTXOs, req)
+        txs, spentUTXOs, newUTXOs = self.blockchain.purchaseTickets(
+            keysource, self.getUTXOs, req
+        )
         if txs:
             # Add the split transactions
             self.addMempoolTx(txs[0])
@@ -376,6 +421,7 @@ class DecredAccount(Account):
         # Store the txids.
         self.tickets.extend([tx.txid() for tx in txs[1]])
         return txs[1]
+
     def sync(self, blockchain, signals):
         """
         Synchronize the UTXO set with the server. This should be the first
@@ -423,5 +469,6 @@ class DecredAccount(Account):
         signals.balance(self.calcBalance(self.blockchain.tip["height"]))
 
         return True
+
 
 tinyjson.register(DecredAccount, "DecredAccount")

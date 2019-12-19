@@ -23,16 +23,17 @@ from tinydecred.pydecred import txscript, calc
 from tinydecred.pydecred.wire import msgtx, wire, msgblock
 from tinydecred.util.database import KeyValueDatabase
 
-log = helpers.getLogger("DCRDATA") # , logLvl=0)
+log = helpers.getLogger("DCRDATA")  # , logLvl=0)
 
 VERSION = "0.0.1"
 GET_HEADERS = {"User-Agent": "PyDcrData/%s" % VERSION}
 POST_HEADERS = {
     "User-Agent": "tinydecred/%s" % VERSION,
-    "Content-Type":"application/json; charset=utf-8",
+    "Content-Type": "application/json; charset=utf-8",
 }
 
 formatTraceback = helpers.formatTraceback
+
 
 class DcrdataPath(object):
     """
@@ -42,20 +43,24 @@ class DcrdataPath(object):
     the following nodes are available as attributes. e.g. if this is node A
     along the URL base/A/B, then node B is available as client.A.B.
     """
+
     def __init__(self):
         self.subpaths = {}
         self.callSigns = []
+
     def getSubpath(self, subpathPart):
         if subpathPart in self.subpaths:
             return self.subpaths[subpathPart]
         p = self.subpaths[subpathPart] = DcrdataPath()
         return p
+
     def addCallsign(self, argList, template):
         """
         Some paths have multiple call signatures or optional parameters.
         Keeps a list of arguments associated with path templates to differentiate.
         """
         self.callSigns.append((argList, template))
+
     def getCallsignPath(self, *args, **kwargs):
         """
         Find the path template that matches the passed arguments.
@@ -67,22 +72,29 @@ class DcrdataPath(object):
             if args:
                 uri = template % args
                 if len(kwargs):
-                    uri += "?"+urlencode(kwargs)
+                    uri += "?" + urlencode(kwargs)
                 return uri
             if all([x in kwargs for x in argList]):
                 return template % tuple(kwargs[x] for x in argList)
-        raise DcrDataException("ArgumentError", "Supplied arguments, %r, do not match any of the know call signatures, %r." %
-            (args if args else kwargs, [argList for argList, _ in self.callSigns]))
+        raise DcrDataException(
+            "ArgumentError",
+            "Supplied arguments, %r, do not match any of the know call signatures, %r."
+            % (args if args else kwargs, [argList for argList, _ in self.callSigns]),
+        )
+
     def __getattr__(self, key):
         if key in self.subpaths:
             return self.subpaths[key]
-        raise DcrDataException("SubpathError", "No subpath %s found in datapath" % (key,))
+        raise DcrDataException(
+            "SubpathError", "No subpath %s found in datapath" % (key,)
+        )
 
     def __call__(self, *args, **kwargs):
         return tinyhttp.get(self.getCallsignPath(*args, **kwargs), headers=GET_HEADERS)
 
     def post(self, data):
         return tinyhttp.post(self.getCallsignPath(), data, headers=POST_HEADERS)
+
 
 def getSocketURIs(uri):
     uri = urlparse(uri)
@@ -92,19 +104,22 @@ def getSocketURIs(uri):
     ps = fmt.format(prot, uri.netloc, "ps")
     return ws, ps
 
+
 # To Do: Get the full list here.
 InsightPaths = [
     "/tx/send",
     "/insight/api/addr/{address}/utxo",
     "/insight/api/addr/{address}/txs",
-    "insight/api/tx/send"
+    "insight/api/tx/send",
 ]
+
 
 class DcrdataClient(object):
     """
     DcrdataClient represents the base node. The only argument to the
     constructor is the path to a DCRData server, e.g. http://explorer.dcrdata.org.
     """
+
     timeFmt = "%Y-%m-%d %H:%M:%S"
     rfc3339Z = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -112,7 +127,7 @@ class DcrdataClient(object):
         """
         Build the DcrdataPath tree.
         """
-        self.baseURI = baseURI.rstrip('/').rstrip("/api")
+        self.baseURI = baseURI.rstrip("/").rstrip("/api")
         self.baseApi = self.baseURI + "/api"
         self.wsURI, self.psURI = getSocketURIs(self.baseURI)
         self.ws = None
@@ -122,14 +137,16 @@ class DcrdataClient(object):
         atexit.register(self.close)
         root = self.root = DcrdataPath()
         self.listEntries = []
-        # /list returns a json list of enpoints with parameters in template format, base/A/{param}/B
+        # /list returns a json list of enpoints with parameters in template format,
+        # base/A/{param}/B
         endpoints = tinyhttp.get(self.baseApi + "/list", headers=GET_HEADERS)
         endpoints += InsightPaths
 
         def getParam(part):
-            if part.startswith('{') and part.endswith('}'):
+            if part.startswith("{") and part.endswith("}"):
                 return part[1:-1]
             return None
+
         pathlog = []
         for path in endpoints:
             path = path.rstrip("/")
@@ -141,7 +158,7 @@ class DcrdataClient(object):
             pathSequence = []
             templateParts = []
             # split the path into an array for nodes and an array for pararmeters
-            for i, part in enumerate(path.strip('/').split('/')):
+            for i, part in enumerate(path.strip("/").split("/")):
                 param = getParam(part)
                 if param:
                     params.append(param)
@@ -155,26 +172,34 @@ class DcrdataClient(object):
             pathPointer.addCallsign(params, "/".join([baseURI] + templateParts))
             if len(pathSequence) == 1:
                 continue
-            self.listEntries.append(("%s(%s)" % (".".join(pathSequence), ", ".join(params)), path))
+            self.listEntries.append(
+                ("%s(%s)" % (".".join(pathSequence), ", ".join(params)), path)
+            )
 
     def __getattr__(self, key):
         return getattr(self.root, key)
+
     def close(self):
         if self.ws:
             self.ws.close()
         if self.ps:
             self.ps.close()
+
     def endpointList(self):
         return [entry[1] for entry in self.listEntries]
+
     def endpointGuide(self):
         """
         Print one endpoint per line.
         Each line shows a translation from Python notation to a URL.
         """
         print("\n".join(["%s  ->  %s" % entry for entry in self.listEntries]))
+
     def psClient(self):
         if self.ps is None:
-            self.ps = WebsocketClient(self.psURI, emitter=self.emitter, exitObject={"done": "done"})
+            self.ps = WebsocketClient(
+                self.psURI, emitter=self.emitter, exitObject={"done": "done"}
+            )
             self.ps.activate()
         return self.ps
 
@@ -192,12 +217,15 @@ class DcrdataClient(object):
                 continue
             subscribed.append(a)
             ps.send(Sub.address(a))
+
     def subscribeBlocks(self):
         ps = self.psClient()
         ps.send(Sub.newblock)
+
     @staticmethod
     def timeStringToUnix(fmtStr):
         return calendar.timegm(time.strptime(fmtStr, DcrdataClient.timeFmt))
+
     @staticmethod
     def RFC3339toUnix(fmtStr):
         return calendar.timegm(time.strptime(fmtStr, DcrdataClient.rfc3339Z))
@@ -205,16 +233,15 @@ class DcrdataClient(object):
 
 _subcounter = 0
 
+
 def makeSubscription(eventID):
     global _subcounter
     _subcounter += 1
     return {
-      "event": "subscribe",
-      "message": {
-        "request_id": _subcounter,
-        "message": eventID,
-      }
+        "event": "subscribe",
+        "message": {"request_id": _subcounter, "message": eventID},
     }
+
 
 class Sub:
     newblock = makeSubscription("newblock")
@@ -222,24 +249,26 @@ class Sub:
     ping = makeSubscription("ping")
     newtxs = makeSubscription("newtxs")
     blockchainSync = makeSubscription("blockchainSync")
+
     def address(addr):
         global _subcounter
         _subcounter += 1
         return {
-          "event": "subscribe",
-          "message": {
-            "request_id": _subcounter,
-            "message": "address:%s" % addr,
-          }
+            "event": "subscribe",
+            "message": {"request_id": _subcounter, "message": "address:%s" % addr},
         }
+
 
 class WebsocketClient(object):
     """
     A WebSocket client.
     """
+
     def __init__(self, path, emitter=None, exitObject=None, decoder=None, encoder=None):
         """
-        See python `socketserver documentation  <https://docs.python.org/3/library/socketserver.html/>`_. for inherited attributes and methods.
+        See python `socketserver documentation
+        <https://docs.python.org/3/library/socketserver.html/>`_.
+        for inherited attributes and methods.
 
         Parameters
         ----------
@@ -258,12 +287,14 @@ class WebsocketClient(object):
         self.socket = None
         self.decoder = decoder if decoder else tinyjson.load
         self.encoder = encoder if encoder else tinyjson.dump
+
     def activate(self):
         """
         Start the server and begin parsing messages
         Returns
         -------
-        True on success. On failure, StrataMinerServer::errMsg is set, and False is returned
+        True on success. On failure, StrataMinerServer::errMsg is set,
+        and False is returned
         """
         self.socket = websocket.WebSocket(sslopt={"cert_reqs": ssl.CERT_NONE})
         self.socket.connect(self.path)
@@ -274,9 +305,11 @@ class WebsocketClient(object):
             return False
         self.errMsg = ""
         return True
+
     def listenLoop(self):
         """
-        This will listen on the socket, with appropriate looping impelemented with select.select
+        This will listen on the socket, with appropriate looping impelemented with
+        select.select
         """
         stringBuffer = ""
         self.handlinBidness = True
@@ -291,27 +324,31 @@ class WebsocketClient(object):
                     status = select.select([self.socket], [], [], 1)
                     sys.stdout.flush()
                 except OSError as e:
-                    if(e.errno == 9):
-                        #OSError: [Errno 9] Bad file descriptor
-                        pass # probably client closed socket
+                    if e.errno == 9:
+                        # OSError: [Errno 9] Bad file descriptor
+                        pass  # probably client closed socket
                     break
                 if status[0]:
                     try:
                         stringBuffer += self.socket.recv()
                     except ConnectionResetError:
-                        break  # ConnectionResetError: [Errno 104] Connection reset by peer
+                        # ConnectionResetError: [Errno 104] Connection reset by peer
+                        break
                     except UnicodeDecodeError as e:
-                        log.error("Error decoding message from client. Msg: '%s', Error:  %s" % (stringBuffer, formatTraceback(e)))
+                        log.error(
+                            "Error decoding message from client. Msg: '%s', Error:  %s"
+                            % (stringBuffer, formatTraceback(e))
+                        )
                         continue
                     except websocket._exceptions.WebSocketConnectionClosedException:
                         # Connection has been closed
                         break
                     except OSError as e:
-                        if(e.errno == 9):
-                            #OSError: [Errno 9] Bad file descriptor
-                            pass # socket was closed
+                        if e.errno == 9:
+                            # OSError: [Errno 9] Bad file descriptor
+                            pass  # socket was closed
                         break
-                    if stringBuffer == "": # server probably closed socket
+                    if stringBuffer == "":  # server probably closed socket
                         break
                     else:
                         try:
@@ -325,6 +362,7 @@ class WebsocketClient(object):
         if self.exitObject:
             self.emitter(self.exitObject)
         self.handlinBidness = False
+
     def send(self, msg):
         if not self.socket:
             log.error("no socket")
@@ -333,9 +371,11 @@ class WebsocketClient(object):
             self.socket.send(self.encoder(msg))
         except Exception as e:
             log.error("Error while sending websocket message: %s" % formatTraceback(e))
+
     def close(self):
         """
-        Attempts to shutdown the server gracefully. Equivalent to setting StrataMinerServer::killerBool = True
+        Attempts to shutdown the server gracefully. Equivalent to setting
+        StrataMinerServer::killerBool = True
         """
         self.killerBool = True
         if self.socket:
@@ -347,33 +387,46 @@ class DcrDataException(Exception):
         self.name = name
         self.message = message
 
+
 class TicketInfo:
     """
     Ticket-related transaction information.
     """
-    def __init__(self, status, purchaseBlock, maturityHeight, expirationHeight,
-                 lotteryBlock, vote, revocation):
-         self.status = status
-         self.purchaseBlock = purchaseBlock
-         self.maturityHeight = maturityHeight
-         self.expirationHeight = expirationHeight
-         self.lotteryBlock = lotteryBlock
-         self.vote = vote
-         self.revocation = revocation
+
+    def __init__(
+        self,
+        status,
+        purchaseBlock,
+        maturityHeight,
+        expirationHeight,
+        lotteryBlock,
+        vote,
+        revocation,
+    ):
+        self.status = status
+        self.purchaseBlock = purchaseBlock
+        self.maturityHeight = maturityHeight
+        self.expirationHeight = expirationHeight
+        self.lotteryBlock = lotteryBlock
+        self.vote = vote
+        self.revocation = revocation
+
     @staticmethod
     def parse(obj):
         return TicketInfo(
-            status = obj["status"],
-            purchaseBlock = obj["purchase_block"],
-            maturityHeight = obj["maturity_height"],
-            expirationHeight = obj["expiration_height"],
-            lotteryBlock = obj["lottery_block"],
-            vote = obj["vote"],
-            revocation = obj["revocation"],
+            status=obj["status"],
+            purchaseBlock=obj["purchase_block"],
+            maturityHeight=obj["maturity_height"],
+            expirationHeight=obj["expiration_height"],
+            lotteryBlock=obj["lottery_block"],
+            vote=obj["vote"],
+            revocation=obj["revocation"],
         )
+
     @staticmethod
     def __fromjson__(obj):
         return TicketInfo.parse(obj)
+
     def __tojson__(self):
         return {
             "status": self.status,
@@ -385,6 +438,7 @@ class TicketInfo:
             "revocation": self.revocation,
         }
 
+
 tinyjson.register(TicketInfo, "TicketInfo")
 
 
@@ -392,8 +446,8 @@ class AgendaChoices:
     """
     Agenda choices such as abstain, yes, no.
     """
-    def __init__(self, ID, description, bits, isabstain,
-                 isno, count, progress):
+
+    def __init__(self, ID, description, bits, isabstain, isno, count, progress):
         self.id = ID
         self.description = description
         self.bits = bits
@@ -419,8 +473,18 @@ class Agenda:
     """
     An agenda with name, description, and AgendaChoices.
     """
-    def __init__(self, ID, description, mask, starttime, expiretime,
-                 status, quorumprogress, choices):
+
+    def __init__(
+        self,
+        ID,
+        description,
+        mask,
+        starttime,
+        expiretime,
+        status,
+        quorumprogress,
+        choices,
+    ):
         self.id = ID
         self.description = description
         self.mask = mask
@@ -449,8 +513,18 @@ class AgendasInfo:
     All current agenda information for the current network. agendas contains
     a list of Agenda.
     """
-    def __init__(self, currentheight, startheight, endheight, HASH,
-                 voteversion, quorum, totalvotes, agendas):
+
+    def __init__(
+        self,
+        currentheight,
+        startheight,
+        endheight,
+        HASH,
+        voteversion,
+        quorum,
+        totalvotes,
+        agendas,
+    ):
         self.currentheight = currentheight
         self.startheight = startheight
         self.endheight = endheight
@@ -479,9 +553,21 @@ class UTXO(object):
     The UTXO is part of the wallet API. BlockChains create and parse UTXO
     objects and fill fields as required by the Wallet.
     """
-    def __init__(self, address, txid, vout, ts=None, scriptPubKey=None,
-                 height=-1, amount=0, satoshis=0, maturity=None,
-                 scriptClass=None, tinfo=None):
+
+    def __init__(
+        self,
+        address,
+        txid,
+        vout,
+        ts=None,
+        scriptPubKey=None,
+        height=-1,
+        amount=0,
+        satoshis=0,
+        maturity=None,
+        scriptClass=None,
+        tinfo=None,
+    ):
         self.address = address
         self.txid = txid
         self.vout = vout
@@ -510,9 +596,11 @@ class UTXO(object):
             "scriptClass": self.scriptClass,
             "tinfo": self.tinfo,
         }
+
     @staticmethod
     def __fromjson__(obj):
         return UTXO.parse(obj)
+
     @staticmethod
     def parse(obj):
         """
@@ -522,25 +610,27 @@ class UTXO(object):
             obj (dict): The dcrdata /api/tx response, decoded.
         """
         utxo = UTXO(
-            address = obj["address"],
-            txid = obj["txid"],
-            vout = obj["vout"],
-            ts = obj["ts"] if "ts" in obj else None,
-            scriptPubKey = ByteArray(obj["scriptPubKey"]),
-            height = obj["height"] if "height" in obj else -1,
-            amount = obj["amount"] if "amount" in obj else 0,
-            satoshis = obj["satoshis"] if "satoshis" in obj else 0,
-            maturity = obj["maturity"] if "maturity" in obj else None,
-            tinfo = obj["tinfo"] if "tinfo" in obj else None,
+            address=obj["address"],
+            txid=obj["txid"],
+            vout=obj["vout"],
+            ts=obj["ts"] if "ts" in obj else None,
+            scriptPubKey=ByteArray(obj["scriptPubKey"]),
+            height=obj["height"] if "height" in obj else -1,
+            amount=obj["amount"] if "amount" in obj else 0,
+            satoshis=obj["satoshis"] if "satoshis" in obj else 0,
+            maturity=obj["maturity"] if "maturity" in obj else None,
+            tinfo=obj["tinfo"] if "tinfo" in obj else None,
         )
         utxo.parseScriptClass()
         return utxo
+
     def parseScriptClass(self):
         """
         Set the script class.
         """
         if self.scriptPubKey:
             self.scriptClass = txscript.getScriptClass(0, self.scriptPubKey)
+
     def confirm(self, block, tx, params):
         """
         This output has been mined. Set the block details.
@@ -551,8 +641,11 @@ class UTXO(object):
             params (object): The network parameters.
         """
         self.height = block.height
-        self.maturity = block.height + params.CoinbaseMaturity if tx.looksLikeCoinbase() else None
+        self.maturity = (
+            block.height + params.CoinbaseMaturity if tx.looksLikeCoinbase() else None
+        )
         self.ts = block.timestamp
+
     def isSpendable(self, tipHeight):
         """
         isSpendable will be True if the UTXO is considered mature at the
@@ -569,11 +662,13 @@ class UTXO(object):
         if self.maturity:
             return self.maturity <= tipHeight
         return True
+
     def key(self):
         """
         A unique ID for this UTXO.
         """
         return UTXO.makeKey(self.txid, self.vout)
+
     @staticmethod
     def makeKey(txid, vout):
         """
@@ -584,6 +679,7 @@ class UTXO(object):
             vout (int): UTXO's transaction output index.
         """
         return txid + "#" + str(vout)
+
     def setTicketInfo(self, apiTinfo):
         """
         Set the ticket info. Only useful for tickets.
@@ -593,6 +689,7 @@ class UTXO(object):
         """
         self.tinfo = TicketInfo.parse(apiTinfo)
         self.maturity = self.tinfo.maturityHeight
+
     def isTicket(self):
         """
         isTicket will be True if this is SSTX output.
@@ -601,6 +698,7 @@ class UTXO(object):
             bool: True if this is an SSTX output.
         """
         return self.scriptClass == txscript.StakeSubmissionTy
+
     def isLiveTicket(self):
         """
         isLiveTicket will return True if this is a live ticket.
@@ -609,6 +707,7 @@ class UTXO(object):
             bool. True if this is a live ticket.
         """
         return self.tinfo and self.tinfo.status in ("immature", "live")
+
 
 tinyjson.register(UTXO, "dcr.UTXO")
 
@@ -639,6 +738,7 @@ def makeOutputs(pairs, chain):
         outputs.append(msgtx.TxOut(value=amt, pkScript=pkScript))
     return outputs
 
+
 def checkOutput(output, fee):
     """
     checkOutput performs simple consensus and policy tests on a transaction
@@ -663,6 +763,7 @@ def checkOutput(output, fee):
     if txscript.isDustOutput(output, fee):
         raise Exception("policy violation: transaction output is dust")
 
+
 def hashFromHex(s):
     """
     Parse a transaction hash or block hash from a hexadecimal string.
@@ -675,6 +776,7 @@ def hashFromHex(s):
     """
     return reversed(ByteArray(s))
 
+
 def hexFromHash(h):
     """
     Parse a tx or block hash from a ByteArray.
@@ -684,10 +786,12 @@ def hexFromHash(h):
     """
     return reversed(h).hex()
 
+
 class DcrdataBlockchain(object):
     """
     DcrdataBlockchain implements the Blockchain API from tinydecred.api.
     """
+
     def __init__(self, dbPath, params, datapath, skipConnect=False):
         """
         Args:
@@ -717,17 +821,16 @@ class DcrdataBlockchain(object):
         """
         Connect to dcrdata.
         """
-        self.dcrdata = DcrdataClient(
-            self.datapath,
-            emitter=self.pubsubSignal,
-        )
+        self.dcrdata = DcrdataClient(self.datapath, emitter=self.pubsubSignal,)
         self.updateTip()
+
     def close(self):
         """
         close any underlying connections.
         """
         if self.dcrdata:
             self.dcrdata.close()
+
     def subscribeBlocks(self, receiver):
         """
         Subscribe to new block notifications.
@@ -760,7 +863,7 @@ class DcrdataBlockchain(object):
         log.debug("subscribing to addresses %s" % repr(addrs))
         if receiver:
             self.addressReceiver = receiver
-        elif self.addressReceiver == None:
+        elif self.addressReceiver is None:
             raise Exception("must set receiver to subscribe to addresses")
         self.dcrdata.subscribeAddresses(addrs)
 
@@ -786,9 +889,10 @@ class DcrdataBlockchain(object):
             try:
                 rawTinfo = self.dcrdata.tx.tinfo(utxo.txid)
                 utxo.setTicketInfo(rawTinfo)
-            except:
+            except Exception:
                 utxo.tinfo = TicketInfo("mempool", None, -1, -1, None, 0, None)
         return utxo
+
     def UTXOs(self, addrs):
         """
         UTXOs will produce any known UTXOs for the list of addresses.
@@ -798,15 +902,16 @@ class DcrdataBlockchain(object):
         """
         utxos = []
         addrCount = len(addrs)
-        addrsPerRequest = 20 # dcrdata allows 25
+        addrsPerRequest = 20  # dcrdata allows 25
         get = lambda addrs: self.dcrdata.insight.api.addr.utxo(",".join(addrs))
-        for i in range(addrCount//addrsPerRequest+1):
-            start = i*addrsPerRequest
+        for i in range(addrCount // addrsPerRequest + 1):
+            start = i * addrsPerRequest
             end = start + addrsPerRequest
             if start < addrCount:
                 ads = addrs[start:end]
                 utxos += [self.processNewUTXO(u) for u in get(ads)]
         return utxos
+
     def txsForAddr(self, addr):
         """
         Get the transaction IDs for the provided address.
@@ -816,8 +921,9 @@ class DcrdataBlockchain(object):
         """
         addrInfo = self.dcrdata.insight.api.addr.txs(addr)
         if "transactions" not in addrInfo:
-            return  []
+            return []
         return addrInfo["transactions"]
+
     def txVout(self, txid, vout):
         """
         Get a UTXO from the outpoint. The UTXO will not have the address set.
@@ -828,12 +934,12 @@ class DcrdataBlockchain(object):
         tx = self.tx(txid)
         txout = tx.txOut[vout]
         utxo = UTXO(
-            address = None,
-            txid = txid,
-            vout = vout,
-            scriptPubKey = txout.pkScript,
-            amount = round(txout.value*1e-8),
-            satoshis = txout.value,
+            address=None,
+            txid=txid,
+            vout=vout,
+            scriptPubKey=txout.pkScript,
+            amount=round(txout.value * 1e-8),
+            satoshis=txout.value,
         )
         self.confirmUTXO(utxo, None, tx)
         return utxo
@@ -862,9 +968,13 @@ class DcrdataBlockchain(object):
                     encoded = ByteArray(txHex)
                     txDB[hashKey] = encoded.bytes()
                     return msgtx.MsgTx.deserialize(encoded)
-                except:
-                    log.warning("unable to retrieve tx data from dcrdata at %s" % self.dcrdata.baseUri)
+                except Exception:
+                    log.warning(
+                        "unable to retrieve tx data from dcrdata at %s"
+                        % self.dcrdata.baseUri
+                    )
         raise Exception("failed to reteive transaction")
+
     def blockForTx(self, txid):
         """
         Get the BlockHeader for the transaction.
@@ -881,14 +991,17 @@ class DcrdataBlockchain(object):
             except database.NoValue:
                 # If the blockhash is not in the database, get it from dcrdata
                 decodedTx = self.dcrdata.tx(txid)
-                if ("block" not in decodedTx or
-                   "blockhash" not in decodedTx["block"] or
-                   decodedTx["block"]["blockhash"] == ""):
+                if (
+                    "block" not in decodedTx
+                    or "blockhash" not in decodedTx["block"]
+                    or decodedTx["block"]["blockhash"] == ""
+                ):
                     return None
                 hexHash = decodedTx["block"]["blockhash"]
                 header = self.blockHeader(hexHash)
                 txblk[txHash] = header.hash().bytes()
                 return header
+
     def decodedTx(self, txid):
         """
         decodedTx will produce a transaction as a Python dict.
@@ -900,6 +1013,7 @@ class DcrdataBlockchain(object):
             dict: A Python dict with transaction information.
         """
         return self.dcrdata.tx(txid)
+
     def blockHeader(self, hexHash):
         """
         blockHeader will produce a blockHeader implements the BlockHeader API.
@@ -917,12 +1031,17 @@ class DcrdataBlockchain(object):
             except database.NoValue:
                 try:
                     block = self.dcrdata.block.hash.header.raw(hexHash)
-                    blockHeader = msgblock.BlockHeader.deserialize(ByteArray(block["hex"]))
+                    blockHeader = msgblock.BlockHeader.deserialize(
+                        ByteArray(block["hex"])
+                    )
                     self.saveBlockHeader(blockHeader)
                     return blockHeader
                 except Exception as e:
-                    log.warning("unable to retrieve block header: %s" % formatTraceback(e))
+                    log.warning(
+                        "unable to retrieve block header: %s" % formatTraceback(e)
+                    )
         raise Exception("failed to get block header for block %s" % hexHash)
+
     def blockHeaderByHeight(self, height):
         """
         Get the block header by height. The blcck header is retreived from the
@@ -945,14 +1064,16 @@ class DcrdataBlockchain(object):
                     blockHeader = msgblock.BlockHeader.deserialize(ByteArray(hexBlock))
                     self.saveBlockHeader(blockHeader)
                     return blockHeader
-                except:
+                except Exception:
                     log.warning("unable to retrieve block header")
         raise Exception("failed to get block header at height %i" % height)
+
     def bestBlock(self):
         """
         bestBlock will produce a decoded block as a Python dict.
         """
         return self.dcrdata.block.best()
+
     def stakeDiff(self):
         """
         Get the current stake difficulty a.k.a. ticket price.
@@ -960,7 +1081,8 @@ class DcrdataBlockchain(object):
         Returns:
             int: The ticket price.
         """
-        return int(round(self.dcrdata.stake.diff()["next"]*1e8))
+        return int(round(self.dcrdata.stake.diff()["next"] * 1e8))
+
     def updateTip(self):
         """
         Update the tip block. If the wallet is subscribed to block updates,
@@ -972,6 +1094,7 @@ class DcrdataBlockchain(object):
         except Exception as e:
             log.error("failed to retrieve tip from blockchain: %s" % formatTraceback(e))
         raise Exception("no tip data retrieved")
+
     def relayFee(self):
         """
         Return the current transaction fee.
@@ -979,7 +1102,8 @@ class DcrdataBlockchain(object):
         Returns:
             int: Atoms per kB of encoded transaction.
         """
-        return  txscript.DefaultRelayFeePerKb
+        return txscript.DefaultRelayFeePerKb
+
     def saveBlockHeader(self, header):
         """
         Save the block header to the database.
@@ -991,6 +1115,7 @@ class DcrdataBlockchain(object):
         with self.heightMap as heightMap, self.headerDB as headers:
             heightMap[header.height] = bHash
             headers[bHash] = header.serialize().bytes()
+
     def sendToAddress(self, value, address, keysource, utxosource, feeRate=None):
         """
         Send the amount in atoms to the specified address.
@@ -1011,6 +1136,7 @@ class DcrdataBlockchain(object):
         self.updateTip()
         outputs = makeOutputs([(address, value)], self.params)
         return self.sendOutputs(outputs, keysource, utxosource, feeRate)
+
     def broadcast(self, txHex):
         """
         Broadcast the hex encoded transaction to dcrdata.
@@ -1020,13 +1146,12 @@ class DcrdataBlockchain(object):
         """
         try:
             log.debug("sending %r to dcrdata" % txHex)
-            self.dcrdata.insight.api.tx.send.post({
-                "rawtx": txHex,
-            })
+            self.dcrdata.insight.api.tx.send.post({"rawtx": txHex})
             return True
         except Exception as e:
             log.error("broadcast error: %s" % e)
             raise e
+
     def pubsubSignal(self, sig):
         """
         Process a notifictation from the block explorer.
@@ -1058,11 +1183,13 @@ class DcrdataBlockchain(object):
                 raise Exception("unknown signal %s" % repr(sigType))
         except Exception as e:
             log.error("failed to process pubsub message: %s" % formatTraceback(e))
+
     def changeScript(self, changeAddress):
         """
         Get a pubkey script for a change output.
         """
         return txscript.makePayToAddrScript(changeAddress, self.params)
+
     def approveUTXO(self, utxo):
         # If the UTXO appears unconfirmed, see if it can be confirmed.
         if utxo.maturity and self.tip["height"] < utxo.maturity:
@@ -1071,6 +1198,7 @@ class DcrdataBlockchain(object):
             # Temporary until revocations implemented.
             return False
         return True
+
     def confirmUTXO(self, utxo, block=None, tx=None):
         if not tx:
             # No tx found is an issue, so pass the exception.
@@ -1081,10 +1209,13 @@ class DcrdataBlockchain(object):
                 block = self.blockForTx(utxo.txid)
             utxo.confirm(block, tx, self.params)
             return True
-        except:
+        except Exception:
             pass
         return False
-    def sendOutputs(self, outputs, keysource, utxosource, feeRate=None): # , minconf=1, randomizeChangeIdx=True):
+
+    def sendOutputs(
+        self, outputs, keysource, utxosource, feeRate=None
+    ):  # , minconf=1, randomizeChangeIdx=True):
         """
         Send the `TxOut`s to the address.
 
@@ -1123,7 +1254,9 @@ class DcrdataBlockchain(object):
         for (i, txout) in enumerate(outputs):
             checkOutput(txout, relayFeePerKb)
 
-        signedSize = txscript.estimateSerializeSize([txscript.RedeemP2PKHSigScriptSize], outputs, changeScriptSize)
+        signedSize = txscript.estimateSerializeSize(
+            [txscript.RedeemP2PKHSigScriptSize], outputs, changeScriptSize
+        )
         targetFee = txscript.calcMinRequiredTxRelayFee(relayFeePerKb, signedSize)
         targetAmount = sum(txo.value for txo in outputs)
 
@@ -1137,12 +1270,12 @@ class DcrdataBlockchain(object):
                 txout = tx.txOut[utxo.vout]
 
                 opCodeClass = txscript.getP2PKHOpCode(txout.pkScript)
-                tree = wire.TxTreeRegular if opCodeClass == txscript.opNonstake else wire.TxTreeStake
-                op = msgtx.OutPoint(
-                    txHash=tx.hash(),
-                    idx=utxo.vout,
-                    tree=tree
+                tree = (
+                    wire.TxTreeRegular
+                    if opCodeClass == txscript.opNonstake
+                    else wire.TxTreeStake
                 )
+                op = msgtx.OutPoint(txHash=tx.hash(), idx=utxo.vout, tree=tree)
                 txIn = msgtx.TxIn(previousOutPoint=op, valueIn=txout.value)
 
                 total += txout.value
@@ -1150,7 +1283,9 @@ class DcrdataBlockchain(object):
                 scripts.append(txout.pkScript)
                 scriptSizes.append(txscript.spendScriptSize(txout.pkScript))
 
-            signedSize = txscript.estimateSerializeSize(scriptSizes, outputs, changeScriptSize)
+            signedSize = txscript.estimateSerializeSize(
+                scriptSizes, outputs, changeScriptSize
+            )
             requiredFee = txscript.calcMinRequiredTxRelayFee(relayFeePerKb, signedSize)
             remainingAmount = total - targetAmount
             if remainingAmount < requiredFee:
@@ -1158,26 +1293,30 @@ class DcrdataBlockchain(object):
                 continue
 
             newTx = msgtx.MsgTx(
-                serType =  wire.TxSerializeFull,
-                version =  txscript.generatedTxVersion,
-                txIn =     inputs,
-                txOut =    outputs,
-                lockTime = 0,
-                expiry =   0,
-                cachedHash = None,
+                serType=wire.TxSerializeFull,
+                version=txscript.generatedTxVersion,
+                txIn=inputs,
+                txOut=outputs,
+                lockTime=0,
+                expiry=0,
+                cachedHash=None,
             )
 
             change = None
             newUTXOs = []
             changeVout = -1
             changeAmount = round(total - targetAmount - requiredFee)
-            if changeAmount != 0 and not txscript.isDustAmount(changeAmount, changeScriptSize, relayFeePerKb):
+            if changeAmount != 0 and not txscript.isDustAmount(
+                changeAmount, changeScriptSize, relayFeePerKb
+            ):
                 if len(changeScript) > txscript.MaxScriptElementSize:
-                    raise Exception("script size exceed maximum bytes pushable to the stack")
+                    raise Exception(
+                        "script size exceed maximum bytes pushable to the stack"
+                    )
                 change = msgtx.TxOut(
-                    value =    changeAmount,
-                    version =  changeScriptVersion,
-                    pkScript = changeScript,
+                    value=changeAmount,
+                    version=changeScriptVersion,
+                    pkScript=changeScript,
                 )
                 changeVout = len(newTx.txOut)
                 newTx.txOut.append(change)
@@ -1186,27 +1325,41 @@ class DcrdataBlockchain(object):
 
             # dcrwallet conditionally randomizes the change position here
             if len(newTx.txIn) != len(scripts):
-                raise Exception("tx.TxIn and prevPkScripts slices must have equal length")
+                raise Exception(
+                    "tx.TxIn and prevPkScripts slices must have equal length"
+                )
 
             # Sign the inputs
             for i, txin in enumerate(newTx.txIn):
                 pkScript = scripts[i]
                 sigScript = txin.signatureScript
-                scriptClass, addrs, numAddrs = txscript.extractPkScriptAddrs(0, pkScript, self.params)
-                script = txscript.signTxOutput(self.params, newTx, i, pkScript,
-                    txscript.SigHashAll, keysource, sigScript, crypto.STEcdsaSecp256k1)
+                scriptClass, addrs, numAddrs = txscript.extractPkScriptAddrs(
+                    0, pkScript, self.params
+                )
+                script = txscript.signTxOutput(
+                    self.params,
+                    newTx,
+                    i,
+                    pkScript,
+                    txscript.SigHashAll,
+                    keysource,
+                    sigScript,
+                    crypto.STEcdsaSecp256k1,
+                )
                 txin.signatureScript = script
             self.broadcast(newTx.txHex())
             if change:
-                newUTXOs.append(UTXO(
-                    address = changeAddress,
-                    txid = newTx.txid(),
-                    vout = changeVout,
-                    ts = int(time.time()),
-                    scriptPubKey = changeScript,
-                    amount = changeAmount*1e-8,
-                    satoshis = changeAmount,
-                ))
+                newUTXOs.append(
+                    UTXO(
+                        address=changeAddress,
+                        txid=newTx.txid(),
+                        vout=changeVout,
+                        ts=int(time.time()),
+                        scriptPubKey=changeScript,
+                        amount=changeAmount * 1e-8,
+                        satoshis=changeAmount,
+                    )
+                )
 
             return newTx, utxos, newUTXOs
 
@@ -1247,7 +1400,7 @@ class DcrdataBlockchain(object):
 
         # Perform a sanity check on expiry.
         tipHeight = self.tip["height"]
-        if req.expiry <= tipHeight+1 and req.expiry > 0:
+        if req.expiry <= tipHeight + 1 and req.expiry > 0:
             raise Exception("expiry height must be above next block height")
 
         # Fetch a new address for creating a split transaction. Then,
@@ -1266,7 +1419,9 @@ class DcrdataBlockchain(object):
 
         # Ensure the ticket price does not exceed the spend limit if set.
         if req.spendLimit > 0 and ticketPrice > req.spendLimit:
-           raise Exception("ticket price %f above spend limit %f" % (ticketPrice, req.spendLimit))
+            raise Exception(
+                "ticket price %f above spend limit %f" % (ticketPrice, req.spendLimit)
+            )
 
         # Check that pool fees is zero, which will result in invalid zero-valued
         # outputs.
@@ -1293,10 +1448,15 @@ class DcrdataBlockchain(object):
         # The stake submission pkScript is tagged by an OP_SSTX.
         if isinstance(votingAddress, crypto.AddressScriptHash):
             stakeSubmissionPkScriptSize = txscript.P2SHPkScriptSize + 1
-        elif isinstance(votingAddress, crypto.AddressPubKeyHash) and votingAddress.sigType == crypto.STEcdsaSecp256k1:
+        elif (
+            isinstance(votingAddress, crypto.AddressPubKeyHash)
+            and votingAddress.sigType == crypto.STEcdsaSecp256k1
+        ):
             stakeSubmissionPkScriptSize = txscript.P2PKHPkScriptSize + 1
         else:
-            raise Exception("unsupported voting address type %s" % votingAddress.__class__.__name__)
+            raise Exception(
+                "unsupported voting address type %s" % votingAddress.__class__.__name__
+            )
 
         ticketFeeIncrement = req.ticketFee
         if ticketFeeIncrement == 0:
@@ -1315,11 +1475,14 @@ class DcrdataBlockchain(object):
         #
         #   NB: The wallet currently only supports P2PKH change addresses.
         #   The network supports both P2PKH and P2SH change addresses however.
-        inSizes = [txscript.RedeemP2PKHSigScriptSize,
-            txscript.RedeemP2PKHSigScriptSize]
-        outSizes = [stakeSubmissionPkScriptSize,
-            txscript.TicketCommitmentScriptSize, txscript.TicketCommitmentScriptSize,
-            txscript.P2PKHPkScriptSize + 1, txscript.P2PKHPkScriptSize + 1]
+        inSizes = [txscript.RedeemP2PKHSigScriptSize, txscript.RedeemP2PKHSigScriptSize]
+        outSizes = [
+            stakeSubmissionPkScriptSize,
+            txscript.TicketCommitmentScriptSize,
+            txscript.TicketCommitmentScriptSize,
+            txscript.P2PKHPkScriptSize + 1,
+            txscript.P2PKHPkScriptSize + 1,
+        ]
         estSize = txscript.estimateSerializeSizeFromScriptSizes(inSizes, outSizes, 0)
 
         ticketFee = txscript.calcMinRequiredTxRelayFee(ticketFeeIncrement, estSize)
@@ -1327,8 +1490,14 @@ class DcrdataBlockchain(object):
 
         # If we need to calculate the amount for a pool fee percentage,
         # do so now.
-        poolFeeAmt = txscript.stakePoolTicketFee(ticketPrice, ticketFee,
-                tipHeight, req.poolFees, self.subsidyCache, self.params)
+        poolFeeAmt = txscript.stakePoolTicketFee(
+            ticketPrice,
+            ticketFee,
+            tipHeight,
+            req.poolFees,
+            self.subsidyCache,
+            self.params,
+        )
 
         # Fetch the single use split address to break tickets into, to
         # immediately be consumed as tickets.
@@ -1349,16 +1518,10 @@ class DcrdataBlockchain(object):
             poolAmt = poolFeeAmt
 
             # Pool amount.
-            splitOuts.append(msgtx.TxOut(
-                value =    poolAmt,
-                pkScript = splitPkScript,
-            ))
+            splitOuts.append(msgtx.TxOut(value=poolAmt, pkScript=splitPkScript,))
 
             # User amount.
-            splitOuts.append(msgtx.TxOut(
-                value =    userAmt,
-                pkScript = splitPkScript,
-            ))
+            splitOuts.append(msgtx.TxOut(value=userAmt, pkScript=splitPkScript,))
 
         txFeeIncrement = req.txFee
         if txFeeIncrement == 0:
@@ -1366,7 +1529,9 @@ class DcrdataBlockchain(object):
 
         # Send the split transaction.
         # sendOutputs takes the fee rate in atoms/byte
-        splitTx, splitSpent, internalOutputs = self.sendOutputs(splitOuts, keysource, utxosource, int(txFeeIncrement/1000))
+        splitTx, splitSpent, internalOutputs = self.sendOutputs(
+            splitOuts, keysource, utxosource, int(txFeeIncrement / 1000)
+        )
 
         # Generate the tickets individually.
         tickets = []
@@ -1378,50 +1543,53 @@ class DcrdataBlockchain(object):
             # input.
             poolIdx = i * 2
             poolTxOut = splitTx.txOut[poolIdx]
-            userIdx = i*2 + 1
+            userIdx = i * 2 + 1
             txOut = splitTx.txOut[userIdx]
 
             eopPool = txscript.ExtendedOutPoint(
-                op = msgtx.OutPoint(
-                    txHash =  splitTx.hash(),
-                    idx = poolIdx,
-                    tree =  wire.TxTreeRegular,
+                op=msgtx.OutPoint(
+                    txHash=splitTx.hash(), idx=poolIdx, tree=wire.TxTreeRegular,
                 ),
-                amt =      poolTxOut.value,
-                pkScript = poolTxOut.pkScript,
+                amt=poolTxOut.value,
+                pkScript=poolTxOut.pkScript,
             )
             eop = txscript.ExtendedOutPoint(
-                op = msgtx.OutPoint(
-                    txHash =  splitTx.hash(),
-                    idx = userIdx,
-                    tree =  wire.TxTreeRegular,
+                op=msgtx.OutPoint(
+                    txHash=splitTx.hash(), idx=userIdx, tree=wire.TxTreeRegular,
                 ),
-                amt =      txOut.value,
-                pkScript = txOut.pkScript,
+                amt=txOut.value,
+                pkScript=txOut.pkScript,
             )
 
             addrSubsidy = txscript.decodeAddress(keysource.internal(), self.params)
 
             # Generate the ticket msgTx and sign it.
-            ticket = txscript.makeTicket(self.params, eopPool, eop, votingAddress,
-                addrSubsidy, ticketPrice, poolAddress)
+            ticket = txscript.makeTicket(
+                self.params,
+                eopPool,
+                eop,
+                votingAddress,
+                addrSubsidy,
+                ticketPrice,
+                poolAddress,
+            )
             forSigning = []
             eopPoolCredit = txscript.Credit(
-                op =     eopPool.op,
-                blockMeta =    None,
-                amount =       eopPool.amt,
-                pkScript =     eopPool.pkScript,
-                received =     int(time.time()),
-                fromCoinBase = False,
+                op=eopPool.op,
+                blockMeta=None,
+                amount=eopPool.amt,
+                pkScript=eopPool.pkScript,
+                received=int(time.time()),
+                fromCoinBase=False,
             )
             forSigning.append(eopPoolCredit)
             eopCredit = txscript.Credit(
-                op =     eop.op,
-                blockMeta =    None,
-                amount =       eop.amt,
-                pkScript =     eop.pkScript,
-                received =     int(time.time()),
-                fromCoinBase = False,
+                op=eop.op,
+                blockMeta=None,
+                amount=eop.amt,
+                pkScript=eop.pkScript,
+                received=int(time.time()),
+                fromCoinBase=False,
             )
             forSigning.append(eopCredit)
 
@@ -1446,13 +1614,15 @@ class DcrdataBlockchain(object):
 
             # Add a UTXO to the internal outputs list.
             txOut = ticket.txOut[0]
-            internalOutputs.append(UTXO(
-                address = votingAddress.string(),
-                txid = ticket.txid(),
-                vout = 0, # sstx is output 0
-                ts = int(time.time()),
-                scriptPubKey = txOut.pkScript,
-                amount = txOut.value*1e-8,
-                satoshis = txOut.value,
-            ))
+            internalOutputs.append(
+                UTXO(
+                    address=votingAddress.string(),
+                    txid=ticket.txid(),
+                    vout=0,  # sstx is output 0
+                    ts=int(time.time()),
+                    scriptPubKey=txOut.pkScript,
+                    amount=txOut.value * 1e-8,
+                    satoshis=txOut.value,
+                )
+            )
         return (splitTx, tickets), splitSpent, internalOutputs

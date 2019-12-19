@@ -5,8 +5,9 @@ See LICENSE for details
 
 PGP-based mnemonic seed generation.
 """
-from tinydecred.crypto.crypto import sha256ChecksumByte
+
 from tinydecred.crypto.bytearray import ByteArray
+from tinydecred.crypto.crypto import sha256ChecksumByte
 
 alternatingWords = """aardvark
 adroitness
@@ -529,6 +530,7 @@ def pgWords():
         idxMap[word.lower()] = i
     return wordList, idxMap
 
+
 def encode(seed):
     """
     Encode the seed to a mnemonic seed.
@@ -542,18 +544,20 @@ def encode(seed):
     if isinstance(seed, ByteArray):
         seed = seed.bytes()
     wordList, _ = pgWords()
+
     def byteToMnemonic(b, i):
         bb = b * 2
-        if i%2 != 0:
+        if i % 2 != 0:
             bb += 1
         return wordList[bb]
 
-    words = [""]*(len(seed)+1)
+    words = [""] * (len(seed) + 1)
     for i, b in enumerate(seed):
         words[i] = byteToMnemonic(b, i)
     checksum = sha256ChecksumByte(seed)
-    words[len(words)-1] = byteToMnemonic(checksum, len(seed))
+    words[len(words) - 1] = byteToMnemonic(checksum, len(seed))
     return words
+
 
 def decode(words):
     """
@@ -561,7 +565,7 @@ def decode(words):
     words that are whitespace are empty are skipped.
     """
     _, byteMap = pgWords()
-    decoded = [0]*len(words)
+    decoded = [0] * len(words)
     idx = 0
     for word in words:
         word = word.strip().lower()
@@ -570,8 +574,11 @@ def decode(words):
         if word not in byteMap:
             raise Exception("unknown words in mnemonic key: %s" % word)
         b = byteMap[word]
-        if int(b%2) != idx%2:
-            raise Exception("word %v is not valid at position %v, check for missing words" % (word, idx))
+        if int(b % 2) != idx % 2:
+            raise Exception(
+                "word %v is not valid at position %v, check for missing words"
+                % (word, idx)
+            )
         decoded[idx] = b // 2
         idx += 1
     return ByteArray(decoded[:idx])

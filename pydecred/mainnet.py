@@ -13,15 +13,15 @@ DefaultPort = "9108"
 DNSSeeds = [
     ("mainnet-seed.decred.mindcry.org", True),
     ("mainnet-seed.decred.netpurgatory.com", True),
-    ("mainnet-seed.decred.org", True)
+    ("mainnet-seed.decred.org", True),
 ]
 GenesisHash = "298e5cc3d985bfe7f81dc135f360abe089edd4396b86d2de66b0cef42b21d980"
-PowLimit = 2^224 - 1
+PowLimit = 2 ^ 224 - 1
 
 # POW parameters
-PowLimitBits = 0x1d00ffff
+PowLimitBits = 0x1D00FFFF
 ReduceMinDifficulty = False
-MinDiffReductionTime = 0 # Does not apply since ReduceMinDifficulty false
+MinDiffReductionTime = 0  # Does not apply since ReduceMinDifficulty false
 GenerateSupported = False
 MaximumBlockSizes = [393216]
 MaxTxSize = 393216
@@ -33,7 +33,7 @@ TargetTimespan = C.MINUTE * 5 * 144  # TimePerBlock * WindowSize
 RetargetAdjustmentFactor = 4
 
 # Subsidy parameters.
-BaseSubsidy = 3119582664              # 21m
+BaseSubsidy = 3119582664  # 21m
 MulSubsidy = 100
 DivSubsidy = 101
 SubsidyReductionInterval = 6144
@@ -61,15 +61,17 @@ Checkpoints = [
     (189950, "000000000000007341d8ae2ea7e41f25cee00e1a70a4a3dc1cb055d14ecb2e11"),
     (214672, "0000000000000021d5cbeead55cb7fd659f07e8127358929ffc34cd362209758"),
     (259810, "0000000000000000ee0fbf469a9f32477ffbb46ebd7a280a53c842ab4243f97c"),
-    (295940, "0000000000000000148852c8a919addf4043f9f267b13c08df051d359f1622ca")
+    (295940, "0000000000000000148852c8a919addf4043f9f267b13c08df051d359f1622ca"),
 ]
 
 # The miner confirmation window is defined as:
 #   target proof of work timespan / target proof of work spacing
-RuleChangeActivationQuorum = 4032 # 10 % of RuleChangeActivationInterval * TicketsPerBlock
-RuleChangeActivationMultiplier = 3    # 75%
+RuleChangeActivationQuorum = (
+    4032  # 10 % of RuleChangeActivationInterval * TicketsPerBlock
+)
+RuleChangeActivationMultiplier = 3  # 75%
 RuleChangeActivationDivisor = 4
-RuleChangeActivationInterval = 2016 * 4 # 4 weeks
+RuleChangeActivationInterval = 2016 * 4  # 4 weeks
 
 
 # Enforce current block version once majority of the network has
@@ -88,43 +90,45 @@ AcceptNonStdTxs = False
 
 # Address encoding magics
 NetworkAddressPrefix = "D"
-PubKeyAddrID = (0x1386).to_bytes(2, byteorder="big") # starts with Dk
-PubKeyHashAddrID = (0x073f).to_bytes(2, byteorder="big") # starts with Ds
-PKHEdwardsAddrID = (0x071f).to_bytes(2, byteorder="big") # starts with De
-PKHSchnorrAddrID = (0x0701).to_bytes(2, byteorder="big") # starts with DS
-ScriptHashAddrID = (0x071a).to_bytes(2, byteorder="big") # starts with Dc
-PrivateKeyID = (0x22de).to_bytes(2, byteorder="big") # starts with Pm
+PubKeyAddrID = (0x1386).to_bytes(2, byteorder="big")  # starts with Dk
+PubKeyHashAddrID = (0x073F).to_bytes(2, byteorder="big")  # starts with Ds
+PKHEdwardsAddrID = (0x071F).to_bytes(2, byteorder="big")  # starts with De
+PKHSchnorrAddrID = (0x0701).to_bytes(2, byteorder="big")  # starts with DS
+ScriptHashAddrID = (0x071A).to_bytes(2, byteorder="big")  # starts with Dc
+PrivateKeyID = (0x22DE).to_bytes(2, byteorder="big")  # starts with Pm
 
 # BIP32 hierarchical deterministic extended key magics
-HDPrivateKeyID = (0x02fda4e8).to_bytes(4, byteorder="big") # starts with dprv
-HDPublicKeyID = (0x02fda926).to_bytes(4, byteorder="big") # starts with dpub
+HDPrivateKeyID = (0x02FDA4E8).to_bytes(4, byteorder="big")  # starts with dprv
+HDPublicKeyID = (0x02FDA926).to_bytes(4, byteorder="big")  # starts with dpub
 
 # BIP44 coin type used in the hierarchical deterministic path for
 # address generation.
-SLIP0044CoinType = 42 # SLIP0044, Decred
-LegacyCoinType = 20 # for backwards compatibility
+SLIP0044CoinType = 42  # SLIP0044, Decred
+LegacyCoinType = 20  # for backwards compatibility
 
 # Decred PoS parameters
-MinimumStakeDiff = 2 * 1e8             # 2 Coin
+MinimumStakeDiff = 2 * 1e8  # 2 Coin
 TicketPoolSize = 8192
 TicketsPerBlock = 5
 TicketMaturity = 256
-TicketExpiry = 40960                  # 5*TicketPoolSize
+TicketExpiry = 40960  # 5*TicketPoolSize
 CoinbaseMaturity = 256
 SStxChangeMaturity = 1
 TicketPoolSizeWeight = 4
-StakeDiffAlpha = 1                  # Minimal
+StakeDiffAlpha = 1  # Minimal
 StakeDiffWindowSize = 144
 StakeDiffWindows = 20
 StakeVersionInterval = 144 * 2 * 7  # ~1 week
-MaxFreshStakePerBlock = 20          # 4*TicketsPerBlock
-StakeEnabledHeight = 256 + 256       # CoinbaseMaturity + TicketMaturity
-StakeValidationHeight = 4096        # ~14 days
+MaxFreshStakePerBlock = 20  # 4*TicketsPerBlock
+StakeEnabledHeight = 256 + 256  # CoinbaseMaturity + TicketMaturity
+StakeValidationHeight = 4096  # ~14 days
 StakeBaseSigScript = (0x0000).to_bytes(2, byteorder="big")
 StakeMajorityMultiplier = 3
 StakeMajorityDivisor = 4
 
-OrganizationPkScript = (0xa914f5916158e3e2c4551c1796708db8367207ed13bb87).to_bytes(23, byteorder="big")
+OrganizationPkScript = (0xA914F5916158E3E2C4551C1796708DB8367207ED13BB87).to_bytes(
+    23, byteorder="big"
+)
 OrganizationPkScriptVersion = 0
 
 # Convenience constants

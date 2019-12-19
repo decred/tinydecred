@@ -2,11 +2,13 @@
 Copyright (c) 2019, Brian Stafford
 See LICENSE for details
 """
+
 import json
 
 JSONDecodeError = json.JSONDecodeError
 
 _types = {}
+
 
 def register(cls, k):
     """
@@ -22,6 +24,7 @@ def register(cls, k):
         raise Exception("tinyjson: mutliple attempts to register class %s" % k)
     _types[k] = cls
 
+
 def decoder(obj):
     if "_jt_" in obj:
         for k in obj.keys():
@@ -30,19 +33,22 @@ def decoder(obj):
         return _types[obj["_jt_"]].__fromjson__(obj)
     return obj
 
+
 def load(s):
     """
     Turn the string into an object with the custon decoder.
     """
     return json.loads(s, object_hook=decoder)
 
+
 def loadFile(filepath):
     """
     Load the JSON with a decoder. This method uses load, and therefore
     the custom decoder which recognizes registered types.
     """
-    with open(filepath, 'r') as f:
+    with open(filepath, "r") as f:
         return load(f.read())
+
 
 class Encoder(json.JSONEncoder):
     """
@@ -53,6 +59,7 @@ class Encoder(json.JSONEncoder):
     2. __tojson__: A method that returns an encodable version of itself,
         probably a dict.
     """
+
     def default(self, obj):
         if hasattr(obj.__class__, "__jsontag__"):
             encoded = obj.__tojson__()
@@ -61,11 +68,13 @@ class Encoder(json.JSONEncoder):
         # Let the base class default method raise the TypeError
         return json.JSONEncoder.default(self, obj)
 
+
 def dump(thing, **kwargs):
     """
     Encode the thing to JSON with the JSONCoder.
     """
     return json.dumps(thing, cls=Encoder, **kwargs)
+
 
 def save(filepath, thing, **kwargs):
     """
@@ -73,6 +82,7 @@ def save(filepath, thing, **kwargs):
     """
     with open(filepath, "w") as f:
         f.write(dump(thing, **kwargs))
+
 
 def dumpFmt(thing):
     """

@@ -13,6 +13,7 @@ from tinydecred.crypto.bytearray import ByteArray
 # The duration purchase info is good for.
 PURCHASE_INFO_LIFE = constants.HOUR
 
+
 def resultIsSuccess(res):
     """
     JSON-decoded stake pool responses have a common base structure that enables
@@ -24,13 +25,20 @@ def resultIsSuccess(res):
     Returns:
         bool: True if result fields indicate success.
     """
-    return res and isinstance(res, object) and "status" in res and res["status"] == "success"
+    return (
+        res
+        and isinstance(res, object)
+        and "status" in res
+        and res["status"] == "success"
+    )
+
 
 class PurchaseInfo(object):
     """
     The PurchaseInfo models the response from the 'getpurchaseinfo' endpoint.
     This information is required for validating the pool and creating tickets.
     """
+
     def __init__(self, pi):
         """
         Args:
@@ -44,6 +52,7 @@ class PurchaseInfo(object):
         self.voteBits = get("VoteBits")
         self.voteBitsVersion = get("VoteBitsVersion")
         self.unixTimestamp = get("unixTimestamp", default=time.time())
+
     def __tojson__(self):
         # using upper-camelcase to match keys in api response
         return {
@@ -55,16 +64,20 @@ class PurchaseInfo(object):
             "VoteBitsVersion": self.voteBitsVersion,
             "unixTimestamp": self.unixTimestamp,
         }
+
     @staticmethod
     def __fromjson__(obj):
         return PurchaseInfo(obj)
 
+
 tinyjson.register(PurchaseInfo, "PurchaseInfo")
+
 
 class PoolStats(object):
     """
     PoolStats models the response from the 'stats' endpoint.
     """
+
     def __init__(self, stats):
         """
         Args:
@@ -93,6 +106,7 @@ class PoolStats(object):
         self.userCount = get("UserCount")
         self.userCountActive = get("UserCountActive")
         self.version = get("Version")
+
     def __tojson__(self):
         return {
             "AllMempoolTix": self.allMempoolTix,
@@ -118,11 +132,14 @@ class PoolStats(object):
             "UserCountActive": self.userCountActive,
             "Version": self.version,
         }
+
     @staticmethod
     def __fromjson__(obj):
         return PoolStats(obj)
 
+
 tinyjson.register(PoolStats, "PoolStats")
+
 
 class VotingServiceProvider(object):
     """
@@ -131,6 +148,7 @@ class VotingServiceProvider(object):
     the VSP API. VotingServiceProvider is JSON-serializable if used with
     tinyjson, so can be stored as part of an Account in the wallet.
     """
+
     def __init__(self, url, apiKey):
         """
         Args:
@@ -151,6 +169,7 @@ class VotingServiceProvider(object):
         self.purchaseInfo = None
         self.stats = None
         self.err = None
+
     def __tojson__(self):
         return {
             "url": self.url,
@@ -158,12 +177,14 @@ class VotingServiceProvider(object):
             "purchaseInfo": self.purchaseInfo,
             "stats": self.stats,
         }
+
     @staticmethod
     def __fromjson__(obj):
         sp = VotingServiceProvider(obj["url"], obj["apiKey"])
         sp.purchaseInfo = obj["purchaseInfo"]
         sp.stats = obj["stats"]
         return sp
+
     @staticmethod
     def providers(net):
         """
@@ -178,6 +199,7 @@ class VotingServiceProvider(object):
         vsps = tinyhttp.get("https://api.decred.org/?c=gsd")
         network = "testnet" if net.Name == "testnet3" else net.Name
         return [vsp for vsp in vsps.values() if vsp["Network"] == network]
+
     def apiPath(self, command):
         """
         The full URL for the specified command.
@@ -189,6 +211,7 @@ class VotingServiceProvider(object):
             string: The full URL.
         """
         return "%s/api/v2/%s" % (self.url, command)
+
     def headers(self):
         """
         Make the API request headers.
@@ -197,6 +220,7 @@ class VotingServiceProvider(object):
             object: The headers as a Python object.
         """
         return {"Authorization": "Bearer %s" % self.apiKey}
+
     def validate(self, addr):
         """
         Validate performs some checks that the PurchaseInfo provided by the
@@ -211,9 +235,14 @@ class VotingServiceProvider(object):
         redeemScript = ByteArray(pi.script)
         scriptAddr = crypto.newAddressScriptHash(redeemScript, self.net)
         if scriptAddr.string() != pi.ticketAddress:
-            raise Exception("ticket address mismatch. %s != %s" % (pi.ticketAddress, scriptAddr.string()))
+            raise Exception(
+                "ticket address mismatch. %s != %s"
+                % (pi.ticketAddress, scriptAddr.string())
+            )
         # extract addresses
-        scriptType, addrs, numSigs = txscript.extractPkScriptAddrs(0, redeemScript, self.net)
+        scriptType, addrs, numSigs = txscript.extractPkScriptAddrs(
+            0, redeemScript, self.net
+        )
         if numSigs != 1:
             raise Exception("expected 2 required signatures, found 2")
         found = False
@@ -224,6 +253,7 @@ class VotingServiceProvider(object):
                 break
         if not found:
             raise Exception("signing pubkey not found in redeem script")
+
     def authorize(self, address, net):
         """
         Authorize the stake pool for the provided address and network. Exception
@@ -235,25 +265,33 @@ class VotingServiceProvider(object):
             net (object): The network parameters.
         """
         # An error is returned if the address is already set
-        # {'status': 'error', 'code': 6, 'message': 'address error - address already submitted'}
+        # {'status': 'error', 'code': 6,
+        #     'message': 'address error - address already submitted'}
         # First try to get the purchase info directly.
         self.net = net
         try:
             self.getPurchaseInfo()
             self.validate(address)
         except Exception as e:
-            alreadyRegistered = isinstance(self.err, dict) and "code" in self.err and self.err["code"] == 9
+            alreadyRegistered = (
+                isinstance(self.err, dict)
+                and "code" in self.err
+                and self.err["code"] == 9
+            )
             if not alreadyRegistered:
                 # code 9 is address not set
                 raise e
             # address is not set
-            data = { "UserPubKeyAddr": address }
-            res = tinyhttp.post(self.apiPath("address"), data, headers=self.headers(), urlEncode=True)
+            data = {"UserPubKeyAddr": address}
+            res = tinyhttp.post(
+                self.apiPath("address"), data, headers=self.headers(), urlEncode=True
+            )
             if resultIsSuccess(res):
                 self.getPurchaseInfo()
                 self.validate(address)
             else:
                 raise Exception("unexpected response from 'address': %s" % repr(res))
+
     def getPurchaseInfo(self):
         """
         Get the purchase info from the stake pool API.
@@ -262,7 +300,8 @@ class VotingServiceProvider(object):
             PurchaseInfo: The PurchaseInfo object.
         """
         # An error is returned if the address isn't yet set
-        # {'status': 'error', 'code': 9, 'message': 'purchaseinfo error - no address submitted', 'data': None}
+        # {'status': 'error', 'code': 9,
+        #     'message': 'purchaseinfo error - no address submitted', 'data': None}
         res = tinyhttp.get(self.apiPath("getpurchaseinfo"), headers=self.headers())
         if resultIsSuccess(res):
             pi = PurchaseInfo(res["data"])
@@ -270,13 +309,15 @@ class VotingServiceProvider(object):
             self.purchaseInfo = pi
             return self.purchaseInfo
         self.err = res
-        raise Exception("unexpected response from 'getpurchaseinfo': %r" % (res, ))
+        raise Exception("unexpected response from 'getpurchaseinfo': %r" % (res,))
+
     def updatePurchaseInfo(self):
-        '''
+        """
         Update purchase info if older than PURCHASE_INFO_LIFE.
-        '''
+        """
         if time.time() - self.purchaseInfo.unixTimestamp > PURCHASE_INFO_LIFE:
             self.getPurchaseInfo()
+
     def getStats(self):
         """
         Get the stats from the stake pool API.
@@ -289,6 +330,7 @@ class VotingServiceProvider(object):
             self.stats = PoolStats(res["data"])
             return self.stats
         raise Exception("unexpected response from 'stats': %s" % repr(res))
+
     def setVoteBits(self, voteBits):
         """
         Set the vote preference on the VotingServiceProvider.
@@ -296,12 +338,14 @@ class VotingServiceProvider(object):
         Returns:
             bool: True on success. Exception raised on error.
         """
-        data = { "VoteBits": voteBits }
-        res = tinyhttp.post(self.apiPath("voting"), data, headers=self.headers(), urlEncode=True)
+        data = {"VoteBits": voteBits}
+        res = tinyhttp.post(
+            self.apiPath("voting"), data, headers=self.headers(), urlEncode=True
+        )
         if resultIsSuccess(res):
             self.purchaseInfo.voteBits = voteBits
             return True
         raise Exception("unexpected response from 'voting': %s" % repr(res))
 
-tinyjson.register(VotingServiceProvider, "VotingServiceProvider")
 
+tinyjson.register(VotingServiceProvider, "VotingServiceProvider")

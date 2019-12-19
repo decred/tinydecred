@@ -6,16 +6,20 @@ create_testnet_wallet.py example script to the return address from the testnet
 faucet at https://faucet.decred.org/.
 Before running this script, send the wallet some DCR from the faucet.
 """
+
 import os
 from getpass import getpass
-from tinydecred.wallet.wallet import Wallet
+
 from tinydecred.pydecred import testnet
 from tinydecred.pydecred.dcrdata import DcrdataBlockchain
+from tinydecred.wallet.wallet import Wallet
+
 
 # We need a class that implements the Signals API.
 class Signals(object):
     def balance(self, bal):
         print(bal)
+
 
 # DcrdataBlockchain implements a Blockchain API (see api.py) for Decred.
 dbPath = os.path.join("testnet", "dcr_testnet.db")
@@ -32,9 +36,9 @@ except Exception as e:
     exit()
 
 # Open the wallet and send some DCR.
-recipient = "TsfDLrRkk9ciUuwfp2b8PawwnukYD7yAjGd" # testnet return address
-value = int(1 * 1e8) # 1 DCR, atoms
-acct = 0 # Every wallet has a zeroth Decred account
+recipient = "TsfDLrRkk9ciUuwfp2b8PawwnukYD7yAjGd"  # testnet return address
+value = int(1 * 1e8)  # 1 DCR, atoms
+acct = 0  # Every wallet has a zeroth Decred account
 with wallet.open(acct, password, blockchain, Signals()):
     wallet.sync()
     try:
