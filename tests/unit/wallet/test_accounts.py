@@ -6,7 +6,7 @@ See LICENSE for details
 import unittest
 
 from tinydecred.crypto import crypto
-from tinydecred.crypto.bytearray import ByteArray
+from tinydecred.util.encode import ByteArray
 from tinydecred.pydecred import nets
 from tinydecred.util import helpers
 from tinydecred.wallet import accounts

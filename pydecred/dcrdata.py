@@ -16,8 +16,8 @@ import select
 import atexit
 import websocket
 from tinydecred.util import tinyjson, helpers, database, tinyhttp
-from tinydecred.crypto import crypto, opcode
-from tinydecred.crypto.bytearray import ByteArray
+from tinydecred.crypto import crypto
+from tinydecred.util.encode import ByteArray
 from tinydecred.wallet.api import InsufficientFundsError
 from tinydecred.pydecred import txscript, calc
 from tinydecred.pydecred.wire import msgtx, wire, msgblock
@@ -801,15 +801,21 @@ class DcrdataBlockchain(object):
     DcrdataBlockchain implements the Blockchain API from tinydecred.api.
     """
 
-    def __init__(self, dbPath, params, datapath, skipConnect=False):
+    def __init__(self, db, params, datapath, skipConnect=False):
         """
         Args:
-            dbPath str: A database file path
+            db (str||database.Bucket): The database bucket or a filepath. If
+                a filepath, a new database will be created.
             params obj: Network parameters
             datapath str: A uri for a dcrdata server
             skipConnect bool: Skip initial connection
         """
-        self.db = KeyValueDatabase(dbPath)
+        # Allow string arguments for datab
+        self.ownsDB = False
+        if isinstance(db, str):
+            self.ownsDB = True
+            db = KeyValueDatabase(db)
+        self.db = db
         self.params = params
         # The blockReceiver and addressReceiver will be set when the respective
         # subscribe* method is called.
@@ -817,10 +823,10 @@ class DcrdataBlockchain(object):
         self.addressReceiver = None
         self.datapath = datapath
         self.dcrdata = None
-        self.txDB = self.db.getBucket("tx")
-        self.heightMap = self.db.getBucket("height", datatypes=("INTEGER", "BLOB"))
-        self.headerDB = self.db.getBucket("header")
-        self.txBlockMap = self.db.getBucket("blocklink")
+        self.txDB = db.child("tx", blobber=msgtx.MsgTx)
+        self.heightMap = db.child("height", datatypes=("INTEGER", "BLOB"))
+        self.headerDB = db.child("header", blobber=msgblock.BlockHeader)
+        self.txBlockMap = db.child("blocklink")
         self.tip = None
         self.subsidyCache = calc.SubsidyCache(params)
         if not skipConnect:
@@ -839,6 +845,8 @@ class DcrdataBlockchain(object):
         """
         if self.dcrdata:
             self.dcrdata.close()
+        if self.ownsDB:
+            self.db.close()
 
     def subscribeBlocks(self, receiver):
         """
@@ -964,24 +972,22 @@ class DcrdataBlockchain(object):
             MsgTx: The transaction.
         """
         hashKey = hashFromHex(txid).bytes()
-        with self.txDB as txDB:
+        try:
+            return self.txDB[hashKey]
+        except database.NoValue:
             try:
-                encoded = ByteArray(txDB[hashKey])
-                return msgtx.MsgTx.deserialize(encoded)
-            except database.NoValue:
-                try:
-                    # Grab the hex encoded transaction
-                    txHex = self.dcrdata.tx.hex(txid)
-                    if not txHex:
-                        raise Exception("failed to retrieve tx hex from dcrdata")
-                    encoded = ByteArray(txHex)
-                    txDB[hashKey] = encoded.bytes()
-                    return msgtx.MsgTx.deserialize(encoded)
-                except Exception:
-                    log.warning(
-                        "unable to retrieve tx data from dcrdata at %s"
-                        % self.dcrdata.baseUri
-                    )
+                # Grab the hex encoded transaction
+                txHex = self.dcrdata.tx.hex(txid)
+                if not txHex:
+                    raise Exception("failed to retrieve tx hex from dcrdata")
+                msgTx = msgtx.MsgTx.deserialize(ByteArray(txHex))
+                self.txDB[hashKey] = msgTx
+                return msgTx
+            except Exception:
+                log.warning(
+                    "unable to retrieve tx data from dcrdata at %s"
+                    % self.dcrdata.baseUri
+                )
         raise Exception("failed to reteive transaction")
 
     def blockForTx(self, txid):
@@ -992,24 +998,23 @@ class DcrdataBlockchain(object):
             txid (str): The transaction ID.
         """
         txHash = hashFromHex(txid).bytes()
-        with self.txBlockMap as txblk:
-            try:
-                # Try to get the blockhash from the database.
-                bHash = txblk[txHash]
-                return self.blockHeader(hexFromHash(bHash))
-            except database.NoValue:
-                # If the blockhash is not in the database, get it from dcrdata
-                decodedTx = self.dcrdata.tx(txid)
-                if (
-                    "block" not in decodedTx
-                    or "blockhash" not in decodedTx["block"]
-                    or decodedTx["block"]["blockhash"] == ""
-                ):
-                    return None
-                hexHash = decodedTx["block"]["blockhash"]
-                header = self.blockHeader(hexHash)
-                txblk[txHash] = header.hash().bytes()
-                return header
+        try:
+            # Try to get the blockhash from the database.
+            bHash = self.txBlockMap[txHash]
+            return self.blockHeader(hexFromHash(bHash))
+        except database.NoValue:
+            # If the blockhash is not in the database, get it from dcrdata
+            decodedTx = self.dcrdata.tx(txid)
+            if (
+                "block" not in decodedTx
+                or "blockhash" not in decodedTx["block"]
+                or decodedTx["block"]["blockhash"] == ""
+            ):
+                return None
+            hexHash = decodedTx["block"]["blockhash"]
+            header = self.blockHeader(hexHash)
+            self.txBlockMap[txHash] = header.hash().bytes()
+            return header
 
     def decodedTx(self, txid):
         """
@@ -1033,22 +1038,21 @@ class DcrdataBlockchain(object):
         Returns:
             BlockHeader: An object which implements the BlockHeader API.
         """
-        with self.headerDB as headers:
+        try:
+            serialized = self.headerDB[hashFromHex(hexHash).bytes()]
+            return msgblock.BlockHeader.deserialize(serialized)
+        except database.NoValue:
             try:
-                serialized = headers[hashFromHex(hexHash).bytes()]
-                return msgblock.BlockHeader.deserialize(serialized)
-            except database.NoValue:
-                try:
-                    block = self.dcrdata.block.hash.header.raw(hexHash)
-                    blockHeader = msgblock.BlockHeader.deserialize(
-                        ByteArray(block["hex"])
-                    )
-                    self.saveBlockHeader(blockHeader)
-                    return blockHeader
-                except Exception as e:
-                    log.warning(
-                        "unable to retrieve block header: %s" % formatTraceback(e)
-                    )
+                block = self.dcrdata.block.hash.header.raw(hexHash)
+                blockHeader = msgblock.BlockHeader.deserialize(
+                    ByteArray(block["hex"])
+                )
+                self.saveBlockHeader(blockHeader)
+                return blockHeader
+            except Exception as e:
+                log.warning(
+                    "unable to retrieve block header: %s" % formatTraceback(e)
+                )
         raise Exception("failed to get block header for block %s" % hexHash)
 
     def blockHeaderByHeight(self, height):
@@ -1062,19 +1066,17 @@ class DcrdataBlockchain(object):
         Returns:
             BlockHeader: The block header.
         """
-        with self.heightMap as heightMap, self.headerDB as headers:
+        try:
+            hashKey = self.heightMap[height]
+            return self.headerDB[hashKey]
+        except database.NoValue:
             try:
-                hashKey = heightMap[height]
-                serialized = headers[hashKey]
-                return msgblock.BlockHeader.deserialize(serialized)
-            except database.NoValue:
-                try:
-                    hexBlock = self.blockchain.block.header.raw(idx=height)
-                    blockHeader = msgblock.BlockHeader.deserialize(ByteArray(hexBlock))
-                    self.saveBlockHeader(blockHeader)
-                    return blockHeader
-                except Exception:
-                    log.warning("unable to retrieve block header")
+                hexBlock = self.blockchain.block.header.raw(idx=height)
+                blockHeader = msgblock.BlockHeader.deserialize(ByteArray(hexBlock))
+                self.saveBlockHeader(blockHeader)
+                return blockHeader
+            except Exception:
+                log.warning("unable to retrieve block header")
         raise Exception("failed to get block header at height %i" % height)
 
     def bestBlock(self):
@@ -1121,9 +1123,8 @@ class DcrdataBlockchain(object):
             header (BlockHeader): The block header to save.
         """
         bHash = header.hash().bytes()
-        with self.heightMap as heightMap, self.headerDB as headers:
-            heightMap[header.height] = bHash
-            headers[bHash] = header.serialize().bytes()
+        self.heightMap[header.height] = bHash
+        self.headerDB[bHash] = header
 
     def sendToAddress(self, value, address, keysource, utxosource, feeRate=None):
         """

@@ -10,7 +10,7 @@ accounts module
 """
 
 from tinydecred.crypto import crypto
-from tinydecred.crypto.bytearray import ByteArray
+from tinydecred.util.encode import ByteArray
 from tinydecred.crypto.rando import generateSeed
 from tinydecred.pydecred import nets, constants as DCR
 from tinydecred.util import tinyjson, helpers

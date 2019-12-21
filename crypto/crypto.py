@@ -12,7 +12,7 @@ import hmac
 from base58 import b58encode, b58decode
 from blake256.blake256 import blake_hash
 
-from tinydecred.crypto.bytearray import ByteArray
+from tinydecred.util.encode import ByteArray
 from tinydecred.crypto.rando import generateSeed
 from tinydecred.crypto.secp256k1.curve import curve as Curve, PublicKey, PrivateKey
 from tinydecred.util import tinyjson

@@ -6,7 +6,7 @@ See LICENSE for details
 Based on dcrd MsgBlock.
 """
 
-from tinydecred.crypto.bytearray import ByteArray
+from tinydecred.util.encode import ByteArray
 from tinydecred.crypto.crypto import hashH
 
 # chainhash.HashSize in go
@@ -80,10 +80,6 @@ class BlockHeader:
         self.stakeVersion = None  # uint32
 
     @staticmethod
-    def deserialize(b):
-        return BlockHeader.btcDecode(b, 0)
-
-    @staticmethod
     def btcDecode(b, pver):  # io.Reader, pver uint32) error {
         """
         BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
@@ -125,6 +121,17 @@ class BlockHeader:
 
     def serialize(self):
         return self.btcEncode(0)
+    @staticmethod
+    def deserialize(b):
+        return BlockHeader.btcDecode(b, 0)
+
+    # blob and unblob satisfy the Blobber API from  util.database
+    @staticmethod
+    def blob(blockHeader):
+        return blockHeader.btcEncode(0).b
+    @staticmethod
+    def unblob(b):
+        return BlockHeader.btcDecode(b, 0)
 
     def btcEncode(self, pver):
 

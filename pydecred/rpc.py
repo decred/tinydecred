@@ -1,7 +1,7 @@
 import base64
 import ssl
 from tinydecred.util import tinyhttp
-from tinydecred.crypto.bytearray import ByteArray
+from tinydecred.util.encode import ByteArray
 
 
 class Client(object):

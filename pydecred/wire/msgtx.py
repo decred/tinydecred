@@ -6,7 +6,7 @@ See LICENSE for details
 Based on dcrd MsgTx.
 """
 
-from tinydecred.crypto.bytearray import ByteArray
+from tinydecred.util.encode import ByteArray
 from tinydecred.crypto.crypto import hashH
 from tinydecred.pydecred.wire import wire
 
@@ -466,7 +466,7 @@ class MsgTx:
         return hashH(toHash.bytes())
 
     def txHex(self):
-        return self.serialize().hex()
+        return self.serialize()
 
     def txid(self):
         """
@@ -617,9 +617,6 @@ class MsgTx:
                 n += txOut.serializeSize()
         return n
 
-    def serialize(self):
-        return self.btcEncode(0)
-
     def decodePrefix(self, b, pver):
         # r io.Reader, pver uint32) (uint64, error) {
         """
@@ -759,9 +756,19 @@ class MsgTx:
 
         return tx
 
+    def serialize(self):
+        return self.btcEncode(0)
     @staticmethod
     def deserialize(b):
         return MsgTx.btcDecode(b, 0)
+
+    # blob and unblob satisfy the Blobber API from util.database
+    @staticmethod
+    def blob(msgTx):
+        return msgTx.serialize().b
+    @staticmethod
+    def unblob(b):
+        return MsgTx.btcDecode(b)
 
     def pkScriptLocs(self):  # []int {
         """

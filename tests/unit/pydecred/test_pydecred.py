@@ -9,7 +9,7 @@ import json
 from tinydecred.pydecred.calc import SubsidyCache
 from tinydecred.pydecred import mainnet, testnet, txscript, vsp
 from tinydecred.pydecred.wire import wire, msgtx
-from tinydecred.crypto.bytearray import ByteArray
+from tinydecred.util.encode import ByteArray
 from tinydecred.crypto import crypto, opcode
 
 

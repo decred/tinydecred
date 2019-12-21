@@ -8,7 +8,7 @@ import time
 from tinydecred.util import tinyhttp, tinyjson
 from tinydecred.pydecred import txscript, constants
 from tinydecred.crypto import crypto
-from tinydecred.crypto.bytearray import ByteArray
+from tinydecred.util.encode import ByteArray
 
 # The duration purchase info is good for.
 PURCHASE_INFO_LIFE = constants.HOUR

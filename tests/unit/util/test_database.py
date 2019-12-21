@@ -8,6 +8,17 @@ import unittest
 
 from tinydecred.util import database
 from tinydecred.util import helpers
+from tinydecred.util.encode import ByteArray
+
+class TBlobber:
+    def __init__(self, b):
+        self.b = b
+    @staticmethod
+    def unblob(b):
+        return TBlobber(ByteArray(b))
+    @staticmethod
+    def blob(tb):
+        return tb.b.bytes()
 
 
 class TestDB(unittest.TestCase):
@@ -34,8 +45,9 @@ class TestDB(unittest.TestCase):
                 kv[1] = kv[1].encode()
 
             # Open a key value db in the temp directory.
-            manager = database.KeyValueDatabase(os.path.join(tempDir, "tmp.sqlite"))
-            with manager.getBucket("test") as db:
+            master = database.KeyValueDatabase(os.path.join(tempDir, "tmp.sqlite"))
+            try:
+                db = master.child("test")
 
                 # Ensure the db has zero length.
                 self.assertTrue(len(db) == 0)
@@ -91,6 +103,20 @@ class TestDB(unittest.TestCase):
                 elapsed = (time.time() - start) * 1000
                 print("{} ms to insert {} values".format(num, elapsed))
                 self.assertRaises(database.NoValue, lambda: db["nonsense"])
-            with manager.getBucket("inttest", datatypes=("INTEGER", "BLOB")) as db:
-                db[5] = b"asdf"
-                self.assertEqual(db[5], b"asdf")
+
+                # test a serializable object
+                objDB = master.child("blobber", blobber=TBlobber)
+                thing = TBlobber(ByteArray("a1b2c3d4e5f6"))
+                k = bytearray([0xaa, 0xbb])
+                objDB[k] = thing
+                reThing = objDB[k]
+                self.assertEqual(thing.b.hex(), reThing.b.hex())
+
+
+                # check integer keys and child naming scheme
+                intdb = db.child("inttest", datatypes=("INTEGER", "BLOB"))
+                self.assertEqual(intdb.name, "test$inttest")
+                intdb[5] = b"asdf"
+                self.assertEqual(intdb[5], b"asdf")
+            finally:
+                master.close()

@@ -6,10 +6,9 @@ The DecredAccount inherits from the tinydecred base Account and adds staking
 support.
 """
 
-from tinydecred.crypto.bytearray import decodeBA
 from tinydecred.crypto import opcode, crypto
 from tinydecred.wallet.accounts import Account
-from tinydecred.util import tinyjson, helpers
+from tinydecred.util import tinyjson, helpers, encode
 from tinydecred.crypto.crypto import AddressSecpPubKey, CrazyKeyError
 from tinydecred.pydecred import txscript
 from tinydecred.pydecred.vsp import VotingServiceProvider
@@ -442,7 +441,7 @@ class DecredAccount(Account):
             )
             redeemScript = next(
                 (
-                    decodeBA(p.purchaseInfo.script)
+                    encode.decodeBA(p.purchaseInfo.script)
                     for p in self.stakePools
                     if p.purchaseInfo.ticketAddress == redeemHash.string()
                 ),

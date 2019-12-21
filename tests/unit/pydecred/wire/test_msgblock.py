@@ -5,7 +5,7 @@ See LICENSE for details
 
 import unittest
 
-from tinydecred.crypto.bytearray import ByteArray
+from tinydecred.util.encode import ByteArray
 from tinydecred.pydecred.wire import msgblock
 
 

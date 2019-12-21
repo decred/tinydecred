@@ -61,9 +61,17 @@ class ByteArray(object):
     def __tojson__(self):
         return {"b": self.b.hex()}
 
-    @staticmethod
     def __fromjson__(obj):
         return ByteArray(obj["b"])
+
+    # blob and unblob satisfy the Blobber API defined in utils.database
+    @staticmethod
+    def unblob(b):
+        return ByteArray(b)
+
+    @staticmethod
+    def blob(ba):
+        return ba.b
 
     def decode(self, a):
         a = decodeBA(a)
@@ -203,7 +211,6 @@ class ByteArray(object):
         b = self[:n]
         self.b = self.b[n:]
         return b
-
 
 # register the ByteArray class with the json encoder/decoder.
 tinyjson.register(ByteArray, "ByteArray")

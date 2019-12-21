@@ -6,7 +6,7 @@ See LICENSE for details
 import unittest
 
 from tinydecred.crypto import mnemonic
-from tinydecred.crypto.bytearray import ByteArray
+from tinydecred.util.encode import ByteArray
 
 
 class TestMnemonic(unittest.TestCase):

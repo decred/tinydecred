@@ -5,10 +5,10 @@ See LICENSE for details
 
 import unittest
 
-from tinydecred.crypto.bytearray import ByteArray
+from tinydecred.util.encode import ByteArray
 
 
-class TestByteArray(unittest.TestCase):
+class TestEncode(unittest.TestCase):
     def test_operators(self):
         makeA = lambda: ByteArray(bytearray([0, 0, 255]))
         makeB = lambda: ByteArray(bytearray([0, 255, 0]))
