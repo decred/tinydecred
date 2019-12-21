@@ -425,35 +425,47 @@ class DecredAccount(Account):
         return txs[1]
 
     def revokeTickets(self):
-        print("revoking")
-        revokableTickets = [utxo for utxo in self.utxos.values() if utxo.isExpiredOrMissedTicket()]
-        for utxo in revokableTickets:
+        """
+        Iterate through missed and expired ticket utxo and revoke them.
+
+        Returns:
+            bool: whether or not an error occured.
+        """
+        revokableTickets = [
+            utxo.txid for utxo in self.utxos.values() if utxo.isRevocableTicket()
+        ]
+        errored = False
+        txs = []
+        for txid in revokableTickets:
             try:
-                tx = self.blockchain.tx(utxo.txid)
+                tx = self.blockchain.tx(txid)
+                txs.append(tx)
             except Exception as e:
                 log.error("error getting tx: %s" % e)
+                errored = True
                 continue
-            print(self.net)
-            redeemHash = crypto.AddressScriptHash(self.net.ScriptHashAddrID, txscript.extractStakeScriptHash(tx.txOut[0].pkScript, opcode.OP_SSTX))
+        for tx in txs:
+            redeemHash = crypto.AddressScriptHash(
+                self.net.ScriptHashAddrID,
+                txscript.extractStakeScriptHash(tx.txOut[0].pkScript, opcode.OP_SSTX),
+            )
             redeemScript = []
-            #purchaseHeight = utxo.tinfo.purchaseBlock.
             for pool in self.stakePools:
-                print(pool.purchaseInfo.ticketAddress, redeemHash.string())
                 if pool.purchaseInfo.ticketAddress == redeemHash.string():
                     redeemScript = decodeBA(pool.purchaseInfo.script)
-                    print(redeemScript)
                     break
             else:
                 log.error("did not find redeem script for hash %s" % redeemHash)
+                errored = True
                 continue
-
             keysource = KeySource(
                 # This will need to change when we start using different
                 # addresses for voting.
-                priv=lambda: self._votingKey,
+                priv=lambda _: self._votingKey,
                 internal=lambda: "",
             )
             self.blockchain.revokeTicket(tx, keysource, redeemScript)
+        return errored
 
     def sync(self, blockchain, signals):
         """

@@ -704,16 +704,16 @@ class UTXO(object):
         isLiveTicket will return True if this is a live ticket.
 
         Returns:
-            bool. True if this is a live ticket.
+            bool: True if this is a live ticket.
         """
         return self.tinfo and self.tinfo.status in ("immature", "live")
-    def isExpiredOrMissedTicket(self):
+
+    def isRevocableTicket(self):
         """
-        isExpiredOrMissedTicket will return True if this is an expired or
-        missed ticket.
+        Returns True if this is an expired or missed ticket.
 
         Returns:
-            bool. True if this is expired or missed ticket.
+            bool: True if this is expired or missed ticket.
         """
         return self.tinfo and self.tinfo.status in ("expired", "missed")
 
@@ -1637,22 +1637,40 @@ class DcrdataBlockchain(object):
         return (splitTx, tickets), splitSpent, internalOutputs
 
     def revokeTicket(self, tx, keysource, redeemScript):
+        """
+        revoke a ticket by signing the supplied redeem script and broadcasting the raw transaction.
+
+        Args:
+            tx (object): the msgTx of the ticket purchase.
+            keysource (object): a KeySource object that holds a function to get the private key used for signing.
+            redeemScript (byte-like): the 1-of-2 multisig script that delegates voting rights for the ticket.
+
+        Returns:
+            MsgTx: the signed revocation.
+        """
 
         revocation = txscript.makeRevocation(tx, self.relayFee())
 
-        print(redeemScript.hex())
         if not revocation:
             log.info("failed to make revocation")
             return
-        script = txscript.signTxOutput(self.params, revocation, 0, redeemScript, txscript.SigHashAll, keysource, redeemScript, crypto.STEcdsaSecp256k1)
 
-        signed = ByteArray(b'')
-        signed += txscript.addData(script[1:])
-        signed += txscript.addData(redeemScript)
+        signedScript = txscript.signTxOutput(
+            self.params,
+            revocation,
+            0,
+            redeemScript,
+            txscript.SigHashAll,
+            keysource,
+            revocation.txIn[0].signatureScript,
+            crypto.STEcdsaSecp256k1,
+        )
 
-        revocation.txIn[0].signatureScript = signed
-        print("script", revocation.txIn[0].signatureScript.hex())
-        log.info("published revocation %s" % revocation.txHex())
+        # Append the redeem script to the signature
+        signedScript += txscript.addData(redeemScript)
+        revocation.txIn[0].signatureScript = signedScript
+
         self.broadcast(revocation.txHex())
 
         log.info("published revocation %s" % revocation.txid())
+        return revocation

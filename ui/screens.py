@@ -1157,7 +1157,12 @@ class StakingScreen(Screen):
         revokeBtn = app.getButton(TINY, "Revoke")
         revokeBtn.clicked.connect(self.revokeTickets)
         votingWgt, _ = Q.makeSeries(Q.HORIZONTAL, agendaBtn, revokeBtn)
+        self.revokeBtn = revokeBtn
         self.layout.addWidget(votingWgt)
+
+        # Hide revoke button unless we have revokable tickets.
+        revokeBtn.hide()
+        self.app.registerSignal(ui.SYNC_SIGNAL, self.checkRevocable)
 
         # Affordability. A row that reads `You can afford X tickets`
         lbl = Q.makeLabel("You can afford ", 14)
@@ -1225,18 +1230,51 @@ class StakingScreen(Screen):
             return
         self.app.appWindow.stack(self.agendasScreen)
 
+    def checkRevocable(self):
+        """
+        On SYNC_SIGNAL signal hide or show revoke button based on wether or not
+        we have revocable tickets.
+        """
+        acct = self.app.wallet.selectedAccount
+        n = 0
+        plural = ""
+        for utxo in acct.utxos.values():
+            if utxo.isRevocableTicket():
+                n += 1
+        if n > 0:
+            if n > 1:
+                plural = "s"
+            self.revokeBtn.setText("revoke {} ticket{}".format(n, plural))
+            self.revokeBtn.show()
+        else:
+            self.revokeBtn.hide()
+
     def revokeTickets(self):
+        """
+        Revoke all revocable tickets.
+        """
+
         def revoke(wallet):
             try:
+                self.app.emitSignal(ui.WORKING_SIGNAL)
                 wallet.openAccount.revokeTickets()
                 return True
             except Exception as e:
                 log.error("revoke tickets error: %s" % formatTraceback(e))
                 return False
+            self.app.emitSignal(ui.DONE_SIGNAL)
+
         self.app.withUnlockedWallet(revoke, self.revoked)
 
     def revoked(self, success):
-        self.app.appWindow.showSuccess("revoke tickets")
+        """
+        revokeTickets callback. Prints success or failure to the screen.
+        """
+        if success:
+            self.app.appWindow.showSuccess("revoke tickets completed without error")
+            self.revokeBtn.hide()
+        else:
+            self.app.appWindow.showError("revoke tickets finished with error")
 
     def setStats(self):
         """
