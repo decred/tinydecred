@@ -4,11 +4,9 @@ See LICENSE for details
 
 DcrdataClient.endpointList() for available enpoints.
 """
-
+import json
 from urllib.parse import urlencode
 import urllib.request as urlrequest
-
-from tinydecred.util import tinyjson
 from tinydecred.util.helpers import formatTraceback
 
 
@@ -31,7 +29,7 @@ def request(
                 encoded = urlencode(postData).encode("utf-8")
             else:
                 # encode the data as json.
-                encoded = tinyjson.dump(postData).encode("utf-8")
+                encoded = json.dumps(postData).encode("utf-8")
             req = urlrequest.Request(uri, headers=headers, data=encoded)
         else:
             req = urlrequest.Request(uri, headers=headers, method="GET")
@@ -39,8 +37,8 @@ def request(
         try:
             # try to decode the response as json, but fall back to just
             # returning the string.
-            return tinyjson.load(raw)
-        except tinyjson.JSONDecodeError:
+            return json.loads(raw)
+        except json.JSONDecodeError:
             return raw
         except Exception as e:
             raise Exception(

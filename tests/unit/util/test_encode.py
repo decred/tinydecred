@@ -5,11 +5,14 @@ See LICENSE for details
 
 import unittest
 
-from tinydecred.util.encode import ByteArray
+from tinydecred.util import encode
+
+ByteArray = encode.ByteArray
+BuildyBytes = encode.BuildyBytes
 
 
 class TestEncode(unittest.TestCase):
-    def test_operators(self):
+    def test_ByteArray(self):
         makeA = lambda: ByteArray(bytearray([0, 0, 255]))
         makeB = lambda: ByteArray(bytearray([0, 255, 0]))
         makeC = lambda: ByteArray(bytearray([255, 0, 0]))
@@ -61,3 +64,22 @@ class TestEncode(unittest.TestCase):
         z = ByteArray(zero)
         z[2] = 255
         self.assertEqual(makeA(), z)
+
+    def test_BuildyBytes(self):
+        d0 = ByteArray([0x01, 0x02])
+        d1 = ByteArray([0x03, 0x04, 0x05])
+        d2 = ByteArray(b"")
+        res = BuildyBytes(0).addData(d0).addData(d1).addData(d2)
+        exp = ByteArray([0x00, 0x02, 0x01, 0x02, 0x03, 0x03, 0x04, 0x05, 0x00])
+        self.assertEqual(res, exp)
+
+        # Now do a versioned blob with a data push > 255 bytes.
+        dBig = ByteArray(b"", length=257)
+        dBig[100] = 0x12
+        res = BuildyBytes(5).addData(d0).addData(d1).addData(d2).addData(dBig)
+        ver, pushes = encode.decodeBlob(res)
+        self.assertEqual(ver, 5)
+        self.assertEqual(d0, pushes[0])
+        self.assertEqual(d1, pushes[1])
+        self.assertEqual(d2, pushes[2])
+        self.assertEqual(dBig, pushes[3])

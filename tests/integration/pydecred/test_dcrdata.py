@@ -10,8 +10,15 @@ import time
 
 from tinydecred.pydecred import mainnet, testnet, txscript, dcrdata, account
 from tinydecred.pydecred.wire import msgtx
-from tinydecred.util.encode import ByteArray
-from tinydecred.crypto import crypto
+from tinydecred.crypto import crypto, rando
+from tinydecred.util import encode
+from tinydecred.crypto.secp256k1 import curve as Curve
+
+ByteArray = encode.ByteArray
+
+
+def newHash():
+    return ByteArray(rando.generateSeed(32))
 
 
 class TestDcrdata(unittest.TestCase):
@@ -50,9 +57,6 @@ class TestDcrdata(unittest.TestCase):
                 blockchain.close()
 
     def test_purchase_ticket(self):
-        from tinydecred.crypto.secp256k1 import curve as Curve
-        from tinydecred.crypto import rando
-
         with TemporaryDirectory() as tempDir:
             blockchain = dcrdata.DcrdataBlockchain(
                 os.path.join(tempDir, "db.db"), testnet, "https://testnet.dcrdata.org"
@@ -73,9 +77,6 @@ class TestDcrdata(unittest.TestCase):
                 blockchain.tx = getTx
                 addrs = []
                 keys = {}
-
-                def newTxid():
-                    return crypto.hashH(rando.generateSeed(20)).hex()
 
                 def internal():
                     privKey = Curve.generateKey()
@@ -104,20 +105,22 @@ class TestDcrdata(unittest.TestCase):
                         atoms = int(nextVal * 1e8)
                         privKey = Curve.generateKey()
                         pkHash = crypto.hash160(privKey.pub.serializeCompressed().b)
-                        addr = crypto.AddressPubKeyHash(testnet.PubKeyHashAddrID, pkHash)
+                        addr = crypto.AddressPubKeyHash(
+                            testnet.PubKeyHashAddrID, pkHash
+                        )
                         addrs.append(addr)
                         addrString = addr.string()
                         keys[addrString] = privKey
                         pkScript = txscript.makePayToAddrScript(addrString, testnet)
-                        txid = newTxid()
+                        txHash = newHash()
+                        txid = reversed(txHash).hex()
                         utxos.append(
-                            dcrdata.UTXO(
+                            account.UTXO(
                                 address=addrString,
-                                txid=txid,
+                                txHash=txHash,
                                 vout=0,
                                 ts=int(time.time()),
                                 scriptPubKey=pkScript,
-                                amount=nextVal,
                                 satoshis=atoms,
                             )
                         )
@@ -132,7 +135,9 @@ class TestDcrdata(unittest.TestCase):
                 pkHash = crypto.hash160(poolPriv.pub.serializeCompressed().b)
                 poolAddr = crypto.AddressPubKeyHash(testnet.PubKeyHashAddrID, pkHash)
                 scriptHash = crypto.hash160("some script. doesn't matter".encode())
-                scriptAddr = crypto.AddressScriptHash(testnet.ScriptHashAddrID, scriptHash)
+                scriptAddr = crypto.AddressScriptHash(
+                    testnet.ScriptHashAddrID, scriptHash
+                )
                 ticketPrice = blockchain.stakeDiff()
 
                 class request:

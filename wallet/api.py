@@ -41,19 +41,6 @@ class UTXO:
         self.txid = txid
         self.vout = vout
 
-    def __tojson__(self):
-        """
-        UTXO must be json-encodable and registered with the tinyjson module.
-        """
-        raise Unimplemented("__tojson__ not implemented")
-
-    @staticmethod
-    def __fromjson__(obj):
-        """
-        Decode the UTXO from the json encoding as returned by __tojson__
-        """
-        raise Unimplemented("__fromjson__ not implemented")
-
     def isSpendable(self, tipHeight):
         """
         Determine whether this UTXO is currently spendable.
@@ -310,19 +297,6 @@ class Balance:
         self.total = total
         # The available is the amount available to spend immediately.
         self.available = available
-
-    def __tojson__(self):
-        """
-        Balance must be json-encodable and registered with the tinyjson module.
-        """
-        raise Unimplemented("__tojson__ not implemented")
-
-    @staticmethod
-    def __fromjson__(obj):
-        """
-        Decode the Balance from the json encoding as returned by __tojson__
-        """
-        raise Unimplemented("__fromjson__ not implemented")
 
 
 class Signals:

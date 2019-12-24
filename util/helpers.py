@@ -16,8 +16,7 @@ from os.path import expanduser
 import platform
 from appdirs import AppDirs
 import configparser
-
-from tinydecred.util import tinyjson
+import json
 
 
 def formatTraceback(e):
@@ -41,6 +40,17 @@ def mkdir(path):
         return False
     os.makedirs(path)
     return True
+
+
+def moveFile(ogPath, newPath):
+    """
+    Move a file.
+
+    Args:
+        ogPath (str): The filepath of the file to move.
+        newPath (str): The destination filepath.
+    """
+    shutil.move(ogPath, newPath)
 
 
 def yearmonthday(t):
@@ -251,7 +261,7 @@ def fetchSettingsFile(filepath):
     if not os.path.isfile(filepath):
         with open(filepath, "w+") as file:
             file.write("{}")
-    return tinyjson.loadFile(filepath)
+    return loadJSON(filepath)
 
 
 def saveFile(path, contents, binary=False):
@@ -332,3 +342,18 @@ def readINI(path, keys):
             if k in keys:
                 res[k] = config[section][k]
     return res
+
+
+def saveJSON(filepath, thing, **kwargs):
+    """
+    Save the object to JSON.
+    """
+    saveFile(filepath, json.dumps(thing, **kwargs))
+
+
+def loadJSON(filepath):
+    """
+    Load the JSON file into a Python object.
+    """
+    with open(filepath, "r") as f:
+        return json.loads(f.read())

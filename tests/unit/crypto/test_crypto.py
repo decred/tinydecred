@@ -5,8 +5,13 @@ See LICENSE for details
 
 import unittest
 
-from tinydecred.crypto import crypto
+from tinydecred.crypto import crypto, rando
 from tinydecred.util.encode import ByteArray
+from tinydecred.pydecred import mainnet
+
+testSeed = ByteArray(
+    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+).b
 
 
 class TestCrypto(unittest.TestCase):
@@ -19,12 +24,10 @@ class TestCrypto(unittest.TestCase):
             b"dprv3n8wmhMhC7p7QuzHn4fYgq2d87hQYAxWH3RJ6pYFrd7LAV71RcBQWrFFmSG3yYWVKrJCbYTBGiniTvKcuuQmi1hA8duKaGM8paYRQNsD1P6"
         )
         b = crypto.SecretKey.rekey("abc".encode(), a.params())
-        aUnenc = b.decrypt(aEnc.bytes())
+        aUnenc = b.decrypt(aEnc)
         self.assertTrue(a, aUnenc)
 
     def test_addr_pubkey(self):
-        from tinydecred.pydecred import mainnet
-
         pairs = [
             (
                 "033b26959b2e1b0d88a050b111eeebcf776a38447f7ae5806b53c9b46e07c267ad",
@@ -52,8 +55,6 @@ class TestCrypto(unittest.TestCase):
             self.assertEqual(addr.string(), addrStr)
 
     def test_addr_pubkey_hash(self):
-        from tinydecred.pydecred import mainnet
-
         pairs = [
             (
                 "e201ee2f37bcc0ba0e93f82322e48333a92b9355",
@@ -83,8 +84,6 @@ class TestCrypto(unittest.TestCase):
             self.assertEqual(addr.string(), addrStr)
 
     def test_addr_script_hash(self):
-        from tinydecred.pydecred import mainnet
-
         pairs = [
             (
                 "52fdfc072182654f163f5f0f9a621d729566c74d",
@@ -110,3 +109,60 @@ class TestCrypto(unittest.TestCase):
         for scriptHash, addrStr in pairs:
             addr = crypto.newAddressScriptHashFromHash(ByteArray(scriptHash), mainnet)
             self.assertEqual(addr.string(), addrStr)
+
+    def test_kdf_params(self):
+        salt = ByteArray(rando.generateSeed(32))
+        digest = ByteArray(32)
+        kdf = crypto.KDFParams(salt, digest)
+        b = kdf.serialize()
+        reKDF = crypto.KDFParams.unblob(b.b)
+        self.assertEqual(kdf.kdfFunc, reKDF.kdfFunc)
+        self.assertEqual(kdf.hashName, reKDF.hashName)
+        self.assertEqual(kdf.salt, reKDF.salt)
+        self.assertEqual(kdf.digest, reKDF.digest)
+        self.assertEqual(kdf.iterations, reKDF.iterations)
+
+    def test_secret_key(self):
+        sk = crypto.SecretKey("pass".encode())
+        test = b"testphrase"
+        enc = sk.encrypt(test)
+        dec = sk.decrypt(enc)
+        self.assertEqual(test, dec)
+
+    def test_extended_key(self):
+        """
+        Test extended key derivation.
+        """
+        kpriv = crypto.ExtendedKey.new(testSeed)
+        kpriv.setNetwork(mainnet)
+        self.assertEqual(
+            kpriv.key.hex(),
+            "f2418d00085be520c6449ddb94b25fe28a1944b5604193bd65f299168796f862",
+        )
+        kpub = kpriv.neuter()
+        self.assertEqual(
+            kpub.key.hex(),
+            "0317a47499fb2ef0ff8dc6133f577cd44a5f3e53d2835ae15359dbe80c41f70c9b",
+        )
+        kpub_branch0 = kpub.child(0)
+        self.assertEqual(
+            kpub_branch0.key.hex(),
+            "02dfed559fddafdb8f0041cdd25c4f9576f71b0e504ce61837421c8713f74fb33c",
+        )
+        kpub_branch0_child1 = kpub_branch0.child(1)
+        self.assertEqual(
+            kpub_branch0_child1.key.hex(),
+            "03745417792d529c66980afe36f364bee6f85a967bae117bc4d316b77e7325f50c",
+        )
+        kpriv_branch0 = kpriv.child(0)
+        self.assertEqual(
+            kpriv_branch0.key.hex(),
+            "6469a8eb3ed6611cc9ee4019d44ec545f3174f756cc41f9867500efdda742dd9",
+        )
+        kpriv_branch0_child1 = kpriv_branch0.child(1)
+        self.assertEqual(
+            kpriv_branch0_child1.key.hex(),
+            "fb8efe52b3e4f31bc12916cbcbfc0e84ef5ebfbceb7197b8103e8009c3a74328",
+        )
+        kpriv01_neutered = kpriv_branch0_child1.neuter()
+        self.assertEqual(kpriv01_neutered.key.hex(), kpub_branch0_child1.key.hex())

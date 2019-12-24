@@ -15,8 +15,8 @@ from tinydecred import config
 from tinydecred.pydecred import constants as DCR
 from tinydecred.pydecred.dcrdata import DcrdataBlockchain
 from tinydecred.ui import screens, ui, qutilities as Q
-from tinydecred.util import helpers
-from tinydecred.wallet.wallet import Wallet
+from tinydecred.util import helpers, database
+from tinydecred.wallet.wallet import Wallet, chains
 
 # the directory of the tinydecred package
 PACKAGEDIR = os.path.dirname(os.path.realpath(__file__))
@@ -116,14 +116,15 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
 
         self.loadSettings()
 
+        dcrdataDB = database.KeyValueDatabase(
+            os.path.join(self.netDirectory(), "dcr.db")
+        )
         # The initialized DcrdataBlockchain will not be connected, as that is a
         # blocking operation. It will be called when the wallet is open.
         self.dcrdata = DcrdataBlockchain(
-            os.path.join(self.netDirectory(), "dcr.db"),
-            cfg.net,
-            self.getNetSetting("dcrdata"),
-            skipConnect=True,
+            dcrdataDB, cfg.net, self.getNetSetting("dcrdata"), skipConnect=True,
         )
+        chains.registerChain("dcr", self.dcrdata)
 
         self.registerSignal(ui.WALLET_CONNECTED, self.syncWallet)
 
@@ -148,6 +149,12 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         self.sysTray.show()
         self.appWindow.show()
 
+        self.initialize()
+
+    def initialize(self):
+        """
+        Show the initial screen based on the presence of a wallet file.
+        """
         # If there is a wallet file, prompt for a password to open the wallet.
         # Otherwise, show the initialization screen.
         if os.path.isfile(self.walletFilename()):
@@ -202,9 +209,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         try:
             self.dcrdata.connect()
             self.emitSignal(ui.BLOCKCHAIN_CONNECTED)
-            w = Wallet.openFile(path, pw)
-            w.open(0, pw, self.dcrdata, self.blockchainSignals)
-            self.appWindow.pop(self.pwDialog)
+            w = Wallet.openFile(path, pw, self.blockchainSignals)
             self.setWallet(w)
             self.home()
         except Exception as e:
@@ -408,7 +413,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         def step2(pw, a, k):
             self.emitSignal(ui.WORKING_SIGNAL)
             try:
-                with self.wallet.open(0, pw, self.dcrdata, self.blockchainSignals) as w:
+                with self.wallet.open("dcr", 0, pw, self.blockchainSignals) as w:
                     r = f(w, *a, **k)
                     self.appWindow.pop(self.waitingScreen)
                     self.appWindow.pop(self.pwDialog)
@@ -570,11 +575,11 @@ def runTinyDecred():
 
 
 if __name__ == "__main__":
-    cfg = config.load()
     # Initialize logging for the entire app.
     logDir = os.path.join(config.DATA_DIR, "logs")
     helpers.mkdir(logDir)
     log = helpers.prepareLogger("APP", os.path.join(logDir, "tinydecred.log"), logLvl=0)
     log.info("configuration file at %s" % config.CONFIG_PATH)
     log.info("data directory at %s" % config.DATA_DIR)
+    cfg = config.load()
     runTinyDecred()

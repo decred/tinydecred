@@ -12,7 +12,7 @@ import os
 from appdirs import AppDirs
 
 from tinydecred.pydecred import nets
-from tinydecred.util import tinyjson, helpers
+from tinydecred.util import helpers
 
 # Set the data directory in a OS-appropriate location.
 _ad = AppDirs("TinyDecred", False)
@@ -35,6 +35,8 @@ MainnetConfig = {"dcrdata": "https://explorer.dcrdata.org/"}
 TestnetConfig = {"dcrdata": "https://testnet.dcrdata.org/"}
 
 SimnetConfig = {"dcrdata": "http://localhost:7777"}  # Run dcrdata locally
+
+log = helpers.getLogger("CONFIG")  # , logLvl=0)
 
 
 def tinyNetConfig(netName):
@@ -62,18 +64,20 @@ class TinyConfig:
     formatted.
     """
 
-    def __init__(self):
+    def __init__(self, netName=None):
         fileCfg = helpers.fetchSettingsFile(CONFIG_PATH)
         self.file = fileCfg
         parser = argparse.ArgumentParser()
         netGroup = parser.add_mutually_exclusive_group()
         netGroup.add_argument("--simnet", action="store_true", help="use simnet")
         netGroup.add_argument("--testnet", action="store_true", help="use testnet")
-        args = parser.parse_args()
+        args, unknown = parser.parse_known_args()
+        if unknown:
+            log.warning("ignoring unknown arguments:", repr(unknown))
         self.net = None
-        if args.simnet:
+        if netName == "simnet" or args.simnet:
             self.net = nets.simnet
-        elif args.testnet:
+        elif netName in ("testnet3", "testnet") or args.testnet:
             self.net = nets.testnet
         else:
             print("**********************************************************")
@@ -130,13 +134,13 @@ class TinyConfig:
         """
         Save the file.
         """
-        tinyjson.save(CONFIG_PATH, self.file, indent=4, sort_keys=True)
+        helpers.saveJSON(CONFIG_PATH, self.file, indent=4, sort_keys=True)
 
 
-tinyConfig = TinyConfig()
+tinyConfig = None
 
 
-def load():
+def load(netName=None):
     """
     Load and return the current configuration.
 
@@ -146,4 +150,7 @@ def load():
     Returns:
         JSON: The current configuration in JSON format.
     """
+    global tinyConfig
+    if not tinyConfig:
+        tinyConfig = TinyConfig(netName=None)
     return tinyConfig

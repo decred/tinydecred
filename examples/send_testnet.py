@@ -39,7 +39,7 @@ except Exception as e:
 recipient = "TsfDLrRkk9ciUuwfp2b8PawwnukYD7yAjGd"  # testnet return address
 value = int(1 * 1e8)  # 1 DCR, atoms
 acct = 0  # Every wallet has a zeroth Decred account
-with wallet.open(acct, password, blockchain, Signals()):
+with wallet.open("dcr", acct, password, blockchain, Signals()):
     wallet.sync()
     try:
         tx = wallet.sendToAddress(value, recipient)

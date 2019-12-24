@@ -8,15 +8,18 @@ testnet wallet. The mnemonic seed and an address are printed.
 import os
 from getpass import getpass
 
-from tinydecred.pydecred import testnet
+from tinydecred import config
 from tinydecred.util.helpers import mkdir
 from tinydecred.wallet.wallet import Wallet
+
+# Load configuration for testnet
+config.load("testnet")
 
 # Create an encrypted, password-protected wallet file.
 password = getpass()
 mkdir("testnet")
 walletPath = os.path.join("testnet", "testnet_wallet.db")
-mnemonicSeed, wallet = Wallet.create(walletPath, password, testnet)
+mnemonicSeed, wallet = Wallet.create(walletPath, password)
 
 # Print the seed words and an address.
 print("Mnemonic seed\n-------------")

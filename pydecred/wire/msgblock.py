@@ -22,62 +22,65 @@ class BlockHeader:
     """
 
     def __init__(self):
-        # Version of the block.  This is not the same as the protocol version.
+        # version of the block.  This is not the same as the protocol version.
         self.version = None  # int32
 
-        # Hash of the previous block in the block chain.
+        # hash of the previous block in the block chain.
         self.prevBlock = None  # chainhash.Hash = [32]byte
 
-        # Merkle tree reference to hash of all transactions for the block.
+        # merkle tree reference to hash of all transactions for the block.
         self.merkleRoot = None  # chainhash.Hash
 
-        # Merkle tree reference to hash of all stake transactions for the block.
+        # merkle tree reference to hash of all stake transactions for the block.
         self.stakeRoot = None  # chainhash.Hash
 
-        # Votes on the previous merkleroot and yet undecided parameters.
+        # votes on the previous merkleroot and yet undecided parameters.
         self.voteBits = None  # uint16
 
-        # Final state of the PRNG used for ticket selection in the lottery.
+        # final state of the PRNG used for ticket selection in the lottery.
         self.finalState = None  # [6]byte
 
-        # Number of participating voters for this block.
+        # number of participating voters for this block.
         self.voters = None  # uint16
 
-        # Number of new sstx in this block.
+        # number of new sstx in this block.
         self.freshStake = None  # uint8
 
-        # Number of ssrtx present in this block.
+        # number of ssrtx present in this block.
         self.revocations = None  # uint8
 
-        # Size of the ticket pool.
+        # size of the ticket pool.
         self.poolSize = None  # uint32
 
-        # Difficulty target for the block.
+        # difficulty target for the block.
         self.bits = None  # uint32
 
-        # Stake difficulty target.
+        # stake difficulty target.
         self.sBits = None  # int64
 
-        # Height is the block height in the block chain.
+        # height is the block height in the block chain.
         self.height = None  # uint32
 
-        # Size is the size of the serialized block in its entirety.
+        # size is the size of the serialized block in its entirety.
         self.size = None  # uint32
 
-        # Time the block was created.  This is, unfortunately, encoded as a
+        # time the block was created.  This is, unfortunately, encoded as a
         # uint32 on the wire and therefore is limited to 2106.
         self.timestamp = None  # time.Time
 
-        # Nonce is technically a part of ExtraData, but we use it as the
+        # nonce is technically a part of ExtraData, but we use it as the
         # classical 4-byte nonce here.
         self.nonce = None  # uint32
 
-        # ExtraData is used to encode the nonce or any other extra data
+        # extraData is used to encode the nonce or any other extra data
         # that might be used later on in consensus.
         self.extraData = None  # [32]byte
 
-        # StakeVersion used for voting.
+        # stakeVersion used for voting.
         self.stakeVersion = None  # uint32
+
+        # cachedH is the cached header hash
+        self.cachedH = None
 
     @staticmethod
     def btcDecode(b, pver):  # io.Reader, pver uint32) error {
@@ -98,6 +101,7 @@ class BlockHeader:
         extraDataSize = 32
 
         # grab the data
+        # TODO: Evaluate the need to interpret the sBits field as signed.
         bh.version = b.pop(int32).unLittle().int()  # int32
         bh.prevBlock = b.pop(HASH_SIZE)  # chainhash.Hash = [32]byte
         bh.merkleRoot = b.pop(HASH_SIZE)  # chainhash.Hash
@@ -112,7 +116,7 @@ class BlockHeader:
         bh.sBits = b.pop(int64).unLittle().int()  # int64
         bh.height = b.pop(uint32).unLittle().int()  # uint32
         bh.size = b.pop(uint32).unLittle().int()  # uint32
-        bh.timestamp = b.pop(uint32).unLittle().int()  # uint32Time  # time.Time
+        bh.timestamp = b.pop(uint32).unLittle().int()  # uint32 # time.Time
         bh.nonce = b.pop(uint32).unLittle().int()  # uint32
         bh.extraData = b.pop(extraDataSize)  # [32]byte
         bh.stakeVersion = b.pop(uint32).unLittle().int()  # uint32
@@ -120,7 +124,14 @@ class BlockHeader:
         return bh
 
     def serialize(self):
+        """
+        Serialize the BlockHeader.
+
+        Returns:
+            ByteArray: The serialized BlockHeader.
+        """
         return self.btcEncode(0)
+
     @staticmethod
     def deserialize(b):
         return BlockHeader.btcDecode(b, 0)
@@ -128,10 +139,13 @@ class BlockHeader:
     # blob and unblob satisfy the Blobber API from  util.database
     @staticmethod
     def blob(blockHeader):
-        return blockHeader.btcEncode(0).b
+        """Satisfies the encode.Blobber API"""
+        return blockHeader.serialize().b
+
     @staticmethod
     def unblob(b):
-        return BlockHeader.btcDecode(b, 0)
+        """Satisfies the encode.Blobber API"""
+        return BlockHeader.deserialize(b)
 
     def btcEncode(self, pver):
 
@@ -192,7 +206,7 @@ class BlockHeader:
             raise Exception("unexpected BlockHeader enocoded size")
         return b
 
-    def hash(self):  # chainhash.Hash {
+    def hash(self):
         """
         hash computes the block identifier hash for the given block header.
         """
@@ -201,6 +215,19 @@ class BlockHeader:
         # encode could fail except being out of memory which would cause a
         # run-time panic.
         return hashH(self.serialize().bytes())
+
+    def cachedHash(self):
+        """
+        Returns the cached hash. If the hash has not been generated, generate
+        the cache first.
+
+        Returns:
+            ByteArray: The transaction hash.
+        """
+        if self.cachedH:
+            return self.cachedH
+        self.cachedH = self.hash()
+        return self.cachedH
 
     def id(self):
         return reversed(self.hash()).hex()

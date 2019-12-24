@@ -6,19 +6,49 @@ The DecredAccount inherits from the tinydecred base Account and adds staking
 support.
 """
 
+from tinydecred.util import helpers, encode
 from tinydecred.crypto import opcode, crypto
-from tinydecred.wallet.accounts import Account
-from tinydecred.util import tinyjson, helpers, encode
-from tinydecred.crypto.crypto import AddressSecpPubKey, CrazyKeyError
 from tinydecred.pydecred import txscript
 from tinydecred.pydecred.vsp import VotingServiceProvider
+from tinydecred.pydecred import nets
 
 log = helpers.getLogger("DCRACCT")
+
+ByteArray = encode.ByteArray
+BuildyBytes = encode.BuildyBytes
 
 # In addition to the standard internal and external branches, we'll have a third
 # branch. This should help accomodate upcoming changes to dcrstakepool. See also
 # https://github.com/decred/dcrstakepool/pull/514
 STAKE_BRANCH = 2
+
+EXTERNAL_BRANCH = 0
+INTERNAL_BRANCH = 1
+
+
+class MetaKeys:
+    """Keys for the account meta table."""
+
+    vsp = "vsp".encode()
+
+
+# See CrazyKeyError docs. When an out-of-range key is created, a placeholder
+# is set for that child's position internally in Account.
+CrazyAddress = "CRAZYADDRESS"
+
+# DefaultGapLimit is the default unused address gap limit defined by BIP0044.
+DefaultGapLimit = 20
+
+
+def filterCrazyAddress(addrs):
+    """
+    When addresses are read out in bulk, they should be filtered for the
+    CrazyAddress.
+
+    Args:
+        addrs (list(str)): The addresses to filter.
+    """
+    return [a for a in addrs if a != CrazyAddress]
 
 
 class KeySource(object):
@@ -104,52 +134,609 @@ class TicketStats:
         self.value = value
 
 
-class DecredAccount(Account):
+class TinyBlock(object):
+    """
+    TinyBlock is a block hash and height that satisfies encode.Blobber.
+    """
+
+    def __init__(self, blockHash, height):
+        """
+        Constructor for a TinyBlock
+
+        Args:
+            blockHash (ByteArray): The block hash.
+            height (int): The block height.
+        """
+        self.hash = blockHash
+        self.height = height
+
+    @staticmethod
+    def blob(blk):
+        """Satisfies the encode.Blobber API"""
+        return BuildyBytes(0).addData(blk.hash).addData(blk.height).b
+
+    @staticmethod
+    def unblob(b):
+        """Satisfies the encode.Blobber API"""
+        ver, d = encode.decodeBlob(b)
+        assert ver == 0
+        assert len(d) == 2
+        return TinyBlock(d[0], encode.intFromBytes(d[1]))
+
+    def serialize(self):
+        """
+        Serialize the TinyBlock.
+
+        Returns:
+            ByteArray: The serialized TinyBlock.
+        """
+        return ByteArray(TinyBlock.blob(self))
+
+    def parse(obj):
+        """
+        Parse the Python dict to a TinyBlock. The dict should have two keys,
+        "hash" -> string, and "height" -> number (int)
+
+        Args:
+            obj (dict): The block dict.
+        """
+        return TinyBlock(ByteArray(obj["hash"]), obj["height"])
+
+    def __eq__(self, blk):
+        """
+        Implements the == operator.
+
+        Args:
+            blk (TinyBlock): The block to compare.
+        """
+        return self.hash == blk.hash and self.height == blk.height
+
+
+class TicketInfo(object):
+    """
+    Ticket-related transaction information.
+    """
+
+    def __init__(
+        self,
+        status,
+        purchaseBlock,
+        maturityHeight,
+        expirationHeight,
+        lotteryBlock,
+        vote,
+        revocation,
+    ):
+        """
+        Ticket information.
+
+        Args:
+            status (str): The ticket status. "immature", "live", "expired", etc.
+            purchaseBlock (TinyBlock): The ticket purchase block.
+            maturityHeight: (int): The height at which the ticket goes live.
+            expirationHeight (int): The height at which the ticket expires.
+            lotteryBlock (TinyBlock): Once chosen, the block in which the ticket
+                was selected.
+            vote (ByteArray): The transaction hash of the vote, if voted.
+            revocation (ByteArray): The transaction hash of the revocation, if
+                revoked.
+        """
+        self.status = status
+        self.purchaseBlock = purchaseBlock
+        self.maturityHeight = maturityHeight
+        self.expirationHeight = expirationHeight
+        self.lotteryBlock = lotteryBlock
+        self.vote = vote
+        self.revocation = revocation
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the TicketInfo from the decoded API response.
+
+        Args:
+            obj (object): The Python object decoded from the JSON API response.
+        """
+        ba = lambda b: reversed(ByteArray(b))
+        return TicketInfo(
+            status=obj["status"],
+            purchaseBlock=TinyBlock.parse(obj["purchase_block"]),
+            maturityHeight=obj["maturity_height"],
+            expirationHeight=obj["expiration_height"],
+            lotteryBlock=TinyBlock.parse(obj["lottery_block"]),
+            vote=ba(obj["vote"]) if obj["vote"] else None,
+            revocation=ba(obj["revocation"]) if obj["revocation"] else None,
+        )
+
+    @staticmethod
+    def blob(utxo):
+        """Satisfies the encode.Blobber API"""
+        f = encode.filterNone
+        iFunc = encode.intToBytes
+        return (
+            BuildyBytes(0)
+            .addData(utxo.status.encode("utf-8"))
+            .addData(
+                f(TinyBlock.blob(utxo.purchaseBlock) if utxo.purchaseBlock else None)
+            )
+            .addData(iFunc(utxo.maturityHeight))
+            .addData(iFunc(utxo.expirationHeight, signed=True))
+            .addData(
+                f(TinyBlock.blob(utxo.lotteryBlock) if utxo.lotteryBlock else None)
+            )
+            .addData(f(utxo.vote))
+            .addData(f(utxo.revocation))
+            .b
+        )
+
+    @staticmethod
+    def unblob(b):
+        """Satisfies the encode.Blobber API"""
+        ver, d = encode.decodeBlob(b)
+        assert ver == 0
+        assert len(d) == 7
+
+        iFunc = encode.intFromBytes
+        f = encode.extractNone
+
+        pbb = f(d[1])
+        purchaseBlock = TinyBlock.unblob(pbb) if pbb else None
+
+        lbb = f(d[4])
+        lotteryBlock = TinyBlock.unblob(lbb) if lbb else None
+
+        v = f(d[5])
+        vote = ByteArray(v) if v else None
+
+        r = f(d[6])
+        revocation = ByteArray(r) if r else None
+
+        return TicketInfo(
+            status=d[0].decode("utf-8"),
+            purchaseBlock=purchaseBlock,
+            maturityHeight=iFunc(d[2]),
+            expirationHeight=iFunc(d[3], signed=True),
+            lotteryBlock=lotteryBlock,
+            vote=vote,
+            revocation=revocation,
+        )
+
+    def serialize(self):
+        """
+        Serialize the TicketInfo.
+
+        Returns:
+            ByteArray: The serialized TicketInfo.
+        """
+        return ByteArray(TicketInfo.blob(self))
+
+
+class UTXO(object):
+    """
+    The UTXO is part of the wallet API. BlockChains create and parse UTXO
+    objects and fill fields as required by the Wallet.
+    """
+
+    def __init__(
+        self,
+        address,
+        txHash,
+        vout,
+        ts=None,
+        scriptPubKey=None,
+        height=-1,
+        satoshis=0,
+        maturity=0,
+        tinfo=None,
+    ):
+        """
+        Contructor for a UTXO.
+
+        Args:
+            address (str): The address to which the UTXO pays.
+            txHash (ByteArray): The transaction hash of the output's tx.
+            vout (int): The output's tx output index.
+            ts (int): The Unix timestamp. default None for mempool.
+            scriptPubKey (ByteArray): The pubkey script.
+            height (int): The output's transaction's block height. default -1
+                signifies a mempool transaction.
+            satoshis (int): The output value.
+            maturity (int): The height at which the output becomes mature.
+            tinfo (TicketInfo): The ticket info. Tickets only.
+        """
+        self.address = address
+        self.txHash = txHash
+        self.vout = vout
+        self.ts = ts
+        self.scriptPubKey = scriptPubKey
+        self.height = height
+        self.satoshis = satoshis
+        self.amount = round(satoshis / 1e8, 8)
+        self.maturity = maturity
+        self.scriptClass = None
+        self.parseScriptClass()
+        self.tinfo = tinfo
+
+    @staticmethod
+    def blob(utxo):
+        """Satisfies the encode.Blobber API"""
+        f = encode.filterNone
+        return (
+            BuildyBytes(0)
+            .addData(utxo.address.encode("utf-8"))
+            .addData(utxo.txHash)
+            .addData(utxo.vout)
+            .addData(f(utxo.ts))
+            .addData(f(utxo.scriptPubKey))
+            .addData(encode.intToBytes(utxo.height, signed=True))
+            .addData(utxo.satoshis)
+            .addData(utxo.maturity)
+            .addData(f(TicketInfo.blob(utxo.tinfo) if utxo.tinfo else None))
+            .b
+        )
+
+    @staticmethod
+    def unblob(b):
+        """Satisfies the encode.Blobber API"""
+        ver, d = encode.decodeBlob(b)
+        assert ver == 0
+        assert len(d) == 9
+
+        iFunc = encode.intFromBytes
+        f = encode.extractNone
+
+        tsB = f(d[3])
+        ts = iFunc(tsB) if tsB else None
+
+        tinfoB = f(d[8])
+        tinfo = TicketInfo.unblob(tinfoB) if tinfoB else None
+
+        utxo = UTXO(
+            d[0].decode("utf-8"),
+            ByteArray(d[1]),
+            encode.intFromBytes(d[2]),
+            ts=ts,
+            scriptPubKey=f(d[4]),
+            height=iFunc(d[5], signed=True),
+            satoshis=iFunc(d[6]),
+            maturity=iFunc(d[7]),
+            tinfo=tinfo,
+        )
+
+        utxo._amount = utxo.satoshis / 1e8
+        utxo.parseScriptClass()
+        return utxo
+
+    def serialize(self):
+        """
+        Serialize the UTXO.
+
+        Returns:
+            ByteArray: The serialized UTXO.
+        """
+        return ByteArray(UTXO.blob(self))
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the decoded JSON from dcrdata into a UTXO.
+
+        Args:
+            obj (dict): The dcrdata /api/tx response, decoded.
+        """
+        utxo = UTXO(
+            address=obj["address"],
+            txHash=reversed(ByteArray(obj["txid"])),
+            vout=obj["vout"],
+            ts=obj["ts"] if "ts" in obj else None,
+            scriptPubKey=ByteArray(obj["scriptPubKey"]),
+            height=obj["height"] if "height" in obj else -1,
+            satoshis=obj["satoshis"] if "satoshis" in obj else 0,
+            maturity=obj["maturity"] if "maturity" in obj else 0,
+            tinfo=TicketInfo.parse(obj["tinfo"]) if "tinfo" in obj else None,
+        )
+        utxo.parseScriptClass()
+        return utxo
+
+    @property
+    def txid(self):
+        """
+        The output's transaction ID.
+
+        Returns:
+            str: The transaction ID.
+        """
+        return reversed(self.txHash).hex()
+
+    @txid.setter
+    def txid(self, txid):
+        """
+        Setter for the txid @property.
+        """
+        self.txHash = reversed(ByteArray(txid))
+
+    def parseScriptClass(self):
+        """
+        Set the script class.
+        """
+        if self.scriptPubKey:
+            self.scriptClass = txscript.getScriptClass(0, self.scriptPubKey)
+
+    def confirm(self, block, tx, params):
+        """
+        This output has been mined. Set the block details.
+
+        Args:
+            block (msgblock.BlockHeader): The block header.
+            tx (dict): The dcrdata transaction.
+            params (object): The network parameters.
+        """
+        self.height = block.height
+        self.maturity = (
+            block.height + params.CoinbaseMaturity if tx.looksLikeCoinbase() else 0
+        )
+        self.ts = block.timestamp
+
+    def isSpendable(self, tipHeight):
+        """
+        isSpendable will be True if the UTXO is considered mature at the
+        specified height.
+
+        Args:
+            tipHeight (int): The current blockchain tip height.
+
+        Returns:
+            bool: True if mature.
+        """
+        if self.isTicket():
+            return False
+        if self.maturity:
+            return self.maturity <= tipHeight
+        return True
+
+    def key(self):
+        """
+        A unique ID for this UTXO.
+        """
+        return UTXO.makeKey(self.txid, self.vout)
+
+    @staticmethod
+    def makeKey(txid, vout):
+        """
+        A unique ID for a UTXO.
+
+        Args:
+            txid (str): UTXO's transaction ID.
+            vout (int): UTXO's transaction output index.
+        """
+        return txid + "#" + str(vout)
+
+    def setTicketInfo(self, apiTinfo):
+        """
+        Set the ticket info. Only useful for tickets.
+
+        Args:
+            apiTinfo (dict): dcrdata /api/tinfo response.
+        """
+        self.tinfo = TicketInfo.parse(apiTinfo)
+        self.maturity = self.tinfo.maturityHeight
+
+    def isTicket(self):
+        """
+        isTicket will be True if this is SSTX output.
+
+        Returns:
+            bool: True if this is an SSTX output.
+        """
+        return self.scriptClass == txscript.StakeSubmissionTy
+
+    def isLiveTicket(self):
+        """
+        isLiveTicket will return True if this is a live ticket.
+
+        Returns:
+            bool. True if this is a live ticket.
+        """
+        return self.tinfo and self.tinfo.status in ("immature", "live")
+
+
+class Balance(object):
+    """
+    Information about an account's balance.
+    The `total` attribute will contain the sum of the value of all UTXOs known
+    for this wallet. The `available` sum is the same, but without those which
+    appear to be from immature coinbase or stakebase transactions.
+    """
+
+    def __init__(self, total=0, available=0, staked=0):
+        """
+        Constructor for a Balance. Units atoms.
+
+        total (int): The total balance.
+        available (int): The available balance.
+        staked (int): The staked balance.
+        """
+        self.total = total
+        self.available = available
+        self.staked = staked
+
+    @staticmethod
+    def blob(bal):
+        """Satisfies the encode.Blobber API"""
+        return (
+            encode.BuildyBytes(0)
+            .addData(bal.total)
+            .addData(bal.available)
+            .addData(bal.staked)
+            .b
+        )
+
+    @staticmethod
+    def unblob(b):
+        """Satisfies the encode.Blobber API"""
+        ver, pushes = encode.decodeBlob(b)
+        assert ver == 0
+        assert len(pushes) == 3
+        i = encode.intFromBytes
+        return Balance(i(pushes[0]), i(pushes[1]), i(pushes[2]))
+
+    def __repr__(self):
+        """
+        String representation of the Balance.
+        """
+        return "Balance(total=%.8f, available=%.8f, staked=%.8f)" % (
+            self.total * 1e-8,
+            self.available * 1e-8,
+            self.staked * 1e-8,
+        )
+
+
+class DecredAccount(object):
     """
     DecredAccount is the Decred version of the base tinydecred Account.
     Decred Account inherits Account, and adds the necessary functionality to
     handle staking.
     """
 
-    def __init__(self, *a, **k):
+    def __init__(self, pubKeyEncrypted, privKeyEncrypted, name, coinID, netID, db=None):
         """
-        All constructor aruments are passed directly to the parent Account.
+        Args:
+            pubKeyEncrypted (str): The encrypted public key bytes.
+            privKeyEncrypted (str): The encrypted private key bytes.
+            name (str): Name for the account.
+            coinID (str): The lowercase symbol of the asset this account is for.
+            netID (str): An identifier that can identify the network for an
+                asset. Probably a string such as "testnet".
+            db (database.Bucket): A database bucket for the account.
         """
-        super().__init__(*a, *k)
+        self.pubKeyEncrypted = pubKeyEncrypted
+        self.privKeyEncrypted = privKeyEncrypted
+        self.name = name
+        self.coinID = coinID
+        self.netID = netID
+        self.net = nets.parse(netID)
+        # For external addresses, the cursor can sit on the last seen address,
+        # so start the lastSeen at the 0th external address. This is necessary
+        # because the currentAddress method grabs the address at the current
+        # cursor position, rather than the next.
+        self.lastSeenExt = 0
+        # For internal addresses, the cursor can sit below zero, since the
+        # addresses are always retrieved with nextInternalAddress.
+        self.lastSeenInt = -1
+        self.externalAddresses = []
+        self.internalAddresses = []
+        self.cursorExt = 0
+        self.cursorInt = 0
+        self.balance = Balance()
+        # Map a txid to a MsgTx for a transaction suspected of being in
+        # mempool.
+        self.mempool = {}
+        # txs maps a base58 encoded address to a list of txid.
+        self.txs = {}
+        # utxos is a mapping of utxo key ({txid}#{vout}) to a UTXO.
+        self.utxos = {}
+        # If the account's privKey is set with the private extended key the
+        # account is considered "open". Closing the wallet zeros and drops
+        # reference to the privKey.
+        self.privKey = None  # The private extended key.
+        self.extPub = None  # The external branch public extended key.
+        self.intPub = None  # The internal branch public extended key.
+        self.gapLimit = DefaultGapLimit
         self.tickets = []
         self.stakeStats = TicketStats()
         self.stakePools = []
         self.blockchain = None
         self.signals = None
         self._votingKey = None
-
-    def __tojson__(self):
-        obj = super().__tojson__()
-        return helpers.recursiveUpdate(
-            obj, {"tickets": self.tickets, "stakePools": self.stakePools}
-        )
-        return obj
+        self.utxoDB = None
+        self.addressDB = None
+        # If a database was provided, load it. This would be the case when
+        # the account is first created, as opposed to be unblobbed.
+        if db is not None:
+            self.load(db)
 
     @staticmethod
-    def __fromjson__(obj):
-        acct = Account.__fromjson__(obj, cls=DecredAccount)
-        acct.tickets = obj["tickets"]
-        acct.stakePools = obj["stakePools"]
-        acct.updateStakeStats()
+    def blob(acct):
+        """Satisfies the encode.Blobber API"""
+        return (
+            BuildyBytes(0)
+            .addData(acct.pubKeyEncrypted)
+            .addData(acct.privKeyEncrypted)
+            .addData(acct.name.encode("utf-8"))
+            .addData(acct.coinID)
+            .addData(acct.netID.encode("utf-8"))
+            .addData(encode.intToBytes(acct.cursorExt, signed=True))
+            .addData(acct.cursorInt)
+            .addData(acct.gapLimit)
+            .b
+        )
+
+    @staticmethod
+    def unblob(b):
+        """Satisfies the encode.Blobber API"""
+        ver, d = encode.decodeBlob(b)
+        assert ver == 0
+        assert len(d) == 8
+        pubEnc = ByteArray(d[0])
+        privEnc = ByteArray(d[1])
+        name = d[2].decode("utf-8")
+        coinID = encode.intFromBytes(d[3])
+        netID = d[4].decode("utf-8")
+        acct = DecredAccount(pubEnc, privEnc, name, coinID, netID)
+        acct.cursorExt = encode.intFromBytes(d[5], signed=True)
+        acct.cursorInt = encode.intFromBytes(d[6])
+        acct.gapLimit = encode.intFromBytes(d[7])
         return acct
 
-    def open(self, pw):
+    def serialize(self):
+        """
+        Serialize the DecredAccount.
+
+        Returns:
+            ByteArray: The serialized DecredAccount.
+        """
+        return ByteArray(DecredAccount.blob(self))
+
+    def load(self, db):
+        """
+        Prep the database and read the account data.
+
+        Args:
+            db (database.Bucket): The database.
+        """
+        self.masterDB = db.child("meta")
+        self.utxoDB = db.child("utxos", blobber=UTXO)
+        self.utxos = {k: v for k, v in self.utxoDB.items()}
+        self.updateStakeStats()
+        self.addrIntDB = db.child("internal_addrs", datatypes=("INTEGER", "TEXT"))
+        self.internalAddresses = readAddrs(self.addrIntDB)
+        self.addrExtDB = db.child("external_addrs", datatypes=("INTEGER", "TEXT"))
+        self.externalAddresses = readAddrs(self.addrExtDB)
+        self.vspDB = db.child(
+            "vsps", datatypes=("TEXT", "BLOB"), blobber=VotingServiceProvider
+        )
+        # Get the ordered list of stake pools.
+        if MetaKeys.vsp in self.masterDB:
+            apiKeys = encode.unblobStrList(self.masterDB[MetaKeys.vsp])
+            self.stakePools = [self.vspDB[apiKey] for apiKey in apiKeys]
+
+    def open(self, cryptoKey, blockchain, signals):
         """
         Open the Decred account. Runs the parent's method, then performs some
         Decred-specific initialization.
         """
-        super().open(pw)
+        self.blockchain = blockchain
+        self.signals = signals
+        self.privKey = self.privateExtendedKey(cryptoKey)
+        pubX = self.privKey.neuter()
+        self.extPub = pubX.child(EXTERNAL_BRANCH)
+        self.intPub = pubX.child(INTERNAL_BRANCH)
         # The voting key is the first non-crazy stake-branch child.
         for i in range(3):
             try:
                 self._votingKey = self.privKey.child(STAKE_BRANCH).child(i).privateKey()
                 return
-            except CrazyKeyError:
+            except crypto.CrazyKeyError:
                 continue
         # It is realistically impossible to reach here.
         raise Exception("error finding voting key")
@@ -159,11 +746,34 @@ class DecredAccount(Account):
         Close the Decred account. Runs the parent's method, then performs some
         Decred-specific clean up.
         """
-        super().close()
-        self._votingKey.key.zero()
+        if self.privKey:
+            self.privKey.key.zero()
+            self.privKey.pubKey.zero()
+            self.extPub.key.zero()
+            self.extPub.pubKey.zero()
+            self.intPub.key.zero()
+            self.intPub.pubKey.zero()
+            self._votingKey.key.zero()
+        self.privKey = None
+        self.extPub = None
+        self.intPub = None
         self._votingKey = None
 
-    def calcBalance(self, tipHeight):
+    def calcBalance(self, tipHeight=None):
+        """
+        Calculate the current balance.
+
+        Args:
+            tipHeight (int): optional. The current tip height. If not provided,
+                the height from the current blockchain.tip will be used.
+
+        Returns:
+            Balance: The current balance. The balance is also assigned to the
+                DecredAccount.balance property.
+        """
+        tipHeight = (
+            tipHeight if tipHeight is not None else self.blockchain.tip["height"]
+        )
         tot = 0
         avail = 0
         staked = 0
@@ -200,17 +810,371 @@ class DecredAccount(Account):
             blockchainUTXOs (list(object)): A list of Python objects decoded from
                 dcrdata's JSON response from ...addr/utxo endpoint.
         """
-        super().resolveUTXOs(blockchainUTXOs)
+        self.utxos = {u.key(): u for u in blockchainUTXOs}
+        self.utxoDB.clear()
+        self.utxoDB.batchInsert(self.utxos.items())
         self.updateStakeStats()
         pool = self.stakePool()
         if pool:
-            pool.authorize(self.votingAddress(), self.net)
+            pool.authorize(self.votingAddress())
+
+    def utxoscan(self):
+        """
+        A generator for iterating UTXOs. None of the UTXO set modifying
+        functions (addUTXO, spendUTXO) should be used during iteration.
+
+        Returns:
+            generator(UTXO): A UTXO generator that iterates all known UTXOs.
+        """
+        for utxo in self.utxos.values():
+            yield utxo
+
+    def getUTXO(self, txid, vout):
+        """
+        Get a UTXO by txid and tx output index.
+
+        Args:
+            txid (str): The hex-encoded transaction ID.
+            vout (int): The transaction output index.
+
+        Returns:
+            UTXO: The UTXO if found or None.
+        """
+        uKey = UTXO.makeKey(txid, vout)
+        return self.utxos[uKey] if uKey in self.utxos else None
+
+    def UTXOsForTXID(self, txid):
+        """
+        Get any UTXOs with the provided transaction ID.
+
+        Args:
+            txid (str): The hex-encoded transaction ID.
+
+        Returns:
+            list(UTXO): List of UTXO for the txid.
+        """
+        return [utxo for utxo in self.utxoscan() if utxo.txid == txid]
+
+    def getUTXOs(self, requested, approve=None):
+        """
+        Find confirmed and mature UTXOs, smallest first, that sum to the
+        requested amount, in atoms.
+
+        Args:
+            requested (int): Required amount in atoms.
+            approve (func(UTXO) -> bool): Optional UTXO filtering function.
+
+        Returns:
+            list(UTXO): A list of UTXOs.
+            bool: True if the UTXO sum is >= the requested amount.
+        """
+        matches = []
+        collected = 0
+        pairs = [(u.satoshis, u) for u in self.utxoscan()]
+        for v, utxo in sorted(pairs, key=lambda p: p[0]):
+            if approve and not approve(utxo):
+                continue
+            matches.append(utxo)
+            collected += v
+            if collected >= requested:
+                break
+        return matches, collected >= requested
+
+    def spendTxidVout(self, txid, vout):
+        """
+        Spend the UTXO. The UTXO is removed from the watched list and returned.
+
+        Args:
+            txid (str): The hex-encoded transaction ID.
+            vout (int): The transaction output index.
+
+        Returns:
+            UTXO: The spent UTXO.
+        """
+        return self.utxos.pop(UTXO.makeKey(txid, vout), None)
+
+    def addMempoolTx(self, tx):
+        """
+        Add a Transaction-implementing object to the mempool.
+
+        Args:
+            tx (Transaction): An object that implements the Transaction API
+                from tinydecred.api.
+        """
+        self.mempool[tx.txid()] = tx
+
+    def addTxid(self, addr, txid):
+        """
+        Add addr and txid to tracked addresses and txids if not already added.
+
+        Args:
+            addr (str): Base-58 encoded address.
+            txid (str): The hex-encoded transaction ID.
+        """
+        if addr not in self.txs:
+            self.txs[addr] = []
+        txids = self.txs[addr]
+        if txid not in txids:
+            txids.append(txid)
+        # Advance the cursors as necessary.
+        if addr in self.externalAddresses:
+            extIdx = self.externalAddresses.index(addr)
+            if extIdx > self.lastSeenExt:
+                diff = extIdx - self.lastSeenExt
+                self.lastSeenExt = extIdx
+                self.cursorExt = max(0, self.cursorExt - diff)
+        elif addr in self.internalAddresses:
+            intIdx = self.internalAddresses.index(addr)
+            if intIdx > self.lastSeenInt:
+                diff = intIdx - self.lastSeenInt
+                self.lastSeenInt = intIdx
+                self.cursorInt = max(0, self.cursorInt - diff)
+
+    def confirmTx(self, tx, blockHeight):
+        """
+        Confirm a transaction. Sets height for any unconfirmed UTXOs in the
+        transaction. Removes the transaction from mempool.
+
+        Args:
+            tx (Transaction): An object that implements the Transaction API
+                from tinydecred.api.
+            blockHeight (int): The height of the transactions block.
+        """
+        txid = tx.txid()
+        self.mempool.pop(txid, None)
+        for utxo in self.UTXOsForTXID(txid):
+            utxo.height = blockHeight
+            if tx.looksLikeCoinbase():
+                # This is a coinbase transaction, set the maturity height.
+                utxo.maturity = utxo.height + self.net.CoinbaseMaturity
+
+    def nextBranchAddress(self, branchKey, branchAddrs, branchDB):
+        """
+        Generate a new address and add it to the list of external addresses.
+        Does not move the cursor.
+
+        Args:
+            branchKey (ExtendedKey): The branch extended public key.
+            branchAddrs (list(string)): The current list of branch addresses.
+            branchDB (database.Bucket): The branch address database bucket.
+
+        Returns:
+            str: Base-58 encoded address.
+        """
+
+        def next():
+            idx = len(branchAddrs)
+            try:
+                addr = branchKey.deriveChildAddress(idx, self.net)
+            except crypto.CrazyKeyError:
+                addr = CrazyAddress
+            branchAddrs.append(addr)
+            branchDB[idx] = addr
+            return addr
+
+        for i in range(3):
+            addr = next()
+            if addr != CrazyAddress:
+                return addr
+        raise Exception("failed to generate new address")
+
+    def nextExternalAddress(self):
+        """
+        Return a new external address by advancing the cursor.
+
+        Returns:
+            addr (str): Base-58 encoded address.
+        """
+        extAddrs = self.externalAddresses
+        addr = CrazyAddress
+        # Though unlikely, if an out or range key is generated, the account will
+        # generate an additional address
+        while addr == CrazyAddress:
+            # gap policy is to wrap. Wrapping brings the cursor back to index 1,
+            # since the index zero is the last seen address.
+            self.cursorExt += 1
+            if self.cursorExt > self.gapLimit:
+                self.cursorExt = 1
+            idx = self.lastSeenExt + self.cursorExt
+            while len(extAddrs) < idx + 1:
+                self.nextBranchAddress(self.extPub, extAddrs, self.addrExtDB)
+            addr = extAddrs[idx]
+        if self.blockchain:
+            self.blockchain.subscribeAddresses(addr)
+        return addr
+
+    def nextInternalAddress(self):
+        """
+        Return a new internal address
+
+        Returns:
+            str: Base-58 encoded address.
+        """
+        intAddrs = self.internalAddresses
+        addr = CrazyAddress
+        # Though unlikely, if an out or range key is generated, the account will
+        # generate an additional address
+        while addr == CrazyAddress:
+            # gap policy is to wrap. Wrapping brings the cursor back to index 1,
+            # since index zero is the last seen address.
+            self.cursorInt += 1
+            if self.cursorInt > self.gapLimit:
+                self.cursorInt = 1
+            idx = self.lastSeenInt + self.cursorInt
+            while len(intAddrs) < idx + 1:
+                self.nextBranchAddress(self.intPub, intAddrs, self.addrIntDB)
+            addr = intAddrs[idx]
+        return addr
+
+    def lastSeen(self, addrs, default=0):
+        """
+        Find the index of the last seen address in the list of addresses.
+        The last seen address is taken as the last address for which there is an
+        entry in the self.txs dict.
+
+        Args:
+            addrs (list(string)): The list of addresses.
+
+        Returns:
+            int: The highest index of all seen addresses in the list.
+        """
+        lastSeen = default
+        for i, addr in enumerate(addrs):
+            if addr in self.txs:
+                lastSeen = i
+        return lastSeen
+
+    def generateGapAddresses(self):
+        """
+        Generate addresses up to gap addresses after the cursor. Do not move the
+        cursor.
+
+        Returns:
+            list(str): Newly generated addresses.
+        """
+        if self.extPub is None:
+            log.warning("attempting to generate gap addresses on a closed account")
+        minExtLen = self.lastSeenExt + self.gapLimit + 1
+        newAddrs = self.generateBranchGaps(
+            self.extPub, self.externalAddresses, self.addrExtDB, minExtLen
+        )
+        minIntLen = self.lastSeenInt + self.gapLimit + 1
+        newAddrs.extend(
+            self.generateBranchGaps(
+                self.intPub, self.internalAddresses, self.addrIntDB, minIntLen
+            )
+        )
+        return newAddrs
+
+    def generateBranchGaps(self, key, addrs, db, reqLen):
+        """
+        Generate gap addresses the specified branch.
+
+        Args:
+            key (crypto.ExtendedKey): The branch extended key.
+            addrs list(str): The current branch addresses.
+            db (database.Bucket): The branch address database.
+            reqLen (int): The minimum length of the resulting address list,
+                formed by appending to the addrs list.
+        """
+        newAddrs = []
+        while len(addrs) < reqLen:
+            self.nextBranchAddress(key, addrs, db)
+            newAddrs.append(addrs[-1])
+        return newAddrs
+
+    def gapAddrs(self):
+        """
+        A list of addresses which have been generated but have not yet been
+        seen. Any addresses before the last seen address will be excluded.
+        Addresses come from both the external and internal branch.
+
+        Returns:
+            list(str): Gap addresses.
+        """
+        return filterCrazyAddress(
+            self.internalAddresses[self.lastSeenInt :]
+            + self.externalAddresses[self.lastSeenExt :]
+        )
+
+    def currentAddress(self):
+        """
+        Get the external address at the cursor. The cursor is not moved.
+
+        Returns:
+            str: Base-58 encoded address.
+        """
+        return self.externalAddresses[self.lastSeenExt + self.cursorExt]
+
+    def privateExtendedKey(self, cryptoKey):
+        """
+        Decode the private extended key for the account using the provided
+        SecretKey.
+
+        Args:
+            pw (SecretKey): The secret key.
+
+        Returns:
+            crypto.ExtendedKey: The current account's decoded private key.
+        """
+        return crypto.decodeExtendedKey(self.net, cryptoKey, self.privKeyEncrypted)
+
+    def publicExtendedKey(self, cryptoKey):
+        """
+        Decode the public extended key for the account using the provided
+        SecretKey.
+
+        Args:
+            pw (SecretKey): The secret key.
+
+        Returns:
+            crypto.ExtendedKey: The current account's decoded public key.
+        """
+        return crypto.decodeExtendedKey(self.net, cryptoKey, self.pubKeyEncrypted)
+
+    def branchAndIndex(self, addr):
+        """
+        Find the branch and index of the address.
+
+        Args:
+            addr (str): Base-58 encoded address.
+
+        Returns:
+            int: Internal (1) or external (0) branch.
+            int: Address index.
+        """
+        branch, idx = None, None
+        if addr in self.externalAddresses:
+            branch = EXTERNAL_BRANCH
+            idx = self.externalAddresses.index(addr)
+        elif addr in self.internalAddresses:
+            branch = INTERNAL_BRANCH
+            idx = self.internalAddresses.index(addr)
+        return branch, idx
+
+    def getPrivKeyForAddress(self, addr):
+        """
+        Get the private key for the address.
+
+        Args:
+            addr (str): Base-58 encoded address.
+
+        Returns:
+            secp256k1.PrivateKey: The private key structure for the address.
+        """
+        branch, idx = self.branchAndIndex(addr)
+        if branch is None:
+            raise Exception("unknown address")
+
+        branchKey = self.privKey.child(branch)
+        privKey = branchKey.child(idx)
+        return crypto.privKeyFromBytes(privKey.key)
 
     def addUTXO(self, utxo):
         """
         Add the UTXO. Update the stake stats if this is a ticket.
         """
-        super().addUTXO(utxo)
+        self.utxos[utxo.key()] = utxo
         if utxo.isTicket():
             self.updateStakeStats()
 
@@ -227,17 +1191,71 @@ class DecredAccount(Account):
                 a.append(pool.purchaseInfo.ticketAddress)
         return a
 
+    def caresAboutTxid(self, txid):
+        """
+        Indicates whether the account has any UTXOs with this transaction ID, or
+        has this transaction in mempool.
+
+        Args:
+            txid (str): The hex-encoded transaction ID.
+
+        Returns:
+            bool: `True` if we are watching the txid.
+        """
+        return txid in self.mempool or self.hasUTXOwithTXID(txid)
+
+    def hasUTXOwithTXID(self, txid):
+        """
+        Search watched transaction ids for txid.
+
+        Args:
+            txid (str): The hex-encoded transaction ID.
+
+        Returns:
+            bool: `True` if found.
+        """
+        for utxo in self.utxos.values():
+            if utxo.txid == txid:
+                return True
+        return False
+
+    def spendUTXOs(self, utxos):
+        """
+        Spend the UTXOs.
+
+        Args:
+            utxos list(UTXO): The UTXOs to spend.
+        """
+        for utxo in utxos:
+            self.spendUTXO(utxo)
+
+    def spendUTXO(self, utxo):
+        """
+        Spend the UTXO. The UTXO is removed from the watched list and returned.
+        Args:
+            utxo (UTXO): The UTXO to spend.
+        Returns:
+            UTXO: The spent UTXO.
+        """
+        return self.utxos.pop(utxo.key(), None)
+
     def allAddresses(self):
         """
         Overload the base class to add the voting address.
         """
-        return self.addTicketAddresses(super().allAddresses())
+        return self.addTicketAddresses(
+            filterCrazyAddress(self.internalAddresses + self.externalAddresses)
+        )
 
     def watchAddrs(self):
         """
         Overload the base class to add the voting address.
         """
-        return self.addTicketAddresses(super().watchAddrs())
+        a = set()
+        a = a.union((utxo.address for utxo in self.utxoscan()))
+        a = a.union(self.externalAddresses)
+        a = a.union((a for a in self.internalAddresses if a not in self.txs))
+        return self.addTicketAddresses(filterCrazyAddress(a))
 
     def votingKey(self):
         """
@@ -254,7 +1272,7 @@ class DecredAccount(Account):
         Returns:
             AddressSecpPubkey: The address object.
         """
-        return AddressSecpPubKey(
+        return crypto.AddressSecpPubKey(
             self.votingKey().pub.serializeCompressed(), self.net
         ).string()
 
@@ -269,6 +1287,10 @@ class DecredAccount(Account):
         self.stakePools = [pool] + [
             p for p in self.stakePools if p.apiKey != pool.apiKey
         ]
+        self.vspDB[pool.apiKey] = pool
+        self.masterDB[MetaKeys.vsp] = encode.blobStrList(
+            [p.apiKey for p in self.stakePools]
+        )
         bc = self.blockchain
         addr = pool.purchaseInfo.ticketAddress
         for txid in bc.txsForAddr(addr):
@@ -276,7 +1298,7 @@ class DecredAccount(Account):
         for utxo in bc.UTXOs([addr]):
             self.addUTXO(utxo)
         self.updateStakeStats()
-        self.signals.balance(self.calcBalance(self.blockchain.tip["height"]))
+        self.signals.balance(self.calcBalance())
 
     def hasPool(self):
         """
@@ -322,7 +1344,7 @@ class DecredAccount(Account):
                 self.confirmTx(tx, self.blockchain.tipHeight)
         # "Spendable" balance can change as utxo's mature, so update the
         # balance at every block.
-        self.signals.balance(self.calcBalance(self.blockchain.tipHeight))
+        self.signals.balance(self.calcBalance())
 
     def addressSignal(self, addr, txid):
         """
@@ -362,9 +1384,9 @@ class DecredAccount(Account):
                 matches += 1
         if matches:
             # signal the balance update
-            self.signals.balance(self.calcBalance(self.blockchain.tip["height"]))
+            self.signals.balance(self.calcBalance())
 
-    def sendToAddress(self, value, address, feeRate):
+    def sendToAddress(self, value, address, feeRate=None):
         """
         Send the value to the address.
 
@@ -385,6 +1407,7 @@ class DecredAccount(Account):
         self.spendUTXOs(spentUTXOs)
         for utxo in newUTXOs:
             self.addUTXO(utxo)
+        self.signals.balance(self.calcBalance())
         return tx
 
     def purchaseTickets(self, qty, price):
@@ -421,6 +1444,7 @@ class DecredAccount(Account):
                 self.addMempoolTx(tx)
         # Store the txids.
         self.tickets.extend([tx.txid() for tx in txs[1]])
+        self.signals.balance(self.calcBalance())
         return txs[1]
 
     def revokeTickets(self):
@@ -458,15 +1482,23 @@ class DecredAccount(Account):
             )
             self.blockchain.revokeTicket(tx, keysource, redeemScript)
 
-    def sync(self, blockchain, signals):
+    def sync(self):
         """
         Synchronize the UTXO set with the server. This should be the first
         action after the account is opened or changed.
         """
-        self.blockchain = blockchain
-        self.signals = signals
-        signals.balance(self.balance)
+        blockchain, signals = self.blockchain, self.signals
+        signals.balance(self.calcBalance())
         self.generateGapAddresses()
+
+        # If there is a chosen stake pool, sync the purchaseInfo.
+        # TODO: Save purchase info
+        stakePool = self.stakePool()
+        if stakePool:
+            try:
+                stakePool.getPurchaseInfo()
+            except Exception as e:
+                log.error("error getting VSP purchase info: %s" % e)
 
         # First, look at addresses that have been generated but not seen. Run in
         # loop until the gap limit is reached.
@@ -502,9 +1534,22 @@ class DecredAccount(Account):
         if watchAddresses:
             blockchain.subscribeAddresses(watchAddresses)
         # Signal the new balance.
-        signals.balance(self.calcBalance(self.blockchain.tip["height"]))
+        signals.balance(self.calcBalance())
 
         return True
 
 
-tinyjson.register(DecredAccount, "DecredAccount")
+def readAddrs(db):
+    """
+    Read and verify the address index database. Create a list of addresses.
+
+    Args:
+        db (database.Bucket): The address table that maps address to child
+            index.
+
+    Returns:
+        list(string): The list of addresses.
+    """
+    pairs = sorted(db.items(), key=lambda pair: pair[0])
+    assert not pairs or len(pairs) == pairs[-1][0] + 1
+    return [pair[1] for pair in pairs]

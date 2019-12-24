@@ -5,15 +5,123 @@ See LICENSE for details
 A class that wraps ByteArray and provides some convenient operators.
 """
 
-import nacl.secret
+import struct
 
-from tinydecred.crypto.rando import generateSeed
-from tinydecred.util import tinyjson
+NONE = "None".encode()
+
+
+def filterNone(b):
+    """
+    If the provided argument is None, return the special None indicator bytes.
+    Otherwise, the argument is returned directly.
+
+    Args:
+        b (bytes-like or None): The bytes to filter.
+
+    Returns:
+        bytes-like
+    """
+    if b == None:
+        return NONE
+    return b
+
+
+def extractNone(b):
+    """
+    If the provided bytes are the special None indicator, return None, else
+    return the bytes.
+
+    Args:
+        b (bytes-like): The bytes to filter.
+
+    Returns:
+        (bytes-like or None)
+    """
+    if b == NONE:
+        return None
+    return b
+
+
+def intToBytes(i, signed=False):
+    """
+    Encodes an integer to bytes.
+
+    Args:
+        i (int): The integer.
+        signed (bool): Whether to encode as a signed integer.
+
+    Returns:
+        bytearray: The encoded integer.
+    """
+    length = ((i + ((i * signed) < 0)).bit_length() + 7 + signed) // 8
+    return bytearray(i.to_bytes(length, byteorder="big", signed=signed))
+
+
+def intFromBytes(b, signed=False):
+    """
+    Decodes an integer from bytes.
+
+    Args:
+        b (bytes-like): The encoded integer.
+        signed (bool): Whether to decode as a signed integer.
+
+    Returns:
+        int: The decoded integer.
+    """
+    return int.from_bytes(b, "big", signed=signed)
+
+
+def floatToBytes(flt):
+    """
+    Encodes a float to bytes.
+
+    Args:
+        flt (float): The float to encode.
+
+    Returns:
+        bytearray: The encoded float.
+    """
+    return bytearray(struct.pack("d", flt))
+
+
+def floatFromBytes(b):
+    """
+    Decode a float from bytes.
+
+    Args:
+        bytes-like: The float bytes to decode.
+
+    Returns:
+        float: The decoded float.
+    """
+    return struct.unpack("d", b)[0]
+
+
+def boolToBytes(v):
+    """
+    Encode the boolean value as a byte.
+    """
+    return 0x01 if v else 0x00
+
+
+def boolFromBytes(b):
+    """
+    Decode the byte as True if 0x01, else False.
+    """
+    return True if b == 0x01 else False
 
 
 def decodeBA(b, copy=False):
     """
     Decode into a bytearray.
+
+    Args:
+        b (str, bytes-like, ByteArray, int, list(int)): The value to decode to
+            a bytearray. Strings are interpreted as hexadecimal. Integers are
+            minimally encoded to an unsigned integer.
+
+    Returns:
+        bytearray: The decoded bytes.
     """
     if isinstance(b, ByteArray):
         return bytearray(b.b) if copy else b.b
@@ -22,7 +130,7 @@ def decodeBA(b, copy=False):
     if isinstance(b, bytes):
         return bytearray(b)
     if isinstance(b, int):
-        return bytearray(b.to_bytes((b.bit_length() + 7) // 8, byteorder="big"))
+        return intToBytes(b)
     if isinstance(b, str):
         return bytearray.fromhex(b)
     if hasattr(b, "__iter__"):
@@ -32,19 +140,16 @@ def decodeBA(b, copy=False):
 
 class ByteArray(object):
     """
-    ByteArray is a bytearray manager that also implements tinyjson marshalling.
-    It implements a subset of bytearray's bitwise operators and provides some
-    convenience decodings on the fly, so operations work with various types of
-    input.  Since bytearrays are mutable, ByteArray can also zero the internal
-    value without relying on garbage collection. An
-    important difference between ByteArray and bytearray is
-    that an integer argument to ByteArray constructor will result in the
-    shortest possible byte representation of the integer, where for
-    bytearray an int argument results in a zero-valued bytearray of said
-    length. To get a zero-valued or zero-padded ByteArray of length n, use the
-    `length` keyword argument.
-
-
+    ByteArray is a bytearray manager. It implements a subset of bytearray's
+    bitwise operators and provides some convenience decodings on the fly, so
+    operations work with various types of input.  Since bytearrays are mutable,
+    ByteArray can also zero the internal value without relying on garbage
+    collection. An important difference between ByteArray and bytearray is that
+    an integer argument to ByteArray constructor will result in the shortest
+    possible byte representation of the integer, where for bytearray an int
+    argument results in a zero-valued bytearray of said length. To get a
+    zero-valued or zero-padded ByteArray of length n, use the `length` keyword
+    argument.
     """
 
     def __init__(self, b=b"", copy=True, length=None):
@@ -58,22 +163,27 @@ class ByteArray(object):
         else:
             self.b = decodeBA(b, copy=copy)
 
-    def __tojson__(self):
-        return {"b": self.b.hex()}
-
-    def __fromjson__(obj):
-        return ByteArray(obj["b"])
-
-    # blob and unblob satisfy the Blobber API defined in utils.database
     @staticmethod
     def unblob(b):
+        """Satisfies the encode.Blobber API"""
         return ByteArray(b)
 
     @staticmethod
     def blob(ba):
+        """Satisfies the encode.Blobber API"""
         return ba.b
 
-    def decode(self, a):
+    def comp(self, a):
+        """
+        comp gets the underlying bytearray and length of this ByteArray
+        and the argument.
+
+        Returns:
+            bytearray: This ByteArray's bytearray.
+            int: This ByteArray's length.
+            bytearray: The other ByteArray's bytearray.
+            int: The other ByteArray's length.
+        """
         a = decodeBA(a)
         aLen, bLen = len(a), len(self.b)
         assert aLen <= bLen, "decode: invalid length %i > %i" % (aLen, bLen)
@@ -110,27 +220,27 @@ class ByteArray(object):
         return len(self.b)
 
     def __and__(self, a):
-        a, aLen, b, bLen = self.decode(a)
+        a, aLen, b, bLen = self.comp(a)
         b = ByteArray(b)
         for i in range(bLen):
             b[bLen - i - 1] &= a[aLen - i - 1] if i < aLen else 0
         return b
 
     def __iand__(self, a):
-        a, aLen, b, bLen = self.decode(a)
+        a, aLen, b, bLen = self.comp(a)
         for i in range(bLen):
             b[bLen - i - 1] &= a[aLen - i - 1] if i < aLen else 0
         return self
 
     def __or__(self, a):
-        a, aLen, b, bLen = self.decode(a)
+        a, aLen, b, bLen = self.comp(a)
         b = ByteArray(b)
         for i in range(bLen):
             b[bLen - i - 1] |= a[aLen - i - 1] if i < aLen else 0
         return b
 
     def __ior__(self, a):
-        a, aLen, b, bLen = self.decode(a)
+        a, aLen, b, bLen = self.comp(a)
         for i in range(bLen):
             b[bLen - i - 1] |= a[aLen - i - 1] if i < aLen else 0
         return self
@@ -158,50 +268,54 @@ class ByteArray(object):
         return ByteArray(bytearray(reversed(self.b)))
 
     def hex(self):
+        """
+        A hexadecimal string representation of the bytes.
+
+        Returns:
+            str: The hex bytes.
+        """
         return self.b.hex()
 
     def zero(self):
+        """
+        Sets the bytes of the underlying bytearray to zero. The benefit of
+        zeroing is that the info is destroyed immediately, rather than relying
+        on the garbage collector.
+        """
         for i in range(len(self.b)):
             self.b[i] = 0
 
     def iszero(self):
-        return all([v == 0 for v in self.b])
+        """
+        True if all bytes are zero.
+        """
+        return all((v == 0 for v in self.b))
 
     def iseven(self):
+        """
+        True if empty or if last byte is zero.
+        """
         l = len(self.b)
         return l == 0 or self.b[l - 1] == 0
 
     def int(self):
-        return int.from_bytes(self.b, "big")
+        """The bytes as an integer."""
+        return intFromBytes(self.b)
 
     def bytes(self):
+        """The bytes as Python `bytes`."""
         return bytes(self.b)
 
-    def encrypt(self, thing):
-        nonce = ByteArray(generateSeed(nacl.secret.SecretBox.NONCE_SIZE))
-
-        # This is your safe, you can use it to encrypt or decrypt messages
-        box = nacl.secret.SecretBox(self.bytes())
-
-        # Encrypt our message, it will be exactly 40 bytes longer than the
-        #   original message as it stores authentication information and the
-        #   nonce alongside it.
-        encrypted = ByteArray(box.encrypt(thing, nonce.bytes()))
-
-        assert len(encrypted) == len(thing) + box.NONCE_SIZE + box.MACBYTES
-
-        return encrypted
-
-    def decrypt(self, thing):
-        return nacl.secret.SecretBox(self.bytes()).decrypt(thing)
-
     def unLittle(self):
+        """A copy of the ByteArray, reversed."""
         return self.littleEndian()
 
     def littleEndian(self):
+        """A copy of the ByteArray, reversed."""
         return ByteArray(reversed(self.b))
 
     def copy(self):
+        """A copy of the ByteArray."""
         return ByteArray(self.b)
 
     def pop(self, n):
@@ -212,5 +326,116 @@ class ByteArray(object):
         self.b = self.b[n:]
         return b
 
-# register the ByteArray class with the json encoder/decoder.
-tinyjson.register(ByteArray, "ByteArray")
+
+class BuildyBytes(ByteArray):
+    """
+    The BuildyBytes class is used to construct (optionally versioned) linearly-
+    encoded 2-D byte arrays.
+    """
+
+    def __init__(self, version=None):
+        """
+        Constructor for a BuildyBytes.
+
+        Args:
+            version (int): optinonal. The version to encode. Default encodes no
+                version byte.
+        """
+        if version == 0:
+            version = [0x00]
+        if version is None:
+            version = []
+        super().__init__(version)
+
+    def addData(self, d):
+        """
+        addData adds the data to the BuildyBytes, and returns the new
+        BuildyBytes. The data has hard-coded length limit of
+        uint16_max = 65535 bytes.
+        """
+        d = decodeBA(d)
+        lenBytes = intToBytes(len(d))
+        bLen = len(lenBytes)
+        assert bLen < 3
+        if bLen == 2:
+            lBytes = bytearray((0xFF, lenBytes[0], lenBytes[1]))
+        elif bLen == 1:
+            lBytes = lenBytes
+        elif bLen == 0:
+            lBytes = bytearray((0x00,))
+        self.b += lBytes + d
+        return self
+
+
+def extractPushes(b):
+    """
+    Parses the linearly-encoded 2D byte array into a list of byte arrays.
+
+    Args:
+        b (bytes-like): The linearly encoded 2-D byte array.
+
+    Returns:
+        list(bytes-like): The 2-D byte array.
+    """
+    pushes = []
+    while True:
+        if len(b) == 0:
+            break
+        bLen = b[0]
+        b = b[1:]
+        if bLen == 255:
+            if len(b) < 2:
+                raise Exception("2 bytes not available for uint16 data length")
+            bLen = intFromBytes(b[:2])
+            b = b[2:]
+        if len(b) < bLen:
+            raise Exception("data too short for pop of %d bytes" % bLen)
+        pushes.append(b[:bLen])
+        b = b[bLen:]
+    return pushes
+
+
+def decodeBlob(b):
+    """
+    decodeBlob decodes a versioned blob into its version and the pushes extracted
+    from its data.
+
+    Args:
+        b (bytes-like): The bytes to decode.
+
+    Returns:
+        int: The blob version (the version passed to BuildyBytes).
+        list(bytes-like): The data pushes.
+    """
+    if len(b) == 0:
+        raise Exception("zero length blob not allowed")
+    return b[0], extractPushes(b[1:])
+
+
+def unblobStrList(b):
+    """
+    Decode a list of strings from the bytes.
+
+    Args:
+        bytes-like: The encoded list.
+
+    Returns:
+        list(str): The decoded list.
+    """
+    return [s.decode("utf-8") for s in extractPushes(b)]
+
+
+def blobStrList(strs):
+    """
+    Encode a list of strings a BuildyBytes array.
+
+    Args:
+        list(str): The strings to encode.
+
+    Returns:
+        bytearray: The encoded list.
+    """
+    b = BuildyBytes()
+    for s in strs:
+        b.addData(s.encode("utf-8"))
+    return b.b

@@ -15,13 +15,18 @@ import sys
 import select
 import atexit
 import websocket
-from tinydecred.util import tinyjson, helpers, database, tinyhttp
+import json
+from tinydecred.util import helpers, database, tinyhttp
 from tinydecred.crypto import crypto
-from tinydecred.util.encode import ByteArray
+from tinydecred.util import encode
 from tinydecred.wallet.api import InsufficientFundsError
-from tinydecred.pydecred import txscript, calc
+from tinydecred.pydecred import txscript, calc, account
 from tinydecred.pydecred.wire import msgtx, wire, msgblock
 from tinydecred.util.database import KeyValueDatabase
+
+ByteArray = encode.ByteArray
+BuildyBytes = encode.BuildyBytes
+UTXO = account.UTXO
 
 log = helpers.getLogger("DCRDATA")  # , logLvl=0)
 
@@ -274,7 +279,7 @@ class WebsocketClient(object):
         ----------
         path: string
             URI for the websocket connection
-        decoder: func(str), default tinyjson.load
+        decoder: func(str), default json.loads
             A function for processing the string from the server
 
         """
@@ -285,8 +290,8 @@ class WebsocketClient(object):
         self.earThread = None
         self.handlinBidness = False
         self.socket = None
-        self.decoder = decoder if decoder else tinyjson.load
-        self.encoder = encoder if encoder else tinyjson.dump
+        self.decoder = decoder if decoder else json.loads
+        self.encoder = encoder if encoder else json.dumps
 
     def activate(self):
         """
@@ -386,60 +391,6 @@ class DcrDataException(Exception):
     def __init__(self, name, message):
         self.name = name
         self.message = message
-
-
-class TicketInfo:
-    """
-    Ticket-related transaction information.
-    """
-
-    def __init__(
-        self,
-        status,
-        purchaseBlock,
-        maturityHeight,
-        expirationHeight,
-        lotteryBlock,
-        vote,
-        revocation,
-    ):
-        self.status = status
-        self.purchaseBlock = purchaseBlock
-        self.maturityHeight = maturityHeight
-        self.expirationHeight = expirationHeight
-        self.lotteryBlock = lotteryBlock
-        self.vote = vote
-        self.revocation = revocation
-
-    @staticmethod
-    def parse(obj):
-        return TicketInfo(
-            status=obj["status"],
-            purchaseBlock=obj["purchase_block"],
-            maturityHeight=obj["maturity_height"],
-            expirationHeight=obj["expiration_height"],
-            lotteryBlock=obj["lottery_block"],
-            vote=obj["vote"],
-            revocation=obj["revocation"],
-        )
-
-    @staticmethod
-    def __fromjson__(obj):
-        return TicketInfo.parse(obj)
-
-    def __tojson__(self):
-        return {
-            "status": self.status,
-            "purchase_block": self.purchaseBlock,
-            "maturity_height": self.maturityHeight,
-            "expiration_height": self.expirationHeight,
-            "lottery_block": self.lotteryBlock,
-            "vote": self.vote,
-            "revocation": self.revocation,
-        }
-
-
-tinyjson.register(TicketInfo, "TicketInfo")
 
 
 class AgendaChoices:
@@ -546,179 +497,6 @@ class AgendasInfo:
             totalvotes=obj["totalvotes"],
             agendas=[Agenda.parse(agenda) for agenda in obj["agendas"]],
         )
-
-
-class UTXO(object):
-    """
-    The UTXO is part of the wallet API. BlockChains create and parse UTXO
-    objects and fill fields as required by the Wallet.
-    """
-
-    def __init__(
-        self,
-        address,
-        txid,
-        vout,
-        ts=None,
-        scriptPubKey=None,
-        height=-1,
-        amount=0,
-        satoshis=0,
-        maturity=None,
-        scriptClass=None,
-        tinfo=None,
-    ):
-        self.address = address
-        self.txid = txid
-        self.vout = vout
-        self.ts = ts
-        self.scriptPubKey = scriptPubKey
-        self.height = height
-        self.amount = amount
-        self.satoshis = satoshis
-        self.maturity = maturity
-        self.scriptClass = scriptClass
-        if not scriptClass:
-            self.parseScriptClass()
-        self.tinfo = tinfo
-
-    def __tojson__(self):
-        return {
-            "address": self.address,
-            "txid": self.txid,
-            "vout": self.vout,
-            "ts": self.ts,
-            "scriptPubKey": self.scriptPubKey,
-            "height": self.height,
-            "amount": self.amount,
-            "satoshis": self.satoshis,
-            "maturity": self.maturity,
-            "scriptClass": self.scriptClass,
-            "tinfo": self.tinfo,
-        }
-
-    @staticmethod
-    def __fromjson__(obj):
-        return UTXO.parse(obj)
-
-    @staticmethod
-    def parse(obj):
-        """
-        Parse the decoded JSON from dcrdata into a UTXO.
-
-        Args:
-            obj (dict): The dcrdata /api/tx response, decoded.
-        """
-        utxo = UTXO(
-            address=obj["address"],
-            txid=obj["txid"],
-            vout=obj["vout"],
-            ts=obj["ts"] if "ts" in obj else None,
-            scriptPubKey=ByteArray(obj["scriptPubKey"]),
-            height=obj["height"] if "height" in obj else -1,
-            amount=obj["amount"] if "amount" in obj else 0,
-            satoshis=obj["satoshis"] if "satoshis" in obj else 0,
-            maturity=obj["maturity"] if "maturity" in obj else None,
-            tinfo=obj["tinfo"] if "tinfo" in obj else None,
-        )
-        utxo.parseScriptClass()
-        return utxo
-
-    def parseScriptClass(self):
-        """
-        Set the script class.
-        """
-        if self.scriptPubKey:
-            self.scriptClass = txscript.getScriptClass(0, self.scriptPubKey)
-
-    def confirm(self, block, tx, params):
-        """
-        This output has been mined. Set the block details.
-
-        Args:
-            block (msgblock.BlockHeader): The block header.
-            tx (dict): The dcrdata transaction.
-            params (object): The network parameters.
-        """
-        self.height = block.height
-        self.maturity = (
-            block.height + params.CoinbaseMaturity if tx.looksLikeCoinbase() else None
-        )
-        self.ts = block.timestamp
-
-    def isSpendable(self, tipHeight):
-        """
-        isSpendable will be True if the UTXO is considered mature at the
-        specified height.
-
-        Args:
-            tipHeight (int): The current blockchain tip height.
-
-        Returns:
-            bool: True if mature.
-        """
-        if self.isTicket():
-            return False
-        if self.maturity:
-            return self.maturity <= tipHeight
-        return True
-
-    def key(self):
-        """
-        A unique ID for this UTXO.
-        """
-        return UTXO.makeKey(self.txid, self.vout)
-
-    @staticmethod
-    def makeKey(txid, vout):
-        """
-        A unique ID for a UTXO.
-
-        Args:
-            txid (str): UTXO's transaction ID.
-            vout (int): UTXO's transaction output index.
-        """
-        return txid + "#" + str(vout)
-
-    def setTicketInfo(self, apiTinfo):
-        """
-        Set the ticket info. Only useful for tickets.
-
-        Args:
-            apiTinfo (dict): dcrdata /api/tinfo response.
-        """
-        self.tinfo = TicketInfo.parse(apiTinfo)
-        self.maturity = self.tinfo.maturityHeight
-
-    def isTicket(self):
-        """
-        isTicket will be True if this is SSTX output.
-
-        Returns:
-            bool: True if this is an SSTX output.
-        """
-        return self.scriptClass == txscript.StakeSubmissionTy
-
-    def isLiveTicket(self):
-        """
-        isLiveTicket will return True if this is a live ticket.
-
-        Returns:
-            bool: True if this is a live ticket.
-        """
-        return self.tinfo and self.tinfo.status in ("immature", "live")
-
-    def isRevocableTicket(self):
-        """
-        Returns True if this is an expired or missed ticket.
-
-        Returns:
-            bool: True if this is expired or missed ticket.
-        """
-        return self.tinfo and self.tinfo.status in ("expired", "missed")
-
-
-tinyjson.register(UTXO, "dcr.UTXO")
 
 
 def makeOutputs(pairs, chain):
@@ -907,7 +685,9 @@ class DcrdataBlockchain(object):
                 rawTinfo = self.dcrdata.tx.tinfo(utxo.txid)
                 utxo.setTicketInfo(rawTinfo)
             except Exception:
-                utxo.tinfo = TicketInfo("mempool", None, -1, -1, None, 0, None)
+                utxo.tinfo = account.TicketInfo(
+                    "mempool", None, 0, -1, None, None, None
+                )
         return utxo
 
     def UTXOs(self, addrs):
@@ -952,10 +732,9 @@ class DcrdataBlockchain(object):
         txout = tx.txOut[vout]
         utxo = UTXO(
             address=None,
-            txid=txid,
+            txHash=reversed(ByteArray(txid)),
             vout=vout,
             scriptPubKey=txout.pkScript,
-            amount=round(txout.value * 1e-8),
             satoshis=txout.value,
         )
         self.confirmUTXO(utxo, None, tx)
@@ -983,12 +762,12 @@ class DcrdataBlockchain(object):
                 msgTx = msgtx.MsgTx.deserialize(ByteArray(txHex))
                 self.txDB[hashKey] = msgTx
                 return msgTx
-            except Exception:
+            except Exception as e:
                 log.warning(
-                    "unable to retrieve tx data from dcrdata at %s"
-                    % self.dcrdata.baseUri
+                    "unable to retrieve tx data from dcrdata at %s: %s"
+                    % (self.dcrdata.baseURI, e)
                 )
-        raise Exception("failed to reteive transaction")
+        raise Exception("failed to retreive transaction")
 
     def blockForTx(self, txid):
         """
@@ -1013,7 +792,7 @@ class DcrdataBlockchain(object):
                 return None
             hexHash = decodedTx["block"]["blockhash"]
             header = self.blockHeader(hexHash)
-            self.txBlockMap[txHash] = header.hash().bytes()
+            self.txBlockMap[txHash] = header.cachedHash().bytes()
             return header
 
     def decodedTx(self, txid):
@@ -1044,15 +823,11 @@ class DcrdataBlockchain(object):
         except database.NoValue:
             try:
                 block = self.dcrdata.block.hash.header.raw(hexHash)
-                blockHeader = msgblock.BlockHeader.deserialize(
-                    ByteArray(block["hex"])
-                )
+                blockHeader = msgblock.BlockHeader.deserialize(ByteArray(block["hex"]))
                 self.saveBlockHeader(blockHeader)
                 return blockHeader
             except Exception as e:
-                log.warning(
-                    "unable to retrieve block header: %s" % formatTraceback(e)
-                )
+                log.warning("unable to retrieve block header: %s" % formatTraceback(e))
         raise Exception("failed to get block header for block %s" % hexHash)
 
     def blockHeaderByHeight(self, height):
@@ -1122,7 +897,7 @@ class DcrdataBlockchain(object):
         Args:
             header (BlockHeader): The block header to save.
         """
-        bHash = header.hash().bytes()
+        bHash = header.cachedHash().bytes()
         self.heightMap[header.height] = bHash
         self.headerDB[bHash] = header
 
@@ -1285,7 +1060,7 @@ class DcrdataBlockchain(object):
                     if opCodeClass == txscript.opNonstake
                     else wire.TxTreeStake
                 )
-                op = msgtx.OutPoint(txHash=tx.hash(), idx=utxo.vout, tree=tree)
+                op = msgtx.OutPoint(txHash=tx.cachedHash(), idx=utxo.vout, tree=tree)
                 txIn = msgtx.TxIn(previousOutPoint=op, valueIn=txout.value)
 
                 total += txout.value
@@ -1362,11 +1137,10 @@ class DcrdataBlockchain(object):
                 newUTXOs.append(
                     UTXO(
                         address=changeAddress,
-                        txid=newTx.txid(),
+                        txHash=newTx.cachedHash(),
                         vout=changeVout,
                         ts=int(time.time()),
                         scriptPubKey=changeScript,
-                        amount=changeAmount * 1e-8,
                         satoshis=changeAmount,
                     )
                 )
@@ -1558,14 +1332,14 @@ class DcrdataBlockchain(object):
 
             eopPool = txscript.ExtendedOutPoint(
                 op=msgtx.OutPoint(
-                    txHash=splitTx.hash(), idx=poolIdx, tree=wire.TxTreeRegular,
+                    txHash=splitTx.cachedHash(), idx=poolIdx, tree=wire.TxTreeRegular,
                 ),
                 amt=poolTxOut.value,
                 pkScript=poolTxOut.pkScript,
             )
             eop = txscript.ExtendedOutPoint(
                 op=msgtx.OutPoint(
-                    txHash=splitTx.hash(), idx=userIdx, tree=wire.TxTreeRegular,
+                    txHash=splitTx.cachedHash(), idx=userIdx, tree=wire.TxTreeRegular,
                 ),
                 amt=txOut.value,
                 pkScript=txOut.pkScript,
@@ -1627,11 +1401,10 @@ class DcrdataBlockchain(object):
             internalOutputs.append(
                 UTXO(
                     address=votingAddress.string(),
-                    txid=ticket.txid(),
+                    txHash=ticket.cachedHash(),
                     vout=0,  # sstx is output 0
                     ts=int(time.time()),
                     scriptPubKey=txOut.pkScript,
-                    amount=txOut.value * 1e-8,
                     satoshis=txOut.value,
                 )
             )

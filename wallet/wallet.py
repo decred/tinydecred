@@ -3,16 +3,27 @@ Copyright (c) 2019, Brian Stafford
 Copyright (c) 2019, The Decred developers
 See LICENSE for details
 """
-import os
 from threading import Lock as Mutex
-from tinydecred.util import tinyjson, helpers
-from tinydecred.crypto import crypto, mnemonic
-from tinydecred.pydecred.account import DecredAccount
-from tinydecred.wallet.accounts import createNewAccountManager
+from tinydecred.util import helpers, encode
+from tinydecred.util.database import KeyValueDatabase
+from tinydecred.crypto import crypto, mnemonic, rando
+from tinydecred.wallet import accounts, chains
+from tinydecred import config
+
+cfg = config.load()
 
 log = helpers.getLogger("WLLT")  # , logLvl=0)
 
-VERSION = "0.0.1"
+CHECKPHRASE = "tinydecred".encode("utf-8")
+
+BipIDs = chains.BipIDs
+
+
+class DBKeys:
+    cryptoKey = "cryptoKey".encode("utf-8")
+    root = "root".encode("utf-8")
+    checkKey = "checkKey".encode("utf-8")
+    keyParams = "keyParams".encode("utf-8")
 
 
 class Wallet(object):
@@ -30,103 +41,86 @@ class Wallet(object):
     wallet is with the `with` statement, i.e.
         ```
         sender = lambda h: dcrdata.insight.api.tx.send.post({"rawtx": h})
-        with wallet.open(pw) as w:
+        with wallet.open("dcr", ...) as w:
             w.sendToAddress(v, addr, sender)
         ```
     If the wallet is used in this way, the mutex will be locked and unlocked
     appropriately.
     """
 
-    def __init__(self):
+    def __init__(self, path):
         """
         Args:
-            chain (object): Network parameters to associate with the wallet. Should
-                probably move this to the account level.
+            path (str): The path to the wallet database.
         """
-        # The path to the filesystem location of the encrypted wallet file.
-        self.path = None
-        # The AccountManager that holds all account information. acctManager is
-        # saved with the encrypted wallet file.
-        self.acctManager = None
+        self.db = KeyValueDatabase(path)
+        self.masterDB = self.db.child("master", blobber=encode.ByteArray)
+        self.coinDB = self.db.child(
+            "accts", datatypes=("INTEGER", "BLOB"), blobber=accounts.AccountManager
+        )
+        self.keyParams = None
         self.selectedAccount = None
         self.openAccount = None
-        # The fileKey is a hash generated with the user's password as an input.
-        # The fileKey hash is used to AES encrypt and decrypt the wallet file.
-        self.fileKey = None
-        # An object implementing the BlockChain API.
-        self.blockchain = None
+        self.mgrCache = {}
         # The best block.
         self.users = 0
         # User provided callbacks for certain events.
-        self.signals = None
         self.mtx = Mutex()
-        self.version = None
 
-    def __tojson__(self):
-        return {
-            "acctManager": self.acctManager,
-            "version": self.version,
-        }
-
-    @staticmethod
-    def __fromjson__(obj):
-        w = Wallet()
-        w.acctManager = obj["acctManager"]
-        w.version = obj["version"]
-        return w
-
-    @staticmethod
-    def create(path, password, chain, userSeed=None):
+    def initialize(self, seed, pw):
         """
-        Create a wallet, locked by `password`, for the network indicated by
-        `chain`. The seed will be randomly generated, unless a `userSeed` is
-        provided.
+        Initialize the wallet.
+
+        Args:
+            seed (bytes-like): The wallet seed.
+            pw   (bytes-like): The wallet password, UTF-8 encoded.
+        """
+        pwKey = crypto.SecretKey(pw)
+        cryptoKey = encode.ByteArray(rando.generateSeed(crypto.KEY_SIZE))
+        root = crypto.ExtendedKey.new(seed)
+        self.masterDB[DBKeys.cryptoKey] = pwKey.encrypt(cryptoKey)
+        self.masterDB[DBKeys.root] = root.serialize()
+        self.masterDB[DBKeys.checkKey] = pwKey.encrypt(CHECKPHRASE)
+        self.masterDB[DBKeys.keyParams] = crypto.ByteArray(pwKey.params().serialize())
+        db = self.coinDB.child(str(BipIDs.decred), table=False)
+        acctManager = accounts.createNewAccountManager(
+            root, cryptoKey, "dcr", cfg.net, db
+        )
+        self.coinDB[BipIDs.decred] = acctManager
+
+    @staticmethod
+    def create(path, password):
+        """
+        Create a wallet, locked by `password`. The seed will be randomly
+        generated.
 
         Args:
             path (str): Filepath to store wallet.
             password (str): User provided password. The password will be used to
                 both decrypt the wallet, and unlock any accounts created.
             chain (object): Network parameters for the zeroth account ExtendedKey.
-            userSeed (ByteArray): A seed for wallet generate, likely generated
-                from a mnemonic seed word list.
 
         Returns:
             Wallet: An initialized wallet with a single Decred account.
             list(str): A mnemonic seed. Only retured when the caller does not
                 provide a seed.
         """
-        if os.path.isfile(path):
-            raise FileExistsError("wallet already exists at path %s" % path)
-        wallet = Wallet()
-        wallet.version = VERSION
-        wallet.path = path
-        seed = userSeed.bytes() if userSeed else crypto.generateSeed(crypto.KEY_SIZE)
-        pw = password.encode()
-        # Create the keys and coin type account, using the seed, the public
-        # password, private password and blockchain params.
-        wallet.acctManager = createNewAccountManager(
-            seed, b"", pw, chain, constructor=DecredAccount
-        )
-        wallet.fileKey = crypto.SecretKey(pw)
-        wallet.selectedAccount = wallet.acctManager.openAccount(0, password)
-        wallet.close()
-
-        if userSeed:
-            # No mnemonic seed is retured when the user provided the seed.
-            userSeed.zero()
-            return wallet
+        assert len(password) > 0
+        seed = rando.generateSeed(crypto.KEY_SIZE)
+        wallet = Wallet(path)
+        wallet.initialize(seed, password.encode())
         words = mnemonic.encode(seed)
         return words, wallet
 
     @staticmethod
-    def createFromMnemonic(words, path, password, chain):
+    def createFromMnemonic(words, path, password):
         """
         Creates the wallet from the mnemonic seed.
 
         Args:
-            words (list(str)): mnemonic seed. Assumed to be PGP words.
+            words (list(str)): Mnemonic seed. Assumed to be PGP words.
+            path (str): Filepath to store wallet.
             password (str): User password. Passed to Wallet.create.
-            chain (object): Network parameters.
 
         Returns:
             Wallet: A wallet initialized from the seed parsed from `words`.
@@ -137,79 +131,74 @@ class Wallet(object):
         cs = crypto.sha256ChecksumByte(userSeed.b)
         if cs != cksum:
             raise Exception("bad checksum %r != %r" % (cs, cksum))
-        return Wallet.create(path, password, chain, userSeed=userSeed)
-
-    def save(self):
-        """
-        Save the encrypted wallet.
-        """
-        if not self.fileKey:
-            log.error("attempted to save a closed wallet")
-            return
-        encrypted = self.fileKey.encrypt(tinyjson.dump(self).encode()).hex()
-        w = tinyjson.dump({"keyparams": self.fileKey.params(), "wallet": encrypted})
-        helpers.saveFile(self.path, w)
-
-    def setAccountHandlers(self, blockchain, signals):
-        """
-        Set blockchain params and user defined callbacks for accounts.
-
-        Args:
-            blockchain (object): An api.Blockchain for accounts.
-            signals (object): An api.Signals.
-        """
-        self.blockchain = blockchain
-        self.signals = signals
-
-    @staticmethod
-    def openFile(path, password):
-        """
-        Open the wallet located at `path`, encrypted with `password`. The zeroth
-        account or the wallet is open, but the wallet's `blockchain` and
-        `signals` are not set.
-
-        Args:
-            path (str): Filepath of the encrypted wallet.
-            password (str): User-supplied password. Must match password in use
-                when saved.
-
-        Returns:
-            Wallet: An opened, unlocked Wallet with the default account open.
-        """
-        if not os.path.isfile(path):
-            raise FileNotFoundError("no wallet found at %s" % path)
-        with open(path, "r") as f:
-            wrapper = tinyjson.load(f.read())
-        pw = password.encode()
-        keyParams = wrapper["keyparams"]
-        fileKey = crypto.SecretKey.rekey(pw, keyParams)
-        wallet = tinyjson.load(
-            fileKey.decrypt(bytes.fromhex(wrapper["wallet"])).decode()
-        )
-        wallet.path = path
-        wallet.fileKey = fileKey
-        wallet.selectedAccount = wallet.acctManager.openAccount(0, password)
-        wallet.close()
+        wallet = Wallet(path)
+        wallet.initialize(userSeed.b, password.encode())
+        userSeed.zero()
         return wallet
 
-    def open(self, acct, password, blockchain, signals):
+    def cryptoKey(self, password):
+        """
+        Create the SecretKey for the password.
+
+        Args:
+            password (str): The wallet password.
+
+        Returns:
+            ByteArray: The master encoding key.
+        """
+        if not self.keyParams:
+            self.keyParams = crypto.KDFParams.unblob(self.masterDB[DBKeys.keyParams].b)
+        pwKey = crypto.SecretKey.rekey(password.encode(), self.keyParams)
+        checkPhrase = pwKey.decrypt(self.masterDB[DBKeys.checkKey])
+        assert checkPhrase == CHECKPHRASE
+        return pwKey.decrypt(self.masterDB[DBKeys.cryptoKey])
+
+    @staticmethod
+    def openFile(filepath, password, signals):
+        """
+        Just checks that the provided password is correct, raising an exception
+        on error.
+
+        Args:
+            password (string): The wallet password.
+        """
+        wallet = Wallet(filepath)
+        # check that the password is correct.
+        wallet.cryptoKey(password).zero()
+        # Open the zeroth account. This will likely change.
+        wallet.open("dcr", 0, password, signals)
+        return wallet
+
+    def accountManager(self, coinType, signals):
+        coinType = chains.parseCoinType(coinType)
+        if coinType in self.mgrCache:
+            return self.mgrCache[coinType]
+        acctMgr = self.coinDB[coinType]
+        acctDB = self.coinDB.child(str(coinType), table=False)
+        acctMgr.load(acctDB, signals)
+        self.mgrCache[coinType] = acctMgr
+        return acctMgr
+
+    def open(self, coinType, acct, password, signals):
         """
         Open an account. The Wallet is returned so that it can be used in
             `with ... as` block for context management.
 
         Args:
+            coinType (str|int): Asset identifier.
             acct (int): The account number to open.
             password (str): Wallet password. Should be the same as used to open
                 the wallet.
-            blockchain (object): An api.Blockchain for the account.
             signals (object): An api.Signals.
 
         Returns:
             Wallet: The wallet with the default account open.
         """
-        self.setAccountHandlers(blockchain, signals)
-        self.selectedAccount = self.openAccount = self.acctManager.openAccount(
-            acct, password
+
+        cryptoKey = self.cryptoKey(password)
+        acctManager = self.accountManager(coinType, signals)
+        self.selectedAccount = self.openAccount = acctManager.openAccount(
+            acct, cryptoKey
         )
         return self
 
@@ -249,34 +238,16 @@ class Wallet(object):
         u = self.users
         self.users = u - 1
         self.unlock()
-        if self.users == 0:
+        if u == 1:
             self.close()
 
     def close(self):
         """
         Save the wallet and close any open account.
         """
-        self.save()
-        # self.fileKey = None
         if self.openAccount:
             self.openAccount.close()
             self.openAccount = None
-
-    def account(self, acct):
-        """
-        Open the account at index `acct`.
-
-        Args:
-            acct (int): The index of the account. A new wallet has a single
-                Decred account located at index 0.
-
-        Returns:
-            Account: The Account object at index acct.
-        """
-        aMgr = self.acctManager
-        if len(aMgr.accounts) <= acct:
-            raise Exception("requested unknown account number %i" % acct)
-        return aMgr.account(acct)
 
     def getNewAddress(self):
         """
@@ -285,11 +256,7 @@ class Wallet(object):
         Returns:
             str: The next unused external address.
         """
-        a = self.selectedAccount.nextExternalAddress()
-        if self.blockchain:
-            self.blockchain.subscribeAddresses(a)
-        self.save()
-        return a
+        return self.selectedAccount.nextExternalAddress()
 
     def currentAddress(self):
         """
@@ -317,32 +284,7 @@ class Wallet(object):
         Returns:
             bool: `True` if no exceptions were encountered.
         """
-        acctManager = self.acctManager
-        acct = acctManager.account(0)
-
         # send the initial balance. This was the balance the last time the
         # wallet was saved, but may be innacurate until sync in complete.
-        acct.sync(self.blockchain, self.signals)
-        self.save()
+        self.openAccount.sync()
         return True
-
-    def sendToAddress(self, value, address, feeRate=None):
-        """
-        Send the value to the address.
-
-        Args:
-            value (int): The amount to send, in atoms.
-            address (str): The base-58 encoded pubkey hash.
-
-        Returns:
-            MsgTx or bool: The newly created transaction on success, `False` on
-                failure.
-        """
-        acct = self.openAccount
-        tx = acct.sendToAddress(value, address, feeRate)
-        self.signals.balance(acct.calcBalance(self.blockchain.tip["height"]))
-        self.save()
-        return tx
-
-
-tinyjson.register(Wallet, "wallet.Wallet")

@@ -4,10 +4,16 @@ See LICENSE for details
 """
 
 import unittest
+import time
 
 from tinydecred.util.encode import ByteArray
 from tinydecred.pydecred.wire import msgtx, wire
+from tinydecred.crypto import rando
 from tinydecred.util import helpers
+
+
+def newHash():
+    return ByteArray(rando.generateSeed(32))
 
 
 class TestMsgTx(unittest.TestCase):
@@ -453,23 +459,50 @@ class TestMsgTx(unittest.TestCase):
         self.assertEqual(wantPayload, maxPayload)
 
     def test_tx_from_hex(self):
-        pver = 1
-        hexTx = (
-            "010000000100000000000000000000000000000000000000000000000000000000000000"
-            "00ffffffff00ffffffff0300f2052a01000000000017a914cbb08d6ca783b533b2c7d24a"
-            "51fbca92d937bf9987000000000000000000000e6a0c1b000000b1bf47057791232500ac"
-            "23fc0600000000001976a914b1eef3d1535a3868d11fa297c35f3deba978036088ac0000"
-            "00000000000001009e29260800000000000000ffffffff0800002f646372642f"
+        tx = msgtx.MsgTx(
+            cachedHash=None,
+            serType=0,
+            version=123,
+            txIn=[
+                msgtx.TxIn(
+                    previousOutPoint=msgtx.OutPoint(txHash=newHash(), idx=5, tree=1,),
+                    sequence=msgtx.MaxTxInSequenceNum,
+                    valueIn=500,
+                    blockHeight=111,
+                    blockIndex=12,
+                    signatureScript=newHash(),
+                ),
+            ],
+            txOut=[
+                msgtx.TxOut(value=321, pkScript=newHash(), version=0,),
+                msgtx.TxOut(value=654, pkScript=newHash(), version=0,),
+                msgtx.TxOut(value=987, pkScript=newHash(), version=0,),
+            ],
+            lockTime=int(time.time()),
+            expiry=int(time.time()) + 86400,
         )
-        buf = ByteArray(hexTx)
-        tx = msgtx.MsgTx.btcDecode(buf, pver)
-        print(repr(tx.cachedHash))
-        print(repr(tx.serType))
-        print(repr(tx.version))
-        print(repr(tx.txIn))
-        print(repr(tx.txOut))
-        print(repr(tx.lockTime))
-        print(repr(tx.expiry))
-        v = sum(txout.value for txout in tx.txOut)
-        print("total sent: %.2f" % (v * 1e-8,))
-        print(tx.txHex())
+
+        b = tx.serialize()
+        reTx = msgtx.MsgTx.unblob(b)
+
+        self.assertEqual(tx.serType, reTx.serType)
+        self.assertEqual(tx.version, reTx.version)
+        self.assertEqual(tx.lockTime, reTx.lockTime)
+        self.assertEqual(tx.expiry, reTx.expiry)
+
+        for i, txIn in enumerate(tx.txIn):
+            reTxIn = reTx.txIn[i]
+            self.assertEqual(txIn.previousOutPoint.hash, reTxIn.previousOutPoint.hash)
+            self.assertEqual(txIn.previousOutPoint.index, reTxIn.previousOutPoint.index)
+            self.assertEqual(txIn.previousOutPoint.tree, reTxIn.previousOutPoint.tree)
+            self.assertEqual(txIn.sequence, reTxIn.sequence)
+            self.assertEqual(txIn.valueIn, reTxIn.valueIn)
+            self.assertEqual(txIn.blockHeight, reTxIn.blockHeight)
+            self.assertEqual(txIn.blockIndex, reTxIn.blockIndex)
+            self.assertEqual(txIn.signatureScript, reTxIn.signatureScript)
+
+        for i, txOut in enumerate(tx.txOut):
+            reTxOut = reTx.txOut[i]
+            self.assertEqual(txOut.value, reTxOut.value)
+            self.assertEqual(txOut.version, reTxOut.version)
+            self.assertEqual(txOut.pkScript, reTxOut.pkScript)
