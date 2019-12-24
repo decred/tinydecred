@@ -1517,7 +1517,7 @@ class PoolScreen(Screen):
         if not parsedURL.scheme or not parsedURL.netloc:
             err("invalid URL")
             return
-        baseUrl = parsedURL.scheme+"://"+parsedURL.netloc
+        baseUrl = parsedURL.scheme + "://" + parsedURL.netloc
         pool = VotingServiceProvider(baseUrl, apiKey)
 
         def registerPool(wallet):
