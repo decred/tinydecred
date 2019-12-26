@@ -451,12 +451,14 @@ class HomeScreen(Screen):
 
         # Create a row to hold an address.
         addrLbl = Q.makeLabel("Address", 14, color="#777777")
-        new = ClickyLabel(self.newAddressClicked, "+new")
-        Q.setProperties(new, color="#777777")
         self.address = Q.makeLabel("", 18, fontFamily="RobotoMono-Bold")
         self.address.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
 
-        header, headerLyt = Q.makeSeries(Q.HORIZONTAL, addrLbl, Q.STRETCH, new,)
+        # New Address button
+        newbtn = app.getButton(TINY, "new address")
+        newbtn.setMinimumWidth(110)
+        newbtn.clicked.connect(self.newAddressClicked)
+        header, headerLyt = Q.makeSeries(Q.HORIZONTAL, addrLbl, Q.STRETCH, newbtn,)
 
         col, colLyt = Q.makeSeries(Q.VERTICAL, header, self.address,)
 
