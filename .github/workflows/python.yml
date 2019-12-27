@@ -33,4 +33,5 @@ jobs:
     - name: Test with pytest
       run: |
         pip install pytest
-        python -m pytest ./tests/unit/
+        cd ..
+        python -m pytest ./tinydecred/tests/unit/
