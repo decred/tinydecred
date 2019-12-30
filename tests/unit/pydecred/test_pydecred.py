@@ -2196,7 +2196,7 @@ class TestTxScript(unittest.TestCase):
             self.assertEqual(err is None, test.valid, "%s error: %s" % (test.name, err))
 
             if err is None:
-                # Ensure the stringer returns the same address as theoriginal.
+                # Ensure the stringer returns the same address as the original.
                 self.assertEqual(test.addr, decoded.string(), test.name)
 
                 # Encode again and compare against the original.

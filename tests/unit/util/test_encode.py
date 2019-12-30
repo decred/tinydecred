@@ -7,6 +7,7 @@ import unittest
 
 from tinydecred.util import encode
 
+
 ByteArray = encode.ByteArray
 BuildyBytes = encode.BuildyBytes
 
@@ -26,6 +27,7 @@ class TestEncode(unittest.TestCase):
         c = makeC()
         a &= c
         self.assertEqual(a, zero)
+        self.assertEqual(a & c, zero)
 
         a = makeA()
         a.zero()
@@ -34,6 +36,11 @@ class TestEncode(unittest.TestCase):
         c = makeA()
         c |= 0
         self.assertEqual(a, zero)
+
+        self.assertFalse(makeA().iseven())
+        self.assertTrue(makeB().iseven())
+        self.assertTrue(makeC().iseven())
+        self.assertTrue(zero.iseven())
 
         zero2 = ByteArray(zero)
         self.assertFalse(zero.b is zero2.b)
@@ -47,10 +54,12 @@ class TestEncode(unittest.TestCase):
         a |= 65280
         self.assertEqual(a, bytearray([255, 255, 255]))
         self.assertFalse(a == makeB())
+        self.assertFalse(a == None)  # noqa
 
         self.assertTrue(makeA() < makeB())
         self.assertTrue(makeC() > makeB())
         self.assertTrue(makeA() != makeB())
+        self.assertTrue(makeA() != None)  # noqa
         self.assertTrue(makeA() <= makeA())
         self.assertTrue(makeB() >= makeA())
 

@@ -68,7 +68,7 @@ class CrazyKeyError(Exception):
     """
     Both derived public or private keys rely on treating the left 32-byte
     sequence calculated above (Il) as a 256-bit integer that must be within the
-    valid range for a secp256k1 private key.  There is a small chance
+    valid range for a secp256k1 private key.  There is an extremely tiny chance
     (< 1 in 2^127) this condition will not hold, and in that case, a child
     extended key can't be created for this index and the caller should simply
     increment to the next index.
@@ -120,7 +120,7 @@ class AddressPubKeyHash:
             raise Exception("AddressPubKeyHash expected 20 bytes, got %d" % len(pkHash))
         # For now, just reject anything except secp256k1
         if sigType != STEcdsaSecp256k1:
-            raise Exception("unsupported signature type %v", self.sigType)
+            raise AssertionError("unsupported signature type %v", self.sigType)
         self.sigType = sigType
         self.netID = netID
         self.pkHash = pkHash
@@ -183,7 +183,7 @@ class AddressSecpPubKey:
         elif fmt == 0x04:
             pkFormat = PKFUncompressed
         else:
-            raise Exception("unknown pubkey format %d", fmt)
+            raise AssertionError("unknown pubkey format %d", fmt)
         self.pubkeyFormat = pkFormat
         self.netID = self.pubkeyID = net.PubKeyAddrID
         self.pubkeyHashID = net.PubKeyHashAddrID
@@ -199,7 +199,7 @@ class AddressSecpPubKey:
             return self.pubkey.serializeUncompressed()
         elif fmt == PKFCompressed:
             return self.pubkey.serializeCompressed()
-        raise Exception("unknown pubkey format")
+        raise AssertionError("unknown pubkey format")
 
     def string(self):
         """
@@ -240,7 +240,7 @@ class AddressSecpPubKey:
         """
         return self.serialize()
 
-    def hash160(self):
+    def hash160(self):  # pragma: no cover
         """
         Hash160 returns the Hash160(data) where data is the data normally
         hashed to 160 bits from the respective address type.
@@ -405,7 +405,7 @@ def modInv(a, m):
     """
     g, x, y = egcd(a, m)
     if g != 1:
-        raise Exception("modular inverse does not exist")
+        raise AssertionError("modular inverse does not exist")
     else:
         return x % m
 
@@ -485,7 +485,8 @@ def newAddressPubKey(decoded, net):
             # return NewAddressEdwardsPubKey(decoded, net)
             raise Exception("Edwards signatures not implemented")
         elif suite == STSchnorrSecp256k1:
-            # return NewAddressSecSchnorrPubKey(append([]byte{toAppend}, decoded[1:]...), net)
+            # return NewAddressSecSchnorrPubKey(
+            #     append([]byte{toAppend}, decoded[1:]...), net)
             raise Exception("Schnorr signatures not implemented")
         else:
             raise Exception("unknown address type %d" % suite)
@@ -868,7 +869,7 @@ class ExtendedKey:
             ExtendedKey: The public extended key.
         """
         # Already an extended public key.
-        if not self.isPrivate:
+        if not self.isPrivate:  # pragma: no cover
             return self
 
         # Convert it to an extended public key. The key for the new extended
@@ -895,7 +896,7 @@ class ExtendedKey:
             ByteArray: The serialized extended key.
         """
         if self.key.iszero():
-            raise Exception("unexpected zero key")
+            raise AssertionError("unexpected zero key")
 
         childNumBytes = ByteArray(self.childNum, length=4)
         depthByte = ByteArray(self.depth % 256, length=1)
@@ -983,7 +984,7 @@ def decodeExtendedKey(net, cryptoKey, key):
     """
     decoded = decrypt(cryptoKey, key)
     if len(decoded) != SERIALIZED_KEY_LENGTH + 4:
-        raise Exception("decoded private key is wrong length")
+        raise AssertionError("decoded private key is wrong length")
 
     # The serialized format is:
     #   version (4) || depth (1) || parent fingerprint (4)) ||
@@ -993,16 +994,14 @@ def decodeExtendedKey(net, cryptoKey, key):
     payload = decoded[: len(decoded) - 4]
     checkSum = decoded[len(decoded) - 4 :]
     if checkSum != checksum(payload.b)[:4]:
-        raise Exception("wrong checksum")
+        raise AssertionError("wrong checksum")
 
     # Ensure the version encoded in the payload matches the provided network.
     privVersion = net.HDPrivateKeyID
     pubVersion = net.HDPublicKeyID
     version = payload[:4]
     if version != privVersion and version != pubVersion:
-        raise Exception(
-            "unknown versions %r %r %r" % (privVersion, pubVersion, version)
-        )
+        raise ValueError(f"Unknown versions {privVersion} {pubVersion} {version}")
 
     # Deserialize the remaining payload fields.
     depth = payload[4:5].int()
@@ -1020,7 +1019,7 @@ def decodeExtendedKey(net, cryptoKey, key):
         keyData = keyData[1:]
         # if keyNum.Cmp(secp256k1.S256().N) >= 0 || keyNum.Sign() == 0 {
         if keyData >= Curve.N or keyData.iszero():
-            raise Exception("unusable key")
+            raise AssertionError("unusable key")
         # Ensure the public key parses correctly and is actually on the
         # secp256k1 curve.
         Curve.publicKey(keyData.int())
@@ -1190,10 +1189,10 @@ class SecretKey(object):
                 )
             )
         else:
-            raise Exception("unkown key derivation function")
+            raise AssertionError("unkown key derivation function")
         checkDigest = ByteArray(hashlib.sha256(sk.key.b).digest())
         if checkDigest != kp.digest:
-            raise Exception("rekey digest check failed")
+            raise AssertionError("rekey digest check failed")
         return sk
 
 

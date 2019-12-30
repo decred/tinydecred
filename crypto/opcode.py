@@ -268,7 +268,7 @@ OP_INVALIDOPCODE       = 0xff # 255 - bitcoin core internal
 
 
 def noFunc(opcode, engine):
-    raise Exception("opcode functions not implemented")
+    raise NotImplementedError("opcode functions not implemented")
 
 
 opcodeFalse = noFunc

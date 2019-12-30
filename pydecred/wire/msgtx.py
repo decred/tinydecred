@@ -75,7 +75,7 @@ def readOutPoint(b, pver, ver):
 def readTxInPrefix(b, pver, serType, ver, ti):
     # r io.Reader, pver uint32, serType TxSerializeType, version uint16, ti *TxIn) error {
     if serType == wire.TxSerializeOnlyWitness:
-        raise Exception(
+        raise AssertionError(
             "readTxInPrefix: tried to read a prefix input for a witness only tx"
         )
 
@@ -134,7 +134,7 @@ def readScript(b, pver, maxAllowed, fieldName):
     # be possible to cause memory exhaustion and panics without a sane
     # upper bound on this count.
     if count > maxAllowed:
-        raise Exception(
+        raise AssertionError(
             "readScript: %s is larger than the max allowed size [count %d, max %d]"
             % (fieldName, count, maxAllowed)
         )
@@ -386,7 +386,7 @@ class OutPoint:
             and self.tree == other.tree
         )
 
-    def txid(self):
+    def txid(self):  # pragma: no cover
         return reversed(self.hash).hex()
 
 
@@ -484,13 +484,13 @@ class MsgTx:
     def txHex(self):
         return self.serialize().hex()
 
-    def txid(self):
+    def txid(self):  # pragma: no cover
         """
         Hex encoded, byte-reversed tx hash.
         """
         return reversed(self.hash()).hex()
 
-    def id(self):
+    def id(self):  # pragma: no cover
         return self.txid()
 
     def command(self):
@@ -577,7 +577,7 @@ class MsgTx:
             b += self.encodeWitness(pver)
 
         else:
-            raise Exception("MsgTx.BtcEncode: unsupported transaction type")
+            raise NotImplementedError("MsgTx.BtcEncode: unsupported transaction type")
 
         return b
 
@@ -690,7 +690,7 @@ class MsgTx:
             # message.  It would be possible to cause memory exhaustion and panics
             # without a sane upper bound on this count.
             if count > maxTxInPerMessage:
-                raise Exception(
+                raise AssertionError(
                     "MsgTx.decodeWitness: too many input transactions to fit into"
                     " max message size [count %d, max %d]" % (count, maxTxInPerMessage)
                 )
@@ -708,7 +708,7 @@ class MsgTx:
             count = wire.readVarInt(b, pver)
 
             if count != len(self.txIn):
-                raise Exception(
+                raise AssertionError(
                     "MsgTx.decodeWitness: non equal witness and prefix txin quantities"
                     " (witness %v, prefix %v)" % (count, len(self.txIn))
                 )
@@ -717,7 +717,7 @@ class MsgTx:
             # message.  It would be possible to cause memory exhaustion and panics
             # without a sane upper bound on this count.
             if count > maxTxInPerMessage:
-                raise Exception(
+                raise AssertionError(
                     "MsgTx.decodeWitness: too many input transactions to fit into"
                     " max message size [count %d, max %d]" % (count, maxTxInPerMessage)
                 )
@@ -766,7 +766,7 @@ class MsgTx:
             b, _ = tx.decodeWitness(b, pver, True)
 
         else:
-            raise Exception("MsgTx.BtcDecode: unsupported transaction type")
+            raise NotImplementedError("MsgTx.BtcDecode: unsupported transaction type")
 
         return tx
 

@@ -22,7 +22,7 @@ def filterNone(b):
     Returns:
         bytes-like
     """
-    if b == None:
+    if b is None:
         return NONE
     return b
 

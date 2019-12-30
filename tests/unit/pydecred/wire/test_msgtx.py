@@ -85,6 +85,8 @@ class TestMsgTx(unittest.TestCase):
         msgTx.addTxOut(txOut)
         msgTx.lockTime = 0
         msgTx.expiry = 0
+        # Check that this is the very first tx in the chain.
+        self.assertTrue(msgTx.looksLikeCoinbase())
         # Ensure the hash produced is expected.
         self.assertEqual(msgTx.hash(), wantHash)
 
