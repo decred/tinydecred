@@ -386,7 +386,7 @@ class OutPoint:
             and self.tree == other.tree
         )
 
-    def txid(self):  # pragma: no cover
+    def txid(self):  # nocover
         return reversed(self.hash).hex()
 
 
@@ -484,13 +484,13 @@ class MsgTx:
     def txHex(self):
         return self.serialize().hex()
 
-    def txid(self):  # pragma: no cover
+    def txid(self):  # nocover
         """
         Hex encoded, byte-reversed tx hash.
         """
         return reversed(self.hash()).hex()
 
-    def id(self):  # pragma: no cover
+    def id(self):  # nocover
         return self.txid()
 
     def command(self):

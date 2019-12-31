@@ -240,7 +240,7 @@ class AddressSecpPubKey:
         """
         return self.serialize()
 
-    def hash160(self):  # pragma: no cover
+    def hash160(self):  # nocover
         """
         Hash160 returns the Hash160(data) where data is the data normally
         hashed to 160 bits from the respective address type.
@@ -464,33 +464,33 @@ def b58CheckDecode(s):
 
 def newAddressPubKey(decoded, net):
     """
-    NewAddressPubKey returns a new Address. decoded must be 33 bytes. This
+    newAddressPubKey returns a new Address. decoded must be 33 bytes. This
     constructor takes the decoded pubkey such as would be decoded from a base58
     string. The first byte indicates the signature suite. For compressed
     secp256k1 pubkeys, use AddressSecpPubKey directly.
     """
-    if len(decoded) == 33:
-        # First byte is the signature suite and ybit.
-        suite = decoded[0]
-        suite &= 127
-        ybit = not (decoded[0] & (1 << 7) == 0)
-        toAppend = 0x02
-        if ybit:
-            toAppend = 0x03
+    if len(decoded) != 33:
+        raise AssertionError("unable to decode pubkey of length %d" % len(decoded))
+    # First byte is the signature suite and ybit.
+    suite = decoded[0]
+    suite &= 127
+    ybit = not (decoded[0] & (1 << 7) == 0)
+    toAppend = 0x02
+    if ybit:
+        toAppend = 0x03  # nocover
 
-        if suite == STEcdsaSecp256k1:
-            b = ByteArray(toAppend) + decoded[1:]
-            return AddressSecpPubKey(b, net)
-        elif suite == STEd25519:
-            # return NewAddressEdwardsPubKey(decoded, net)
-            raise Exception("Edwards signatures not implemented")
-        elif suite == STSchnorrSecp256k1:
-            # return NewAddressSecSchnorrPubKey(
-            #     append([]byte{toAppend}, decoded[1:]...), net)
-            raise Exception("Schnorr signatures not implemented")
-        else:
-            raise Exception("unknown address type %d" % suite)
-    raise Exception("unable to decode pubkey of length %d" % len(decoded))
+    if suite == STEcdsaSecp256k1:
+        b = ByteArray(toAppend) + decoded[1:]
+        return AddressSecpPubKey(b, net)
+    elif suite == STEd25519:  # nocover
+        # return NewAddressEdwardsPubKey(decoded, net)
+        raise NotImplementedError("Edwards signatures not implemented")
+    elif suite == STSchnorrSecp256k1:  # nocover
+        # return NewAddressSecSchnorrPubKey(
+        #     append([]byte{toAppend}, decoded[1:]...), net)
+        raise NotImplementedError("Schnorr signatures not implemented")
+    else:
+        raise AssertionError("unknown address type %d" % suite)
 
 
 def newAddressPubKeyHash(pkHash, net, algo):
@@ -507,15 +507,15 @@ def newAddressPubKeyHash(pkHash, net, algo):
     """
     if algo == STEcdsaSecp256k1:
         netID = net.PubKeyHashAddrID
-    elif algo == STEd25519:
+        return AddressPubKeyHash(netID, pkHash)
+    elif algo == STEd25519:  # nocover
         # netID = net.PKHEdwardsAddrID
-        raise Exception("Edwards not implemented")
-    elif algo == STSchnorrSecp256k1:
+        raise NotImplementedError("Edwards not implemented")
+    elif algo == STSchnorrSecp256k1:  # nocover
         # netID = net.PKHSchnorrAddrID
-        raise Exception("Schnorr not implemented")
+        raise NotImplementedError("Schnorr not implemented")
     else:
-        raise Exception("unknown ECDSA algorithm")
-    return AddressPubKeyHash(netID, pkHash)
+        raise AssertionError("unknown ECDSA algorithm")
 
 
 def newAddressScriptHash(script, net):
@@ -869,7 +869,7 @@ class ExtendedKey:
             ExtendedKey: The public extended key.
         """
         # Already an extended public key.
-        if not self.isPrivate:  # pragma: no cover
+        if not self.isPrivate:  # nocover
             return self
 
         # Convert it to an extended public key. The key for the new extended
@@ -952,7 +952,7 @@ class ExtendedKey:
             hash160(child.publicKey().serializeCompressed().b), net, STEcdsaSecp256k1
         ).string()
 
-    def privateKey(self):
+    def privateKey(self):  # nocover
         """
         A PrivateKey structure that can be used for signatures.
 
@@ -1039,8 +1039,8 @@ def decodeExtendedKey(net, cryptoKey, key):
 
 DEFAULT_KDF_PARAMS = {
     "func": "pbkdf2_hmac",
-    "iterations": 100000,
     "hash_name": "sha256",
+    "iterations": 100000,
 }
 
 
@@ -1063,11 +1063,11 @@ class KDFParams(object):
     """
 
     def __init__(self, salt, digest):
+        self.salt = salt
+        self.digest = digest
         func, hn, its = defaultKDFParams()
         self.kdfFunc = func
         self.hashName = hn
-        self.salt = salt
-        self.digest = digest
         self.iterations = its
 
     @staticmethod
@@ -1124,7 +1124,7 @@ class SecretKey(object):
         super().__init__()
         salt = ByteArray(rando.generateSeed(KEY_SIZE))
         b = lambda v: ByteArray(v).bytes()
-        func, hashName, iterations = defaultKDFParams()
+        _, hashName, iterations = defaultKDFParams()
         self.key = ByteArray(
             hashlib.pbkdf2_hmac(hashName, b(pw), salt.bytes(), iterations)
         )

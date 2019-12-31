@@ -4,22 +4,18 @@ omit = tinydecred/tests/*
 [report]
 # Regexes for lines to exclude from consideration
 exclude_lines =
-    # Have to re-enable the standard pragma
-    pragma: no cover
+    nocover
 
-    # Don't complain about missing debug-only code:
+    # Don't complain about debug-only code.
     def __repr__
-    if self\.debug
-    if settings\.DEBUG
 
-    # Don't complain if tests don't hit defensive assertion code:
+    # Don't complain if tests don't hit defensive assertion code.
     raise AssertionError
     raise NotImplementedError
     raise CrazyKeyError
     raise ParameterRangeError
 
-    # Don't complain if non-runnable code isn't run:
-    if 0:
+    # Don't complain if non-runnable code isn't run.
     if __name__ == .__main__.:
 
 ignore_errors = True

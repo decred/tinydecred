@@ -62,7 +62,7 @@ MaxBlockPayloadV3 = 1000000  # Not actually 1MB which would be 1024 * 1024
 # MaxBlockPayload is the maximum bytes a block message can be in bytes.
 MaxBlockPayload = 1310720  # 1.25MB
 
-# ProtocolVersion is the latest protocol version this package supports.
+# ProtocolVersion (pver) is the latest protocol version this package supports.
 ProtocolVersion = 6
 
 # TxTreeRegular is the value for a normal transaction tree for a
@@ -166,7 +166,7 @@ def readVarInt(b, pver):  # r io.Reader, pver uint32) (uint64, error) {
         # encoded using fewer bytes.
         minRv = 0x10000
         if rv < minRv:
-            raise Exception(
+            raise AssertionError(
                 "ReadVarInt noncanon error: %d - %d <= %d" % (rv, discriminant, minRv)
             )
 
@@ -177,7 +177,7 @@ def readVarInt(b, pver):  # r io.Reader, pver uint32) (uint64, error) {
         # encoded using fewer bytes.
         minRv = 0xFD
         if rv < minRv:
-            raise Exception(
+            raise AssertionError(
                 "ReadVarInt noncanon error: %d - %d <= %d" % (rv, discriminant, minRv)
             )
 

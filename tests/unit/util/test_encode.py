@@ -14,10 +14,10 @@ BuildyBytes = encode.BuildyBytes
 
 class TestEncode(unittest.TestCase):
     def test_ByteArray(self):
-        makeA = lambda: ByteArray(bytearray([0, 0, 255]))
-        makeB = lambda: ByteArray(bytearray([0, 255, 0]))
-        makeC = lambda: ByteArray(bytearray([255, 0, 0]))
-        zero = ByteArray(bytearray([0, 0, 0]))
+        makeA = lambda: ByteArray([0, 0, 255])
+        makeB = lambda: ByteArray([0, 255, 0])
+        makeC = lambda: ByteArray([255, 0, 0])
+        zero = ByteArray([0, 0, 0])
 
         a = makeA()
         b = makeB()
