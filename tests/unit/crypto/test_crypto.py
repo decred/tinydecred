@@ -16,7 +16,6 @@ testSeed = ByteArray(
 
 
 class TestCrypto(unittest.TestCase):
-
     def test_encryption(self):
         """
         Test encryption and decryption.
