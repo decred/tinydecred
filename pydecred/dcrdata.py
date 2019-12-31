@@ -1638,7 +1638,7 @@ class DcrdataBlockchain(object):
 
     def revokeTicket(self, tx, keysource, redeemScript):
         """
-        revoke a ticket by signing the supplied redeem script and broadcasting the raw transaction.
+        Revoke a ticket by signing the supplied redeem script and broadcasting the raw transaction.
 
         Args:
             tx (object): the msgTx of the ticket purchase.
@@ -1650,10 +1650,6 @@ class DcrdataBlockchain(object):
         """
 
         revocation = txscript.makeRevocation(tx, self.relayFee())
-
-        if not revocation:
-            log.info("failed to make revocation")
-            return
 
         signedScript = txscript.signTxOutput(
             self.params,

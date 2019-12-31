@@ -426,7 +426,7 @@ class DecredAccount(Account):
 
     def revokeTickets(self):
         """
-        Iterate through missed and expired ticket utxo and revoke them.
+        Iterate through missed and expired tickets and revoke them.
 
         Returns:
             bool: whether or not an error occured.
@@ -434,16 +434,10 @@ class DecredAccount(Account):
         revokableTickets = [
             utxo.txid for utxo in self.utxos.values() if utxo.isRevocableTicket()
         ]
-        errored = False
         txs = []
         for txid in revokableTickets:
-            try:
-                tx = self.blockchain.tx(txid)
-                txs.append(tx)
-            except Exception as e:
-                log.error("error getting tx: %s" % e)
-                errored = True
-                continue
+            tx = self.blockchain.tx(txid)
+            txs.append(tx)
         for tx in txs:
             redeemHash = crypto.AddressScriptHash(
                 self.net.ScriptHashAddrID,
@@ -455,9 +449,8 @@ class DecredAccount(Account):
                     redeemScript = decodeBA(pool.purchaseInfo.script)
                     break
             else:
-                log.error("did not find redeem script for hash %s" % redeemHash)
-                errored = True
-                continue
+                raise Exception("did not find redeem script for hash %s" % redeemHash)
+
             keysource = KeySource(
                 # This will need to change when we start using different
                 # addresses for voting.
@@ -465,7 +458,6 @@ class DecredAccount(Account):
                 internal=lambda: "",
             )
             self.blockchain.revokeTicket(tx, keysource, redeemScript)
-        return errored
 
     def sync(self, blockchain, signals):
         """

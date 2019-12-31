@@ -1123,6 +1123,7 @@ class StakingScreen(Screen):
         self.wgt.setContentsMargins(5, 5, 5, 5)
         self.wgt.setMinimumWidth(400)
         self.blockchain = app.dcrdata
+        self.revocableTicketsCount = 0
 
         # Register for a few key signals.
         self.app.registerSignal(ui.BLOCKCHAIN_CONNECTED, self.blockchainConnected)
@@ -1236,7 +1237,7 @@ class StakingScreen(Screen):
         we have revocable tickets.
         """
         acct = self.app.wallet.selectedAccount
-        n = 0
+        n = self.revocableTicketsCount
         plural = ""
         for utxo in acct.utxos.values():
             if utxo.isRevocableTicket():
@@ -1271,7 +1272,13 @@ class StakingScreen(Screen):
         revokeTickets callback. Prints success or failure to the screen.
         """
         if success:
-            self.app.appWindow.showSuccess("revoke tickets completed without error")
+            n = self.revocableTicketsCount
+            plural = ""
+            if n > 0:
+                if n > 1:
+                    plural = "s"
+                self.app.appWindow.showSuccess("revoked {} ticket{}".format(n, plural))
+                self.revocableTicketsCount = 0
             self.revokeBtn.hide()
         else:
             self.app.appWindow.showError("revoke tickets finished with error")

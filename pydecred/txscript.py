@@ -227,6 +227,19 @@ mac = crypto.mac
 hashH = crypto.hashH
 
 
+def canonicalPadding(b):
+    """
+    canonicalPadding checks whether a big-endian encoded integer could
+    possibly be misinterpreted as a negative number (even though OpenSSL
+    treats all numbers as unsigned), or if there is any unnecessary
+    leading zero padding.
+    """
+    if b[0] & 0x80 == 0x80:
+        raise Exception("negative number")
+    if len(b) > 1 and b[0] == 0x00 and b[1] & 0x80 != 0x80:
+        raise Exception("excessive padding")
+
+
 class Signature:
     """
     The Signature class represents an ECDSA-algorithm signature.
@@ -277,85 +290,97 @@ class Signature:
         return b
 
     @staticmethod
-    def parseSig(sigBytes):
+    def parse(sigBytes):
         """
-	# Originally this code used encoding/asn1 in order to parse the
-	# signature, but a number of problems were found with this approach.
-	# Despite the fact that signatures are stored as DER, the difference
-	# between go's idea of a bignum (and that they have sign) doesn't agree
-	# with the openssl one (where they do not). The above is true as of
-	# Go 1.1. In the end it was simpler to rewrite the code to explicitly
-	# understand the format which is this:
-	# 0x30 <length of whole message> <0x02> <length of R> <R> 0x2
-	# <length of S> <S>.
-sigStr []byte, der bool) (*Signature, error) {
-        """
+        Parse sigBytes to make sure they make up a valid Signature.
 
+        Args:
+            sigBytes (byte-like): The bytes of the signature.
+        Returns:
+            object: the ECDSA Signature.
+        """
         # minimal message is when both numbers are 1 bytes. adding up to:
         # 0x30 + len + 0x02 + 0x01 + <byte> + 0x2 + 0x01 + <byte>
         if len(sigBytes) < 8:
-            log.error("malformed signature: too short")
-            return None
+            raise Exception("malformed signature: too short")
 
         # 0x30
         index = 0
         if sigBytes[index] != 0x30:
-            log.error("malformed signature: no header magic")
-            return None
+            raise Exception("malformed signature: no header magic")
         index += 1
         # length of remaining message
         siglen = sigBytes[index]
         index += 1
         if siglen + 2 > len(sigBytes):
-            log.error("malformed signature: bad length")
-            return None
+            raise Exception("malformed signature: bad length")
         # trim the slice we're working on so we only look at what matters.
         sigBytes = sigBytes[: siglen + 2]
 
         # 0x02
         if sigBytes[index] != 0x02:
-            log.error("malformed signature: no 1st int marker")
-            return None
+            raise Exception("malformed signature: no 1st int marker")
         index += 1
 
-        # Length of signature R.
+        # Length of signature r.
         rLen = sigBytes[index]
         # must be positive, must be able to fit in another 0x2, <len> <s>
         # hence the -3. We assume that the length must be at least one byte.
         index += 1
         if rLen <= 0 or rLen > len(sigBytes) - index - 3:
-            log.error("malformed signature: bogus R length")
-            return None
+            raise Exception("malformed signature: bogus r length")
 
-        # Then R itself.
+        # Then r itself.
         rBytes = sigBytes[index : index + rLen]
+        try:
+            canonicalPadding(rBytes)
+        except Exception as e:
+            raise Exception(
+                "malformed signature: bogus r padding or sign: {}".format(e)
+            )
+
         index += rLen
         # 0x02. length already checked in previous if.
         if sigBytes[index] != 0x02:
-            log.error("malformed signature: no 2nd int marker")
-            return None
+            raise Exception("malformed signature: no 2nd int marker")
         index += 1
 
-        # Length of signature S.
+        # Length of signature s.
         sLen = sigBytes[index]
         index += 1
-        # S should be the rest of the bytes.
+        # s should be the rest of the bytes.
         if sLen <= 0 or sLen > len(sigBytes) - index:
-            log.error("malformed signature: bogus S length")
-            return None
+            raise Exception("malformed signature: bogus S length")
 
-        # Then S itself.
+        # Then s itself.
         sBytes = sigBytes[index : index + sLen]
-        index += sLen
+        try:
+            canonicalPadding(rBytes)
+        except Exception as e:
+            raise Exception(
+                "malformed signature: bogus s padding or sign: {}".format(e)
+            )
 
+        index += sLen
         # sanity check length parsing
         if index != len(sigBytes):
-            log.error(
+            raise Exception(
                 "malformed signature: bad final length %s != %s" % index, len(sigBytes)
             )
-            return None
 
-        return Signature(rBytes, sBytes)
+        signature = Signature(rBytes, sBytes)
+
+        # FWIW the ecdsa spec states that r and s must be | 1, N - 1 |
+        if signature.r.int() < 1:
+            raise Exception("signature r is less than one")
+        if signature.s.int() < 1:
+            raise Exception("signature s is less than one")
+        if signature.r.int() >= Curve.N:
+            raise Exception("signature r is >= curve.N")
+        if signature.s.int() >= Curve.N:
+            raise Exception("signature s is >= curve.N")
+
+        return signature
 
 
 class ScriptTokenizer:
@@ -2503,7 +2528,7 @@ def mergeMultiSig(tx, idx, addresses, nRequired, pkScript, sigScript, prevScript
             if len(data) != 0:
                 possibleSigs.append(data)
         if tokenizer.err is not None:
-            return None
+            raise Exception("mergeMultisig: extractSigs: {}".format(tokenizer.err))
 
     # Attempt to extract signatures from the two scripts.  Return the other
     # script that is intended to be merged in the case signature extraction
@@ -2530,7 +2555,7 @@ def mergeMultiSig(tx, idx, addresses, nRequired, pkScript, sigScript, prevScript
         tSig = sig[:-1]
         hashType = sig[-1]
 
-        pSig = Signature.parseSig(tSig)
+        pSig = Signature.parse(tSig)
         if not pSig:
             continue
 
@@ -3138,15 +3163,15 @@ def makeTicket(
 
 def sstxStakeOutputInfo(outs):
     """
-    sstxStakeOutputInfo takes an SStx as input and scans through its outputs,
-    returning the pubkeyhashs and amounts for any NullDataTy's (future
-    commitments to stake generation rewards).
+    sstxStakeOutputInfo takes a list of msgtx.txOut as input and scans through
+    its outputs, returning the pubkeyhashs and amounts for any NullDataTy's
+    (future commitments to stake generation rewards).
 
     Args:
         outs (list(object)): an SStx MsgTx outputs
 
     Returns:
-        list(bool): is pay to script.
+        list(bool): is pay-to-script-hash.
         list(byte-like): the output addresses.
         list(int): the subsidy amounts.
         list(int): the change amounts.
@@ -3213,7 +3238,7 @@ def sstxStakeOutputInfo(outs):
 
 def calculateRewards(amounts, amountTicket, subsidy):
     """
-    CalculateRewards takes a list of SStx adjusted output amounts, the amount used
+    calculateRewards takes a list of SStx adjusted output amounts, the amount used
     to purchase that ticket, and the reward for an SSGen tx and subsequently
     generates what the outputs should be in the SSGen tx.  If used for calculating
     the outputs for an SSRtx, pass 0 for subsidy.
@@ -3298,7 +3323,6 @@ def makeRevocation(ticketPurchase, feePerKB):
         previousOutPoint=ticketOutPoint,
         valueIn=ticketPurchase.txOut[ticketOutPoint.index].value,
     )
-    # ticketInput = wire.NewTxIn(ticketOutPoint, ticketPurchase.TxOut[ticketOutPoint.Index].Value, nil)
     revocation.addTxIn(ticketInput)
     scriptSizes = [RedeemP2SHSigScriptSize]
 
@@ -3329,5 +3353,4 @@ def makeRevocation(ticketPurchase, feePerKB):
             if not isDustAmount(amount, len(output.pkScript), feePerKB):
                 output.value = amount
                 return revocation
-    log.error("missing suitable revocation output to pay relay fee")
-    return None
+    raise Exception("missing suitable revocation output to pay relay fee")
