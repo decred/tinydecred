@@ -69,7 +69,12 @@ class TinyConfig:
         netGroup = parser.add_mutually_exclusive_group()
         netGroup.add_argument("--simnet", action="store_true", help="use simnet")
         netGroup.add_argument("--testnet", action="store_true", help="use testnet")
+        parser.add_argument("-l", "--log", dest="logLevel", default='INFO',
+                            choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+                            help="set the logging level")
+
         args = parser.parse_args()
+        self.logLevel = args.logLevel
         self.net = None
         if args.simnet:
             self.net = nets.simnet

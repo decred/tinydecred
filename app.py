@@ -574,7 +574,7 @@ if __name__ == "__main__":
     # Initialize logging for the entire app.
     logDir = os.path.join(config.DATA_DIR, "logs")
     helpers.mkdir(logDir)
-    log = helpers.prepareLogger("APP", os.path.join(logDir, "tinydecred.log"), logLvl=0)
+    log = helpers.prepareLogger("APP", os.path.join(logDir, "tinydecred.log"), logLvl=cfg.logLevel)
     log.info("configuration file at %s" % config.CONFIG_PATH)
     log.info("data directory at %s" % config.DATA_DIR)
     runTinyDecred()
