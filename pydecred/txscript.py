@@ -493,7 +493,7 @@ class ScriptTokenizer:
 
         # The only remaining case is an opcode with length zero which is
         # impossible.
-        raise Exception("unreachable")
+        raise AssertionError("unreachable")
 
     def done(self):
         """
@@ -700,10 +700,13 @@ def hashToInt(h):
     return ret
 
 
-def getScriptClass(version, script):
+def getScriptClass(scriptVersion, script):
     """
-    getScriptClass returns the class of the script passed.
+    getScriptClass returns the class of the script from the known
+    standard types.
     NonStandardTy will be returned when the script does not parse.
+    NOTE:  All scripts that are not version 0 are currently considered
+    non standard.
 
     Args:
         version (int): The script version.
@@ -711,20 +714,6 @@ def getScriptClass(version, script):
 
     Returns:
         int: The script class.
-    """
-    if version != DefaultScriptVersion:
-        return NonStandardTy
-
-    return typeOfScript(version, script)
-
-
-def typeOfScript(scriptVersion, script):
-    """
-    scriptType returns the type of the script being inspected from the known
-    standard types.
-
-    NOTE:  All scripts that are not version 0 are currently considered non
-    standard.
     """
     if scriptVersion != DefaultScriptVersion:
         return NonStandardTy
@@ -924,7 +913,7 @@ def isStakeSubmissionScript(scriptVersion, script):
     return false for other script versions.
     """
     # The only currently supported script version is 0.
-    if scriptVersion != 0:
+    if scriptVersion != 0:  # nocover
         return False
 
     # The only supported stake submission scripts are pay-to-pubkey-hash and
@@ -945,7 +934,7 @@ def isStakeGenScript(scriptVersion, script):
     return false for other script versions.
     """
     # The only currently supported script version is 0.
-    if scriptVersion != 0:
+    if scriptVersion != 0:  # nocover
         return False
 
     # The only supported stake generation scripts are pay-to-pubkey-hash and
@@ -966,7 +955,7 @@ def isStakeRevocationScript(scriptVersion, script):
     return false for other script versions.
     """
     # The only currently supported script version is 0.
-    if scriptVersion != 0:
+    if scriptVersion != 0:  # nocover
         return False
 
     # The only supported stake revocation scripts are pay-to-pubkey-hash and
@@ -1013,21 +1002,15 @@ def getStakeOutSubclass(pkScript):
     if err is not None:
         raise err
 
-    scriptClass = typeOfScript(scriptVersion, pkScript)
-    isStake = scriptClass in (
+    if getScriptClass(scriptVersion, pkScript) not in (
         StakeSubmissionTy,
         StakeGenTy,
         StakeRevocationTy,
         StakeSubChangeTy,
-    )
-
-    subClass = 0
-    if isStake:
-        subClass = typeOfScript(scriptVersion, pkScript[1:])
-    else:
+    ):
         raise Exception("not a stake output")
 
-    return subClass
+    return getScriptClass(scriptVersion, pkScript[1:])
 
 
 class multiSigDetails(object):
@@ -1062,7 +1045,7 @@ def extractMultisigScriptDetails(scriptVersion, script, extractPubKeys):
     other script versions.
     """
     # The only currently supported script version is 0.
-    if scriptVersion != 0:
+    if scriptVersion != 0:  # nocover
         return invalidMSDetails()
 
     # A multi-signature script is of the form:
@@ -1128,7 +1111,7 @@ def isNullDataScript(scriptVersion, script):
     return false for other script versions.
     """
     # The only currently supported script version is 0.
-    if scriptVersion != 0:
+    if scriptVersion != 0:  # nocover
         return False
 
     # A null script is of the form:
@@ -1312,11 +1295,11 @@ def payToAddrScript(addr):
             return payToPubKeyHashScript(addr.scriptAddress())
         elif addr.sigType == crypto.STEd25519:
             # return payToPubKeyHashEdwardsScript(addr.ScriptAddress())
-            raise Exception("Edwards signatures not implemented")
+            raise NotImplementedError("Edwards signatures not implemented")
         elif addr.sigType == crypto.STSchnorrSecp256k1:
             # return payToPubKeyHashSchnorrScript(addr.ScriptAddress())
-            raise Exception("Schnorr signatures not implemented")
-        raise Exception("unknown signature type %d" % addr.sigType)
+            raise NotImplementedError("Schnorr signatures not implemented")
+        raise AssertionError("unknown signature type %d" % addr.sigType)
 
     elif isinstance(addr, crypto.AddressScriptHash):
         return payToScriptHashScript(addr.scriptAddress())
@@ -1326,13 +1309,13 @@ def payToAddrScript(addr):
 
     elif isinstance(addr, crypto.AddressEdwardsPubKey):
         # return payToEdwardsPubKeyScript(addr.ScriptAddress())
-        raise Exception("Edwards signatures not implemented")
+        raise NotImplementedError("Edwards signatures not implemented")
 
     elif isinstance(addr, crypto.AddressSecSchnorrPubKey):
         # return payToSchnorrPubKeyScript(addr.ScriptAddress())
-        raise Exception("Schnorr signatures not implemented")
+        raise NotImplementedError("Schnorr signatures not implemented")
 
-    raise Exception(
+    raise AssertionError(
         "unable to generate payment script for unsupported address type %s" % type(addr)
     )
 
@@ -1423,14 +1406,14 @@ def payToSStx(addr):
     scriptType = PubKeyHashTy
     if isinstance(addr, crypto.AddressPubKeyHash):
         if addr.sigType != crypto.STEcdsaSecp256k1:
-            raise Exception(
+            raise NotImplementedError(
                 "unable to generate payment script for "
                 "unsupported digital signature algorithm"
             )
     elif isinstance(addr, crypto.AddressScriptHash):
         scriptType = ScriptHashTy
     else:
-        raise Exception(
+        raise NotImplementedError(
             "unable to generate payment script for "
             "unsupported address type %s" % type(addr)
         )
@@ -1494,14 +1477,14 @@ def generateSStxAddrPush(addr, amount, limits):
     scriptType = PubKeyHashTy
     if isinstance(addr, crypto.AddressPubKeyHash):
         if addr.sigType != crypto.STEcdsaSecp256k1:
-            raise Exception(
+            raise NotImplementedError(
                 "unable to generate payment script for "
                 "unsupported digital signature algorithm"
             )
     elif isinstance(addr, crypto.AddressScriptHash):
         scriptType = ScriptHashTy
     else:
-        raise Exception(
+        raise NotImplementedError(
             "unable to generate payment script for unsupported address type %s"
             % type(addr)
         )
@@ -1531,14 +1514,14 @@ def payToSStxChange(addr):
     scriptType = PubKeyHashTy
     if isinstance(addr, crypto.AddressPubKeyHash):
         if addr.sigType != crypto.STEcdsaSecp256k1:
-            raise Exception(
+            raise NotImplementedError(
                 "unable to generate payment script for "
                 "unsupported digital signature algorithm"
             )
     elif isinstance(addr, crypto.AddressScriptHash):
         scriptType = ScriptHashTy
     else:
-        raise Exception(
+        raise NotImplementedError(
             "unable to generate payment script for unsupported address type %s",
             type(addr),
         )
@@ -1563,13 +1546,13 @@ def decodeAddress(addr, net):
         return crypto.newAddressPubKeyHash(decoded, net, crypto.STEcdsaSecp256k1)
     elif netID == net.PKHEdwardsAddrID:
         # return NewAddressPubKeyHash(decoded, net, STEd25519)
-        raise Exception("Edwards signatures not implemented")
+        raise NotImplementedError("Edwards signatures not implemented")
     elif netID == net.PKHSchnorrAddrID:
         # return NewAddressPubKeyHash(decoded, net, STSchnorrSecp256k1)
-        raise Exception("Schnorr signatures not implemented")
+        raise NotImplementedError("Schnorr signatures not implemented")
     elif netID == net.ScriptHashAddrID:
         return crypto.newAddressScriptHashFromHash(decoded, net)
-    raise Exception("unknown network ID %s" % netID)
+    raise AssertionError("unknown network ID %s" % netID)
 
 
 def makePayToAddrScript(addrStr, chain):
@@ -1713,7 +1696,7 @@ def signRFC6979(privateKey, inHash):
     r = Curve.scalarBaseMult(k)[0] % N
 
     if r == 0:
-        raise Exception("calculated R is zero")
+        raise AssertionError("calculated R is zero")
 
     e = hashToInt(inHash)
     s = privateKey.int() * r
@@ -1724,7 +1707,7 @@ def signRFC6979(privateKey, inHash):
     if (N >> 1) > 1:
         s = N - s
     if s == 0:
-        raise Exception("calculated S is zero")
+        raise AssertionError("calculated S is zero")
 
     return Signature(r, s)
 
@@ -2087,7 +2070,7 @@ def signP2PKHMsgTx(msgtx, prevOutputs, keysource, params):
     Only P2PKH outputs are supported at this point.
     """
     if len(prevOutputs) != len(msgtx.txIn):
-        raise Exception(
+        raise AssertionError(
             "Number of prevOutputs (%d) does not match number of tx inputs (%d)"
             % len(prevOutputs),
             len(msgtx.TxIn),
@@ -2101,7 +2084,7 @@ def signP2PKHMsgTx(msgtx, prevOutputs, keysource, params):
             continue
         apkh = addrs[0]
         if not isinstance(apkh, crypto.AddressPubKeyHash):
-            raise Exception("previous output address is not P2PKH")
+            raise AssertionError("previous output address is not P2PKH")
 
         privKey = keysource.priv(apkh.string())
         sigscript = signatureScript(
@@ -2225,7 +2208,7 @@ def extractPkScriptAddrs(version, pkScript, chainParams):
     with an invalid script version error.
     """
     if version != 0:
-        raise Exception("invalid script version")
+        raise AssertionError("invalid script version")
 
     # Check for pay-to-pubkey-hash script.
     pkHash = extractPubKeyHash(pkScript)
@@ -2313,13 +2296,13 @@ def sign(chainParams, tx, idx, subScript, hashType, keysource, sigType):
         subClass = getStakeOutSubclass(subScript)
 
     if scriptClass == PubKeyTy:
-        raise Exception("P2PK signature scripts not implemented")
+        raise NotImplementedError("P2PK signature scripts not implemented")
         # privKey = keysource.priv(addresses[0].string())
         # script = p2pkSignatureScript(tx, idx, subScript, hashType, key)
         # return script, scriptClass, addresses, nrequired, nil
 
     elif scriptClass == PubkeyAltTy:
-        raise Exception("alt signatures not implemented")
+        raise NotImplementedError("alt signatures not implemented")
         # privKey = keysource.priv(addresses[0].string())
         # script = p2pkSignatureScriptAlt(tx, idx, subScript, hashType, key, sigType)
         # return script, scriptClass, addresses, nrequired, nil
@@ -2330,7 +2313,7 @@ def sign(chainParams, tx, idx, subScript, hashType, keysource, sigType):
         return script, scriptClass, addresses, nrequired
 
     elif scriptClass == PubkeyHashAltTy:
-        raise Exception("alt signatures not implemented")
+        raise NotImplementedError("alt signatures not implemented")
         # look up key for address
         # privKey = keysource.priv(addresses[0].string())
         # script = signatureScriptAlt(
@@ -2338,7 +2321,7 @@ def sign(chainParams, tx, idx, subScript, hashType, keysource, sigType):
         # return script, scriptClass, addresses, nrequired
 
     elif scriptClass == ScriptHashTy:
-        raise Exception("script-hash script signing not implemented")
+        raise NotImplementedError("script-hash script signing not implemented")
         # script = keysource.script(addresses[0])
         # return script, scriptClass, addresses, nrequired
 
@@ -2404,9 +2387,9 @@ def sign(chainParams, tx, idx, subScript, hashType, keysource, sigType):
         )
 
     elif scriptClass == NullDataTy:
-        raise Exception("can't sign NULLDATA transactions")
+        raise NotImplementedError("can't sign NULLDATA transactions")
 
-    raise Exception("can't sign unknown transactions")
+    raise AssertionError("can't sign unknown transactions")
 
 
 def signMultiSig(tx, idx, subScript, hashType, addresses, nRequired, privKeys):
@@ -2456,12 +2439,12 @@ def handleStakeOutSign(
         privKey = keysource.priv(addresses[0].string())
         txscript = signatureScript(tx, idx, subScript, hashType, privKey, True)
         return txscript, scriptClass, addresses, nrequired
-    elif subClass == ScriptHashTy:
+    elif subClass == ScriptHashTy:  # nocover
         # This will be needed in order to enable voting.
-        raise Exception("script-hash script signing not implemented")
+        raise NotImplementedError("script-hash script signing not implemented")
         # script = keysource.script(addresses[0].string())
         # return script, scriptClass, addresses, nrequired
-    raise Exception("unknown subclass for stake output to sign")
+    raise AssertionError("unknown subclass for stake output to sign")
 
 
 def mergeScripts(
@@ -2696,7 +2679,7 @@ def signTxOutput(
         scriptClass = getStakeOutSubclass(pkScript)
 
     if scriptClass == ScriptHashTy:
-        raise Exception("ScriptHashTy signing unimplemented")
+        raise NotImplementedError("ScriptHashTy signing unimplemented")
         # # TODO keep the sub addressed and pass down to merge.
         # realSigScript, _, _, _ = sign(
         #     privKey, chainParams, tx, idx, sigScript, hashType, sigType)
@@ -2737,7 +2720,7 @@ def getP2PKHOpCode(pkScript):
     """
     scriptClass = getScriptClass(DefaultScriptVersion, pkScript)
     if scriptClass == NonStandardTy:
-        raise Exception("unknown script class")
+        raise AssertionError("unknown script class")
     if scriptClass == StakeSubmissionTy:
         return opcode.OP_SSTX
     elif scriptClass == StakeGenTy:
@@ -2776,7 +2759,7 @@ def spendScriptSize(pkScript):
                 "unexpected nested script class for credit: %d" % scriptClass
             )
         return RedeemP2PKHSigScriptSize
-    raise Exception("unimplemented: %s : %r" % (scriptClass, scriptClass))
+    raise NotImplementedError("unimplemented: %s : %r" % (scriptClass, scriptClass))
 
 
 def estimateInputSize(scriptSize):
@@ -3168,7 +3151,7 @@ def makeTicket(
     mtx = msgtx.MsgTx.new()
 
     if not addrPool or not inputPool:
-        raise Exception("solo tickets not supported")
+        raise NotImplementedError("solo tickets not supported")
 
     txIn = msgtx.TxIn(previousOutPoint=inputPool.op, valueIn=inputPool.amt)
     mtx.addTxIn(txIn)
@@ -3179,7 +3162,7 @@ def makeTicket(
     # Create a new script which pays to the provided address with an
     # SStx tagged output.
     if not addrVote:
-        raise Exception("no voting address provided")
+        raise AssertionError("no voting address provided")
 
     pkScript = payToSStx(addrVote)
 
