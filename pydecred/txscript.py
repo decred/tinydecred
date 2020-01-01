@@ -290,12 +290,13 @@ class Signature:
         return b
 
     @staticmethod
-    def parse(sigBytes):
+    def parse(sigBytes, der):
         """
         Parse sigBytes to make sure they make up a valid Signature.
 
         Args:
             sigBytes (byte-like): The bytes of the signature.
+            der (bool): Whether to check for padding and sign.
         Returns:
             object: the ECDSA Signature.
         """
@@ -332,12 +333,13 @@ class Signature:
 
         # Then r itself.
         rBytes = sigBytes[index : index + rLen]
-        try:
-            canonicalPadding(rBytes)
-        except Exception as e:
-            raise Exception(
-                "malformed signature: bogus r padding or sign: {}".format(e)
-            )
+        if der:
+            try:
+                canonicalPadding(rBytes)
+            except Exception as e:
+                raise Exception(
+                    "malformed signature: bogus r padding or sign: {}".format(e)
+                )
 
         index += rLen
         # 0x02. length already checked in previous if.
@@ -354,12 +356,13 @@ class Signature:
 
         # Then s itself.
         sBytes = sigBytes[index : index + sLen]
-        try:
-            canonicalPadding(rBytes)
-        except Exception as e:
-            raise Exception(
-                "malformed signature: bogus s padding or sign: {}".format(e)
-            )
+        if der:
+            try:
+                canonicalPadding(rBytes)
+            except Exception as e:
+                raise Exception(
+                    "malformed signature: bogus s padding or sign: {}".format(e)
+                )
 
         index += sLen
         # sanity check length parsing
@@ -2555,7 +2558,7 @@ def mergeMultiSig(tx, idx, addresses, nRequired, pkScript, sigScript, prevScript
         tSig = sig[:-1]
         hashType = sig[-1]
 
-        pSig = Signature.parse(tSig)
+        pSig = Signature.parse(tSig, True)
         if not pSig:
             continue
 
