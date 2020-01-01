@@ -1,14 +1,18 @@
 """
 Copyright (c) 2019, Brian Stafford
+Copyright (c) 2019, the Decred developers
 See LICENSE for details
 
-DcrdataClient.endpointList() for available enpoints.
+DcrdataClient.endpointList() for available endpoints.
 """
+
 import time
-from tinydecred.util import tinyhttp, encode
-from tinydecred.pydecred import txscript, constants, nets
+
 from tinydecred.crypto import crypto
+from tinydecred.pydecred import constants, nets, txscript
+from tinydecred.util import encode, tinyhttp
 from tinydecred.util.encode import ByteArray
+
 
 # The duration purchase info is good for.
 PURCHASE_INFO_LIFE = constants.HOUR
