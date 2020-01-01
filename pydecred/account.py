@@ -431,24 +431,24 @@ class DecredAccount(Account):
         Returns:
             bool: whether or not an error occured.
         """
-        revokableTickets = [
+        revocableTickets = (
             utxo.txid for utxo in self.utxos.values() if utxo.isRevocableTicket()
-        ]
-        txs = []
-        for txid in revokableTickets:
-            tx = self.blockchain.tx(txid)
-            txs.append(tx)
+        )
+        txs = (self.blockchain.tx(txid) for txid in revocableTickets)
         for tx in txs:
             redeemHash = crypto.AddressScriptHash(
                 self.net.ScriptHashAddrID,
                 txscript.extractStakeScriptHash(tx.txOut[0].pkScript, opcode.OP_SSTX),
             )
-            redeemScript = []
-            for pool in self.stakePools:
-                if pool.purchaseInfo.ticketAddress == redeemHash.string():
-                    redeemScript = decodeBA(pool.purchaseInfo.script)
-                    break
-            else:
+            redeemScript = next(
+                (
+                    decodeBA(p.purchaseInfo.script)
+                    for p in self.stakePools
+                    if p.purchaseInfo.ticketAddress == redeemHash.string()
+                ),
+                None,
+            )
+            if not redeemScript:
                 raise Exception("did not find redeem script for hash %s" % redeemHash)
 
             keysource = KeySource(
