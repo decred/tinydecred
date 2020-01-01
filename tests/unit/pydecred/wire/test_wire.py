@@ -5,12 +5,13 @@ See LICENSE for details
 
 import unittest
 
-from tinydecred.crypto.bytearray import ByteArray
 from tinydecred.pydecred.wire import wire
 from tinydecred.util import helpers
+from tinydecred.util.encode import ByteArray
 
 
 class TestWire(unittest.TestCase):
+
     @classmethod
     def setUpClass(cls):
         helpers.prepareLogger("TestWire")

@@ -5,15 +5,15 @@ See LICENSE for details
 
 Based on dcrd txscript.
 """
+
 import math
-from tinydecred.util.encode import ByteArray
-from tinydecred.pydecred.wire import (
-    wire,
-    msgtx,
-)  # A couple of usefule serialization functions.
-from tinydecred.crypto import opcode, crypto
-from tinydecred.util import helpers
+
+from tinydecred.crypto import crypto, opcode
 from tinydecred.crypto.secp256k1.curve import curve as Curve
+from tinydecred.pydecred.wire import msgtx, wire
+from tinydecred.util import helpers
+from tinydecred.util.encode import ByteArray
+
 
 log = helpers.getLogger("TXSCRIPT")
 
