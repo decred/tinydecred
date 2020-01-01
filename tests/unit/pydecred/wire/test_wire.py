@@ -11,7 +11,6 @@ from tinydecred.util.encode import ByteArray
 
 
 class TestWire(unittest.TestCase):
-
     @classmethod
     def setUpClass(cls):
         helpers.prepareLogger("TestWire")

@@ -244,9 +244,7 @@ def scriptClassTests():
 
 
 class TestTxScript(unittest.TestCase):
-
     def test_stake_pool_ticketFee(self):
-
         class test:
             def __init__(self, StakeDiff, Fee, Height, PoolFee, Expected):
                 self.StakeDiff = int(StakeDiff)
@@ -1377,7 +1375,6 @@ class TestTxScript(unittest.TestCase):
             )
 
     def test_addresses(self):
-
         class test:
             def __init__(
                 self,
