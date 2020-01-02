@@ -270,10 +270,7 @@ def saveFile(path, contents, binary=False):
 def appDataDir(appName):
     """
     appDataDir returns an operating system specific directory to be used for
-    storing application data for an application.  See AppDataDir for more
-    details.  This unexported version takes an operating system argument
-    primarily to enable the testing package to properly test the function by
-    forcing an operating system that is not the currently one.
+    storing application data for an application.
     """
     if appName == "" or appName == ".":
         return "."
@@ -284,12 +281,11 @@ def appDataDir(appName):
     appNameUpper = appName.capitalize()
     appNameLower = appName.lower()
 
-    # Get the OS specific home directory via the Go standard lib.
+    # Get the OS specific home directory.
     homeDir = expanduser("~")
 
     # Fall back to standard HOME environment variable that works
-    # for most POSIX OSes if the directory from the Go standard
-    # lib failed.
+    # for most POSIX OSes.
     if homeDir == "":
         homeDir = os.getenv("HOME")
 
@@ -326,7 +322,10 @@ def readINI(path, keys):
         dict: Discovered keys and values.
     """
     config = configparser.ConfigParser()
-    config.read(path)
+    # Need to add a section header since configparser doesn't handle sectionless
+    # INI format.
+    with open(path) as f:
+        config.read_string("[tinydecred]\n" + f.read())  # This line does the trick.
     res = {}
     for section in config.sections():
         for k in config[section]:

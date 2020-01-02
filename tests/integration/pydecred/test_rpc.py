@@ -23,7 +23,7 @@ def config():
 def test_rpc(config):
     if config is None:
         pytest.skip("did not locate a dcrd config file")
-    rpcClient = rpc.RPCClient(
+    rpcClient = rpc.Client(
         "https://" + config["rpclisten"],
         config["rpcuser"],
         config["rpcpass"],

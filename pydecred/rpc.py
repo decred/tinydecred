@@ -4,9 +4,9 @@ from tinydecred.util import tinyhttp
 from tinydecred.crypto.bytearray import ByteArray
 
 
-class RPCClient(object):
+class Client(object):
     """
-    The RPCClient has communicates with the blockchain RPC API.
+    The Client communicates with the blockchain RPC API.
     """
 
     def __init__(self, host, user, pw, cert=None):
@@ -112,7 +112,7 @@ class GetBlockChainInfoResult(object):
             headers (int): The number of validated block headers that
                 comprise the target best chain.
             syncHeight (int): The latest known block height being synced to.
-            bestBlockHash (str):  The block hash of the current best chain
+            bestBlockHash (str): The block hash of the current best chain
                 tip.
             difficultyRatio (float): The current proof-of-work difficulty as
                 a multiple of the minimum difficulty.
