@@ -906,7 +906,7 @@ def isStakeSubmissionScript(scriptVersion, script):
     return false for other script versions.
     """
     # The only currently supported script version is 0.
-    if scriptVersion != 0:  # nocover
+    if scriptVersion != 0:
         return False
 
     # The only supported stake submission scripts are pay-to-pubkey-hash and
@@ -927,7 +927,7 @@ def isStakeGenScript(scriptVersion, script):
     return false for other script versions.
     """
     # The only currently supported script version is 0.
-    if scriptVersion != 0:  # nocover
+    if scriptVersion != 0:
         return False
 
     # The only supported stake generation scripts are pay-to-pubkey-hash and
@@ -948,7 +948,7 @@ def isStakeRevocationScript(scriptVersion, script):
     return false for other script versions.
     """
     # The only currently supported script version is 0.
-    if scriptVersion != 0:  # nocover
+    if scriptVersion != 0:
         return False
 
     # The only supported stake revocation scripts are pay-to-pubkey-hash and
@@ -1038,7 +1038,7 @@ def extractMultisigScriptDetails(scriptVersion, script, extractPubKeys):
     other script versions.
     """
     # The only currently supported script version is 0.
-    if scriptVersion != 0:  # nocover
+    if scriptVersion != 0:
         return invalidMSDetails()
 
     # A multi-signature script is of the form:
@@ -1104,7 +1104,7 @@ def isNullDataScript(scriptVersion, script):
     return false for other script versions.
     """
     # The only currently supported script version is 0.
-    if scriptVersion != 0:  # nocover
+    if scriptVersion != 0:
         return False
 
     # A null script is of the form:
