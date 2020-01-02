@@ -112,6 +112,7 @@ class TestCrypto(unittest.TestCase):
         for scriptHash, addrStr in pairs:
             addr = crypto.newAddressScriptHashFromHash(ByteArray(scriptHash), mainnet)
             self.assertEqual(addr.string(), addrStr)
+<<<<<<< HEAD
 
     def test_kdf_params(self):
         salt = ByteArray(rando.generateSeed(32))
@@ -169,3 +170,5 @@ class TestCrypto(unittest.TestCase):
         )
         kpriv01_neutered = kpriv_branch0_child1.neuter()
         self.assertEqual(kpriv01_neutered.key.hex(), kpub_branch0_child1.key.hex())
+=======
+>>>>>>> Changes per review.

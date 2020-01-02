@@ -116,11 +116,10 @@ class AddressPubKeyHash:
     """
 
     def __init__(self, netID=None, pkHash=None, sigType=STEcdsaSecp256k1):
-        if len(pkHash) != 20:
-            raise Exception("AddressPubKeyHash expected 20 bytes, got %d" % len(pkHash))
+        pkh_len = len(pkHash)
+        assert pkh_len == 20, f"AddressPubKeyHash expected 20 bytes, got {pkh_len}"
         # For now, just reject anything except secp256k1
-        if sigType != STEcdsaSecp256k1:
-            raise AssertionError("unsupported signature type %v", self.sigType)
+        assert sigType == STEcdsaSecp256k1, f"unsupported signature type {sigType}"
         self.sigType = sigType
         self.netID = netID
         self.pkHash = pkHash
@@ -183,7 +182,7 @@ class AddressSecpPubKey:
         elif fmt == 0x04:
             pkFormat = PKFUncompressed
         else:
-            raise AssertionError("unknown pubkey format %d", fmt)
+            raise NotImplementedError("unknown pubkey format %d", fmt)
         self.pubkeyFormat = pkFormat
         self.netID = self.pubkeyID = net.PubKeyAddrID
         self.pubkeyHashID = net.PubKeyHashAddrID
@@ -199,7 +198,7 @@ class AddressSecpPubKey:
             return self.pubkey.serializeUncompressed()
         elif fmt == PKFCompressed:
             return self.pubkey.serializeCompressed()
-        raise AssertionError("unknown pubkey format")
+        raise NotImplementedError("unknown pubkey format")
 
     def string(self):
         """
@@ -240,7 +239,7 @@ class AddressSecpPubKey:
         """
         return self.serialize()
 
-    def hash160(self):  # nocover
+    def hash160(self):
         """
         Hash160 returns the Hash160(data) where data is the data normally
         hashed to 160 bits from the respective address type.
@@ -404,10 +403,8 @@ def modInv(a, m):
         int: The modular inverse.
     """
     g, x, y = egcd(a, m)
-    if g != 1:
-        raise AssertionError("modular inverse does not exist")
-    else:
-        return x % m
+    assert g == 1, "modular inverse does not exist"
+    return x % m
 
 
 def hashH(b):
@@ -452,12 +449,11 @@ def b58CheckDecode(s):
         int: The version (leading two) bytes.
     """
     decoded = b58decode(s)
-    if len(decoded) < 6:
-        raise Exception("decoded lacking version/checksum")
+    assert len(decoded) >= 6, "decoded lacking version/checksum"
     version = decoded[:2]
-    cksum = decoded[len(decoded) - 4 :]
-    if checksum(decoded[: len(decoded) - 4]) != cksum:
-        raise Exception("checksum error")
+    included_cksum = decoded[len(decoded) - 4 :]
+    computed_cksum = checksum(decoded[: len(decoded) - 4])
+    assert included_cksum == computed_cksum, "checksum error"
     payload = ByteArray(decoded[2 : len(decoded) - 4])
     return payload, version
 
@@ -469,15 +465,14 @@ def newAddressPubKey(decoded, net):
     string. The first byte indicates the signature suite. For compressed
     secp256k1 pubkeys, use AddressSecpPubKey directly.
     """
-    if len(decoded) != 33:
-        raise AssertionError("unable to decode pubkey of length %d" % len(decoded))
+    assert len(decoded) == 33, f"unable to decode pubkey of length {len(decoded)}"
     # First byte is the signature suite and ybit.
     suite = decoded[0]
     suite &= 127
     ybit = not (decoded[0] & (1 << 7) == 0)
     toAppend = 0x02
     if ybit:
-        toAppend = 0x03  # nocover
+        toAppend = 0x03
 
     if suite == STEcdsaSecp256k1:
         b = ByteArray(toAppend) + decoded[1:]
@@ -490,7 +485,7 @@ def newAddressPubKey(decoded, net):
         #     append([]byte{toAppend}, decoded[1:]...), net)
         raise NotImplementedError("Schnorr signatures not implemented")
     else:
-        raise AssertionError("unknown address type %d" % suite)
+        raise NotImplementedError("unknown address type %d" % suite)
 
 
 def newAddressPubKeyHash(pkHash, net, algo):
@@ -515,7 +510,7 @@ def newAddressPubKeyHash(pkHash, net, algo):
         # netID = net.PKHSchnorrAddrID
         raise NotImplementedError("Schnorr not implemented")
     else:
-        raise AssertionError("unknown ECDSA algorithm")
+        raise NotImplementedError("unknown ECDSA algorithm")
 
 
 def newAddressScriptHash(script, net):
@@ -544,8 +539,7 @@ def newAddressScriptHashFromHash(scriptHash, net):
     Returns:
         AddressScriptHash: An address object.
     """
-    if len(scriptHash) != RIPEMD160_SIZE:
-        raise Exception("incorrect script hash length")
+    assert len(scriptHash) == RIPEMD160_SIZE, "incorrect script hash length"
     return AddressScriptHash(net.ScriptHashAddrID, scriptHash)
 
 
@@ -869,7 +863,7 @@ class ExtendedKey:
             ExtendedKey: The public extended key.
         """
         # Already an extended public key.
-        if not self.isPrivate:  # nocover
+        if not self.isPrivate:
             return self
 
         # Convert it to an extended public key. The key for the new extended
@@ -895,8 +889,7 @@ class ExtendedKey:
         Returns:
             ByteArray: The serialized extended key.
         """
-        if self.key.iszero():
-            raise AssertionError("unexpected zero key")
+        assert not self.key.iszero(), "unexpected zero key"
 
         childNumBytes = ByteArray(self.childNum, length=4)
         depthByte = ByteArray(self.depth % 256, length=1)
@@ -952,7 +945,7 @@ class ExtendedKey:
             hash160(child.publicKey().serializeCompressed().b), net, STEcdsaSecp256k1
         ).string()
 
-    def privateKey(self):  # nocover
+    def privateKey(self):
         """
         A PrivateKey structure that can be used for signatures.
 
@@ -991,10 +984,10 @@ def decodeExtendedKey(net, cryptoKey, key):
     #   child num (4) || chain code (32) || key data (33) || checksum (4)
 
     # Split the payload and checksum up and ensure the checksum matches.
-    payload = decoded[: len(decoded) - 4]
-    checkSum = decoded[len(decoded) - 4 :]
-    if checkSum != checksum(payload.b)[:4]:
-        raise AssertionError("wrong checksum")
+    payload = decoded[: decoded_len - 4]
+    included_cksum = decoded[decoded_len - 4 :]
+    computed_cksum = checksum(payload.b)[:4]
+    assert included_cksum == computed_cksum, "wrong checksum"
 
     # Ensure the version encoded in the payload matches the provided network.
     privVersion = net.HDPrivateKeyID
@@ -1018,8 +1011,7 @@ def decodeExtendedKey(net, cryptoKey, key):
         # of the order of the secp256k1 curve and not be 0.
         keyData = keyData[1:]
         # if keyNum.Cmp(secp256k1.S256().N) >= 0 || keyNum.Sign() == 0 {
-        if keyData >= Curve.N or keyData.iszero():
-            raise AssertionError("unusable key")
+        assert keyData < Curve.N and not keyData.iszero(), "unusable key"
         # Ensure the public key parses correctly and is actually on the
         # secp256k1 curve.
         Curve.publicKey(keyData.int())
@@ -1182,17 +1174,15 @@ class SecretKey(object):
         sk = SecretKey(b"")
         sk.keyParams = kp
         func = kp.kdfFunc
-        if func == "pbkdf2_hmac":
-            sk.key = ByteArray(
-                hashlib.pbkdf2_hmac(
-                    kp.hashName, bytes(password), bytes(kp.salt), kp.iterations
-                )
+        if func != "pbkdf2_hmac":
+            raise ValueError("unknown key derivation function")
+        sk.key = ByteArray(
+            hashlib.pbkdf2_hmac(
+                kp.hashName, bytes(password), bytes(kp.salt), kp.iterations
             )
-        else:
-            raise AssertionError("unkown key derivation function")
+        )
         checkDigest = ByteArray(hashlib.sha256(sk.key.b).digest())
-        if checkDigest != kp.digest:
-            raise AssertionError("rekey digest check failed")
+        assert checkDigest == kp.digest, "rekey digest check failed"
         return sk
 
 

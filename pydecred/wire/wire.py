@@ -149,26 +149,22 @@ def readVarInt(b, pver):  # r io.Reader, pver uint32) (uint64, error) {
     """
     discriminant = b.pop(1).int()
     rv = 0
+    err_msg = "ReadVarInt noncanon error: {} - {} <= {}"
     if discriminant == 0xFF:
         rv = b.pop(8).unLittle().int()
 
         # The encoding is not canonical if the value could have been
         # encoded using fewer bytes.
         minRv = 0x100000000
-        if rv < minRv:
-            raise Exception(
-                "ReadVarInt noncanon error: %d - %d <= %d" % (rv, discriminant, minRv)
-            )
+        assert rv >= minRv, err_msg.format(rv, discriminant, minRv)
+
     elif discriminant == 0xFE:
         rv = b.pop(4).unLittle().int()
 
         # The encoding is not canonical if the value could have been
         # encoded using fewer bytes.
         minRv = 0x10000
-        if rv < minRv:
-            raise AssertionError(
-                "ReadVarInt noncanon error: %d - %d <= %d" % (rv, discriminant, minRv)
-            )
+        assert rv >= minRv, err_msg.format(rv, discriminant, minRv)
 
     elif discriminant == 0xFD:
         rv = b.pop(2).unLittle().int()
@@ -176,10 +172,7 @@ def readVarInt(b, pver):  # r io.Reader, pver uint32) (uint64, error) {
         # The encoding is not canonical if the value could have been
         # encoded using fewer bytes.
         minRv = 0xFD
-        if rv < minRv:
-            raise AssertionError(
-                "ReadVarInt noncanon error: %d - %d <= %d" % (rv, discriminant, minRv)
-            )
+        assert rv >= minRv, err_msg.format(rv, discriminant, minRv)
 
     else:
         rv = discriminant

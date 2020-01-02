@@ -73,11 +73,9 @@ def readOutPoint(b, pver, ver):
 
 
 def readTxInPrefix(b, pver, serType, ver, ti):
-    # r io.Reader, pver uint32, serType TxSerializeType, version uint16, ti *TxIn) error {
-    if serType == wire.TxSerializeOnlyWitness:
-        raise AssertionError(
-            "readTxInPrefix: tried to read a prefix input for a witness only tx"
-        )
+    # r io.Reader, pver uint32, serType TxSerializeType, version uint16, ti *TxIn
+    msg = "readTxInPrefix: tried to read a prefix input for a witness only tx"
+    assert serType != wire.TxSerializeOnlyWitness, msg
 
     # Outpoint.
     b, ti.previousOutPoint = readOutPoint(b, pver, ver)
@@ -133,11 +131,8 @@ def readScript(b, pver, maxAllowed, fieldName):
     # Prevent byte array larger than the max message size.  It would
     # be possible to cause memory exhaustion and panics without a sane
     # upper bound on this count.
-    if count > maxAllowed:
-        raise AssertionError(
-            "readScript: %s is larger than the max allowed size [count %d, max %d]"
-            % (fieldName, count, maxAllowed)
-        )
+    msg = "readScript: {} is larger than the max allowed size [count {}, max {}]"
+    assert count <= maxAllowed, msg.format(fieldName, count, maxAllowed)
 
     a = b.pop(count)
 
@@ -386,7 +381,7 @@ class OutPoint:
             and self.tree == other.tree
         )
 
-    def txid(self):  # nocover
+    def txid(self):
         return reversed(self.hash).hex()
 
 
@@ -484,13 +479,13 @@ class MsgTx:
     def txHex(self):
         return self.serialize().hex()
 
-    def txid(self):  # nocover
+    def txid(self):
         """
         Hex encoded, byte-reversed tx hash.
         """
         return reversed(self.hash()).hex()
 
-    def id(self):  # nocover
+    def id(self):
         return self.txid()
 
     def command(self):
@@ -689,11 +684,10 @@ class MsgTx:
             # Prevent more input transactions than could possibly fit into a
             # message.  It would be possible to cause memory exhaustion and panics
             # without a sane upper bound on this count.
-            if count > maxTxInPerMessage:
-                raise AssertionError(
-                    "MsgTx.decodeWitness: too many input transactions to fit into"
-                    " max message size [count %d, max %d]" % (count, maxTxInPerMessage)
-                )
+            assert count <= maxTxInPerMessage, (
+                "MsgTx.decodeWitness: too many input transactions to fit into"
+                f" max message size [count {count}, max {maxTxInPerMessage}]"
+            )
 
             self.txIn = [TxIn(None, 0) for i in range(count)]
             for txIn in self.txIn:
@@ -707,20 +701,18 @@ class MsgTx:
             # the signature scripts.
             count = wire.readVarInt(b, pver)
 
-            if count != len(self.txIn):
-                raise AssertionError(
-                    "MsgTx.decodeWitness: non equal witness and prefix txin quantities"
-                    " (witness %v, prefix %v)" % (count, len(self.txIn))
-                )
+            assert count == len(self.txIn), (
+                "MsgTx.decodeWitness: non equal witness and prefix txin"
+                f" quantities (witness {count}, prefix {len(self.txIn)})"
+            )
 
             # Prevent more input transactions than could possibly fit into a
             # message.  It would be possible to cause memory exhaustion and panics
             # without a sane upper bound on this count.
-            if count > maxTxInPerMessage:
-                raise AssertionError(
-                    "MsgTx.decodeWitness: too many input transactions to fit into"
-                    " max message size [count %d, max %d]" % (count, maxTxInPerMessage)
-                )
+            assert count <= maxTxInPerMessage, (
+                "MsgTx.decodeWitness: too many input transactions to fit into"
+                f" max message size [count {count}, max {maxTxInPerMessage}]"
+            )
 
             # Read in the witnesses, and copy them into the already generated
             # by decodePrefix TxIns.
