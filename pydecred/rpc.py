@@ -60,6 +60,53 @@ class Client(object):
         """
         return GetBlockChainInfoResult.parse(self.call("getblockchaininfo"))
 
+    def validateAddress(self, addr):
+        """
+        Returns:
+            ValidateAddressResult: Whether the address isMine and other info if so.
+        """
+        return ValidateAddressChainResult.parse(self.call("validateaddress", addr))
+
+    def verifyChain(self):
+        """
+        Returns:
+            VerifyChainResult:
+        """
+        return VerifyChainResult.parse(self.call("verifychain"))
+
+    def verifyMessage(self, addr, sig, message):
+        """
+        Returns:
+            VerifyMessageResult:
+        """
+        return VerifyMessageResult.parse(self.call("verifymessage", addr, sig, message))
+
+    def version(self):
+        """
+        Returns:
+            VersionResult: dcrd's version info.
+        """
+        return VersionResult.parse(self.call("version"))
+
+
+def get(k, obj):
+    """
+    Helper method to check for nil keys and set those values to None.
+    Args:
+        k (string): dict key
+        obj (dict): the dict to search
+
+    Returns:
+        object: the thing found at k or None.
+    """
+    return obj[k] if k in obj else None
+
+
+def checkBool(b):
+    if not b:
+        return b
+    return b == "true"
+
 
 class GetBestBlockResult(object):
     """getbestblockhash"""
@@ -199,4 +246,163 @@ class AgendaInfo(object):
             since=obj["since"] if "since" in obj else 0,
             startTime=obj["starttime"],
             expireTime=obj["expiretime"],
+        )
+
+
+class ValidateAddressChainResult:
+    """validateaddress"""
+
+    def __init__(
+        self, isValid, address,
+    ):
+        """
+        Args:
+            isValid (bool): Whether the address is valid.
+            address (string): The address or None if not valid.
+        """
+        self.isValid = isValid
+        self.address = address
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the ValidateAddressChainResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            ValidateAddressChainResult: The ValidateAddressChainResult.
+        """
+        return ValidateAddressChainResult(
+            isValid=obj["isvalid"], address=get("address", obj),
+        )
+
+
+class VerifyChainResult:
+    """verifychainresult"""
+
+    def __init__(
+        self, verified,
+    ):
+        """
+        Args:
+            verified (bool): Whether the blockchain database verified.
+        """
+        self.verified = verified
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the VerifyChainResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            VerifyChainResult: The VerifyChainResult.
+        """
+        return VerifyChainResult(verified=obj)
+
+
+class VerifyMessageResult:
+    """verifymessageresult"""
+
+    def __init__(
+        self, verified,
+    ):
+        """
+        Args:
+            verified (bool): Whether the message can be verified as signed by
+                the private key corresponding to the supplied address.
+        """
+        self.verified = verified
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the VerifyMessageResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            VerifyMessageResult: The VerifyMessageResult.
+        """
+        return VerifyMessageResult(verified=obj)
+
+
+class VersionResult:
+    """versionresult"""
+
+    def __init__(
+        self, dcrd, dcrdjsonrpcapi,
+    ):
+        """
+        Args:
+            dcrd (object): The dcrd version.
+            dcrdjsonrpcapi (object): The dcrdjsonrpcapi version.
+        """
+        self.dcrd = dcrd
+        self.dcrdjsonrpcapi = dcrdjsonrpcapi
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the VerifyMessageResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            VerifyMessageResult: The VerifyMessageResult.
+        """
+        return VersionResult(
+            dcrd=Version.parse(obj["dcrd"]),
+            dcrdjsonrpcapi=Version.parse(obj["dcrdjsonrpcapi"]),
+        )
+
+
+class Version:
+    """
+    Version provides a data structure to store version information.
+    """
+
+    def __init__(
+        self, versionstring, major, minor, patch, prerelease, buildmetadata,
+    ):
+        """
+        Args:
+            versionstring (string): The semver version as a string.
+            major (int): The semver major.
+            minor (int): The semver minor.
+            patch (int): The semver patch.
+            prerelease (string): Prerelease status.
+            buildmetadata (string): The go version used to build the dcrd binary.
+        """
+        self.versionstring = versionstring
+        self.major = major
+        self.minor = minor
+        self.patch = patch
+        self.prerelease = prerelease
+        self.buildmetadata = buildmetadata
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the Version from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            Version: A Version object.
+        """
+        return Version(
+            versionstring=obj["versionstring"],
+            major=obj["major"],
+            minor=obj["minor"],
+            patch=obj["patch"],
+            prerelease=obj["prerelease"],
+            buildmetadata=obj["buildmetadata"],
         )

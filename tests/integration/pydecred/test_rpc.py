@@ -35,3 +35,19 @@ def test_rpc(config):
 
     blockchainInfo = rpcClient.getBlockchainInfo()
     assert isinstance(blockchainInfo, rpc.GetBlockChainInfoResult)
+
+    validateAddress = rpcClient.validateAddress("DsUxwT6Kbiur6Nps9q3uGEpJCvrhcxX2nii")
+    assert isinstance(validateAddress, rpc.ValidateAddressChainResult)
+
+    verifyChain = rpcClient.verifyChain()
+    assert isinstance(verifyChain, rpc.VerifyChainResult)
+
+    verifyMessage = rpcClient.verifyMessage(
+        "DsUxwT6Kbiur6Nps9q3uGEpJCvrhcxX2nii",
+        "H166ndZLNEpIXrcEm4V9lf+AizRp/ejCAhs21J/ht87/RK0QFnOscCbJixKok3oHjpOS0jAkJ4jFktqMXD59LU8=",
+        "this decred is tiny",
+    )
+    assert isinstance(verifyMessage, rpc.VerifyMessageResult)
+
+    version = rpcClient.version()
+    assert isinstance(version, rpc.VersionResult)
