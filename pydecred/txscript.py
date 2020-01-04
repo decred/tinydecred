@@ -635,6 +635,43 @@ def canonicalizeInt(val):
     return b
 
 
+def scriptNumBytes(n):
+    """
+    scriptNumBytes returns a minimal encoding for a signed integer as bytes.
+    Based on dcrd/txscript (scriptNum).Bytes.
+
+    Args:
+        n (int): The integer to encode.
+
+    Returns:
+        ByteArray: The encoded bytes.
+    """
+    if n == 0:
+        return ByteArray()
+
+    isNegative = n < 0
+    if isNegative:
+        n = -n
+
+    result = ByteArray(length=9)
+    i = 0
+    while n > 0:
+        result[i] = n & 0xFF
+        n = n >> 8
+        i += 1
+
+    if result[i - 1] & 0x80 != 0:
+        extraByte = 0x00
+        if isNegative:
+            extraByte = 0x80
+        result[i] = extraByte
+        i += 1
+    elif isNegative:
+        result[i - 1] |= 0x80
+
+    return result[:i]
+
+
 def hashToInt(h):
     """
     hashToInt converts a hash value to an integer. There is some disagreement
@@ -1731,7 +1768,7 @@ def addInt(val):
     if val == -1 or (val >= 1 and val <= 16):
         b += opcode.OP_1 - 1 + val
         return b
-    raise Exception("adding integers over 16 not yet implemented")
+    raise addData(scriptNumBytes(val))
 
 
 def addData(data):

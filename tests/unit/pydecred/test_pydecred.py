@@ -2734,6 +2734,55 @@ class TestTxScript(unittest.TestCase):
 
             self.assertEqual(sigHash, expectedHash)
 
+    def test_scriptNumBytes(self):
+        tests = [
+            (0, ByteArray()),
+            (1, ByteArray("01")),
+            (-1, ByteArray("81")),
+            (127, ByteArray("7f")),
+            (-127, ByteArray("ff")),
+            (128, ByteArray("8000")),
+            (-128, ByteArray("8080")),
+            (129, ByteArray("8100")),
+            (-129, ByteArray("8180")),
+            (256, ByteArray("0001")),
+            (-256, ByteArray("0081")),
+            (32767, ByteArray("ff7f")),
+            (-32767, ByteArray("ffff")),
+            (32768, ByteArray("008000")),
+            (-32768, ByteArray("008080")),
+            (65535, ByteArray("ffff00")),
+            (-65535, ByteArray("ffff80")),
+            (524288, ByteArray("000008")),
+            (-524288, ByteArray("000088")),
+            (7340032, ByteArray("000070")),
+            (-7340032, ByteArray("0000f0")),
+            (8388608, ByteArray("00008000")),
+            (-8388608, ByteArray("00008080")),
+            (2147483647, ByteArray("ffffff7f")),
+            (-2147483647, ByteArray("ffffffff")),
+            (2147483648, ByteArray("0000008000")),
+            (-2147483648, ByteArray("0000008080")),
+            (2415919104, ByteArray("0000009000")),
+            (-2415919104, ByteArray("0000009080")),
+            (4294967295, ByteArray("ffffffff00")),
+            (-4294967295, ByteArray("ffffffff80")),
+            (4294967296, ByteArray("0000000001")),
+            (-4294967296, ByteArray("0000000081")),
+            (281474976710655, ByteArray("ffffffffffff00")),
+            (-281474976710655, ByteArray("ffffffffffff80")),
+            (72057594037927935, ByteArray("ffffffffffffff00")),
+            (-72057594037927935, ByteArray("ffffffffffffff80")),
+            (9223372036854775807, ByteArray("ffffffffffffff7f")),
+            (-9223372036854775807, ByteArray("ffffffffffffffff")),
+        ]
+
+        for num, serialized in tests:
+            gotBytes = txscript.scriptNumBytes(num)
+            assert gotBytes == serialized, (
+                str(num) + ": wanted " + serialized.hex() + ", got " + gotBytes.hex()
+            )
+
 
 class TestVSP(unittest.TestCase):
     def setUp(self):
