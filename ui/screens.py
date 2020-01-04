@@ -1151,11 +1151,11 @@ class StakingScreen(Screen):
         self.layout.addWidget(wgt)
 
         # A button to view agendas and choose how to vote.
-        agendaBtn = app.getButton(TINY, "Voting")
+        agendaBtn = app.getButton(TINY, "voting")
         agendaBtn.clicked.connect(self.stackAgendas)
 
         # A button to revoke expired and missed tickets.
-        revokeBtn = app.getButton(TINY, "Revoke")
+        revokeBtn = app.getButton(TINY, "")
         revokeBtn.clicked.connect(self.revokeTickets)
         votingWgt, _ = Q.makeSeries(Q.HORIZONTAL, agendaBtn, revokeBtn)
         self.revokeBtn = revokeBtn

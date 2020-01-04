@@ -1360,6 +1360,21 @@ def payToStakeSHScript(addr, stakeCode):
     return script
 
 
+def multiSigScript(addrs, nRequired):
+    if len(addrs) < nRequired:
+        raise Exception(
+            "unable to generate multisig script with {} required signatures when there are only {} public keys available".format(
+                nRequired, len(addrs)
+            )
+        )
+    script = ByteArray(addInt(nRequired))
+    for addr in addrs:
+        script += addData(addr.scriptAddress())
+    script += addInt(len(addrs))
+    script += opcode.OP_CHECKMULTISIG
+    return script
+
+
 def payToSStx(addr):
     """
     payToSStx creates a new script to pay a transaction output to a script hash or
@@ -1701,6 +1716,22 @@ def putVarInt(val):
         )
 
     return reversed(ByteArray(0xFF, length=9)) | ByteArray(val, length=8).littleEndian()
+
+
+def addInt(val):
+    """
+    addInt pushes the passed integer to the end of the script.
+    """
+    b = ByteArray(b"")
+
+    # Fast path for small integers and OP_1NEGATE.
+    if val == 0:
+        b += opcode.OP_0
+        return b
+    if val == -1 or (val >= 1 and val <= 16):
+        b += opcode.OP_1 - 1 + val
+        return b
+    raise Exception("adding integers over 16 not yet implemented")
 
 
 def addData(data):
@@ -2514,10 +2545,10 @@ def mergeMultiSig(tx, idx, addresses, nRequired, pkScript, sigScript, prevScript
 
     # Nothing to merge if either the new or previous signature scripts are
     # empty.
-    if len(sigScript) == 0:
+    if not sigScript or len(sigScript) == 0:
         return prevScript
 
-    if len(prevScript) == 0:
+    if not prevScript or len(prevScript) == 0:
         return sigScript
 
     # Convenience function to avoid duplication.
