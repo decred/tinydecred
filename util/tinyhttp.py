@@ -20,7 +20,9 @@ def post(uri, data, **kwargs):
     return request(uri, data, **kwargs)
 
 
-def request(uri, postData=None, headers=None, urlEncode=False, supressErr=False):
+def request(
+    uri, postData=None, headers=None, urlEncode=False, supressErr=False, context=None
+):
     try:
         headers = headers if headers else {}
         if postData:
@@ -33,7 +35,7 @@ def request(uri, postData=None, headers=None, urlEncode=False, supressErr=False)
             req = urlrequest.Request(uri, headers=headers, data=encoded)
         else:
             req = urlrequest.Request(uri, headers=headers, method="GET")
-        raw = urlrequest.urlopen(req).read().decode()
+        raw = urlrequest.urlopen(req, context=context).read().decode()
         try:
             # try to decode the response as json, but fall back to just
             # returning the string.
