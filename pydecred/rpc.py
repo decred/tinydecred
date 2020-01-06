@@ -62,29 +62,45 @@ class Client(object):
 
     def validateAddress(self, addr):
         """
+        Validate an address.
+
+        Args:
+            addr (string): The address to validate.
+
         Returns:
-            ValidateAddressResult: Whether the address isMine and other info if so.
+            ValidateAddressChainResult: Whether the address can be verified.
         """
         return ValidateAddressChainResult.parse(self.call("validateaddress", addr))
 
     def verifyChain(self):
         """
+        Verify the block chain database.
+
         Returns:
-            VerifyChainResult:
+            VerifyChainResult: Whether the database can be verified.
         """
         return VerifyChainResult.parse(self.call("verifychain"))
 
     def verifyMessage(self, addr, sig, message):
         """
+        Verify that a message was signed by the private key belonging to addr.
+
+        Args:
+            addr (string): The address used to sign.
+            sig (string): The signed message.
+            message (string): The message.
+
         Returns:
-            VerifyMessageResult:
+            VerifyMessageResult: Whether the message could be verified.
         """
         return VerifyMessageResult.parse(self.call("verifymessage", addr, sig, message))
 
     def version(self):
         """
+        Get the dcrd and dcrdjsonrpcapi version info.
+
         Returns:
-            VersionResult: dcrd's version info.
+            VersionResult: dcrd's and dcrdjsonrpcapi's version info.
         """
         return VersionResult.parse(self.call("version"))
 
@@ -100,12 +116,6 @@ def get(k, obj):
         object: the thing found at k or None.
     """
     return obj[k] if k in obj else None
-
-
-def checkBool(b):
-    if not b:
-        return b
-    return b == "true"
 
 
 class GetBestBlockResult(object):
