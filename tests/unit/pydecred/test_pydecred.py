@@ -1128,6 +1128,293 @@ class TestTxScript(unittest.TestCase):
                 % (test_name, tokenizerIdx, test_finalIdx),
             )
 
+    def test_signature(self):
+        class test:
+            def __init__(self, name, sig, der, isValid):
+                self.name = name
+                self.sig = sig
+                self.der = der
+                self.isValid = isValid
+
+        # fmt: off
+        tests = [
+            # signatures from bitcoin blockchain tx
+            # 0437cd7f8525ceed2324359c2d0ba26006d92d85
+            test(
+                "valid signature.",
+                [0x30, 0x44, 0x02, 0x20, 0x4e, 0x45, 0xe1, 0x69,
+                    0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1, 0xd3, 0xa1,
+                    0xa2, 0x5f, 0xdf, 0x3f, 0x4f, 0x77, 0x32, 0xe9, 0xd6,
+                    0x24, 0xc6, 0xc6, 0x15, 0x48, 0xab, 0x5f, 0xb8, 0xcd,
+                    0x41, 0x02, 0x20, 0x18, 0x15, 0x22, 0xec, 0x8e, 0xca,
+                    0x07, 0xde, 0x48, 0x60, 0xa4, 0xac, 0xdd, 0x12, 0x90,
+                    0x9d, 0x83, 0x1c, 0xc5, 0x6c, 0xbb, 0xac, 0x46, 0x22,
+                    0x08, 0x22, 0x21, 0xa8, 0x76, 0x8d, 0x1d, 0x09],
+                True,
+                True,
+            ),
+            test(
+                "empty.",
+                [],
+                "",
+                False,
+            ),
+            test(
+                "bad magic.",
+                [0x31, 0x44, 0x02, 0x20, 0x4e, 0x45, 0xe1, 0x69,
+                    0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1, 0xd3, 0xa1,
+                    0xa2, 0x5f, 0xdf, 0x3f, 0x4f, 0x77, 0x32, 0xe9, 0xd6,
+                    0x24, 0xc6, 0xc6, 0x15, 0x48, 0xab, 0x5f, 0xb8, 0xcd,
+                    0x41, 0x02, 0x20, 0x18, 0x15, 0x22, 0xec, 0x8e, 0xca,
+                    0x07, 0xde, 0x48, 0x60, 0xa4, 0xac, 0xdd, 0x12, 0x90,
+                    0x9d, 0x83, 0x1c, 0xc5, 0x6c, 0xbb, 0xac, 0x46, 0x22,
+                    0x08, 0x22, 0x21, 0xa8, 0x76, 0x8d, 0x1d, 0x09],
+                True,
+                False,
+            ),
+            test(
+                "bad 1st int marker magic.",
+                [0x30, 0x44, 0x03, 0x20, 0x4e, 0x45, 0xe1, 0x69,
+                    0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1, 0xd3, 0xa1,
+                    0xa2, 0x5f, 0xdf, 0x3f, 0x4f, 0x77, 0x32, 0xe9, 0xd6,
+                    0x24, 0xc6, 0xc6, 0x15, 0x48, 0xab, 0x5f, 0xb8, 0xcd,
+                    0x41, 0x02, 0x20, 0x18, 0x15, 0x22, 0xec, 0x8e, 0xca,
+                    0x07, 0xde, 0x48, 0x60, 0xa4, 0xac, 0xdd, 0x12, 0x90,
+                    0x9d, 0x83, 0x1c, 0xc5, 0x6c, 0xbb, 0xac, 0x46, 0x22,
+                    0x08, 0x22, 0x21, 0xa8, 0x76, 0x8d, 0x1d, 0x09],
+                True,
+                False,
+            ),
+            test(
+                "bad 2nd int marker.",
+                [0x30, 0x44, 0x02, 0x20, 0x4e, 0x45, 0xe1, 0x69,
+                    0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1, 0xd3, 0xa1,
+                    0xa2, 0x5f, 0xdf, 0x3f, 0x4f, 0x77, 0x32, 0xe9, 0xd6,
+                    0x24, 0xc6, 0xc6, 0x15, 0x48, 0xab, 0x5f, 0xb8, 0xcd,
+                    0x41, 0x03, 0x20, 0x18, 0x15, 0x22, 0xec, 0x8e, 0xca,
+                    0x07, 0xde, 0x48, 0x60, 0xa4, 0xac, 0xdd, 0x12, 0x90,
+                    0x9d, 0x83, 0x1c, 0xc5, 0x6c, 0xbb, 0xac, 0x46, 0x22,
+                    0x08, 0x22, 0x21, 0xa8, 0x76, 0x8d, 0x1d, 0x09],
+                True,
+                False,
+            ),
+            test(
+                "short len",
+                [0x30, 0x43, 0x02, 0x20, 0x4e, 0x45, 0xe1, 0x69,
+                    0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1, 0xd3, 0xa1,
+                    0xa2, 0x5f, 0xdf, 0x3f, 0x4f, 0x77, 0x32, 0xe9, 0xd6,
+                    0x24, 0xc6, 0xc6, 0x15, 0x48, 0xab, 0x5f, 0xb8, 0xcd,
+                    0x41, 0x02, 0x20, 0x18, 0x15, 0x22, 0xec, 0x8e, 0xca,
+                    0x07, 0xde, 0x48, 0x60, 0xa4, 0xac, 0xdd, 0x12, 0x90,
+                    0x9d, 0x83, 0x1c, 0xc5, 0x6c, 0xbb, 0xac, 0x46, 0x22,
+                    0x08, 0x22, 0x21, 0xa8, 0x76, 0x8d, 0x1d, 0x09],
+                True,
+                False,
+            ),
+            test(
+                "long len",
+                [0x30, 0x45, 0x02, 0x20, 0x4e, 0x45, 0xe1, 0x69,
+                    0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1, 0xd3, 0xa1,
+                    0xa2, 0x5f, 0xdf, 0x3f, 0x4f, 0x77, 0x32, 0xe9, 0xd6,
+                    0x24, 0xc6, 0xc6, 0x15, 0x48, 0xab, 0x5f, 0xb8, 0xcd,
+                    0x41, 0x02, 0x20, 0x18, 0x15, 0x22, 0xec, 0x8e, 0xca,
+                    0x07, 0xde, 0x48, 0x60, 0xa4, 0xac, 0xdd, 0x12, 0x90,
+                    0x9d, 0x83, 0x1c, 0xc5, 0x6c, 0xbb, 0xac, 0x46, 0x22,
+                    0x08, 0x22, 0x21, 0xa8, 0x76, 0x8d, 0x1d, 0x09],
+                True,
+                False,
+            ),
+            test(
+                "long X",
+                [0x30, 0x44, 0x02, 0x42, 0x4e, 0x45, 0xe1, 0x69,
+                    0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1, 0xd3, 0xa1,
+                    0xa2, 0x5f, 0xdf, 0x3f, 0x4f, 0x77, 0x32, 0xe9, 0xd6,
+                    0x24, 0xc6, 0xc6, 0x15, 0x48, 0xab, 0x5f, 0xb8, 0xcd,
+                    0x41, 0x02, 0x20, 0x18, 0x15, 0x22, 0xec, 0x8e, 0xca,
+                    0x07, 0xde, 0x48, 0x60, 0xa4, 0xac, 0xdd, 0x12, 0x90,
+                    0x9d, 0x83, 0x1c, 0xc5, 0x6c, 0xbb, 0xac, 0x46, 0x22,
+                    0x08, 0x22, 0x21, 0xa8, 0x76, 0x8d, 0x1d, 0x09],
+                True,
+                False,
+            ),
+            test(
+                "long Y",
+                [0x30, 0x44, 0x02, 0x20, 0x4e, 0x45, 0xe1, 0x69,
+                    0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1, 0xd3, 0xa1,
+                    0xa2, 0x5f, 0xdf, 0x3f, 0x4f, 0x77, 0x32, 0xe9, 0xd6,
+                    0x24, 0xc6, 0xc6, 0x15, 0x48, 0xab, 0x5f, 0xb8, 0xcd,
+                    0x41, 0x02, 0x21, 0x18, 0x15, 0x22, 0xec, 0x8e, 0xca,
+                    0x07, 0xde, 0x48, 0x60, 0xa4, 0xac, 0xdd, 0x12, 0x90,
+                    0x9d, 0x83, 0x1c, 0xc5, 0x6c, 0xbb, 0xac, 0x46, 0x22,
+                    0x08, 0x22, 0x21, 0xa8, 0x76, 0x8d, 0x1d, 0x09],
+                True,
+                False,
+            ),
+            test(
+                "short Y",
+                [0x30, 0x44, 0x02, 0x20, 0x4e, 0x45, 0xe1, 0x69,
+                    0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1, 0xd3, 0xa1,
+                    0xa2, 0x5f, 0xdf, 0x3f, 0x4f, 0x77, 0x32, 0xe9, 0xd6,
+                    0x24, 0xc6, 0xc6, 0x15, 0x48, 0xab, 0x5f, 0xb8, 0xcd,
+                    0x41, 0x02, 0x19, 0x18, 0x15, 0x22, 0xec, 0x8e, 0xca,
+                    0x07, 0xde, 0x48, 0x60, 0xa4, 0xac, 0xdd, 0x12, 0x90,
+                    0x9d, 0x83, 0x1c, 0xc5, 0x6c, 0xbb, 0xac, 0x46, 0x22,
+                    0x08, 0x22, 0x21, 0xa8, 0x76, 0x8d, 0x1d, 0x09],
+                True,
+                False,
+            ),
+            test(
+                "trailing crap.",
+                [0x30, 0x44, 0x02, 0x20, 0x4e, 0x45, 0xe1, 0x69,
+                    0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1, 0xd3, 0xa1,
+                    0xa2, 0x5f, 0xdf, 0x3f, 0x4f, 0x77, 0x32, 0xe9, 0xd6,
+                    0x24, 0xc6, 0xc6, 0x15, 0x48, 0xab, 0x5f, 0xb8, 0xcd,
+                    0x41, 0x02, 0x20, 0x18, 0x15, 0x22, 0xec, 0x8e, 0xca,
+                    0x07, 0xde, 0x48, 0x60, 0xa4, 0xac, 0xdd, 0x12, 0x90,
+                    0x9d, 0x83, 0x1c, 0xc5, 0x6c, 0xbb, 0xac, 0x46, 0x22,
+                    0x08, 0x22, 0x21, 0xa8, 0x76, 0x8d, 0x1d, 0x09, 0x01],
+                True,
+                # This test is now passing (used to be failing) because there
+                # are signatures in the blockchain that have trailing zero
+                # bytes before the hashtype. So ParseSignature was fixed to
+                # permit buffers with trailing nonsense after the actual
+                # signature.
+                True,
+            ),
+            test(
+                "X == N ",
+                [0x30, 0x44, 0x02, 0x20, 0xFF, 0xFF, 0xFF, 0xFF,
+                    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                    0xFF, 0xFF, 0xFE, 0xBA, 0xAE, 0xDC, 0xE6, 0xAF, 0x48,
+                    0xA0, 0x3B, 0xBF, 0xD2, 0x5E, 0x8C, 0xD0, 0x36, 0x41,
+                    0x41, 0x02, 0x20, 0x18, 0x15, 0x22, 0xec, 0x8e, 0xca,
+                    0x07, 0xde, 0x48, 0x60, 0xa4, 0xac, 0xdd, 0x12, 0x90,
+                    0x9d, 0x83, 0x1c, 0xc5, 0x6c, 0xbb, 0xac, 0x46, 0x22,
+                    0x08, 0x22, 0x21, 0xa8, 0x76, 0x8d, 0x1d, 0x09],
+                True,
+                False,
+            ),
+            test(
+                "X == N ",
+                [0x30, 0x44, 0x02, 0x20, 0xFF, 0xFF, 0xFF, 0xFF,
+                    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                    0xFF, 0xFF, 0xFE, 0xBA, 0xAE, 0xDC, 0xE6, 0xAF, 0x48,
+                    0xA0, 0x3B, 0xBF, 0xD2, 0x5E, 0x8C, 0xD0, 0x36, 0x41,
+                    0x42, 0x02, 0x20, 0x18, 0x15, 0x22, 0xec, 0x8e, 0xca,
+                    0x07, 0xde, 0x48, 0x60, 0xa4, 0xac, 0xdd, 0x12, 0x90,
+                    0x9d, 0x83, 0x1c, 0xc5, 0x6c, 0xbb, 0xac, 0x46, 0x22,
+                    0x08, 0x22, 0x21, 0xa8, 0x76, 0x8d, 0x1d, 0x09],
+                False,
+                False,
+            ),
+            test(
+                "Y == N",
+                [0x30, 0x44, 0x02, 0x20, 0x4e, 0x45, 0xe1, 0x69,
+                    0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1, 0xd3, 0xa1,
+                    0xa2, 0x5f, 0xdf, 0x3f, 0x4f, 0x77, 0x32, 0xe9, 0xd6,
+                    0x24, 0xc6, 0xc6, 0x15, 0x48, 0xab, 0x5f, 0xb8, 0xcd,
+                    0x41, 0x02, 0x20, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                    0xFE, 0xBA, 0xAE, 0xDC, 0xE6, 0xAF, 0x48, 0xA0, 0x3B,
+                    0xBF, 0xD2, 0x5E, 0x8C, 0xD0, 0x36, 0x41, 0x41],
+                True,
+                False,
+            ),
+            test(
+                "Y > N",
+                [0x30, 0x44, 0x02, 0x20, 0x4e, 0x45, 0xe1, 0x69,
+                    0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1, 0xd3, 0xa1,
+                    0xa2, 0x5f, 0xdf, 0x3f, 0x4f, 0x77, 0x32, 0xe9, 0xd6,
+                    0x24, 0xc6, 0xc6, 0x15, 0x48, 0xab, 0x5f, 0xb8, 0xcd,
+                    0x41, 0x02, 0x20, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                    0xFE, 0xBA, 0xAE, 0xDC, 0xE6, 0xAF, 0x48, 0xA0, 0x3B,
+                    0xBF, 0xD2, 0x5E, 0x8C, 0xD0, 0x36, 0x41, 0x42],
+                False,
+                False,
+            ),
+            test(
+                "0 len X.",
+                [0x30, 0x24, 0x02, 0x00, 0x02, 0x20, 0x18, 0x15,
+                    0x22, 0xec, 0x8e, 0xca, 0x07, 0xde, 0x48, 0x60, 0xa4,
+                    0xac, 0xdd, 0x12, 0x90, 0x9d, 0x83, 0x1c, 0xc5, 0x6c,
+                    0xbb, 0xac, 0x46, 0x22, 0x08, 0x22, 0x21, 0xa8, 0x76,
+                    0x8d, 0x1d, 0x09],
+                True,
+                False,
+            ),
+            test(
+                "0 len Y.",
+                [0x30, 0x24, 0x02, 0x20, 0x4e, 0x45, 0xe1, 0x69,
+                    0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1, 0xd3, 0xa1,
+                    0xa2, 0x5f, 0xdf, 0x3f, 0x4f, 0x77, 0x32, 0xe9, 0xd6,
+                    0x24, 0xc6, 0xc6, 0x15, 0x48, 0xab, 0x5f, 0xb8, 0xcd,
+                    0x41, 0x02, 0x00],
+                True,
+                False,
+            ),
+            test(
+                "extra R padding.",
+                [0x30, 0x45, 0x02, 0x21, 0x00, 0x4e, 0x45, 0xe1, 0x69,
+                    0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1, 0xd3, 0xa1,
+                    0xa2, 0x5f, 0xdf, 0x3f, 0x4f, 0x77, 0x32, 0xe9, 0xd6,
+                    0x24, 0xc6, 0xc6, 0x15, 0x48, 0xab, 0x5f, 0xb8, 0xcd,
+                    0x41, 0x02, 0x20, 0x18, 0x15, 0x22, 0xec, 0x8e, 0xca,
+                    0x07, 0xde, 0x48, 0x60, 0xa4, 0xac, 0xdd, 0x12, 0x90,
+                    0x9d, 0x83, 0x1c, 0xc5, 0x6c, 0xbb, 0xac, 0x46, 0x22,
+                    0x08, 0x22, 0x21, 0xa8, 0x76, 0x8d, 0x1d, 0x09],
+                True,
+                False,
+            ),
+            test(
+                "extra S padding.",
+                [0x30, 0x45, 0x02, 0x20, 0x4e, 0x45, 0xe1, 0x69,
+                    0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1, 0xd3, 0xa1,
+                    0xa2, 0x5f, 0xdf, 0x3f, 0x4f, 0x77, 0x32, 0xe9, 0xd6,
+                    0x24, 0xc6, 0xc6, 0x15, 0x48, 0xab, 0x5f, 0xb8, 0xcd,
+                    0x41, 0x02, 0x21, 0x00, 0x18, 0x15, 0x22, 0xec, 0x8e, 0xca,
+                    0x07, 0xde, 0x48, 0x60, 0xa4, 0xac, 0xdd, 0x12, 0x90,
+                    0x9d, 0x83, 0x1c, 0xc5, 0x6c, 0xbb, 0xac, 0x46, 0x22,
+                    0x08, 0x22, 0x21, 0xa8, 0x76, 0x8d, 0x1d, 0x09],
+                True,
+                False,
+            ),
+            # Standard checks (in BER format, without checking for 'canonical' DER
+            # signatures) don't test for negative numbers here because there isn't
+            # a way that is the same between openssl and go that will mark a number
+            # as negative. The Go ASN.1 parser marks numbers as negative when
+            # openssl does not (it doesn't handle negative numbers that I can tell
+            # at all. When not parsing DER signatures, which is done by by bitcoind
+            # when accepting transactions into its mempool, we otherwise only check
+            # for the coordinates being zero.
+            test(
+                "X == 0",
+                [0x30, 0x25, 0x02, 0x01, 0x00, 0x02, 0x20, 0x18,
+                    0x15, 0x22, 0xec, 0x8e, 0xca, 0x07, 0xde, 0x48, 0x60,
+                    0xa4, 0xac, 0xdd, 0x12, 0x90, 0x9d, 0x83, 0x1c, 0xc5,
+                    0x6c, 0xbb, 0xac, 0x46, 0x22, 0x08, 0x22, 0x21, 0xa8,
+                    0x76, 0x8d, 0x1d, 0x09],
+                False,
+                False,
+            ),
+            test(
+                "Y == 0.",
+                [0x30, 0x25, 0x02, 0x20, 0x4e, 0x45, 0xe1, 0x69,
+                    0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1, 0xd3, 0xa1,
+                    0xa2, 0x5f, 0xdf, 0x3f, 0x4f, 0x77, 0x32, 0xe9, 0xd6,
+                    0x24, 0xc6, 0xc6, 0x15, 0x48, 0xab, 0x5f, 0xb8, 0xcd,
+                    0x41, 0x02, 0x01, 0x00],
+                False,
+                False,
+            ),
+        ]
+        # fmt: on
+        for test in tests:
+            try:
+                txscript.Signature.parse(ByteArray(test.sig), test.der)
+            except Exception:
+                assert test.isValid is False
+
     def test_sign_tx(self):
         """
         Based on dcrd TestSignTxOutput.
@@ -1248,7 +1535,7 @@ class TestTxScript(unittest.TestCase):
         #     ),
         # )
 
-        # Pay to Pubkey Hash (uncompressed)
+        # Pay to Pubkey Hash (compressed)
         testingParams = mainnet
         for hashType in hashTypes:
             for suite in signatureSuites:
@@ -1297,7 +1584,215 @@ class TestTxScript(unittest.TestCase):
                         ByteArray(sigStr),
                         msg="%d:%d:%d" % (hashType, idx, suite),
                     )
-        return
+
+        # Pay to Pubkey Hash for a ticket (SStx) (compressed)
+        # For compressed keys
+        tests = (
+            (
+                "b78a743c0c6557f24a51192b82925942ebade0be86efd7dad58b9fa358d3857c",
+                "4730440220411b0a068d5b1c5fd6ec98a0e3f17ce632a863a9d57876c0bde2647a8dcd26c602204f05f109f0f185cc79a43168411075eb58fd350cc135f4872b0b8c81015e21c3012102e11d2c0e415343435294079ac0774a21c8e6b1e6fd9b671cb08af43a397f3df1",
+            ),
+            (
+                "a00616c21b117ba621d4c72faf30d30cd665416bdc3c24e549de2348ac68cfb8",
+                "473044022050a359daf7db3db11e95ceb8494173f8ca168b32ccc6cc57dcad5f78564678af02200c09e2c7c72736ef9835f05eb0c6eb72fdd2e1e98cdaf7af7f2d9523ed5f410501210224397bd81b0e80ec1bbfe104fb251b57eb0adcf044c3eec05d913e2e8e04396b",
+            ),
+            (
+                "8902ea1f64c6fb7aa40dfbe798f5dc53b466a3fc01534e867581936a8ecbff5b",
+                "4730440220257fe3c52ce408561aec4446c30bca6d6fad98ba554917c4e7714a89badbfdbf02201aa569c5e28d728dd20ce32656915729ebc6679527bfe2401ea3723791e04538012103255f71eab9eb2a7e3f822569484448acbe2880d61b4db61020f73fd54cbe370d",
+            ),
+        )
+
+        testingParams = mainnet
+        for hashType in hashTypes:
+            for suite in signatureSuites:
+                for idx in range(len(tx.txIn)):
+                    # var keyDB, pkBytes []byte
+                    # var key chainec.PrivateKey
+                    # var pk chainec.PublicKey
+                    kStr, sigStr = tests[idx]
+
+                    if suite == crypto.STEcdsaSecp256k1:
+                        # k = Curve.generateKey(rand.Reader)
+                        k = ByteArray(kStr)
+                        privKey = crypto.privKeyFromBytes(k)
+                        pkBytes = privKey.pub.serializeCompressed()
+                    else:
+                        raise Exception(
+                            "test for signature suite %d not implemented" % suite
+                        )
+
+                    address = crypto.newAddressPubKeyHash(
+                        crypto.hash160(pkBytes.bytes()), testingParams, suite
+                    )
+
+                    pkScript = txscript.payToSStx(address)
+
+                    class keysource:
+                        @staticmethod
+                        def priv(addr):
+                            return privKey
+
+                    sigScript = txscript.signTxOutput(
+                        testingParams,
+                        tx,
+                        idx,
+                        pkScript,
+                        hashType,
+                        keysource,
+                        None,
+                        suite,
+                    )
+
+                    self.assertEqual(
+                        sigScript,
+                        ByteArray(sigStr),
+                        msg="%d:%d:%d" % (hashType, idx, suite),
+                    )
+
+        # Pay to Pubkey Hash for a ticket revocation (SSRtx) (compressed)
+        # For compressed keys
+        tests = (
+            (
+                "b78a743c0c6557f24a51192b82925942ebade0be86efd7dad58b9fa358d3857c",
+                "483045022100ad46b5bd365af6964562bfac90abad9d9cf30fdc53ae4011103c646df04a7d5f022076209ea5626cb9a3f16add11c361f6f66c7436eec8efe1688e43ac9f71a86b88012102e11d2c0e415343435294079ac0774a21c8e6b1e6fd9b671cb08af43a397f3df1",
+            ),
+            (
+                "a00616c21b117ba621d4c72faf30d30cd665416bdc3c24e549de2348ac68cfb8",
+                "483045022100eeacc7f3fcba009f6ab319b2221e64d52d94d5009cfd037ef03c86dc1bcb2c990220212000f05d1a904d3d995b18b8b94bd0e84dc35aa308df5149094678f6cd40e501210224397bd81b0e80ec1bbfe104fb251b57eb0adcf044c3eec05d913e2e8e04396b",
+            ),
+            (
+                "8902ea1f64c6fb7aa40dfbe798f5dc53b466a3fc01534e867581936a8ecbff5b",
+                "47304402200fa66dd2be65cd8c0e89bc299b99cadac36805af627432cbdc968c53b4c4f41b02200b117b145dfdb6ba7846b9b02c63d85d11bfc2188f58f083da6bb88220a9e517012103255f71eab9eb2a7e3f822569484448acbe2880d61b4db61020f73fd54cbe370d",
+            ),
+        )
+
+        testingParams = mainnet
+        for hashType in hashTypes:
+            for suite in signatureSuites:
+                for idx in range(len(tx.txIn)):
+                    # var keyDB, pkBytes []byte
+                    # var key chainec.PrivateKey
+                    # var pk chainec.PublicKey
+                    kStr, sigStr = tests[idx]
+
+                    if suite == crypto.STEcdsaSecp256k1:
+                        # k = Curve.generateKey(rand.Reader)
+                        k = ByteArray(kStr)
+                        privKey = crypto.privKeyFromBytes(k)
+                        pkBytes = privKey.pub.serializeCompressed()
+                    else:
+                        raise Exception(
+                            "test for signature suite %d not implemented" % suite
+                        )
+
+                    address = crypto.newAddressPubKeyHash(
+                        crypto.hash160(pkBytes.bytes()), testingParams, suite
+                    )
+
+                    pkScript = txscript.payToSSRtxPKHDirect(
+                        txscript.decodeAddress(
+                            address.string(), testingParams
+                        ).scriptAddress()
+                    )
+
+                    class keysource:
+                        @staticmethod
+                        def priv(addr):
+                            return privKey
+
+                    sigScript = txscript.signTxOutput(
+                        testingParams,
+                        tx,
+                        idx,
+                        pkScript,
+                        hashType,
+                        keysource,
+                        None,
+                        suite,
+                    )
+
+                    self.assertEqual(
+                        sigScript,
+                        ByteArray(sigStr),
+                        msg="%d:%d:%d" % (hashType, idx, suite),
+                    )
+
+        # Basic Multisig (compressed)
+        # For compressed keys
+        tests = (
+            (
+                "b78a743c0c6557f24a51192b82925942ebade0be86efd7dad58b9fa358d3857c",
+                "483045022100f12b12474e64b807eaeda6ac05b26d4b6bee2519385a84815f4ec2ccdf0aa45b022055c590d36a172c4735c8886572723037dc65329e70b8e5e012a9ec24993c284201483045022100ae2fec7236910b0bbc5eab37b7d987d61f22139f6381f2cc9781373e4f470c37022037d8b1658c2a83c40cc1b97036239eb0f4b313f3d2bf4558de33412e834c45d50147522102e11d2c0e415343435294079ac0774a21c8e6b1e6fd9b671cb08af43a397f3df1210224397bd81b0e80ec1bbfe104fb251b57eb0adcf044c3eec05d913e2e8e04396b52ae",
+            ),
+            (
+                "a00616c21b117ba621d4c72faf30d30cd665416bdc3c24e549de2348ac68cfb8",
+                "473044022047b34afd287cacbc4ba0d95d985b23a55069c0bd81d61eb32435348bef2dc6c602201e4c7c0c437d4d53172cac355eadd70c8b87d3936c7a0a0179201b9b9327852d01483045022100df1975379ac38dcc5caddb1f55974b5b08a22b4fdb6e88be9ba12da0c0ecfbed022042bc3420adde7410f463caa998a460d58b214bf082e004b5067a4c0f061e0769014752210224397bd81b0e80ec1bbfe104fb251b57eb0adcf044c3eec05d913e2e8e04396b2103255f71eab9eb2a7e3f822569484448acbe2880d61b4db61020f73fd54cbe370d52ae",
+            ),
+            (
+                "8902ea1f64c6fb7aa40dfbe798f5dc53b466a3fc01534e867581936a8ecbff5b",
+                "473044022002d1251cb8a2f1a20225948f99e6c71a188915c3ca0dc433ca9c35c050ee1dd602206880d041a9a9f9888ab751a371768bffd89251edf354eccdac73fe1376095ba20147304402204ddebf367aea5750123c2b4807815487d07239c776b6cc70a99c46a8b3261f4c022044549b4aeda7eb08692fa500b5518655be61fd5299c07adf0caddf41ab391dd00147522103255f71eab9eb2a7e3f822569484448acbe2880d61b4db61020f73fd54cbe370d2102e11d2c0e415343435294079ac0774a21c8e6b1e6fd9b671cb08af43a397f3df152ae",
+            ),
+        )
+
+        testingParams = mainnet
+        for hashType in hashTypes:
+            # TODO enable this test after script-hash script signing is implemented
+            break
+            for suite in signatureSuites:
+                for idx in range(len(tx.txIn)):
+                    # var keyDB, pkBytes []byte
+                    # var key chainec.PrivateKey
+                    # var pk chainec.PublicKey
+                    kStr, sigStr = tests[idx]
+                    kStr2, _ = tests[(idx + 1) % 3]
+
+                    if suite == crypto.STEcdsaSecp256k1:
+                        # k = Curve.generateKey(rand.Reader)
+                        k = ByteArray(kStr)
+                        k2 = ByteArray(kStr2)
+                        privKey = crypto.privKeyFromBytes(k)
+                        privKey2 = crypto.privKeyFromBytes(k2)
+                        pkBytes = privKey.pub.serializeCompressed()
+                        pkBytes2 = privKey2.pub.serializeCompressed()
+                    else:
+                        raise Exception(
+                            "test for signature suite %d not implemented" % suite
+                        )
+
+                    address = crypto.AddressSecpPubKey(pkBytes.bytes(), testingParams)
+
+                    address2 = crypto.AddressSecpPubKey(pkBytes2.bytes(), testingParams)
+
+                    pkScript = txscript.multiSigScript([address, address2], 2)
+
+                    scriptAddr = crypto.newAddressScriptHash(pkScript, testingParams)
+
+                    scriptPkScript = txscript.payToAddrScript(scriptAddr)
+
+                    keys = iter([privKey, privKey2])
+
+                    class keysource:
+                        @staticmethod
+                        def priv(addr):
+                            return next(keys)
+
+                    sigScript = txscript.signTxOutput(
+                        testingParams,
+                        tx,
+                        idx,
+                        scriptPkScript,
+                        hashType,
+                        keysource,
+                        None,
+                        suite,
+                    )
+                    print(sigScript.hex())
+
+                    self.assertEqual(
+                        sigScript,
+                        ByteArray(sigStr),
+                        msg="%d:%d:%d" % (hashType, idx, suite),
+                    )
 
     def test_sign_stake_p2pkh_outputs(self):
         from tinydecred.crypto.secp256k1 import curve as Curve
@@ -2238,6 +2733,55 @@ class TestTxScript(unittest.TestCase):
                 continue
 
             self.assertEqual(sigHash, expectedHash)
+
+    def test_scriptNumBytes(self):
+        tests = [
+            (0, ByteArray()),
+            (1, ByteArray("01")),
+            (-1, ByteArray("81")),
+            (127, ByteArray("7f")),
+            (-127, ByteArray("ff")),
+            (128, ByteArray("8000")),
+            (-128, ByteArray("8080")),
+            (129, ByteArray("8100")),
+            (-129, ByteArray("8180")),
+            (256, ByteArray("0001")),
+            (-256, ByteArray("0081")),
+            (32767, ByteArray("ff7f")),
+            (-32767, ByteArray("ffff")),
+            (32768, ByteArray("008000")),
+            (-32768, ByteArray("008080")),
+            (65535, ByteArray("ffff00")),
+            (-65535, ByteArray("ffff80")),
+            (524288, ByteArray("000008")),
+            (-524288, ByteArray("000088")),
+            (7340032, ByteArray("000070")),
+            (-7340032, ByteArray("0000f0")),
+            (8388608, ByteArray("00008000")),
+            (-8388608, ByteArray("00008080")),
+            (2147483647, ByteArray("ffffff7f")),
+            (-2147483647, ByteArray("ffffffff")),
+            (2147483648, ByteArray("0000008000")),
+            (-2147483648, ByteArray("0000008080")),
+            (2415919104, ByteArray("0000009000")),
+            (-2415919104, ByteArray("0000009080")),
+            (4294967295, ByteArray("ffffffff00")),
+            (-4294967295, ByteArray("ffffffff80")),
+            (4294967296, ByteArray("0000000001")),
+            (-4294967296, ByteArray("0000000081")),
+            (281474976710655, ByteArray("ffffffffffff00")),
+            (-281474976710655, ByteArray("ffffffffffff80")),
+            (72057594037927935, ByteArray("ffffffffffffff00")),
+            (-72057594037927935, ByteArray("ffffffffffffff80")),
+            (9223372036854775807, ByteArray("ffffffffffffff7f")),
+            (-9223372036854775807, ByteArray("ffffffffffffffff")),
+        ]
+
+        for num, serialized in tests:
+            gotBytes = txscript.scriptNumBytes(num)
+            assert gotBytes == serialized, (
+                str(num) + ": wanted " + serialized.hex() + ", got " + gotBytes.hex()
+            )
 
 
 class TestVSP(unittest.TestCase):

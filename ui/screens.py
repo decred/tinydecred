@@ -1123,6 +1123,7 @@ class StakingScreen(Screen):
         self.wgt.setContentsMargins(5, 5, 5, 5)
         self.wgt.setMinimumWidth(400)
         self.blockchain = app.dcrdata
+        self.revocableTicketsCount = 0
 
         # Register for a few key signals.
         self.app.registerSignal(ui.BLOCKCHAIN_CONNECTED, self.blockchainConnected)
@@ -1150,10 +1151,19 @@ class StakingScreen(Screen):
         self.layout.addWidget(wgt)
 
         # A button to view agendas and choose how to vote.
-        btn = app.getButton(TINY, "Voting")
-        btn.clicked.connect(self.stackAgendas)
-        agendasWgt, _ = Q.makeSeries(Q.HORIZONTAL, btn)
-        self.layout.addWidget(agendasWgt)
+        agendaBtn = app.getButton(TINY, "voting")
+        agendaBtn.clicked.connect(self.stackAgendas)
+
+        # A button to revoke expired and missed tickets.
+        revokeBtn = app.getButton(TINY, "")
+        revokeBtn.clicked.connect(self.revokeTickets)
+        votingWgt, _ = Q.makeSeries(Q.HORIZONTAL, agendaBtn, revokeBtn)
+        self.revokeBtn = revokeBtn
+        self.layout.addWidget(votingWgt)
+
+        # Hide revoke button unless we have revokable tickets.
+        revokeBtn.hide()
+        self.app.registerSignal(ui.SYNC_SIGNAL, self.checkRevocable)
 
         # Affordability. A row that reads `You can afford X tickets`
         lbl = Q.makeLabel("You can afford ", 14)
@@ -1220,6 +1230,58 @@ class StakingScreen(Screen):
             self.app.appWindow.showError("cannot vote: pool not synced")
             return
         self.app.appWindow.stack(self.agendasScreen)
+
+    def checkRevocable(self):
+        """
+        On SYNC_SIGNAL signal hide or show revoke button based on wether or not
+        we have revocable tickets.
+        """
+        acct = self.app.wallet.selectedAccount
+        n = self.revocableTicketsCount
+        plural = ""
+        for utxo in acct.utxos.values():
+            if utxo.isRevocableTicket():
+                n += 1
+        if n > 0:
+            if n > 1:
+                plural = "s"
+            self.revokeBtn.setText("revoke {} ticket{}".format(n, plural))
+            self.revokeBtn.show()
+        else:
+            self.revokeBtn.hide()
+
+    def revokeTickets(self):
+        """
+        Revoke all revocable tickets.
+        """
+
+        def revoke(wallet):
+            try:
+                self.app.emitSignal(ui.WORKING_SIGNAL)
+                wallet.openAccount.revokeTickets()
+                return True
+            except Exception as e:
+                log.error("revoke tickets error: %s" % formatTraceback(e))
+                return False
+            self.app.emitSignal(ui.DONE_SIGNAL)
+
+        self.app.withUnlockedWallet(revoke, self.revoked)
+
+    def revoked(self, success):
+        """
+        revokeTickets callback. Prints success or failure to the screen.
+        """
+        if success:
+            n = self.revocableTicketsCount
+            plural = ""
+            if n > 0:
+                if n > 1:
+                    plural = "s"
+                self.app.appWindow.showSuccess("revoked {} ticket{}".format(n, plural))
+                self.revocableTicketsCount = 0
+            self.revokeBtn.hide()
+        else:
+            self.app.appWindow.showError("revoke tickets finished with error")
 
     def setStats(self):
         """

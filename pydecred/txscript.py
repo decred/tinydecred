@@ -12,7 +12,10 @@ from tinydecred.pydecred.wire import (
     msgtx,
 )  # A couple of usefule serialization functions.
 from tinydecred.crypto import opcode, crypto
+from tinydecred.util import helpers
 from tinydecred.crypto.secp256k1.curve import curve as Curve
+
+log = helpers.getLogger("TXSCRIPT")
 
 HASH_SIZE = 32
 SHA256_SIZE = 32
@@ -120,6 +123,18 @@ opNonstake = opcode.OP_NOP10
 #   - 33 bytes serialized compressed pubkey
 RedeemP2PKHSigScriptSize = 1 + 73 + 1 + 33
 
+# RedeemP2SHSigScriptSize is the worst case (largest) serialize size
+# of a transaction input script that redeems a P2SH output.
+# It is calculated as:
+#
+#  - OP_DATA_73
+#  - 73-byte signature
+#  - OP_DATA_35
+#  - OP_DATA_33
+#  - 33 bytes serialized compressed pubkey
+#  - OP_CHECKSIG
+RedeemP2SHSigScriptSize = 1 + 73 + 1 + 1 + 33 + 1
+
 # TicketCommitmentScriptSize is the size of a ticket purchase commitment
 # script. It is calculated as:
 #
@@ -180,9 +195,49 @@ SStxPKHMaxOutSize = 77
 # fee limits imposed on a ticket.
 defaultTicketFeeLimits = 0x5800
 
+# SStxVoteReturnFractionMask extracts the return fraction from a
+# commitment output version.
+# If after applying this mask &0x003f is given, the entire amount of
+# the output is allowed to be spent as fees if the flag to allow fees
+# is set.
+SStxVoteReturnFractionMask = 0x003F
+
+# SStxRevReturnFractionMask extracts the return fraction from a
+# commitment output version.
+# If after applying this mask &0x3f00 is given, the entire amount of
+# the output is allowed to be spent as fees if the flag to allow fees
+# is set.
+SStxRevReturnFractionMask = 0x3F00
+
+
+# SStxVoteFractionFlag is a bitflag mask specifying whether or not to
+# apply a fractional limit to the amount used for fees in a vote.
+# 00000000 00000000 = No fees allowed
+# 00000000 01000000 = Apply fees rule
+SStxVoteFractionFlag = 0x0040
+
+# SStxRevFractionFlag is a bitflag mask specifying whether or not to
+# apply a fractional limit to the amount used for fees in a vote.
+# 00000000 00000000 = No fees allowed
+# 01000000 00000000 = Apply fees rule
+SStxRevFractionFlag = 0x4000
+
 # A couple of hashing functions from the crypto module.
 mac = crypto.mac
 hashH = crypto.hashH
+
+
+def canonicalPadding(b):
+    """
+    canonicalPadding checks whether a big-endian encoded integer could
+    possibly be misinterpreted as a negative number (even though OpenSSL
+    treats all numbers as unsigned), or if there is any unnecessary
+    leading zero padding.
+    """
+    if b[0] & 0x80 == 0x80:
+        raise Exception("negative number")
+    if len(b) > 1 and b[0] == 0x00 and b[1] & 0x80 != 0x80:
+        raise Exception("excessive padding")
 
 
 class Signature:
@@ -233,6 +288,102 @@ class Signature:
         offset += 1
         b[offset] = sb
         return b
+
+    @staticmethod
+    def parse(sigBytes, der):
+        """
+        Parse sigBytes to make sure they make up a valid Signature.
+
+        Args:
+            sigBytes (byte-like): The bytes of the signature.
+            der (bool): Whether to check for padding and sign.
+        Returns:
+            object: the ECDSA Signature.
+        """
+        # minimal message is when both numbers are 1 bytes. adding up to:
+        # 0x30 + len + 0x02 + 0x01 + <byte> + 0x2 + 0x01 + <byte>
+        if len(sigBytes) < 8:
+            raise Exception("malformed signature: too short")
+
+        # 0x30
+        index = 0
+        if sigBytes[index] != 0x30:
+            raise Exception("malformed signature: no header magic")
+        index += 1
+        # length of remaining message
+        siglen = sigBytes[index]
+        index += 1
+        if siglen + 2 > len(sigBytes):
+            raise Exception("malformed signature: bad length")
+        # trim the slice we're working on so we only look at what matters.
+        sigBytes = sigBytes[: siglen + 2]
+
+        # 0x02
+        if sigBytes[index] != 0x02:
+            raise Exception("malformed signature: no 1st int marker")
+        index += 1
+
+        # Length of signature r.
+        rLen = sigBytes[index]
+        # must be positive, must be able to fit in another 0x2, <len> <s>
+        # hence the -3. We assume that the length must be at least one byte.
+        index += 1
+        if rLen <= 0 or rLen > len(sigBytes) - index - 3:
+            raise Exception("malformed signature: bogus r length")
+
+        # Then r itself.
+        rBytes = sigBytes[index : index + rLen]
+        if der:
+            try:
+                canonicalPadding(rBytes)
+            except Exception as e:
+                raise Exception(
+                    "malformed signature: bogus r padding or sign: {}".format(e)
+                )
+
+        index += rLen
+        # 0x02. length already checked in previous if.
+        if sigBytes[index] != 0x02:
+            raise Exception("malformed signature: no 2nd int marker")
+        index += 1
+
+        # Length of signature s.
+        sLen = sigBytes[index]
+        index += 1
+        # s should be the rest of the bytes.
+        if sLen <= 0 or sLen > len(sigBytes) - index:
+            raise Exception("malformed signature: bogus S length")
+
+        # Then s itself.
+        sBytes = sigBytes[index : index + sLen]
+        if der:
+            try:
+                canonicalPadding(rBytes)
+            except Exception as e:
+                raise Exception(
+                    "malformed signature: bogus s padding or sign: {}".format(e)
+                )
+
+        index += sLen
+        # sanity check length parsing
+        if index != len(sigBytes):
+            raise Exception(
+                "malformed signature: bad final length %s != %s" % index, len(sigBytes)
+            )
+
+        signature = Signature(rBytes, sBytes)
+
+        # FWIW the ecdsa spec states that r and s must be | 1, N - 1 |
+        if signature.r.int() < 1:
+            raise Exception("signature r is less than one")
+        if signature.s.int() < 1:
+            raise Exception("signature s is less than one")
+        if signature.r.int() >= Curve.N:
+            raise Exception("signature r is >= curve.N")
+        if signature.s.int() >= Curve.N:
+            raise Exception("signature s is >= curve.N")
+
+        return signature
 
 
 class ScriptTokenizer:
@@ -482,6 +633,43 @@ def canonicalizeInt(val):
     if (b[0] & 0x80) != 0:
         b = ByteArray(0, length=len(b) + 1) | b
     return b
+
+
+def scriptNumBytes(n):
+    """
+    scriptNumBytes returns a minimal encoding for a signed integer as bytes.
+    Based on dcrd/txscript (scriptNum).Bytes.
+
+    Args:
+        n (int): The integer to encode.
+
+    Returns:
+        ByteArray: The encoded bytes.
+    """
+    if n == 0:
+        return ByteArray()
+
+    isNegative = n < 0
+    if isNegative:
+        n = -n
+
+    result = ByteArray(length=9)
+    i = 0
+    while n > 0:
+        result[i] = n & 0xFF
+        n = n >> 8
+        i += 1
+
+    if result[i - 1] & 0x80 != 0:
+        extraByte = 0x00
+        if isNegative:
+            extraByte = 0x80
+        result[i] = extraByte
+        i += 1
+    elif isNegative:
+        result[i - 1] |= 0x80
+
+    return result[:i]
 
 
 def hashToInt(h):
@@ -1209,6 +1397,21 @@ def payToStakeSHScript(addr, stakeCode):
     return script
 
 
+def multiSigScript(addrs, nRequired):
+    if len(addrs) < nRequired:
+        raise Exception(
+            "unable to generate multisig script with {} required signatures when there are only {} public keys available".format(
+                nRequired, len(addrs)
+            )
+        )
+    script = ByteArray(addInt(nRequired))
+    for addr in addrs:
+        script += addData(addr.scriptAddress())
+    script += addInt(len(addrs))
+    script += opcode.OP_CHECKMULTISIG
+    return script
+
+
 def payToSStx(addr):
     """
     payToSStx creates a new script to pay a transaction output to a script hash or
@@ -1235,6 +1438,50 @@ def payToSStx(addr):
     if scriptType == PubKeyHashTy:
         return payToStakePKHScript(addr, opcode.OP_SSTX)
     return payToStakeSHScript(addr, opcode.OP_SSTX)
+
+
+def payToSSRtxPKHDirect(pkh):
+    """
+    payToSSRtxPKHDirect creates a new script to pay a transaction output to a
+    public key hash, but tags the output with OP_SSRTX. For use in constructing
+    valid SSRtx. Unlike payToSSRtx, this function directly uses the HASH160
+    pubkeyhash (instead of an address).
+
+    Args:
+        sh (byte-like): raw script.
+
+    Returns:
+        byte-like: script to pay a stake based public key hash.
+    """
+    script = ByteArray(b"")
+    script += opcode.OP_SSRTX
+    script += opcode.OP_DUP
+    script += opcode.OP_HASH160
+    script += addData(pkh)
+    script += opcode.OP_EQUALVERIFY
+    script += opcode.OP_CHECKSIG
+    return script
+
+
+def payToSSRtxSHDirect(sh):
+    """
+    payToSSRtxSHDirect creates a new script to pay a transaction output to a
+    script hash, but tags the output with OP_SSRTX. For use in constructing
+    valid SSRtx. Unlike payToSSRtx, this function directly uses the HASH160
+    script hash (instead of an address).
+
+    Args:
+        sh (byte-like): raw script.
+
+    Returns:
+        byte-like: script to pay a stake based script hash.
+    """
+    script = ByteArray(b"")
+    script += opcode.OP_SSRTX
+    script += opcode.OP_HASH160
+    script += addData(sh)
+    script += opcode.OP_EQUAL
+    return script
 
 
 def generateSStxAddrPush(addr, amount, limits):
@@ -1506,6 +1753,22 @@ def putVarInt(val):
         )
 
     return reversed(ByteArray(0xFF, length=9)) | ByteArray(val, length=8).littleEndian()
+
+
+def addInt(val):
+    """
+    addInt pushes the passed integer to the end of the script.
+    """
+    b = ByteArray(b"")
+
+    # Fast path for small integers and OP_1NEGATE.
+    if val == 0:
+        b += opcode.OP_0
+        return b
+    if val == -1 or (val >= 1 and val <= 16):
+        b += opcode.OP_1 - 1 + val
+        return b
+    return addData(scriptNumBytes(val))
 
 
 def addData(data):
@@ -2080,9 +2343,13 @@ def sign(chainParams, tx, idx, subScript, hashType, keysource, sigType):
         # return script, scriptClass, addresses, nrequired
 
     elif scriptClass == MultiSigTy:
-        raise Exception("spending multi-sig script not implemented")
-        # script = signMultiSig(tx, idx, subScript, hashType, addresses, nrequired, kdb)
-        # return script, scriptClass, addresses, nrequired
+        privKeys = []
+        for addr in addresses:
+            privKeys.append(keysource.priv(addr))
+        script = signMultiSig(
+            tx, idx, subScript, hashType, addresses, nrequired, privKeys
+        )
+        return script, scriptClass, addresses, nrequired
 
     elif scriptClass == StakeSubmissionTy:
         return handleStakeOutSign(
@@ -2140,6 +2407,42 @@ def sign(chainParams, tx, idx, subScript, hashType, keysource, sigType):
         raise Exception("can't sign NULLDATA transactions")
 
     raise Exception("can't sign unknown transactions")
+
+
+def signMultiSig(tx, idx, subScript, hashType, addresses, nRequired, privKeys):
+    """
+    signMultiSig signs as many of the outputs in the provided multisig script as
+    possible. It returns the generated script and a boolean if the script
+    fulfills the contract (i.e. nrequired signatures are provided).  Since it is
+    arguably legal to not be able to sign any of the outputs, no error is
+    returned.
+
+    Args:
+        tx (object): the ticket purchase MsgTx.
+        idx (int): the output index that contains the multisig.
+        subScript (byte-like): the multisig script.
+        hashType (int): the type of hash needed
+        addresses (list(object)): the addresses that make up the multisig.
+        nRequired (int): the number of signatures required to fulfill the pkScript.
+        privKeys (list(byte-like)): the private keys for addresses.
+
+    Returns:
+        byte-like: the signed multisig script.
+    """
+
+    # No need to add dummy in Decred.
+    signed = 0
+    script = ByteArray(b"")
+    for idx in range(len(addresses)):
+
+        sig = rawTxInSignature(tx, idx, subScript, hashType, privKeys[idx].key)
+
+        script += addData(sig)
+        signed += 1
+        if signed == nRequired:
+            break
+
+    return script
 
 
 def handleStakeOutSign(
@@ -2236,9 +2539,9 @@ def mergeScripts(
         finalScript += addData(script)
         return finalScript
     elif scriptClass == MultiSigTy:
-        raise Exception("multisig signing unimplemented")
-        # return mergeMultiSig(tx, idx, addresses, nRequired, pkScript,
-        #   sigScript, prevScript)
+        return mergeMultiSig(
+            tx, idx, addresses, nRequired, pkScript, sigScript, prevScript
+        )
     else:
         # It doesn't actually make sense to merge anything other than multiig
         # and scripthash (because it could contain multisig). Everything else
@@ -2249,6 +2552,117 @@ def mergeScripts(
         if prevScript is None or len(sigScript) > len(prevScript):
             return sigScript
         return prevScript
+
+
+def mergeMultiSig(tx, idx, addresses, nRequired, pkScript, sigScript, prevScript):
+    """
+    mergeMultiSig combines the two signature scripts sigScript and prevScript
+    that both provide signatures for pkScript in output idx of tx. addresses
+    and nRequired should be the results from extracting the addresses from
+    pkScript. Since this function is internal only we assume that the arguments
+    have come from other functions internally and thus are all consistent with
+    each other, behaviour is undefined if this contract is broken.
+
+    NOTE: This function is only valid for version 0 scripts.  Since the function
+    does not accept a script version, the results are undefined for other script
+    versions.
+
+    Args:
+        tx (object): the ticket purchase MsgTx.
+        idx (int): the output index that contains the multisig.
+        addresses (object): the addresses that make up the multisig.
+        nRequired (int): the number of signatures required to fulfill the pkScript.
+        pkScript (byte-like): the multisig script.
+        sigScript (byte-like): the mulitsig script's signature.
+        prevScript (byte-like): the output's previous signature script.
+
+    Returns:
+        byte-like: the merged signature scripts.
+    """
+
+    # Nothing to merge if either the new or previous signature scripts are
+    # empty.
+    if not sigScript or len(sigScript) == 0:
+        return prevScript
+
+    if not prevScript or len(prevScript) == 0:
+        return sigScript
+
+    # Convenience function to avoid duplication.
+    possibleSigs = []
+
+    def extractSigs(script):
+        scriptVersion = 0
+        tokenizer = ScriptTokenizer(scriptVersion, script)
+        while tokenizer.next():
+            data = tokenizer.data()
+            if len(data) != 0:
+                possibleSigs.append(data)
+        if tokenizer.err is not None:
+            raise Exception("mergeMultisig: extractSigs: {}".format(tokenizer.err))
+
+    # Attempt to extract signatures from the two scripts.  Return the other
+    # script that is intended to be merged in the case signature extraction
+    # fails for some reason.
+    if not extractSigs(sigScript):
+        return prevScript
+
+    if not extractSigs(prevScript):
+        return sigScript
+
+    # Now we need to match the signatures to pubkeys, the only real way to
+    # do that is to try to verify them all and match it to the pubkey
+    # that verifies it. we then can go through the addresses in order
+    # to build our script. Anything that doesn't parse or doesn't verify we
+    # throw away.
+    addrToSig = {}
+    for sig in possibleSigs:
+
+        # can't have a valid signature that doesn't at least have a
+        # hashtype, in practise it is even longer than this. but
+        # that'll be checked next.
+        if len(sig) < 1:
+            continue
+        tSig = sig[:-1]
+        hashType = sig[-1]
+
+        pSig = Signature.parse(tSig, True)
+        if not pSig:
+            continue
+
+        # We have to do this each round since hash types may vary
+        # between signatures and so the hash will vary. We can,
+        # however, assume no sigs etc are in the script since that
+        # would make the transaction nonstandard and thus not
+        # MultiSigTy, so we just need to hash the full thing.
+        hash = calcSignatureHash(pkScript, hashType, tx, idx, None)
+
+        for addr in addresses:
+            # All multisig addresses should be pubkey addresses
+            # it is an error to call this internal function with
+            # bad input.
+
+            # If it matches we put it in the map. We only
+            # can take one signature per public key so if we
+            # already have one, we can throw this away.
+            if verifySig(addr.pubkey, hash, pSig.r.int(), pSig.s.int()):
+                addrToSig[addr.string()] = sig
+
+    script = ByteArray(b"")
+    doneSigs = 0
+    # This assumes that addresses are in the same order as in the script.
+    for addr in addresses:
+        if addr.string() in addrToSig:
+            script += addData(addrToSig[addr.string()])
+            doneSigs += 1
+        if doneSigs == nRequired:
+            break
+
+    # padding for missing ones
+    for i in range(nRequired - doneSigs):
+        script += opcode.OP_0
+
+    return script
 
 
 def signTxOutput(
@@ -2816,3 +3230,198 @@ def makeTicket(
     checkSStx(mtx)
 
     return mtx
+
+
+def sstxStakeOutputInfo(outs):
+    """
+    sstxStakeOutputInfo takes a list of msgtx.txOut as input and scans through
+    its outputs, returning the pubkeyhashs and amounts for any NullDataTy's
+    (future commitments to stake generation rewards).
+
+    Args:
+        outs (list(object)): an SStx MsgTx outputs
+
+    Returns:
+        list(bool): is pay-to-script-hash.
+        list(byte-like): the output addresses.
+        list(int): the subsidy amounts.
+        list(int): the change amounts.
+        list(list(bool)): the spend rules.
+        list(list(int)): the spend limits.
+    """
+    isP2SH = []
+    addresses = []
+    amounts = []
+    changeAmounts = []
+    allSpendRules = []
+    allSpendLimits = []
+
+    # Cycle through the inputs and pull the proportional amounts
+    # and commit to PKHs/SHs.
+    for idx in range(len(outs)):
+        # We only care about the outputs where we get proportional
+        # amounts and the PKHs/SHs to send rewards to, which is all
+        # the odd numbered output indexes.
+        if (idx > 0) and (idx % 2 != 0):
+            # The MSB (sign), not used ever normally, encodes whether
+            # or not it is a P2PKH or P2SH for the input.
+            amtEncoded = outs[idx].pkScript[22:30]
+            # MSB set?
+            isP2SH.append(not (amtEncoded[7] & (1 << 7) == 0))
+            # Clear bit
+            amtEncoded[7] &= 127
+
+            addresses.append(outs[idx].pkScript[2:22])
+            # amounts[idx/2] = int64(binary.LittleEndian.Uint64(amtEncoded))
+            amounts.append(ByteArray(amtEncoded, length=8).littleEndian().int())
+
+            # Get flags and restrictions for the outputs to be
+            # made in either a vote or revocation.
+            spendRules = []
+            spendLimits = []
+
+            # This bitflag is true/false.
+            feeLimitUint16 = (
+                ByteArray(outs[idx].pkScript[30:32], length=4).littleEndian().int()
+            )
+            spendRules.append(
+                (feeLimitUint16 & SStxVoteFractionFlag) == SStxVoteFractionFlag
+            )
+            spendRules.append(
+                (feeLimitUint16 & SStxRevFractionFlag) == SStxRevFractionFlag
+            )
+            allSpendRules.append(spendRules)
+
+            # This is the fraction to use out of 64.
+            spendLimits.append(feeLimitUint16 & SStxVoteReturnFractionMask)
+            spendLimits.append(feeLimitUint16 & SStxRevReturnFractionMask)
+            spendLimits[1] >>= 8
+            allSpendLimits.append(spendLimits)
+
+        # Here we only care about the change amounts, so scan
+        # the change outputs (even indices) and save their
+        # amounts.
+        if (idx > 0) and (idx % 2 == 0):
+            changeAmounts.append(outs[idx].value)
+
+    return isP2SH, addresses, amounts, changeAmounts, allSpendRules, allSpendLimits
+
+
+def calculateRewards(amounts, amountTicket, subsidy):
+    """
+    calculateRewards takes a list of SStx adjusted output amounts, the amount used
+    to purchase that ticket, and the reward for an SSGen tx and subsequently
+    generates what the outputs should be in the SSGen tx.  If used for calculating
+    the outputs for an SSRtx, pass 0 for subsidy.
+
+    Args:
+        amounts list (int): output amounts.
+        amountTicket (int): amount used to purchase ticket.
+        subsidy (int): amount to pay.
+
+    Returns:
+        list(int): list of SStx adjusted output amounts.
+    """
+    outputsAmounts = []
+
+    # SSGen handling
+    amountWithStakebase = amountTicket + subsidy
+
+    # Get the sum of the amounts contributed between both fees
+    # and contributions to the ticket.
+    totalContrib = 0
+    for amount in amounts:
+        totalContrib += amount
+
+    # Now we want to get the adjusted amounts including the reward.
+    # The algorithm is like this:
+    # 1 foreach amount
+    # 2     amount *= 2^32
+    # 3     amount /= amountTicket
+    # 4     amount *= amountWithStakebase
+    # 5     amount /= 2^32
+
+    for amount in amounts:
+        # mul amountWithStakebase
+        amount *= amountWithStakebase
+
+        # mul 2^32
+        amount <<= 32
+
+        # div totalContrib
+        amount //= totalContrib
+
+        # div 2^32
+        amount >>= 32
+
+        # make int64
+        outputsAmounts.append(amount)
+
+    return outputsAmounts
+
+
+def makeRevocation(ticketPurchase, feePerKB):
+    """
+    makeRevocation creates an unsigned revocation transaction that
+    revokes a missed or expired ticket.  Revocations must carry a relay fee and
+    this function can error if the revocation contains no suitable output to
+    decrease the estimated relay fee from.
+
+    Args:
+        ticketPurchase (object): the ticket to revoke's MsgTx.
+        feePerKB (int): the miner's fee per kb.
+
+    Returns:
+        object: the unsigned revocation MsgTx or None in case of error.
+    """
+    # Parse the ticket purchase transaction to determine the required output
+    # destinations for vote rewards or revocations.
+    ticketPayKinds, ticketHash160s, ticketValues, _, _, _ = sstxStakeOutputInfo(
+        ticketPurchase.txOut
+    )
+
+    # Calculate the output values for the revocation.  Revocations do not
+    # contain any subsidy.
+    revocationValues = calculateRewards(ticketValues, ticketPurchase.txOut[0].value, 0)
+
+    # Begin constructing the revocation transaction.
+    revocation = msgtx.MsgTx.new()
+
+    # Revocations reference the ticket purchase with the first (and only)
+    # input.
+    ticketOutPoint = msgtx.OutPoint(ticketPurchase.hash(), 0, msgtx.TxTreeStake)
+    ticketInput = msgtx.TxIn(
+        previousOutPoint=ticketOutPoint,
+        valueIn=ticketPurchase.txOut[ticketOutPoint.index].value,
+    )
+    revocation.addTxIn(ticketInput)
+    scriptSizes = [RedeemP2SHSigScriptSize]
+
+    # All remaining outputs pay to the output destinations and amounts tagged
+    # by the ticket purchase.
+    for i in range(len(ticketHash160s)):
+        scriptFn = payToSSRtxPKHDirect
+        # P2SH
+        if ticketPayKinds[i]:
+            scriptFn = payToSSRtxSHDirect
+        script = scriptFn(ticketHash160s[i])
+        revocation.addTxOut(msgtx.TxOut(revocationValues[i], script))
+
+    # Revocations must pay a fee but do so by decreasing one of the output
+    # values instead of increasing the input value and using a change output.
+    # Calculate the estimated signed serialize size.
+    sizeEstimate = estimateSerializeSize(scriptSizes, revocation.txOut, 0)
+    feeEstimate = calcMinRequiredTxRelayFee(feePerKB, sizeEstimate)
+
+    # Reduce the output value of one of the outputs to accommodate for the relay
+    # fee. To avoid creating dust outputs, a suitable output value is reduced
+    # by the fee estimate only if it is large enough to not create dust. This
+    # code does not currently handle reducing the output values of multiple
+    # commitment outputs to accommodate for the fee.
+    for output in revocation.txOut:
+        if output.value > feeEstimate:
+            amount = output.value - feeEstimate
+            if not isDustAmount(amount, len(output.pkScript), feePerKB):
+                output.value = amount
+                return revocation
+    raise Exception("missing suitable revocation output to pay relay fee")

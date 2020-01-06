@@ -6,6 +6,8 @@ The DecredAccount inherits from the tinydecred base Account and adds staking
 support.
 """
 
+from tinydecred.crypto.bytearray import decodeBA
+from tinydecred.crypto import opcode, crypto
 from tinydecred.wallet.accounts import Account
 from tinydecred.util import tinyjson, helpers
 from tinydecred.crypto.crypto import AddressSecpPubKey, CrazyKeyError
@@ -421,6 +423,41 @@ class DecredAccount(Account):
         # Store the txids.
         self.tickets.extend([tx.txid() for tx in txs[1]])
         return txs[1]
+
+    def revokeTickets(self):
+        """
+        Iterate through missed and expired tickets and revoke them.
+
+        Returns:
+            bool: whether or not an error occured.
+        """
+        revocableTickets = (
+            utxo.txid for utxo in self.utxos.values() if utxo.isRevocableTicket()
+        )
+        txs = (self.blockchain.tx(txid) for txid in revocableTickets)
+        for tx in txs:
+            redeemHash = crypto.AddressScriptHash(
+                self.net.ScriptHashAddrID,
+                txscript.extractStakeScriptHash(tx.txOut[0].pkScript, opcode.OP_SSTX),
+            )
+            redeemScript = next(
+                (
+                    decodeBA(p.purchaseInfo.script)
+                    for p in self.stakePools
+                    if p.purchaseInfo.ticketAddress == redeemHash.string()
+                ),
+                None,
+            )
+            if not redeemScript:
+                raise Exception("did not find redeem script for hash %s" % redeemHash)
+
+            keysource = KeySource(
+                # This will need to change when we start using different
+                # addresses for voting.
+                priv=lambda _: self._votingKey,
+                internal=lambda: "",
+            )
+            self.blockchain.revokeTicket(tx, keysource, redeemScript)
 
     def sync(self, blockchain, signals):
         """
