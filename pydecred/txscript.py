@@ -1768,7 +1768,7 @@ def addInt(val):
     if val == -1 or (val >= 1 and val <= 16):
         b += opcode.OP_1 - 1 + val
         return b
-    raise addData(scriptNumBytes(val))
+    return addData(scriptNumBytes(val))
 
 
 def addData(data):
