@@ -77,9 +77,9 @@ class Client(object):
         Verify the block chain database.
 
         Returns:
-            VerifyChainResult: Whether the database can be verified.
+            bool: Whether the database can be verified.
         """
-        return VerifyChainResult.parse(self.call("verifychain"))
+        return self.call("verifychain")
 
     def verifyMessage(self, addr, sig, message):
         """
@@ -91,18 +91,18 @@ class Client(object):
             message (string): The message.
 
         Returns:
-            VerifyMessageResult: Whether the message could be verified.
+            bool: Whether the message could be verified.
         """
-        return VerifyMessageResult.parse(self.call("verifymessage", addr, sig, message))
+        return self.call("verifymessage", addr, sig, message)
 
     def version(self):
         """
         Get the dcrd and dcrdjsonrpcapi version info.
 
         Returns:
-            VersionResult: dcrd's and dcrdjsonrpcapi's version info.
+            dict[string]VersionResult: dcrd's version info with keys "dcrd" and "dcrdjsonrpcapi" .
         """
-        return VersionResult.parse(self.call("version"))
+        return {k: VersionResult.parse(v) for k, v in self.call("version").items()}
 
 
 def get(k, obj):
@@ -289,130 +289,46 @@ class ValidateAddressChainResult:
         )
 
 
-class VerifyChainResult:
-    """verifychainresult"""
-
-    def __init__(
-        self, verified,
-    ):
-        """
-        Args:
-            verified (bool): Whether the blockchain database verified.
-        """
-        self.verified = verified
-
-    @staticmethod
-    def parse(obj):
-        """
-        Parse the VerifyChainResult from the decoded RPC response.
-
-        Args:
-            obj (object): The decoded dcrd RPC response.
-
-        Returns:
-            VerifyChainResult: The VerifyChainResult.
-        """
-        return VerifyChainResult(verified=obj)
-
-
-class VerifyMessageResult:
-    """verifymessageresult"""
-
-    def __init__(
-        self, verified,
-    ):
-        """
-        Args:
-            verified (bool): Whether the message can be verified as signed by
-                the private key corresponding to the supplied address.
-        """
-        self.verified = verified
-
-    @staticmethod
-    def parse(obj):
-        """
-        Parse the VerifyMessageResult from the decoded RPC response.
-
-        Args:
-            obj (object): The decoded dcrd RPC response.
-
-        Returns:
-            VerifyMessageResult: The VerifyMessageResult.
-        """
-        return VerifyMessageResult(verified=obj)
-
-
 class VersionResult:
-    """versionresult"""
-
-    def __init__(
-        self, dcrd, dcrdjsonrpcapi,
-    ):
-        """
-        Args:
-            dcrd (object): The dcrd version.
-            dcrdjsonrpcapi (object): The dcrdjsonrpcapi version.
-        """
-        self.dcrd = dcrd
-        self.dcrdjsonrpcapi = dcrdjsonrpcapi
-
-    @staticmethod
-    def parse(obj):
-        """
-        Parse the VerifyMessageResult from the decoded RPC response.
-
-        Args:
-            obj (object): The decoded dcrd RPC response.
-
-        Returns:
-            VerifyMessageResult: The VerifyMessageResult.
-        """
-        return VersionResult(
-            dcrd=Version.parse(obj["dcrd"]),
-            dcrdjsonrpcapi=Version.parse(obj["dcrdjsonrpcapi"]),
-        )
-
-
-class Version:
     """
-    Version provides a data structure to store version information.
+    VersionResult provides a data structure to store version information.
     """
 
     def __init__(
-        self, versionstring, major, minor, patch, prerelease, buildmetadata,
+        self, versionString, major, minor, patch, prerelease, buildMetadata,
     ):
         """
         Args:
-            versionstring (string): The semver version as a string.
+            versionString (string): The semver version as a string.
             major (int): The semver major.
             minor (int): The semver minor.
             patch (int): The semver patch.
             prerelease (string): Prerelease status.
-            buildmetadata (string): The go version used to build the dcrd binary.
+            buildMetadata (string): The go version used to build the dcrd binary.
         """
-        self.versionstring = versionstring
+        self.versionString = versionString
         self.major = major
         self.minor = minor
         self.patch = patch
         self.prerelease = prerelease
-        self.buildmetadata = buildmetadata
+        self.buildMetadata = buildMetadata
 
     @staticmethod
     def parse(obj):
         """
-        Parse the Version from the decoded RPC response.
+        Parse the VersionResult from the decoded RPC response.
 
         Args:
             obj (object): The decoded dcrd RPC response.
 
         Returns:
-            Version: A Version object.
+            VersionResult: A VersionResult object.
         """
-        return Version(
-            versionstring=obj["versionstring"],
+        return VersionResult(
+            versionString=obj["versionstring"],
             major=obj["major"],
             minor=obj["minor"],
             patch=obj["patch"],
             prerelease=obj["prerelease"],
-            buildmetadata=obj["buildmetadata"],
+            buildMetadata=obj["buildmetadata"],
         )
