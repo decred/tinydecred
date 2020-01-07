@@ -36,6 +36,28 @@ def test_rpc(config):
     blockchainInfo = rpcClient.getBlockchainInfo()
     assert isinstance(blockchainInfo, rpc.GetBlockChainInfoResult)
 
+    searchRawTransactions = rpcClient.searchRawTransactions(
+        "Dcur2mcGjmENx4DhNqDctW5wJCVyT3Qeqkx"
+    )
+    assert isinstance(searchRawTransactions[0], rpc.SearchRawTransactionsResult)
+
+    ticketFeeInfo = rpcClient.ticketFeeInfo()
+    assert isinstance(ticketFeeInfo["feeinfomempool"], rpc.FeeInfoResult)
+
+    ticketsForAddress = rpcClient.ticketsForAddress(
+        "DcaephHCqjdfb3gPz778DJZWvwmUUs3ssGk"
+    )
+    assert (
+        ticketsForAddress[0]
+        == "d54d90bcec4146e9ae8c2ec860364f7023f33cad02b3c2bb4bdbb36689e68614"
+    )
+
+    ticketVWAP = rpcClient.ticketVWAP()
+    assert ticketVWAP
+
+    txFeeInfo = rpcClient.txFeeInfo()
+    assert isinstance(ticketFeeInfo["feeinfomempool"], rpc.FeeInfoResult)
+
     validateAddress = rpcClient.validateAddress("DsUxwT6Kbiur6Nps9q3uGEpJCvrhcxX2nii")
     assert isinstance(validateAddress, rpc.ValidateAddressChainResult)
     assert validateAddress.isValid
