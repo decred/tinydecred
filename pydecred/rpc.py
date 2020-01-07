@@ -60,6 +60,63 @@ class Client(object):
         """
         return GetBlockChainInfoResult.parse(self.call("getblockchaininfo"))
 
+    def validateAddress(self, addr):
+        """
+        Validate an address.
+
+        Args:
+            addr (string): The address to validate.
+
+        Returns:
+            ValidateAddressChainResult: Whether the address can be verified.
+        """
+        return ValidateAddressChainResult.parse(self.call("validateaddress", addr))
+
+    def verifyChain(self):
+        """
+        Verify the block chain database.
+
+        Returns:
+            bool: Whether the database can be verified.
+        """
+        return self.call("verifychain")
+
+    def verifyMessage(self, addr, sig, message):
+        """
+        Verify that a message was signed by the private key belonging to addr.
+
+        Args:
+            addr (string): The address used to sign.
+            sig (string): The signed message.
+            message (string): The message.
+
+        Returns:
+            bool: Whether the message could be verified.
+        """
+        return self.call("verifymessage", addr, sig, message)
+
+    def version(self):
+        """
+        Get the dcrd and dcrdjsonrpcapi version info.
+
+        Returns:
+            dict[string]VersionResult: dcrd's version info with keys "dcrd" and "dcrdjsonrpcapi" .
+        """
+        return {k: VersionResult.parse(v) for k, v in self.call("version").items()}
+
+
+def get(k, obj):
+    """
+    Helper method to check for nil keys and set those values to None.
+    Args:
+        k (string): dict key
+        obj (dict): the dict to search
+
+    Returns:
+        object: the thing found at k or None.
+    """
+    return obj[k] if k in obj else None
+
 
 class GetBestBlockResult(object):
     """getbestblockhash"""
@@ -199,4 +256,79 @@ class AgendaInfo(object):
             since=obj["since"] if "since" in obj else 0,
             startTime=obj["starttime"],
             expireTime=obj["expiretime"],
+        )
+
+
+class ValidateAddressChainResult:
+    """validateaddress"""
+
+    def __init__(
+        self, isValid, address,
+    ):
+        """
+        Args:
+            isValid (bool): Whether the address is valid.
+            address (string): The address or None if not valid.
+        """
+        self.isValid = isValid
+        self.address = address
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the ValidateAddressChainResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            ValidateAddressChainResult: The ValidateAddressChainResult.
+        """
+        return ValidateAddressChainResult(
+            isValid=obj["isvalid"], address=get("address", obj),
+        )
+
+
+class VersionResult:
+    """
+    VersionResult provides a data structure to store version information.
+    """
+
+    def __init__(
+        self, versionString, major, minor, patch, prerelease, buildMetadata,
+    ):
+        """
+        Args:
+            versionString (string): The semver version as a string.
+            major (int): The semver major.
+            minor (int): The semver minor.
+            patch (int): The semver patch.
+            prerelease (string): Prerelease status.
+            buildMetadata (string): The go version used to build the dcrd binary.
+        """
+        self.versionString = versionString
+        self.major = major
+        self.minor = minor
+        self.patch = patch
+        self.prerelease = prerelease
+        self.buildMetadata = buildMetadata
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the VersionResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            VersionResult: A VersionResult object.
+        """
+        return VersionResult(
+            versionString=obj["versionstring"],
+            major=obj["major"],
+            minor=obj["minor"],
+            patch=obj["patch"],
+            prerelease=obj["prerelease"],
+            buildMetadata=obj["buildmetadata"],
         )
