@@ -4,10 +4,10 @@ Copyright (c) 2019, The Decred developers
 See LICENSE for details
 """
 from threading import Lock as Mutex
-from tinydecred.util import helpers, encode
+from tinydecred.util import helpers, encode, chains
 from tinydecred.util.database import KeyValueDatabase
 from tinydecred.crypto import crypto, mnemonic, rando
-from tinydecred.wallet import accounts, chains
+from tinydecred.wallet import accounts
 from tinydecred import config
 
 cfg = config.load()

@@ -51,7 +51,8 @@ def tinyNetConfig(netName):
     """
     if netName == MAINNET:
         return MainnetConfig
-    if netName == TESTNET:
+    # Omission of number in testnet name goes to default.
+    if netName in ("testnet", TESTNET):
         return TestnetConfig
     if netName == SIMNET:
         return SimnetConfig
@@ -75,9 +76,9 @@ class TinyConfig:
         if unknown:
             log.warning("ignoring unknown arguments:", repr(unknown))
         self.net = None
-        if netName == "simnet" or args.simnet:
+        if netName == SIMNET or args.simnet:
             self.net = nets.simnet
-        elif netName in ("testnet3", "testnet") or args.testnet:
+        elif netName in (TESTNET, "testnet") or args.testnet:
             self.net = nets.testnet
         else:
             print("**********************************************************")
@@ -152,5 +153,5 @@ def load(netName=None):
     """
     global tinyConfig
     if not tinyConfig:
-        tinyConfig = TinyConfig(netName=None)
+        tinyConfig = TinyConfig(netName)
     return tinyConfig

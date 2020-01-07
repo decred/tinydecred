@@ -1,9 +1,6 @@
 """
 Copyright (c) 2019, Brian Stafford
 See LICENSE for details
-
-The DecredAccount inherits from the tinydecred base Account and adds staking
-support.
 """
 
 from tinydecred.util import helpers, encode
@@ -535,9 +532,17 @@ class UTXO(object):
         isLiveTicket will return True if this is a live ticket.
 
         Returns:
-            bool. True if this is a live ticket.
+            bool: True if this is a live ticket.
         """
         return self.tinfo and self.tinfo.status in ("immature", "live")
+
+    def isRevocableTicket(self):
+        """
+        Returns True if this is an expired or missed ticket.
+        Returns:
+            bool: True if this is expired or missed ticket.
+        """
+        return self.tinfo and self.tinfo.status in ("expired", "missed")
 
 
 class Balance(object):
@@ -591,11 +596,9 @@ class Balance(object):
         )
 
 
-class DecredAccount(object):
+class Account(object):
     """
-    DecredAccount is the Decred version of the base tinydecred Account.
-    Decred Account inherits Account, and adds the necessary functionality to
-    handle staking.
+    Account is a Decred account.
     """
 
     def __init__(self, pubKeyEncrypted, privKeyEncrypted, name, coinID, netID, db=None):
@@ -682,7 +685,7 @@ class DecredAccount(object):
         name = d[2].decode("utf-8")
         coinID = encode.intFromBytes(d[3])
         netID = d[4].decode("utf-8")
-        acct = DecredAccount(pubEnc, privEnc, name, coinID, netID)
+        acct = Account(pubEnc, privEnc, name, coinID, netID)
         acct.cursorExt = encode.intFromBytes(d[5], signed=True)
         acct.cursorInt = encode.intFromBytes(d[6])
         acct.gapLimit = encode.intFromBytes(d[7])
@@ -690,12 +693,12 @@ class DecredAccount(object):
 
     def serialize(self):
         """
-        Serialize the DecredAccount.
+        Serialize the Account.
 
         Returns:
-            ByteArray: The serialized DecredAccount.
+            ByteArray: The serialized Account.
         """
-        return ByteArray(DecredAccount.blob(self))
+        return ByteArray(Account.blob(self))
 
     def load(self, db):
         """
@@ -769,7 +772,7 @@ class DecredAccount(object):
 
         Returns:
             Balance: The current balance. The balance is also assigned to the
-                DecredAccount.balance property.
+                Account.balance property.
         """
         tipHeight = (
             tipHeight if tipHeight is not None else self.blockchain.tip["height"]
@@ -1413,9 +1416,9 @@ class DecredAccount(object):
     def purchaseTickets(self, qty, price):
         """
         purchaseTickets completes the purchase of the specified tickets. The
-        DecredAccount uses the blockchain to do the heavy lifting, but must
-        prepare the TicketRequest and KeySource and gather some other account-
-        related information.
+        Account uses the blockchain to do the heavy lifting, but must prepare
+        the TicketRequest and KeySource and gather some other account- related
+        information.
         """
         keysource = KeySource(
             priv=self.getPrivKeyForAddress, internal=self.nextInternalAddress,

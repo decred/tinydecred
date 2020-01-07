@@ -16,7 +16,7 @@ SymbolIDs = {v: k for k, v in IDSymbols.items()}
 
 
 AccountConstructors = {
-    BipIDs.decred: dcracct.DecredAccount,
+    BipIDs.decred: dcracct.Account,
 }
 
 NetworkParams = {
@@ -50,5 +50,4 @@ def registerChain(coinType, chain):
 
 def chain(coinType):
     coinType = parseCoinType(coinType)
-    assert coinType in _chains, "coin " + str(coinType) + " not registered"
-    return _chains[coinType]
+    return _chains[coinType] if coinType in _chains else None

@@ -16,7 +16,7 @@ from tinydecred.pydecred import constants as DCR
 from tinydecred.pydecred.dcrdata import DcrdataBlockchain
 from tinydecred.ui import screens, ui, qutilities as Q
 from tinydecred.util import helpers, database
-from tinydecred.wallet.wallet import Wallet, chains
+from tinydecred.wallet.wallet import Wallet
 
 # the directory of the tinydecred package
 PACKAGEDIR = os.path.dirname(os.path.realpath(__file__))
@@ -124,7 +124,6 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         self.dcrdata = DcrdataBlockchain(
             dcrdataDB, cfg.net, self.getNetSetting("dcrdata"), skipConnect=True,
         )
-        chains.registerChain("dcr", self.dcrdata)
 
         self.registerSignal(ui.WALLET_CONNECTED, self.syncWallet)
 

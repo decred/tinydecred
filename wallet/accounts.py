@@ -10,8 +10,7 @@ accounts module
 """
 
 from tinydecred.crypto import crypto
-from tinydecred.util import encode, helpers
-from tinydecred.wallet import chains
+from tinydecred.util import encode, helpers, chains
 
 ByteArray = encode.ByteArray
 BuildyBytes = encode.BuildyBytes
@@ -173,7 +172,7 @@ class AccountManager(object):
             acctName: A name for the account.
 
         Returns:
-            DecredAccount: The account.
+            Account: The account.
         """
         idx = len(self.acctDB)
         coinExtKey = self.coinKey(cryptoKey)

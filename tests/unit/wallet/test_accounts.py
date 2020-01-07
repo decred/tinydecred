@@ -10,8 +10,8 @@ from tempfile import TemporaryDirectory
 from tinydecred.crypto import crypto, rando
 from tinydecred.util.encode import ByteArray
 from tinydecred.pydecred import nets
-from tinydecred.util import helpers, database
-from tinydecred.wallet import accounts, chains
+from tinydecred.util import helpers, database, chains
+from tinydecred.wallet import accounts
 
 testSeed = ByteArray(
     "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"

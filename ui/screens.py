@@ -9,8 +9,8 @@ from urllib.parse import urlparse
 from PyQt5 import QtGui, QtCore, QtWidgets
 from tinydecred import config
 from tinydecred.ui import qutilities as Q, ui
-from tinydecred.wallet.wallet import Wallet, chains
-from tinydecred.util import helpers
+from tinydecred.wallet.wallet import Wallet
+from tinydecred.util import helpers, chains
 from tinydecred.pydecred import constants as DCR
 from tinydecred.pydecred.vsp import VotingServiceProvider
 

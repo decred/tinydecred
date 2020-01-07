@@ -18,8 +18,8 @@ import websocket
 import json
 from tinydecred.util import helpers, database, tinyhttp
 from tinydecred.crypto import crypto
-from tinydecred.util import encode
-from tinydecred.wallet.api import InsufficientFundsError
+from tinydecred.util import encode, chains
+from tinydecred.wallet import api
 from tinydecred.pydecred import txscript, calc, account
 from tinydecred.pydecred.wire import msgtx, wire, msgblock
 from tinydecred.util.database import KeyValueDatabase
@@ -609,6 +609,7 @@ class DcrdataBlockchain(object):
         self.subsidyCache = calc.SubsidyCache(params)
         if not skipConnect:
             self.connect()
+        chains.registerChain("dcr", self)
 
     def connect(self):
         """
@@ -1048,7 +1049,7 @@ class DcrdataBlockchain(object):
         while True:
             utxos, enough = utxosource(targetAmount + targetFee, self.approveUTXO)
             if not enough:
-                raise InsufficientFundsError("insufficient funds")
+                raise api.InsufficientFundsError("insufficient funds")
             for utxo in utxos:
                 tx = self.tx(utxo.txid)
                 # header = self.blockHeaderByHeight(utxo["height"])

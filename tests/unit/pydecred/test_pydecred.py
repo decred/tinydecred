@@ -13,17 +13,14 @@ from tinydecred.pydecred.calc import SubsidyCache
 from tinydecred.pydecred import mainnet, testnet, txscript, vsp, account
 from tinydecred.pydecred.wire import wire, msgtx
 from tinydecred.util.encode import ByteArray
-from tinydecred.util import database
+from tinydecred.util import database, chains
 from tinydecred.crypto import crypto, opcode, rando
 from tinydecred.wallet.accounts import createAccount
-from tinydecred.wallet import chains
 from tinydecred.crypto.secp256k1 import curve as Curve
 
 testSeed = ByteArray(
     "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 ).b
-
-chains.registerChain("dcr", None)
 
 
 def newHash():
@@ -31,6 +28,10 @@ def newHash():
 
 
 class TestSubsidyCache(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        chains.registerChain("dcr", None)
+
     def test_subsidy_cache_calcs(self):
         """
         TestSubsidyCacheCalcs ensures the subsidy cache calculates the various
@@ -2975,7 +2976,7 @@ class TestAccount(unittest.TestCase):
             self.assertEqual(utxocount(), 0)
 
             b = acct.serialize()
-            reAcct = account.DecredAccount.unblob(b.b)
+            reAcct = account.Account.unblob(b.b)
 
             self.assertEqual(acct.pubKeyEncrypted, reAcct.pubKeyEncrypted)
             self.assertEqual(acct.privKeyEncrypted, reAcct.privKeyEncrypted)
