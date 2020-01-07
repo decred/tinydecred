@@ -582,7 +582,9 @@ if __name__ == "__main__":
             module = parts[0].upper()
             logLvl = helpers.getLogLevel(parts[1])
 
-            helpers.prepareLogger(module, os.path.join(logDir, "tinydecred.log"), logLvl=logLvl)
+            helpers.prepareLogger(
+                module, os.path.join(logDir, "tinydecred.log"), logLvl=logLvl
+            )
         except:
             log.info("Bad argument in module logging level: ", logLvlModule)
 

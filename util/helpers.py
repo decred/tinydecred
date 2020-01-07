@@ -223,6 +223,7 @@ def getLogger(name, logLvl=logging.INFO):
     l.setLevel(logLvl)
     return l
 
+
 def getLogLevel(logLvl):
     """
     From a string (by argparse) that could be INT or STR, check and solve the LogLevel.
@@ -230,15 +231,16 @@ def getLogLevel(logLvl):
 
     Return: logging.LogLvl
     """
-    logNameToLevel = {'CRITICAL': logging.CRITICAL,
-                    'FATAL': logging.CRITICAL,
-                    'ERROR': logging.ERROR,
-                    'WARN': logging.WARNING,
-                    'WARNING': logging.WARNING,
-                    'INFO': logging.INFO,
-                    'DEBUG': logging.DEBUG,
-                    'NOTSET': logging.NOTSET
-                    }
+    logNameToLevel = {
+        "CRITICAL": logging.CRITICAL,
+        "FATAL": logging.CRITICAL,
+        "ERROR": logging.ERROR,
+        "WARN": logging.WARNING,
+        "WARNING": logging.WARNING,
+        "INFO": logging.INFO,
+        "DEBUG": logging.DEBUG,
+        "NOTSET": logging.NOTSET,
+    }
 
     try:
         lvl = int(logLvl)
