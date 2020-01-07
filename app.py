@@ -574,7 +574,18 @@ if __name__ == "__main__":
     # Initialize logging for the entire app.
     logDir = os.path.join(config.DATA_DIR, "logs")
     helpers.mkdir(logDir)
-    log = helpers.prepareLogger("APP", os.path.join(logDir, "tinydecred.log"), logLvl=cfg.logLevel)
+    log = helpers.getLogger("APP")
+
+    for logLvlModule in cfg.logLvls:
+        try:
+            parts = logLvlModule.split(":")
+            module = parts[0].upper()
+            logLvl = helpers.getLogLevel(parts[1])
+
+            helpers.prepareLogger(module, os.path.join(logDir, "tinydecred.log"), logLvl=logLvl)
+        except:
+            log.info("Bad argument in module logging level: ", logLvlModule)
+
     log.info("configuration file at %s" % config.CONFIG_PATH)
     log.info("data directory at %s" % config.DATA_DIR)
     runTinyDecred()
