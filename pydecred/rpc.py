@@ -63,6 +63,163 @@ class Client(object):
         """
         return GetBlockChainInfoResult.parse(self.call("getblockchaininfo"))
 
+    def getRawTransaction(self, txid, verbose=0):
+        """
+        Returns information about a transaction given its hash.
+
+        Args:
+            txid (str): The hash of the transaction
+            verbose (int): Optional. Default=0. Specifies the transaction is
+                returned as a JSON object instead of a hex-encoded string
+
+        Returns:
+            RawTransactionResult or string: RawTransactionResult if verbose=1,
+                hex string for the transaction if default
+        """
+        res = self.call("getrawtransaction", txid, verbose,)
+        return RawTransactionsResult.parse(res) if verbose else res
+
+    def getStakeDifficulty(self):
+        """
+        Returns the proof-of-stake difficulty.
+
+        Returns:
+            GetStakeDifficultyResult: The current and calculated next difficulty.
+        """
+        return GetStakeDifficultyResult.parse(self.call("getstakedifficulty"))
+
+    def getStakeVersionInfo(self, count=None):
+        """
+        Returns stake version statistics for one or more stake version intervals.
+
+        Args:
+            count (int): Optional. Default=None. Number of intervals to return.
+
+        Returns:
+            GetStakeVersionInfoResult: The stake version statistics.
+        """
+        return GetStakeVersionInfoResult.parse(self.call("getstakeversioninfo", count))
+
+    def getStakeVersions(self, Hash, count):
+        """
+        Returns the stake versions statistics.
+
+        Args:
+            Hash (str) The start block hash.
+            count (int) The number of blocks that will be returned.
+
+        Returns:
+            list(GetStakeVersionsResult): Array of stake versions per block.
+        """
+        return [
+            GetStakeVersionsResult.parse(ver)
+            for ver in self.call("getstakeversions", Hash, count)["stakeversions"]
+        ]
+
+    def getTicketPoolValue(self):
+        """
+        Return the current value of all locked funds in the ticket pool.
+
+        Returns:
+            float: Total value of ticket pool
+        """
+        return self.call("getticketpoolvalue")
+
+    def getTxOut(self, txid, vout, includeMempool=True):
+        """
+        Returns information about an unspent transaction output.
+
+        Args:
+            txid (str): The hash of the transaction
+            vout (int): The index of the output
+            includeMempool (bool): Optional. Default=True. Include the mempool
+                when true
+
+        Returns:
+            GetTxOutResult: The utxo information.
+        """
+        return GetTxOutResult.parse(self.call("gettxout", txid, vout, includeMempool))
+
+    def getVoteInfo(self, version):
+        """
+        Returns the vote info statistics.
+
+        Args:
+            version (int) The stake version.
+
+        Returns:
+            GetVoteInfoResult: The voting information.
+        """
+        return GetVoteInfoResult.parse(self.call("getvoteinfo", version))
+
+    def getWork(self, data=None):
+        """
+        Returns formatted hash data to work on or checks and submits solved data.
+
+        Args:
+            data (str): Optional. Default=None. Hex-encoded data to check
+
+        Returns:
+            GetWorkResult or bool: If data is not provided, returns GetWorkResult,
+                else returns whether or not the solved data is valid and was
+                added to the chain
+        """
+        res = self.call("getwork", data)
+        return res if data else GetWorkResult.parse(res)
+
+    def help(self, command=None):
+        """
+        Returns a list of all commands or help for a specified command.
+
+        Ars:
+            command (str): Optional. Default=None. The command to retrieve help for.
+
+        Returns:
+            str: List of commands or help for specified command.
+        """
+        return self.call("help", command)
+
+    def liveTickets(self):
+        """
+        Returns live ticket hashes from the ticket database.
+
+        Returns:
+            list(str): List of live tickets.
+        """
+        return self.call("livetickets")
+
+    def missedTickets(self):
+        """
+        Returns missed ticket hashes from the ticket database.
+
+        Returns:
+            list(str): List of missed tickets.
+        """
+        return self.call("missedtickets")
+
+    def node(self, subcmd, target, connectSubCmd=None):
+        """
+        Attempts to add or remove a peer.
+
+        Args:
+            subcmd (str): 'disconnect' to remove all matching non-persistent
+                peers, 'remove' to remove a persistent peer, or 'connect' to
+                connect to a peer
+            target (str): Either the IP address and port of the peer to
+                operate on, or a valid peer ID.
+            connectSubCmd (str): Optional. Default=None. 'perm' to make the
+                connected peer a permanent one, 'temp' to try a single connect
+                to a peer
+        """
+        self.call("node", self, subcmd, target, connectSubCmd)
+
+    def ping(self):
+        """
+        Queues a ping to be sent to each connected peer. Ping times are provided
+            by getpeerinfo via the pingtime and pingwait fields.
+        """
+        self.call("ping")
+
     def searchRawTransactions(
         self,
         address,
@@ -99,10 +256,10 @@ class Client(object):
                 address will be returned.
 
         Returns:
-            list(SearchRawTransactionResult): The SearchRawTransactionResults.
+            list(RawTransactionResult): The RawTransactionResults.
         """
         return [
-            SearchRawTransactionsResult.parse(rawTx)
+            RawTransactionsResult.parse(rawTx)
             for rawTx in self.call(
                 "searchrawtransactions",
                 address,
@@ -176,7 +333,7 @@ class Client(object):
                 ticket fee information about.
 
         Returns:
-            dict[string]FeeInfoResult: FeeInfoResults for the keys
+            dict[str]FeeInfoResult: FeeInfoResults for the keys
                 "feeinfomempool", "feeinfoblocks", and "feeinfowindows".
         """
         return {
@@ -225,7 +382,7 @@ class Client(object):
                 transaction fees for.
 
         Returns:
-            dict[string]FeeInfoResult: FeeInfoResults for the keys
+            dict[str]FeeInfoResult: FeeInfoResults for the keys
                 "feeinfomempool", "feeinfoblocks", and "feeinforange".
         """
         return {
@@ -274,7 +431,7 @@ class Client(object):
         Get the dcrd and dcrdjsonrpcapi version info.
 
         Returns:
-            dict[string]VersionResult: dcrd's version info with keys "dcrd" and "dcrdjsonrpcapi".
+            dict[str]VersionResult: dcrd's version info with keys "dcrd" and "dcrdjsonrpcapi".
         """
         return {k: VersionResult.parse(v) for k, v in self.call("version").items()}
 
@@ -291,6 +448,446 @@ def get(k, obj):
         object: the thing found at k or None.
     """
     return obj[k] if k in obj else None
+
+
+class GetWorkResult:
+    """getworkresult"""
+
+    def __init__(
+        self, data, target,
+    ):
+        """
+        Args:
+            data (str): Hex-encoded block data.
+            target (str): Hex-encoded little-endian hash target.
+        """
+        self.data = data
+        self.target = target
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the GetWorkResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            GetWorkResult: The GetWorkResult.
+        """
+        return GetWorkResult(data=obj["data"], target=obj["target"],)
+
+
+class GetTxOutResult:
+    """gettxoutresult"""
+
+    def __init__(
+        self, bestBlock, confirmations, value, scriptPubKey, version, coinbase,
+    ):
+        """
+        Args:
+            bestBlock (str): The block hash that contains the transaction
+                output
+            confirmations (int): The number of confirmations
+            value (float): The transaction amount in DCR
+            scriptPubKey (ScriptPubKeyResult): The public key script used to pay
+                coins as a JSON object
+            version (int): The transaction version
+            coinbase (bool): Whether or not the transaction is a coinbase
+        """
+        self.bestBlock = bestBlock
+        self.confirmations = confirmations
+        self.value = value
+        self.scriptPubKey = scriptPubKey
+        self.version = version
+        self.coinbase = coinbase
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the GetTxOutResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            GetTxOutResult: The GetTxOutResult.
+        """
+        return GetTxOutResult(
+            bestBlock=obj["bestblock"],
+            confirmations=obj["confirmations"],
+            value=obj["value"],
+            scriptPubKey=ScriptPubKeyResult.parse(obj["scriptPubKey"]),
+            version=obj["version"],
+            coinbase=obj["coinbase"],
+        )
+
+
+class Choice:
+    """
+    Choice models an individual choice inside an Agenda.
+    """
+
+    def __init__(
+        self, ID, description, bits, isAbstain, isNo, count, progress,
+    ):
+        """
+        Args:
+            ID (str): Unique identifier of this choice.
+            description (str): Description of this choice.
+            bits (int): Bits that identify this choice.
+            isAbstain (bool): This choice is to abstain from change.
+            isNo (bool): Hard no choice (1 and only 1 per agenda).
+            count (int): How many votes received.
+            progress (float): Progress of the overall count.
+        """
+        self.id = ID
+        self.description = description
+        self.bits = bits
+        self.isAbstain = isAbstain
+        self.isNo = isNo
+        self.count = count
+        self.progress = progress
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the Choice from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            Choice: The parsed Choice.
+        """
+        return Choice(
+            ID=obj["id"],
+            description=obj["description"],
+            bits=obj["bits"],
+            isAbstain=obj["isabstain"],
+            isNo=obj["isno"],
+            count=obj["count"],
+            progress=obj["progress"],
+        )
+
+
+class Agenda:
+    """
+    Agenda models an individual agenda including its choices.
+    """
+
+    def __init__(
+        self,
+        ID,
+        description,
+        mask,
+        startTime,
+        expireTime,
+        status,
+        quorumProgress,
+        choices,
+    ):
+        """
+        Args:
+            id (str): Unique identifier of this agenda.
+            description (str): Description of this agenda.
+            mask (int): Agenda mask.
+            startTime (int): Time agenda becomes valid.
+            expireTime (int): Time agenda becomes invalid.
+            status (str): Agenda status.
+            quorumProgress (float): Progress of quorum reached.
+            choices list(Choice): All choices in this agenda.
+        """
+        self.id = ID
+        self.description = description
+        self.mask = mask
+        self.startTime = startTime
+        self.expireTime = expireTime
+        self.status = status
+        self.quorumProgress = quorumProgress
+        self.choices = choices
+
+    def parse(obj):
+        """
+        Parse the Agenda from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            Agenda: The parsed Agenda info.
+        """
+        return Agenda(
+            ID=obj["id"],
+            description=obj["description"],
+            mask=obj["mask"],
+            startTime=obj["starttime"],
+            expireTime=obj["expiretime"],
+            status=obj["status"],
+            quorumProgress=obj["quorumprogress"],
+            choices=[Choice.parse(choice) for choice in obj["choices"]],
+        )
+
+
+class GetVoteInfoResult:
+    """getvoteinfo"""
+
+    def __init__(
+        self,
+        currentHeight,
+        startHeight,
+        endHeight,
+        Hash,
+        voteVersion,
+        quorum,
+        totalVotes,
+        agendas=None,
+    ):
+        """
+        currentHeight (int): Top of the chain height.
+        startHeight (int): The start height of this voting window.
+        endHeight (int): The end height of this voting window.
+        hash (str): The hash of the current height block.
+        voteVersion (int): Selected vote version.
+        quorum (int): Minimum amount of votes required.
+        totalVotes (int): Total votes.
+        agendas list(Agenda): All agendas for this stake version. May be empty.
+        """
+        self.currentHeight = currentHeight
+        self.startHeight = startHeight
+        self.endHeight = endHeight
+        self.Hash = Hash
+        self.voteVersion = voteVersion
+        self.quorum = quorum
+        self.totalVotes = totalVotes
+        self.agendas = agendas if agendas else []
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the GetVoteInfoResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            GetVoteInfoResult: The GetVoteInfoResult.
+        """
+        return GetVoteInfoResult(
+            currentHeight=obj["currentheight"],
+            startHeight=obj["startheight"],
+            endHeight=obj["endheight"],
+            Hash=obj["hash"],
+            voteVersion=obj["voteversion"],
+            quorum=obj["quorum"],
+            totalVotes=obj["totalvotes"],
+            agendas=[Agenda.parse(agenda) for agenda in obj["agendas"]]
+            if obj["agendas"]
+            else [],
+        )
+
+
+class VersionBits:
+    """
+    VersionBits models a generic version:bits tuple.
+    """
+
+    def __init__(
+        self, version, bits,
+    ):
+        """
+        Args:
+            version (int): The version of the vote.
+            bits (int): The bits assigned by the vote.
+        """
+        self.version = version
+        self.bits = bits
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the VersionBits from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            VersionBits: The parsed VersionBits.
+        """
+        return VersionBits(version=obj["version"], bits=obj["bits"],)
+
+
+class GetStakeVersionsResult:
+    """getstakeversionsresult"""
+
+    def __init__(
+        self, Hash, height, blockVersion, stakeVersion, votes,
+    ):
+        """
+        Args:
+            hash (str): Hash of the block.
+            height (int): Height of the block.
+            blockVersion (int): The block version.
+            stakeVersion (int): The stake version of the block.
+            votes list(VersionBits): The version and bits of each vote in the
+                block.
+        """
+        self.hash = Hash
+        self.height = height
+        self.blockVersion = blockVersion
+        self.stakeVersion = stakeVersion
+        self.votes = votes
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the StakeVersionsResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            StakeVersionsResult: The StakeVersionsResult.
+        """
+        return GetStakeVersionsResult(
+            Hash=obj["hash"],
+            height=obj["height"],
+            blockVersion=obj["blockversion"],
+            stakeVersion=obj["stakeversion"],
+            votes=[VersionBits.parse(vote) for vote in obj["votes"]],
+        )
+
+
+class VersionCount:
+    """
+    VersionCount models a generic version:count tuple.
+    """
+
+    def __init__(
+        self, version, count,
+    ):
+        """
+        version (int): Version of the vote.
+        count (int): Number of votes.
+        """
+        self.version = version
+        self.count = count
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the VersionCount from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            VersionCount: The parsed VersionCount.
+        """
+        return VersionCount(version=obj["version"], count=obj["count"],)
+
+
+class VersionInterval:
+    """
+    VersionInterval models a cooked version count for an interval.
+    """
+
+    def __init__(
+        self, startHeight, endHeight, poSVersions, voteVersions,
+    ):
+        """
+        Args:
+            startHeight (int): Start of the interval.
+            endHeight (int): End of the interval.
+            posVersions list(VersionCount): Tally of the stake versions.
+            voteVersions list(VersionCount): Tally of all vote versions.
+        """
+        self.startHeight = startHeight
+        self.endHeight = endHeight
+        self.poSVersions = poSVersions
+        self.voteVersions = voteVersions
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the VersionInterval from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            VersionInterval: The parsed VersionInterval.
+        """
+        return VersionInterval(
+            startHeight=obj["startheight"],
+            endHeight=obj["endheight"],
+            poSVersions=[VersionCount.parse(ver) for ver in obj["posversions"]],
+            voteVersions=[VersionCount.parse(ver) for ver in obj["voteversions"]],
+        )
+
+
+class GetStakeVersionInfoResult:
+    """getstakeversioninforesult"""
+
+    def __init__(
+        self, currentHeight, Hash, intervals,
+    ):
+        """
+        Args:
+            currentHeight (int): Top of the chain height.
+            hash (str): Top of the chain hash.
+            intervals list(VersionInterval): Array of total stake and vote counts.
+        """
+        self.currentHeight = currentHeight
+        self.hash = Hash
+        self.intervals = intervals
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the GetStakeVersionInfoResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            GetStakeVersionInfoResult: The GetStakeVersionInfoResult.
+        """
+        return GetStakeVersionInfoResult(
+            currentHeight=obj["currentheight"],
+            Hash=obj["hash"],
+            intervals=[VersionInterval.parse(ver) for ver in obj["intervals"]],
+        )
+
+
+class GetStakeDifficultyResult:
+    """getstakedifficultyresult"""
+
+    def __init__(
+        self, currentStakeDifficulty, nextStakeDifficulty,
+    ):
+        """
+        currentStakeDifficulty (float): The current top block's stake difficulty
+        nextStakeDifficulty (float): The calculated stake difficulty of the next
+            block
+        """
+        self.currentStakeDifficulty = currentStakeDifficulty
+        self.nextStakeDifficulty = nextStakeDifficulty
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the GetStakeDifficultyResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            GetStakeDifficultyResult: The GetStakeDifficultyResult.
+        """
+        return GetStakeDifficultyResult(
+            currentStakeDifficulty=obj["current"], nextStakeDifficulty=obj["next"],
+        )
 
 
 class FeeInfoResult:
@@ -414,7 +1011,7 @@ class GetBlockChainInfoResult(object):
             verificationProgress (float): The chain verification progress
                 estimate.
             chainWork (str):  Hex encoded total work done for the chain.
-            initialBlockDownload (boolean): Best guess of whether this node is
+            initialBlockDownload (bool): Best guess of whether this node is
                 in the initial block download mode used to catch up the chain
                 when it is far behind
             maxBlockSize (int): The maximum allowed block size.
@@ -497,7 +1094,7 @@ class AgendaInfo(object):
         )
 
 
-class SearchRawTransactionsResult:
+class RawTransactionsResult:
     """searchrawtransactions"""
 
     def __init__(
@@ -549,7 +1146,7 @@ class SearchRawTransactionsResult:
 
     @staticmethod
     def parse(obj):
-        return SearchRawTransactionsResult(
+        return RawTransactionsResult(
             txid=obj["txid"],
             version=obj["version"],
             lockTime=obj["locktime"],
@@ -577,7 +1174,7 @@ class PrevOut:
         """
         Args:
             value (float): previous output value.
-            addresses (list(str)): previous output addresses. Maybe empty.
+            addresses (list(str)): previous output addresses. May be empty.
         """
         self.value = value
         self.addresses = addresses if addresses else []
@@ -607,8 +1204,8 @@ class Vin:
 
     def __init__(
         self,
-        coinbase,
         amountIn,
+        coinbase=None,
         stakebase=None,
         txid=None,
         vout=None,
@@ -621,9 +1218,9 @@ class Vin:
     ):
         """
         Args:
-            coinbase (str): The hex-encoded bytes of the signature script
-                (coinbase txns only).
             amountIn (int): The amount in for this transaction input, in coins.
+            coinbase (str): The hex-encoded bytes of the signature script
+                (coinbase txns only) or None.
             stakebase (str): The hash of the stake transaction or None.
             txid (str): The hash of the origin transaction (non-coinbase txns
                 only) or None.
@@ -641,8 +1238,8 @@ class Vin:
                 vout or None.
             sequence (int) The script sequence number or None.
         """
-        self.coinbase = coinbase
         self.amountIn = amountIn
+        self.coinbase = coinbase
         self.stakebase = stakebase
         self.txid = txid
         self.vout = vout
@@ -666,8 +1263,8 @@ class Vin:
             Vin: The Parsed Vin.
         """
         Vin(
-            coinbase=obj["coinbase"],
             amountIn=obj["amountin"],
+            coinbase=get("coinbase", obj),
             stakebase=get("stakebase", obj),
             txid=get("txid", obj),
             vout=get("vout", obj),
