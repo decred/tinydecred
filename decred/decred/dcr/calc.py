@@ -671,3 +671,19 @@ class SubsidyCache(object):
 
         # Adjust for the number of voters.
         return (voters * subsidy) // self.params.TicketsPerBlock
+
+
+def blksLeftStakeWindow(net, height):
+    """
+    Return the number of blocks until the next stake difficulty change.
+
+        Args:
+            net (object): The network parameters.
+            height (int): Block height to find remaining blocks from.
+
+        Returns:
+            int: The number of blocks left in the current window.
+    """
+    window = net.StakeDiffWindowSize
+    # Add one to height to account for the genesis block.
+    return window - (height + 1) % window

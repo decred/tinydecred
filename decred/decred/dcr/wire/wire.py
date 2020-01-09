@@ -53,6 +53,13 @@ CmdCFHeaders      = "cfheaders"
 CmdCFTypes        = "cftypes"
 # fmt: on
 
+
+# NullBlockHeight is the null value for an input witness. It references the
+# genesis block.
+NullBlockHeight = 0x00000000
+# NullBlockIndex is the null transaction index in a block for an input witness.
+NullBlockIndex = 0xFFFFFFFF
+
 # MaxMessagePayload is the maximum bytes a message can be regardless of other
 # individual limits imposed by messages themselves.
 MaxMessagePayload = 1024 * 1024 * 32  # 32MB

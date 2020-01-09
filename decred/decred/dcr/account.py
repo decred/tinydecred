@@ -1,5 +1,6 @@
 """
 Copyright (c) 2019, Brian Stafford
+Copyright (c) 2020, the Decred developers
 See LICENSE for details
 """
 
@@ -216,9 +217,13 @@ class TicketInfo:
         purchaseBlock,
         maturityHeight,
         expirationHeight,
-        lotteryBlock,
-        vote,
-        revocation,
+        lotteryBlock=None,
+        vote=None,
+        revocation=None,
+        poolFee=0,
+        purchaseTxFee=0,
+        spendTxFee=0,
+        stakebase=0,
     ):
         """
         Ticket information.
@@ -242,6 +247,10 @@ class TicketInfo:
         self.lotteryBlock = lotteryBlock
         self.vote = vote
         self.revocation = revocation
+        self.poolFee = poolFee
+        self.purchaseTxFee = purchaseTxFee
+        self.spendTxFee = spendTxFee
+        self.stakebase = stakebase
 
     @staticmethod
     def parse(obj):
@@ -257,7 +266,9 @@ class TicketInfo:
             purchaseBlock=TinyBlock.parse(obj["purchase_block"]),
             maturityHeight=obj["maturity_height"],
             expirationHeight=obj["expiration_height"],
-            lotteryBlock=TinyBlock.parse(obj["lottery_block"]),
+            lotteryBlock=TinyBlock.parse(obj["lottery_block"])
+            if obj["lottery_block"]
+            else None,
             vote=ba(obj["vote"]) if obj["vote"] else None,
             revocation=ba(obj["revocation"]) if obj["revocation"] else None,
         )
@@ -267,7 +278,7 @@ class TicketInfo:
         """Satisfies the encode.Blobber API"""
         f = encode.filterNone
         return (
-            BuildyBytes(0)
+            BuildyBytes(1)
             .addData(utxo.status.encode("utf-8"))
             .addData(
                 f(TinyBlock.blob(utxo.purchaseBlock) if utxo.purchaseBlock else None)
@@ -279,6 +290,10 @@ class TicketInfo:
             )
             .addData(f(utxo.vote))
             .addData(f(utxo.revocation))
+            .addData(utxo.poolFee)
+            .addData(utxo.purchaseTxFee)
+            .addData(utxo.spendTxFee)
+            .addData(utxo.stakebase)
             .b
         )
 
@@ -286,12 +301,21 @@ class TicketInfo:
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        if ver != 0:
+        if ver == 0:
+            if len(d) != 7:
+                # TODO change to DecredError
+                raise AssertionError(
+                    "wrong number of pushes for TicketInfo. wanted 7, got %d" % len(d)
+                )
+            d.extend([b"", b"", b"", b""])
+        elif ver == 1:
+            if len(d) != 11:
+                # TODO change to DecredError
+                raise AssertionError(
+                    "wrong number of pushes for TicketInfo. wanted 11, got %d" % len(d)
+                )
+        else:
             raise AssertionError("invalid TicketInfo version %d" % ver)
-        if len(d) != 7:
-            raise AssertionError(
-                "wrong number of pushes for TicketInfo. wanted 7, got %d" % len(d)
-            )
 
         iFunc = encode.intFromBytes
         f = encode.extractNone
@@ -315,6 +339,81 @@ class TicketInfo:
             lotteryBlock=lotteryBlock,
             vote=vote,
             revocation=revocation,
+            poolFee=iFunc(d[7]),
+            purchaseTxFee=iFunc(d[8]),
+            spendTxFee=iFunc(d[9]),
+            stakebase=iFunc(d[10]),
+        )
+
+    @staticmethod
+    def fees(tx):
+        """
+        Helper method to extract pool and transaction fees from a voting MsgTx.
+
+        Args:
+            tx (msgtx.MsgTx): The transaction to extract fees for.
+
+        Returns:
+            int: The pool fees associated with this transaction.
+            int: The transaction fees incurred by sending this transaction.
+        """
+        poolFee = (
+            tx.txOut[2].value
+            if len(tx.txOut) > 2 and txscript.isSSGen(tx)
+            else tx.txOut[0].value
+        )
+        atomsIn = sum(txIn.valueIn for txIn in tx.txIn)
+        atomsOut = sum(txOut.value for txOut in tx.txOut)
+        txFee = atomsIn - atomsOut
+        return poolFee, txFee
+
+    @staticmethod
+    def fromSpendingTx(ticket, spendingTx, purchaseBlock, lotteryBlock, netParams):
+        """
+        Get TicketInfo from a voting Tx.
+
+        Args:
+            ticket (msgtx.MsgTx): The ticket that was voted.
+            spendingTx (msgtx.MsgTx): Voting or revoking transaction transaction
+                to produce TicketInfo for.
+            purchaseBlock (TinyBlock): The block the ticket was purchased in.
+            lotteryBlock (TinyBlock): The block the ticket was pulled to vote in.
+            netParams (obj): The network parameters.
+
+        Returns:
+            TicketInfo: The ticket info belonging to the ticket this vote is
+                spending.
+        """
+        isVote = txscript.isSSGen(spendingTx)
+        # sometimes this data cannot be fetched yet by dcrdata
+        if not lotteryBlock:
+            status = "unconfirmed"
+        else:
+            if isVote:
+                status = "voted"
+            else:
+                status = "revoked"
+
+        if isVote:
+            stakebase = spendingTx.txIn[0].valueIn
+
+        _, purchaseTxFee = TicketInfo.fees(ticket)
+        poolFee, spendTxFee = TicketInfo.fees(spendingTx)
+        maturity = purchaseBlock.height + netParams.TicketMaturity
+        expiration = maturity + netParams.TicketExpiry
+
+        return TicketInfo(
+            status=status,
+            purchaseBlock=purchaseBlock,
+            maturityHeight=maturity,
+            expirationHeight=expiration,
+            lotteryBlock=lotteryBlock,
+            vote=spendingTx.txid() if isVote else None,
+            revocation=spendingTx.txid() if not isVote else None,
+            stakebase=stakebase if isVote else 0,
+            purchaseTxFee=purchaseTxFee,
+            spendTxFee=spendTxFee,
+            poolFee=poolFee,
         )
 
     def serialize(self):
@@ -460,6 +559,45 @@ class UTXO:
         utxo.parseScriptClass()
         return utxo
 
+    @staticmethod
+    def ticketFromTx(tx, netParams, block=None, tinfo=None):
+        """
+        Convert a msgtx.MsgTx into a ticket.
+
+        Args:
+            tx (msgtx.MsgTx): The ticket transaction.
+            netParams (obj): Network parameters.
+            block (msgblock.BlockHeader): Optional. Default=None. The block the ticket was
+                purchased in.
+            tinfo (TicketInfo): Optional. Default of None is replaced with
+                immature status TicketInfo.
+
+        Returns:
+            UTXO: The ticket.
+        """
+        txout = tx.txOut[0]
+        rawaddr = txscript.extractStakeScriptHash(
+            txout.pkScript, opcode.OP_SSTX
+        ).bytes()
+        addr = crypto.AddressScriptHash(netParams.ScriptHashAddrID, rawaddr).string()
+        ticket = UTXO(
+            address=addr,
+            txHash=tx.cachedHash(),
+            vout=0,
+            scriptPubKey=txout.pkScript,
+            satoshis=txout.value,
+            maturity=netParams.TicketMaturity,
+            tinfo=tinfo
+            if tinfo
+            else TicketInfo("mempool", None, 0, 0, None, None, None),
+        )
+        if block:
+            ticket.confirm(block, tx, netParams)
+        elif ticket.tinfo.status != "mempool":
+            ticket.tinfo.status = "unconfirmed"
+
+        return ticket
+
     @property
     def txid(self):
         """
@@ -552,6 +690,33 @@ class UTXO:
         """
         return self.scriptClass == txscript.StakeSubmissionTy
 
+    def isVote(self):
+        """
+        isVote will be True if this is a vote.
+
+        Returns:
+            bool: True if this is a vote.
+        """
+        return self.scriptClass == txscript.StakeGenTy
+
+    def isRevocation(self):
+        """
+        isRevocation will be True if this is a revocation.
+
+        Returns:
+            bool: True if this is a revocation.
+        """
+        return self.scriptClass == txscript.StakeRevocationTy
+
+    def isRevocableTicket(self):
+        """
+        Returns True if this is an expired or missed ticket.
+
+        Returns:
+            bool: True if this is expired or missed ticket.
+        """
+        return self.tinfo and self.tinfo.status in ("expired", "missed")
+
     def isLiveTicket(self):
         """
         isLiveTicket will return True if this is a live ticket.
@@ -559,15 +724,16 @@ class UTXO:
         Returns:
             bool: True if this is a live ticket.
         """
-        return self.tinfo and self.tinfo.status in ("immature", "live")
+        return self.tinfo and self.tinfo.status in ("live")
 
-    def isRevocableTicket(self):
+    def isImmatureTicket(self):
         """
-        Returns True if this is an expired or missed ticket.
+        isImmatureTicket will return True if this is an immature ticket.
+
         Returns:
-            bool: True if this is expired or missed ticket.
+            bool: True if this is an immature ticket.
         """
-        return self.tinfo and self.tinfo.status in ("expired", "missed")
+        return self.tinfo and self.tinfo.status in ("immature")
 
 
 class Balance:
@@ -646,6 +812,7 @@ class Account:
         self.name = name
         self.coinID = BIPID
         self.netID = netID
+        # TODO: change self.net to self.netParams
         self.net = nets.parse(netID)
         # For external addresses, the cursor can sit on the last seen address,
         # so start the lastSeen at the 0th external address. This is necessary
@@ -674,7 +841,6 @@ class Account:
         self.extPub = None  # The external branch public extended key.
         self.intPub = None  # The internal branch public extended key.
         self.gapLimit = DefaultGapLimit
-        self.tickets = []
         self.stakeStats = TicketStats()
         self.stakePools = []
         self.blockchain = None
@@ -682,6 +848,8 @@ class Account:
         self._votingKey = None
         self.utxoDB = None
         self.addressDB = None
+        # ticketDB is a mapping of txid to tickets (UTXO objects).
+        self.ticketDB = None
         # If a database was provided, load it. This would be the case when
         # the account is first created, as opposed to be unblobbed.
         if db is not None:
@@ -744,7 +912,7 @@ class Account:
         self.masterDB = db.child("meta")
         self.utxoDB = db.child("utxos", blobber=UTXO)
         self.utxos = {k: v for k, v in self.utxoDB.items()}
-        self.updateStakeStats()
+        self.ticketDB = db.child("tickets", datatypes=("TEXT", "BLOB"), blobber=UTXO)
         self.addrIntDB = db.child("internal_addrs", datatypes=("INTEGER", "TEXT"))
         self.internalAddresses = readAddrs(self.addrIntDB)
         self.addrExtDB = db.child("external_addrs", datatypes=("INTEGER", "TEXT"))
@@ -804,6 +972,63 @@ class Account:
         self.intPub = None
         self._votingKey = None
 
+    def votedTickets(self):
+        """
+        All tickets voted by this account and saved in the database. These are
+        updated by calling updateSpentTickets.
+
+        returns:
+            dict[str]UTXO: Dictionary of txid to voted transaction outputs.
+        """
+        return {k: v for k, v in self.ticketDB.items() if v.tinfo.vote}
+
+    def revokedTickets(self):
+        """
+        All tickets revoked by this account and saved in the database. These are
+        updated by calling updateSpentTickets.
+
+        returns:
+            dict[str]UTXO: Dictionary of txid to revoked transaction outputs.
+        """
+        return {k: v for k, v in self.ticketDB.items() if v.tinfo.revocation}
+
+    def sortedTickets(self):
+        """
+        Dictionary of live and lists of spent tickets in the database. These are
+        updated by calling updateSpentTickets.
+
+        Returns:
+            dict[str]UTXO: Dictionary of txid to unspent transaction outputs.
+            list(str): txids for voted tickets.
+            list(str): txids for revoked tickets.
+            list(str): txids of tickets with "unconfirmed" status.
+        """
+        live, unconfirmed, voted, revoked = {}, [], [], []
+        for txid, ticket in self.ticketDB.items():
+            if ticket.tinfo.status == "unconfirmed":
+                unconfirmed.append(txid)
+            elif ticket.tinfo.vote:
+                voted.append(txid)
+            elif ticket.tinfo.revocation:
+                revoked.append(txid)
+            else:
+                live[txid] = ticket
+        return live, voted, revoked, unconfirmed
+
+    def unspentTickets(self):
+        """
+        All unspent tickets held by this account and saved in the database.
+        These are updated by calling updateSpentTickets.
+
+        returns:
+            dict[str]UTXO: Dictionary of txid to unspent transaction outputs.
+        """
+        return {
+            k: v
+            for k, v in self.ticketDB.items()
+            if not v.tinfo.revocation and not v.tinfo.vote
+        }
+
     def calcBalance(self, tipHeight=None):
         """
         Calculate the current balance.
@@ -833,18 +1058,172 @@ class Account:
         self.balance.staked = staked
         return self.balance
 
+    def calcTicketProfits(self):
+        """
+        Ticket purchase statistics for this account. All values in atoms.
+
+        Returns:
+            int: Total of all stakebases received.
+            int: Total of all paid pool fees.
+            int: Total of all transactions fees, both for ticket purchases and
+                votes/revocations.
+        """
+        stakebases = sum(ticket.tinfo.stakebase for ticket in self.ticketDB.values())
+        poolFees = sum(ticket.tinfo.poolFee for ticket in self.ticketDB.values())
+        txFees = sum(
+            ticket.tinfo.purchaseTxFee + ticket.tinfo.spendTxFee
+            for ticket in self.ticketDB.values()
+        )
+        return stakebases, poolFees, txFees
+
     def updateStakeStats(self):
         """
         Updates the stake stats object.
         """
-        ticketCount = 0
-        ticketVal = 0
-        for utxo in self.utxos.values():
-            if utxo.isTicket():
-                ticketCount += 1
-                ticketVal += utxo.satoshis
-                self.tickets.append(utxo.txid)
+        uT = self.unspentTickets()
+        ticketCount = len(uT)
+        ticketVal = sum(t.satoshis for t in uT.values())
         self.stakeStats = TicketStats(ticketCount, ticketVal)
+
+    def spentTicketInfo(self, txid):
+        """
+        When retrieving the tinfo from dcrdata, it may not be ready. Log a message and
+        return None if so. Return the TicketInfo if found.
+
+        Args:
+            txid (str): The ticket to find info for.
+
+        Returns:
+            TicketInfo: The ticket info if found or None.
+        """
+        tinfo = self.blockchain.ticketInfo(txid)
+        if tinfo.vote or tinfo.revocation:
+            return tinfo
+        log.debug("ticket's tinfo not found on the blockchain {}".format(txid))
+
+    def spendTicket(self, tx):
+        """
+        Update a ticket that is already in the ticketDB. Sends a
+            ui.SPENT_TICKETS_SIGNAL on completion.
+
+        Args:
+            tx (msgtx.MsgTx): the vote or transaction that spends a ticket in
+                the ticketDB.
+        """
+        isVote = txscript.isSSGen(tx)
+        idx = 1 if isVote else 0
+        ticketTxid = tx.txIn[idx].previousOutPoint.txid()
+        if ticketTxid not in self.ticketDB:
+            raise DecredError(
+                "spending tx came for ticket that was not found in the database: {}".format(
+                    ticketTxid
+                )
+            )
+        tinfo = self.blockchain.ticketInfoForSpendingTx(tx.txid(), self.net)
+
+        ticket = self.ticketDB[ticketTxid]
+        ticket.tinfo = tinfo
+        self.ticketDB[ticketTxid] = ticket
+
+    def updateSpentTickets(self, poolTxids=None):
+        """
+        Update voted and revoked tickets. ui.SPENT_TICKETS_SIGNAL is called if
+        there was an update.
+
+            Args:
+                poolTxids (list(str)): Optional. Default=None. Additional txids
+                    to check for tickets.
+        """
+        # Get current unspent tickets.
+        mempoolTickets = {
+            k: UTXO.ticketFromTx(v, self.net)
+            for k, v in self.mempool.items()
+            if v.isTicket()
+        }
+        activeTickets = {
+            utxo.txid: utxo for utxo in self.utxos.values() if utxo.isTicket()
+        }
+        activeTickets.update(mempoolTickets)
+        # Get tickets as stored in the database.
+        unspentTickets, voted, revoked, unconfs = self.sortedTickets()
+
+        # Check tickets with unconfirmed status.
+        checkers = unconfs
+
+        for txid, tkt in activeTickets.items():
+            # Check new tickets.
+            if txid not in unspentTickets:
+                checkers.append(txid)
+                continue
+            dbTicket = unspentTickets[txid]
+            # Check tickets whose status has changed.
+            if dbTicket.tinfo.status != tkt.tinfo.status:
+                checkers.append(txid)
+
+        for txid in unspentTickets.keys():
+            # Check tickets that have been spent or disappeared due to a reorg
+            # or never have being mined.
+            if txid not in activeTickets:
+                checkers.append(txid)
+
+        # Check for possible unknown tickets if pool txids are supplied.
+        if poolTxids:
+            for txid in poolTxids:
+                if txid not in voted and txid not in revoked:
+                    checkers.append(txid)
+
+        remove = []
+        for txid in checkers:
+            try:
+                tx = self.blockchain.tx(txid)
+            # TODO: If this exception is due to blockchain being disconnected, stop.
+            except Exception:
+                if txid in self.mempool:
+                    tx = self.mempool[txid]
+                elif txid in unspentTickets:
+                    # Maybe never mined? Log and remove from database.
+                    log.info(f"ticket has disappeared: {txid}")
+                    remove.append(txid)
+                    continue
+                else:
+                    # Should never make it here.
+                    log.error(f"unknown ticket: {txid}")
+                    continue
+            if not tx.isTicket():
+                log.debug(f"not a ticket: {txid}")
+                continue
+
+            # Create the ticket.
+            tinfo = self.blockchain.ticketInfo(txid)
+            block = self.blockchain.blockForTx(txid)
+            ticket = UTXO.ticketFromTx(tx, self.net, block=block, tinfo=tinfo)
+
+            # Set the transaction fee for the original purchase.
+            _, tinfo.purchaseTxFee = TicketInfo.fees(tx)
+
+            # Store the ticket.
+            self.ticketDB[txid] = ticket
+            log.info("found ticket: {}".format(txid))
+
+            # Spend the ticket if able.
+            spendID = tinfo.vote if tinfo.vote else tinfo.revocation
+            if spendID:
+                spendingTxid = reversed(spendID).hex()
+                log.info(
+                    "found spending tx {} for ticket: {}".format(spendingTxid, txid)
+                )
+                try:
+                    tx = self.blockchain.tx(spendingTxid)
+                    self.spendTicket(tx)
+                except Exception as e:
+                    log.error("unable to spend ticket: {}: {}".format(txid, e))
+
+        for txid in remove:
+            del self.ticketDB[txid]
+
+        # Notify listeners if there was a change.
+        if len(checkers) > 0:
+            self.signals.spentTickets()
 
     def resolveUTXOs(self, utxos):
         """
@@ -857,6 +1236,8 @@ class Account:
         self.utxos = {u.key(): u for u in utxos}
         self.utxoDB.clear()
         self.utxoDB.batchInsert(self.utxos.items())
+        self.updateSpentTickets()
+        self.updateStakeStats()
 
     def utxoscan(self):
         """
@@ -1197,11 +1578,9 @@ class Account:
 
     def addUTXO(self, utxo):
         """
-        Add the UTXO. Update the stake stats if this is a ticket.
+        Add the UTXO.
         """
         self.utxos[utxo.key()] = utxo
-        if utxo.isTicket():
-            self.updateStakeStats()
 
     def addTicketAddresses(self, a):
         """
@@ -1308,7 +1687,7 @@ class Account:
         """
         return crypto.AddressSecpPubKey(
             self.votingKey().pub.serializeCompressed(), self.net
-        ).string()
+        )
 
     def setPool(self, pool):
         """
@@ -1326,12 +1705,24 @@ class Account:
         self.masterDB[MetaKeys.vsp] = encode.blobStrList(
             [p.apiKey for p in self.stakePools]
         )
+
+    def setNewPool(self, pool):
+        """
+        Set the specified new pool as the default.
+
+        Args:
+            pool (vsp.VotingServiceProvider): The stake pool object.
+        """
+        self.setPool(pool)
         bc = self.blockchain
         addr = pool.purchaseInfo.ticketAddress
+        checkTxids = []
         for txid in bc.txsForAddr(addr):
             self.addTxid(addr, txid)
+            checkTxids.append(txid)
         for utxo in bc.UTXOs([addr]):
             self.addUTXO(utxo)
+        self.updateSpentTickets(checkTxids)
         self.updateStakeStats()
         self.signals.balance(self.calcBalance())
 
@@ -1416,6 +1807,15 @@ class Account:
                 utxo = self.blockchain.txVout(txid, vout)
                 utxo.address = addr
                 self.addUTXO(utxo)
+                if utxo.isVote() or utxo.isRevocation():
+                    log.info(
+                        "incoming {}: {}".format(
+                            "vote" if utxo.isVote() else "revocation", utxo.txid
+                        )
+                    )
+                    self.spendTicket(tx)
+                    self.signals.spentTickets()
+                    self.updateStakeStats()
                 matches += 1
         if matches:
             # signal the balance update
@@ -1477,10 +1877,11 @@ class Account:
         for tx in txs[1]:
             self.addMempoolTx(tx)
         # Store the txids.
-        self.tickets.extend([tx.txid() for tx in txs[1]])
         self.spendUTXOs(spentUTXOs)
         for utxo in newUTXOs:
             self.addUTXO(utxo)
+        self.updateSpentTickets()
+        self.updateStakeStats()
         self.signals.balance(self.calcBalance())
         return txs[1]
 
@@ -1541,6 +1942,7 @@ class Account:
         # loop until the gap limit is reached.
         requestedTxs = 0
         addrs = self.gapAddrs()
+
         while addrs:
             for addr in addrs:
                 for txid in blockchain.txsForAddr(addr):
@@ -1568,7 +1970,7 @@ class Account:
         self.updateStakeStats()
         pool = self.stakePool()
         if pool:
-            pool.authorize(self.votingAddress())
+            pool.authorize(self.votingAddress().string())
 
         # Subscribe to block and address updates.
         blockchain.addressReceiver = self.addressSignal

@@ -6,13 +6,14 @@ See LICENSE for detail
 
 import os
 import random
+import threading
 import time
 from urllib.parse import urlparse
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from decred import config
-from decred.dcr import constants as DCR
+from decred.dcr import calc, constants as DCR, nets
 from decred.dcr.vsp import VotingServiceProvider
 from decred.util import chains, helpers
 from decred.wallet.wallet import Wallet
@@ -49,6 +50,35 @@ def pixmapFromSvg(filename, w, h):
         QPixmap: A sized pixmap created from the scaled SVG file.
     """
     return QtGui.QIcon(os.path.join(UI_DIR, "icons", filename)).pixmap(w, h)
+
+
+def sprintDcr(atoms, comma=""):
+    """
+    Helper to format dcr amounts.
+
+    Args:
+        atoms (int): Amount of dcr in atoms to convert to coins.
+        comma (str): Separator to add to the end of the string.
+
+    returns:
+        str: Formatted dcr amount
+    """
+    return "{:.2f} dcr{}".format(atoms / 1e8, comma)
+
+
+def sprintAmount(thing):
+    """
+    Helper to produce functions that format amounts of thing.
+
+    Args:
+        thing (str): The thing to stringify amounts for.
+
+    returns:
+        func(int, str)str: Function to stringify amounts of thing.
+    """
+    return lambda n, comma="": "{} {}{}{}".format(
+        n, thing, "" if n == 1 else "s", comma
+    )
 
 
 class TinyDialog(QtWidgets.QFrame):
@@ -1100,6 +1130,7 @@ class StakingScreen(Screen):
         self.poolScreen = PoolScreen(app, self.poolAuthed)
         self.accountScreen = PoolAccountScreen(app, self.poolScreen)
         self.agendasScreen = AgendasScreen(app, self.accountScreen)
+        self.statsScreen = StakeStatsScreen(app)
         self.balance = None
         self.wgt.setContentsMargins(5, 5, 5, 5)
         self.wgt.setMinimumWidth(400)
@@ -1132,14 +1163,21 @@ class StakingScreen(Screen):
         self.layout.addWidget(wgt)
 
         # A button to view agendas and choose how to vote.
-        agendaBtn = app.getButton(TINY, "voting")
-        agendaBtn.clicked.connect(self.stackAgendas)
+        btn = app.getButton(TINY, "voting")
+        btn.clicked.connect(self.stackAgendas)
+        agendasWgt, _ = Q.makeSeries(Q.HORIZONTAL, btn)
+
+        # A button to view network and ticket stats.
+        btn = app.getButton(TINY, "stats")
+        btn.clicked.connect(lambda: self.app.appWindow.stack(self.statsScreen))
+
+        statsWgt, _ = Q.makeSeries(Q.HORIZONTAL, agendasWgt, btn)
 
         # A button to revoke expired and missed tickets.
         revokeBtn = app.getButton(TINY, "")
-        revokeBtn.clicked.connect(self.revokeTickets)
-        votingWgt, _ = Q.makeSeries(Q.HORIZONTAL, agendaBtn, revokeBtn)
         self.revokeBtn = revokeBtn
+        revokeBtn.clicked.connect(self.revokeTickets)
+        votingWgt, _ = Q.makeSeries(Q.HORIZONTAL, agendasWgt, statsWgt, revokeBtn)
         self.layout.addWidget(votingWgt)
 
         # Hide revoke button unless we have revokable tickets.
@@ -1175,7 +1213,9 @@ class StakingScreen(Screen):
 
         # Navigate to account screen, to choose or add a different VSP account.
         self.currentPool = Q.makeLabel("", 15)
-        lbl2 = ClickyLabel(self.stackAccounts, "change")
+        lbl2 = ClickyLabel(
+            lambda: self.app.appWindow.stack(self.accountScreen), "change"
+        )
         Q.setProperties(lbl2, underline=True, fontSize=15)
         Q.addHoverColor(lbl2, "#f5ffff")
         wgt, lyt = Q.makeSeries(Q.HORIZONTAL, self.currentPool, Q.STRETCH, lbl2)
@@ -1190,9 +1230,6 @@ class StakingScreen(Screen):
         if not acct.hasPool():
             self.app.appWindow.pop(self)
             self.app.appWindow.stack(self.poolScreen)
-
-    def stackAccounts(self):
-        self.app.appWindow.stack(self.accountScreen)
 
     def stackAgendas(self):
         acct = self.app.wallet.selectedAccount
@@ -1219,14 +1256,11 @@ class StakingScreen(Screen):
         """
         acct = self.app.wallet.selectedAccount
         n = self.revocableTicketsCount
-        plural = ""
         for utxo in acct.utxos.values():
             if utxo.isRevocableTicket():
                 n += 1
         if n > 0:
-            if n > 1:
-                plural = "s"
-            self.revokeBtn.setText("revoke {} ticket{}".format(n, plural))
+            self.revokeBtn.setText("revoke {}".format(sprintAmount("ticket")(n)))
             self.revokeBtn.show()
         else:
             self.revokeBtn.hide()
@@ -1381,6 +1415,291 @@ class StakingScreen(Screen):
         window = self.app.appWindow
         window.pop(self.poolScreen)
         window.stack(self)
+
+
+class LiveTicketsScreen(Screen):
+    """
+    A screen that shows network and ticket stats.
+    """
+
+    def __init__(self, app):
+        """
+        Args:
+            app (TinyDecred): The TinyDecred application instance.
+        """
+        super().__init__(app)
+        self.isPoppable = True
+        self.canGoHome = True
+
+        self.wgt.setMinimumWidth(400)
+        self.wgt.setMinimumHeight(225)
+
+        self.liveTickets = {}
+
+        # Network statistics
+        lbl = Q.makeLabel("Live Tickets", 18)
+        self.layout.addWidget(lbl, 0, Q.ALIGN_LEFT)
+
+        # List of live tickets. Click to open dcrdata in browser.
+        wgt = self.ticketsWgt = QtWidgets.QListWidget()
+        wgt.itemClicked.connect(self.onTicketItemClicked)
+        self.layout.addWidget(wgt, 0, Q.ALIGN_LEFT)
+
+    def onTicketItemClicked(self, item):
+        """
+        Open clicked tickets in dcrdata in the user's browser.
+        """
+        utxo = self.liveTickets[item.text()[:8]]
+        url = "https://{}.dcrdata.org/tx/{}".format(
+            nets.normalizeName(cfg.net.Name), utxo.txid
+        )
+        helpers.openInBrowser(url)
+
+    def addItems(self, liveTickets):
+        """
+        Add tickets to the live list.
+
+        Args:
+            liveTickets(dict[txid]UTXO): List of live tickets.
+        """
+        self.liveTickets = liveTickets
+        self.ticketsWgt.clear()
+        self.ticketsWgt.addItems(
+            [
+                "{}... {}".format(
+                    k,
+                    " @ height {}".format(utxo.height)
+                    if utxo.height > -1
+                    else " unconfirmed",
+                )
+                for k, utxo in self.liveTickets.items()
+            ]
+        )
+
+
+class StakeStatsScreen(Screen):
+    """
+    A screen that shows network and ticket stats.
+    """
+
+    def __init__(self, app):
+        """
+        Args:
+            app (TinyDecred): The TinyDecred application instance.
+        """
+        super().__init__(app)
+        self.isPoppable = True
+        self.canGoHome = True
+
+        self.liveTicketsScreen = LiveTicketsScreen(app)
+
+        self.updatingLock = threading.Lock()
+
+        # live and immature tickets, viewable on dcrdata
+        self.liveTickets = {}
+
+        # keep track of last update and update if past LIFE
+        self.lastUpdated = time.time()
+        self.LIFE = DCR.HOUR
+
+        # Update stats on initial sync or if spent tickets have been updated.
+        self.app.registerSignal(ui.SYNC_SIGNAL, self.setStats)
+        self.app.registerSignal(ui.SPENT_TICKETS_SIGNAL, self.setStats)
+
+        self.wgt.setMinimumWidth(400)
+        self.wgt.setMinimumHeight(225)
+
+        # header and a button to show live tickets
+        lbl = Q.makeLabel("Staking", 18)
+        self.liveTicketsListBtn = btn = app.getButton(TINY, "live tickets")
+        btn.clicked.connect(lambda: self.app.appWindow.stack(self.liveTicketsScreen))
+        wgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, Q.STRETCH, btn)
+        self.layout.addWidget(wgt)
+        btn.hide()
+
+        # network statistics
+        lbl = Q.makeLabel("Network", 16)
+        self.layout.addWidget(lbl, 0, Q.ALIGN_LEFT)
+
+        lbl = Q.makeLabel("current height: ", 14)
+        h = self.blkHeight = Q.makeLabel("", 14)
+        wgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, h)
+        self.layout.addWidget(wgt)
+
+        # ticket prices
+        lbl = Q.makeLabel("current price: ", 14)
+        lbl2 = Q.makeLabel("next price: ", 14)
+        qty = self.stakeDiff = Q.makeLabel("", 14)
+        qty2 = self.nextStakeDiff = Q.makeLabel("", 14)
+        wgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, qty, lbl2, qty2)
+        self.layout.addWidget(wgt)
+
+        # ticket pool and next blocks left in stake window
+        lbl = Q.makeLabel("ticket pool: ", 14)
+        lbl2 = Q.makeLabel("next diff in: ", 14)
+        qty = self.networkTickets = Q.makeLabel("", 14)
+        qty2 = self.blocksLeft = Q.makeLabel("", 14)
+        wgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, qty, lbl2, qty2)
+        self.layout.addWidget(wgt)
+
+        # reward and total staked
+        lbl = Q.makeLabel("reward: ", 14)
+        lbl2 = Q.makeLabel("total staked: ", 14)
+        qty = self.stakebase = Q.makeLabel("", 14)
+        qty2 = self.networkValue = Q.makeLabel("", 14)
+        wgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, qty, lbl2, qty2)
+        self.layout.addWidget(wgt)
+
+        # Lifetime user statistics
+        lbl = Q.makeLabel("Lifetime", 16)
+        self.layout.addWidget(lbl, 0, Q.ALIGN_LEFT)
+
+        # A row of lifetime rewards and fees.
+        lbl = Q.makeLabel("rewards: ", 14)
+        lbl2 = Q.makeLabel("pool fees: ", 14)
+        lbl3 = Q.makeLabel("tx fees: ", 14)
+        qty = self.allStakebases = Q.makeLabel("", 14)
+        qty2 = self.allPoolFees = Q.makeLabel("", 14)
+        qty3 = self.allTxFees = Q.makeLabel("", 14)
+        wgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, qty, lbl2, qty2, lbl3, qty3)
+        self.layout.addWidget(wgt)
+
+        # A row of lifetime profits.
+        lbl = Q.makeLabel("net profit: ", 14)
+        qty = self.netProfit = Q.makeLabel("", 14)
+        wgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, qty)
+        self.layout.addWidget(wgt)
+
+        # A row of voted and revoked ticket numbers.
+        lbl = Q.makeLabel("voted: ", 14)
+        lbl2 = Q.makeLabel("revoked: ", 14)
+        qty = self.votedCount = Q.makeLabel("", 14)
+        qty2 = self.revokedCount = Q.makeLabel("", 14)
+        wgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, qty, lbl2, qty2)
+        self.layout.addWidget(wgt)
+
+        # Current staking statistics
+        lbl = Q.makeLabel("Current", 16)
+        self.layout.addWidget(lbl, 0, Q.ALIGN_LEFT)
+
+        # A row of immature, live, and revocable ticket numbers.
+        lbl = Q.makeLabel("immature: ", 14)
+        lbl2 = Q.makeLabel("live: ", 14)
+        lbl3 = Q.makeLabel("revocable: ", 14)
+        qty = self.immatureCount = Q.makeLabel("", 14)
+        qty2 = self.liveCount = Q.makeLabel("", 14)
+        qty3 = self.revocableCount = Q.makeLabel("", 14)
+        wgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, qty, lbl2, qty2, lbl3, qty3)
+        self.layout.addWidget(wgt)
+
+        # total staked and a button to show a list of live tickets
+        lbl = Q.makeLabel("total staked:", 14)
+        amt = self.ticketValue = Q.makeLabel("", 14)
+        wgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, amt)
+        self.layout.addWidget(wgt)
+
+    def stacked(self):
+        """
+        Update on stacking if necessary.
+        """
+        if time.time() > self.lastUpdated + self.LIFE:
+            self.setStats()
+
+    def setStats(self):
+        """
+        Set stats on SPENT_TICKETS_SIGNAL, SYNC_SIGNAL, or if stacking and
+        self.LIFE has expired.
+        """
+        if self.updatingLock.locked():
+            return
+        self.updatingLock.acquire()
+        self.liveTicketsListBtn.hide()
+
+        def set():
+            self.app.emitSignal(ui.WORKING_SIGNAL)
+            self.setStatsNetwork()
+            self.setStatsLifetime()
+            self.setStatsCurrent()
+            self.app.emitSignal(ui.DONE_SIGNAL)
+            self.lastUpdated = time.time()
+            self.updatingLock.release()
+
+        self.app.makeThread(set)
+
+    def setStatsNetwork(self):
+        """
+        Set network statistics.
+        """
+        blockchain = self.app.dcrdata
+
+        r = sprintDcr
+        t = sprintAmount("ticket")
+        b = sprintAmount("block")
+
+        tpinfo = blockchain.ticketPoolInfo()
+        self.blkHeight.setText(str(tpinfo.height))
+        self.networkTickets.setText(t(tpinfo.size, ", "))
+        self.networkValue.setText("{:.2f} dcr".format(tpinfo.value))
+        blocksLeft = calc.blksLeftStakeWindow(cfg.net, tpinfo.height)
+        self.blocksLeft.setText(b(blocksLeft))
+        cache = calc.SubsidyCache(cfg.net)
+        self.stakebase.setText(r(cache.calcStakeVoteSubsidy(tpinfo.height), ", "))
+
+        stakeDiff = blockchain.stakeDiff()
+        self.stakeDiff.setText(r(stakeDiff, ", "))
+
+        nextStakeDiff = blockchain.nextStakeDiff()
+        self.nextStakeDiff.setText(r(nextStakeDiff))
+
+    def setStatsLifetime(self):
+        """
+        Set lifetime statistics.
+        """
+        acct = self.app.wallet.selectedAccount
+
+        r = sprintDcr
+
+        allStakebases, allPoolFees, allTxFees = acct.calcTicketProfits()
+        self.allStakebases.setText(r(allStakebases, ", "))
+        self.allPoolFees.setText(r(allPoolFees, ", "))
+        self.allTxFees.setText(r(allTxFees))
+        netProfit = allStakebases - allPoolFees - allTxFees
+        self.netProfit.setText(r(netProfit))
+
+    def setStatsCurrent(self):
+        """
+        Set current, unspent tickets. Populate live ticket list.
+        """
+        acct = self.app.wallet.selectedAccount
+
+        r = sprintDcr
+        t = sprintAmount("ticket")
+
+        unSpent, voted, revoked, _ = acct.sortedTickets()
+        self.votedCount.setText(t(len(voted), ", "))
+        self.revokedCount.setText(t(len(revoked)))
+        live = 0
+        immature = 0
+        revocable = 0
+        unconfirmed = 0
+        self.liveTickets = {"{}".format(k[:8]): v for k, v in unSpent.items()}
+        for ticket in self.liveTickets.values():
+            if ticket.isLiveTicket():
+                live += 1
+            elif ticket.isImmatureTicket():
+                immature += 1
+            elif ticket.isRevocableTicket():
+                revocable += 1
+            else:
+                unconfirmed += 1
+        self.immatureCount.setText(t(immature + unconfirmed, ", "))
+        self.liveCount.setText(t(live, ", "))
+        self.revocableCount.setText(t(revocable))
+        if len(self.liveTickets) > 0:
+            self.liveTicketsScreen.addItems(self.liveTickets)
+            self.liveTicketsListBtn.show()
+        stats = acct.ticketStats()
+        self.ticketValue.setText(r(stats.value))
 
 
 class PoolScreen(Screen):
@@ -1564,10 +1883,10 @@ class PoolScreen(Screen):
 
         def registerPool(wallet):
             try:
-                addr = wallet.openAccount.votingAddress()
+                addr = wallet.openAccount.votingAddress().string()
                 pool.authorize(addr)
                 app.appWindow.showSuccess("pool authorized")
-                wallet.openAccount.setPool(pool)
+                wallet.openAccount.setNewPool(pool)
                 # Notify that vote data should be updated.
                 self.app.emitSignal(ui.PURCHASEINFO_SIGNAL)
                 return True
@@ -1583,14 +1902,14 @@ class PoolScreen(Screen):
         Connected to the "see all" button clicked signal. Open the fu
         decred.org VSP list in the browser.
         """
-        QtGui.QDesktopServices.openUrl(QtCore.QUrl("https://decred.org/vsp/"))
+        helpers.openInBrowser("https://decred.org/vsp/")
 
     def linkClicked(self):
         """
         Callback from the clicked signal on the pool URL QLabel. Opens the
         pool's homepage in the users browser.
         """
-        QtGui.QDesktopServices.openUrl(QtCore.QUrl(self.poolUrl.text()))
+        helpers.openInBrowser(self.poolUrl.text())
 
     def poolClicked(self):
         """
@@ -1649,12 +1968,6 @@ class AgendasScreen(Screen):
             Q.HORIZONTAL, prevPg, Q.STRETCH, pgNum, Q.STRETCH, nextPg
         )
         self.layout.addWidget(self.pagination)
-
-    def stacked(self):
-        """
-        stacked is called on screens when stacked by the TinyDialog.
-        """
-        pass
 
     def pageBack(self):
         """

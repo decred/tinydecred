@@ -8,6 +8,7 @@ Based on dcrd MsgTx.
 
 from decred import DecredError
 from decred.crypto.crypto import hashH
+from decred.dcr import txscript
 from decred.util.encode import ByteArray
 
 from . import wire
@@ -850,6 +851,17 @@ class MsgTx:
 
     def looksLikeCoinbase(self):
         return self.txIn and self.txIn[0].previousOutPoint.hash.iszero()
+
+    def isTicket(self):
+        """
+        Whether this transaction is a stake submission.
+
+        Returns:
+            bool: True if ticket.
+        """
+        return len(self.txOut) > 0 and txscript.isStakeSubmissionScript(
+            0, self.txOut[0].pkScript
+        )
 
 
 # fmt: off

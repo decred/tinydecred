@@ -21,3 +21,16 @@ def parse(name):
         return the_nets[name]
     except KeyError:
         raise DecredError(f"unrecognized network name {name}")
+
+
+def normalizeName(netName):
+    """
+    Remove the numerals from testnet.
+
+    Args:
+        netName (string): The raw network name.
+
+    Returns:
+        string: The network name with numerals stripped.
+    """
+    return "testnet" if "testnet" in netName else netName

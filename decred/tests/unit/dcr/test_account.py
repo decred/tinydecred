@@ -15,6 +15,7 @@ from decred.util.database import KeyValueDatabase
 from decred.util.encode import ByteArray
 
 
+# TODO: use pytest tmp_path instead of TemporaryDirectory
 LOGGER_ID = "test_account"
 
 testSeed = ByteArray(
@@ -158,7 +159,7 @@ def test_utxo(prepareLogger):
     utxo.parseScriptClass()
 
     assert utxo.maturity == 345059
-    assert utxo.isLiveTicket()
+    assert utxo.isImmatureTicket()
     assert not utxo.isRevocableTicket()
     assert utxo.isTicket()
 
@@ -437,6 +438,7 @@ def test_account(prepareLogger):
         ticket.scriptPubKey = ticketScript
         ticket.parseScriptClass()
         acct.blockchain.purchaseTickets = lambda *a: ([newTx, []], [], [ticket])
+        acct.signals.spentTickets = lambda: True
         acct.purchaseTickets(1, 1)
         assert Signals.b.total == changeVal + ticket.satoshis
 
@@ -554,3 +556,511 @@ def test_gap_handling(prepareLogger):
             acct.nextInternalAddress()
         addrs = acct.internalAddresses
         assert addrs[len(addrs) - 1] == internalAddrs[5]
+
+
+def test_ticket_info_from_spending_tx():
+    """
+    Test constructing tinfo from spending tx.
+    """
+    ticket = (
+        "0100000002387a5b26700b9780f745921f14694e6563fe9a855d322ad4"
+        "01cea43cddb816d80200000000ffffffff387a5b26700b9780f745921f"
+        "14694e6563fe9a855d322ad401cea43cddb816d80300000000ffffffff"
+        "05c47b008801000000000018baa9143068cdfb98fd1eb27ac708e933f2"
+        "f9286c27ef0d8700000000000000000000206a1e781f472a926da0bb7c"
+        "e9eec7f4d434de21015cae80ff01000000000000580000000000000000"
+        "00001abd76a914000000000000000000000000000000000000000088ac"
+        "00000000000000000000206a1e90875ba5fee5f35352e9171d40190e79"
+        "6b1b15277091fe87010000000058000000000000000000001abd76a914"
+        "000000000000000000000000000000000000000088ac00000000000000"
+        "000280ff01000000000048700500020000006b483045022100a4e0e625"
+        "ce3d0f0d80477d64d439071cd52875ad8eecac0a164a224552cdbe1d02"
+        "204e0f71975fdc5d26ff8740e98fff3f630f739ebcf82c9373419207ce"
+        "cc92a56701210392d0251eddee688fb0bf0140cd32f66e0c2328fa0193"
+        "195aa44ccad345b3c0797091fe870100000048700500020000006a4730"
+        "440220016ea7d98cd3adb826bae11ccd0caec2cb23ecabf42424eedd5c"
+        "83ab6f0d6cbe02206684c1f2c38b61f9da7faa0b2bf9d802c5f07ec7be"
+        "a31729d6ec2cc55a3476de01210392d0251eddee688fb0bf0140cd32f6"
+        "6e0c2328fa0193195aa44ccad345b3c079"
+    )
+
+    revocation = (
+        "010000000139cb023fdcf6fcd18273c7395f51084721d0e4baf0ca"
+        "3ee9590ad63a411a4cb30000000001ffffffff02f0ff0100000000"
+        "0000001abc76a914781f472a926da0bb7ce9eec7f4d434de21015c"
+        "ae88ac8fcc07ba0100000000001abc76a914f90abbb67dc9257efa"
+        "6ab24eb88e2755f34b1f7f88ac0000000000000000018ad609ba01"
+        "000000296505001000000091483045022100bc9a694d0864df030e"
+        "6edea181a2e2385dfbf93396b5792899a65f19c9afd67a02206052"
+        "192b5631e062f4497706276ec514a14cdfa8035ef6c7dca0df7120"
+        "84618e0147512103af3c24d005ca8b755e7167617f3a5b4c60a65f"
+        "8318a7fcd1b0cacb1abd2a97fc21027b81bc16954e28adb8322481"
+        "40eb58bedb6078ae5f4dabf21fde5a8ab7135cb652ae"
+    )
+
+    lotteryBlkHeader = (
+        "08000000f5fff7b1daf5d81bdb0dcf0e57b53366353d720d"
+        "97f965f9ec9723c341000000af1e5cbae4064bd50e4f82a9"
+        "5ba38176c113c5b8a3aaf73195674a787485e5ab7fd2076e"
+        "365a895a677a16e8a08ba63fad2a89f42042adf3032ef9e2"
+        "d65ada8e0100823a94a9e54105001002311400006a7e621d"
+        "f99a21c501000000866d05003f1d000040a8335e0fe3cc00"
+        "2e6492202536b13a00000000000000000000000000000000"
+        "000000000000000008000000"
+    )
+
+    purchaseBlkHeader = (
+        "08000000c605a843366b64d669f277d9142533ef4e339ac"
+        "f192b5fae281d8b49010000003028d68834c31dd387a7e4"
+        "a5b2df6316013788819ed61f4f0f5f4da56d6d86e6a25df"
+        "e5a736252237f85db2e0298c72f03d091fa4987fd6ab4e2"
+        "ea9087dd877801002b72bd5a29d405001400ad140000001"
+        "b761d8ad609ba0100000029650500903300004ec12f5ee3"
+        "9319002de4b8299d2f99400000000000000000000000000"
+        "0000000000000000000000008000000"
+    )
+
+    class Dummy:
+        pass
+
+    class FakeTicketInfo(account.TicketInfo):
+        def __init__(self):
+            pass
+
+    ti = FakeTicketInfo()
+
+    pbh = msgblock.BlockHeader.deserialize(ByteArray(purchaseBlkHeader))
+    tinyP = account.TinyBlock(pbh.cachedHash(), pbh.height)
+    rev = msgtx.MsgTx.deserialize(ByteArray(revocation))
+    lbh = msgblock.BlockHeader.deserialize(ByteArray(lotteryBlkHeader))
+    tinyL = account.TinyBlock(lbh.cachedHash(), lbh.height)
+    ticket = msgtx.MsgTx.deserialize(ticket)
+
+    tinfo = ti.fromSpendingTx(ticket, rev, tinyP, tinyL, nets.testnet)
+
+    assert tinfo.purchaseBlock.height == 353577
+    assert tinfo.lotteryBlock.height == 355718
+    assert tinfo.revocation == rev.txid()
+    assert tinfo.maturityHeight == 353593
+    assert tinfo.expirationHeight == 359737
+    assert tinfo.purchaseTxFee == 5420
+    assert tinfo.poolFee == 131056
+    assert tinfo.spendTxFee == 2571
+
+    ticket = (
+        "0100000002bde648ee89dec1e687f2ddcab3ddce2953717c47f8716923"
+        "e35bd06a4351f81d0000000000ffffffffbde648ee89dec1e687f2ddca"
+        "b3ddce2953717c47f8716923e35bd06a4351f81d0100000000ffffffff"
+        "058ad609ba01000000000018baa9143068cdfb98fd1eb27ac708e933f2"
+        "f9286c27ef0d8700000000000000000000206a1e781f472a926da0bb7c"
+        "e9eec7f4d434de21015caefb0902000000000000580000000000000000"
+        "00001abd76a914000000000000000000000000000000000000000088ac"
+        "00000000000000000000206a1ef90abbb67dc9257efa6ab24eb88e2755"
+        "f34b1f7fbbe107ba010000000058000000000000000000001abd76a914"
+        "000000000000000000000000000000000000000088ac00000000000000"
+        "0002fb0902000000000028650500050000006b483045022100b42aefb8"
+        "9eca6a4608115f48de20f6574337085bdff5cb8dbc04cb52ec71986e02"
+        "2036f12f662381cd6f0e920380d881a3191ad834a02721dfcd9b2b9f32"
+        "266073460121028c4e667b51128332036daf75d46f1a1e9115eaf4c086"
+        "e0b2b94d91e855ba1754bbe107ba0100000028650500050000006b4830"
+        "45022100c912cb3bddb732047011730805ea8fb42017ef1865fda8c22d"
+        "c9423fc9be2e65022022aa0bc735f1624277ee71e0e77cf24f211689cf"
+        "39e73467cc1e82712ccd53b20121028c4e667b51128332036daf75d46f"
+        "1a1e9115eaf4c086e0b2b94d91e855ba1754"
+    )
+
+    vote = (
+        "010000000200000000000000000000000000000000000000000000000000"
+        "00000000000000ffffffff00ffffffff571ce9fb0c52ae22c3a6480cbf6d"
+        "30ff76bdffbf54b6e081eb218aa3a0ca2bc40000000001ffffffff040000"
+        "0000000000000000266a2432c0c546b332f7abf51f3fc73f4482185f4c09"
+        "61625763a766774237280000007f75050000000000000000000000086a06"
+        "050008000000900102000000000000001abb76a914781f472a926da0bb7c"
+        "e9eec7f4d434de21015cae88acd9b293890100000000001abb76a9149087"
+        "5ba5fee5f35352e9171d40190e796b1b152788ac000000000000000002a6"
+        "3895010000000000000000ffffffff020000c47b00880100000049700500"
+        "0600000091483045022100c1ec49cb687fa2421e76b534ced49563b3de1e"
+        "c6407b1bbfda26752fbdedc88302204988390ea3be77324909781322a46b"
+        "463d00dd14718f0964b9536b5eef4e35570147512103af3c24d005ca8b75"
+        "5e7167617f3a5b4c60a65f8318a7fcd1b0cacb1abd2a97fc21027b81bc16"
+        "954e28adb832248140eb58bedb6078ae5f4dabf21fde5a8ab7135cb652ae"
+    )
+
+    lotteryBlkHeader = (
+        "0800000032c0c546b332f7abf51f3fc73f4482185f4c0961"
+        "625763a7667742372800000077270b229ee8e9be0a96bf14"
+        "c01797cb4af8e104115be3669898c0a7d319a31fe66e45e4"
+        "5c94392225a2ca6ffec424fb60d1adfc8c23259624ce949b"
+        "3740ed2b0100e507395f6e5905000000a61400005ea3001e"
+        "d11d24a101000000807505006c080000e96e375e6000fd00"
+        "cd4f3e1dc861c7db00000000000000000000000000000000"
+        "000000000000000008000000"
+    )
+
+    purchaseBlkHeader = (
+        "080000001bb464c806d08ff2d3970a0aa3e23357b815e23"
+        "e50bdc21dca341a2929000000688c46a5bb4400340dd4c0"
+        "0ef2074f2cbfc01b75365abf72370bafa35f27f52324a3c"
+        "6c4fc58e54a66bc5d595eac4c82c212312276c681590c19"
+        "7c702b4e88f70100bc0a7cbc436e0500060080130000aa7"
+        "3741dc47b00880100000049700500ae26000064fa345e9d"
+        "8b2d00b3c9521b11e06aff0000000000000000000000000"
+        "0000000000000000000000008000000"
+    )
+
+    pbh = msgblock.BlockHeader.deserialize(ByteArray(purchaseBlkHeader))
+    tinyP = account.TinyBlock(pbh.cachedHash(), pbh.height)
+    lbh = msgblock.BlockHeader.deserialize(ByteArray(lotteryBlkHeader))
+    tinyL = account.TinyBlock(lbh.cachedHash(), lbh.height)
+    ticket = msgtx.MsgTx.deserialize(ticket)
+    v = msgtx.MsgTx.deserialize(vote)
+
+    tinfo = ti.fromSpendingTx(ticket, v, tinyP, tinyL, nets.testnet)
+
+    assert tinfo.purchaseBlock.height == 356425
+    assert tinfo.lotteryBlock.height == 357760
+    assert tinfo.vote == v.txid()
+    assert tinfo.maturityHeight == 356441
+    assert tinfo.expirationHeight == 362585
+    assert tinfo.stakebase == 26556582
+    assert tinfo.purchaseTxFee == 5420
+    assert tinfo.poolFee == 131472
+    assert tinfo.spendTxFee == 1
+
+
+def test_account_update_spent_tickets():
+    """
+    Test updating spent tickets.
+    """
+
+    class Dummy:
+        pass
+
+    class FakeAccount(account.Account):
+        def __init__(self):
+            self.signals = Dummy()
+            pool = Dummy()
+            pool.purchaseInfo = Dummy()
+            pool.purchaseInfo.ticketAddress = "ticketaddress"
+            self.stakePools = [pool]
+            self.blockchain = Dummy()
+            self.mempool = {}
+            self.txs = {}
+            self.utxos = {}
+            self.net = nets.testnet
+
+    with TemporaryDirectory() as tempDir:
+        db = KeyValueDatabase(os.path.join(tempDir, "tmp.db")).child("tmp")
+
+        acct = FakeAccount()
+        tDB = acct.ticketDB = db.child(
+            "tickets", datatypes=("TEXT", "BLOB"), blobber=account.UTXO
+        )
+
+        def fail():
+            assert False
+
+        acct.signals.spentTickets = fail
+
+        # tickets and ticketDB empty, noop
+        acct.updateSpentTickets()
+
+        stakeSubmission = ByteArray(opcode.OP_SSTX)
+        stakeSubmission += opcode.OP_HASH160
+        stakeSubmission += opcode.OP_DATA_20
+        stakeSubmission += 1 << (8 * 19)
+        stakeSubmission += opcode.OP_EQUAL
+
+        def newTinfo():
+            return account.TicketInfo(
+                status="live",
+                purchaseBlock=account.TinyBlock(ByteArray(0), 42),
+                maturityHeight=0,
+                expirationHeight=0,
+                lotteryBlock=None,
+                vote=None,
+                revocation=None,
+                poolFee=0,
+                purchaseTxFee=1,
+                spendTxFee=0,
+                stakebase=0,
+            )
+
+        txid = "aa"
+
+        def utxoWithTxid(txid):
+            return account.UTXO(
+                address="ticketaddress",
+                txHash=reversed(ByteArray(txid)),
+                vout=0,
+                scriptPubKey=stakeSubmission,
+                satoshis=2,
+                tinfo=newTinfo(),
+            )
+
+        utxo = utxoWithTxid(txid)
+
+        def txWithTxid(txid):
+            txInOne = msgtx.TxIn(msgtx.OutPoint(ByteArray("ff"), 0, 0), valueIn=1)
+            txInTwo = msgtx.TxIn(None, valueIn=3)
+            txOutOne = msgtx.TxOut(pkScript=stakeSubmission, value=3)
+            txOutTwo = msgtx.TxOut()
+            txOutThree = msgtx.TxOut()
+            txOutFour = msgtx.TxOut()
+            txOutFive = msgtx.TxOut()
+            txsIn = [txInOne, txInTwo]
+            txsOut = [txOutOne, txOutTwo, txOutThree, txOutFour, txOutFive]
+            return msgtx.MsgTx(
+                reversed(ByteArray(txid)), None, None, txsIn, txsOut, None, None
+            )
+
+        tx = txWithTxid(txid)
+        utxo.tinfo.status = "mempool"
+        tDB[txid] = utxo
+        acct.mempool[txid] = tx
+
+        # mempool and ticketDB have the same txid and status, noop
+        acct.updateSpentTickets()
+
+        called = False
+
+        def ok():
+            nonlocal called
+            called = True
+
+        acct.signals.spentTickets = ok
+
+        tinfos = {
+            "aa": utxo.tinfo,
+            "ab": newTinfo(),
+            "ac": newTinfo(),
+            "ad": newTinfo(),
+        }
+
+        txs = {k: txWithTxid(k) for k in tinfos.keys() if k != "ab"}
+
+        blockheader = Dummy()
+        blockheader.height = 0
+        blockheader.timestamp = 0
+
+        vote = "ff"
+        revocation = "fe"
+
+        def setVoteOrRevoke(txid):
+            if txid == vote:
+                ticket = tDB["ac"]
+                ticket.tinfo.vote = reversed(ByteArray(vote))
+            if txid == revocation:
+                ticket = tDB["ad"]
+                ticket.tinfo.revocation = reversed(ByteArray(revocation))
+
+        acct.spendTicket = lambda tx: setVoteOrRevoke(reversed(tx.cachedH).hex())
+        acct.blockchain.tx = lambda txid: txs[txid]
+        acct.blockchain.ticketInfo = lambda txid: tinfos[txid]
+        acct.blockchain.blockForTx = lambda *args: blockheader
+        acct.utxos = {k + "#0": utxoWithTxid(k) for k in txs.keys()}
+        acct.mempool = {"ab": txWithTxid("ab")}
+
+        txs[vote] = txWithTxid(vote)
+        txs[revocation] = txWithTxid(revocation)
+
+        # Live tickets are now different than database.
+        acct.updateSpentTickets()
+        assert called
+
+        # The tickets are now stored in the database.
+        assert "ab" in tDB and "ac" in tDB and "ad" in tDB
+        # They are unspent tickets.
+        ut = acct.unspentTickets()
+        assert "ab" in ut and "ac" in ut and "ad" in ut
+
+        called = False
+        txid = "ac"
+        tinfos["ac"].vote = reversed(ByteArray(vote))
+        del acct.utxos[txid + "#0"]
+
+        # A ticket has been voted.
+        acct.updateSpentTickets()
+        assert called
+        # It is an voted ticket.
+        assert txid in acct.votedTickets() and txid not in acct.unspentTickets()
+
+        called = False
+        txid = "ad"
+        tinfos["ad"].revocation = reversed(ByteArray(revocation))
+        del acct.utxos[txid + "#0"]
+
+        # A ticket has been revoked.
+        acct.updateSpentTickets()
+        assert called
+        # It is a revoked ticket.
+        assert txid in acct.revokedTickets() and txid not in acct.unspentTickets()
+
+        txid = "ae"
+        called = False
+        tDB[txid] = utxo
+
+        # A txid is in the ticketDB but not in utxos or mempool or the
+        # blockchain.
+        acct.updateSpentTickets()
+        assert called
+        # It was removed.
+        assert txid not in tDB
+
+
+def test_account_clac_ticket_profits():
+    """
+    Test ticket profit calculation.
+    """
+
+    class FakeAccount(account.Account):
+        def __init__(self):
+            pass
+
+    with TemporaryDirectory() as tempDir:
+        db = KeyValueDatabase(os.path.join(tempDir, "tmp.db")).child("tmp")
+
+        acct = FakeAccount()
+        tDB = acct.ticketDB = db.child(
+            "tickets", datatypes=("TEXT", "BLOB"), blobber=account.UTXO
+        )
+
+        def newTinfo(poolFee, purchaseTxFee, spendTxFee, stakebase):
+            return account.TicketInfo(
+                status="",
+                purchaseBlock=account.TinyBlock(ByteArray(0), 0),
+                maturityHeight=0,
+                expirationHeight=0,
+                lotteryBlock=None,
+                vote=None,
+                revocation=None,
+                poolFee=poolFee,
+                purchaseTxFee=purchaseTxFee,
+                spendTxFee=spendTxFee,
+                stakebase=stakebase,
+            )
+
+        utxo = account.UTXO(
+            address="",
+            txHash=reversed(ByteArray("aa")),
+            vout=0,
+            scriptPubKey=None,
+            satoshis=5,
+        )
+
+        tinfo = newTinfo(0, 1, 1, 1)
+        utxo.tinfo = tinfo
+        tDB["aa"] = utxo
+        tinfo = newTinfo(1, 1, 1, 1)
+        utxo.tinfo = tinfo
+        tDB["ab"] = utxo
+        tinfo = newTinfo(0, 1, 0, 0)
+        utxo.tinfo = tinfo
+        tDB["ac"] = utxo
+
+        stakebases, poolFees, txFees = acct.calcTicketProfits()
+
+        s, p, t = 2, 1, 5
+
+        assert stakebases == s
+        assert poolFees == p
+        assert txFees == t
+
+
+def test_account_spend_ticket():
+    """
+    Test updating spent tickets.
+    """
+    vote = (
+        "010000000200000000000000000000000000000000000000000000000000"
+        "00000000000000ffffffff00ffffffff571ce9fb0c52ae22c3a6480cbf6d"
+        "30ff76bdffbf54b6e081eb218aa3a0ca2bc40000000001ffffffff040000"
+        "0000000000000000266a2432c0c546b332f7abf51f3fc73f4482185f4c09"
+        "61625763a766774237280000007f75050000000000000000000000086a06"
+        "050008000000900102000000000000001abb76a914781f472a926da0bb7c"
+        "e9eec7f4d434de21015cae88acd9b293890100000000001abb76a9149087"
+        "5ba5fee5f35352e9171d40190e796b1b152788ac000000000000000002a6"
+        "3895010000000000000000ffffffff020000c47b00880100000049700500"
+        "0600000091483045022100c1ec49cb687fa2421e76b534ced49563b3de1e"
+        "c6407b1bbfda26752fbdedc88302204988390ea3be77324909781322a46b"
+        "463d00dd14718f0964b9536b5eef4e35570147512103af3c24d005ca8b75"
+        "5e7167617f3a5b4c60a65f8318a7fcd1b0cacb1abd2a97fc21027b81bc16"
+        "954e28adb832248140eb58bedb6078ae5f4dabf21fde5a8ab7135cb652ae"
+    )
+
+    revocation = (
+        "010000000139cb023fdcf6fcd18273c7395f51084721d0e4baf0ca"
+        "3ee9590ad63a411a4cb30000000001ffffffff02f0ff0100000000"
+        "0000001abc76a914781f472a926da0bb7ce9eec7f4d434de21015c"
+        "ae88ac8fcc07ba0100000000001abc76a914f90abbb67dc9257efa"
+        "6ab24eb88e2755f34b1f7f88ac0000000000000000018ad609ba01"
+        "000000296505001000000091483045022100bc9a694d0864df030e"
+        "6edea181a2e2385dfbf93396b5792899a65f19c9afd67a02206052"
+        "192b5631e062f4497706276ec514a14cdfa8035ef6c7dca0df7120"
+        "84618e0147512103af3c24d005ca8b755e7167617f3a5b4c60a65f"
+        "8318a7fcd1b0cacb1abd2a97fc21027b81bc16954e28adb8322481"
+        "40eb58bedb6078ae5f4dabf21fde5a8ab7135cb652ae"
+    )
+
+    # Tickets can be found on testnet3.
+    ticketVotedTxid = "c42bcaa0a38a21eb81e0b654bfffbd76ff306dbf0c48a6c322ae520cfbe91c57"
+    ticketRevokedTxid = (
+        "b34c1a413ad60a59e93ecaf0bae4d0214708515f39c77382d1fcf6dc3f02cb39"
+    )
+
+    voteTxid = "aa19094e404a1ee056760bdb1b7ed1b6c8e5f1d97752335eddbfdfa19e76c262"
+    revocationTxid = "d85694ba7aae060667b393558cd96c2df2926426f80db16a18bf4fc9102b0953"
+
+    class Dummy:
+        pass
+
+    class FakeAccount(account.Account):
+        def __init__(self):
+            self.signals = Dummy()
+            self.blockchain = Dummy()
+            self.net = nets.testnet
+
+    with TemporaryDirectory() as tempDir:
+        db = KeyValueDatabase(os.path.join(tempDir, "tmp.db")).child("tmp")
+
+        acct = FakeAccount()
+        tDB = acct.ticketDB = db.child(
+            "tickets", datatypes=("TEXT", "BLOB"), blobber=account.UTXO
+        )
+
+        def newTinfo(status):
+            return account.TicketInfo(
+                status=status,
+                purchaseBlock=account.TinyBlock(ByteArray(0), 0),
+                maturityHeight=0,
+                expirationHeight=0,
+            )
+
+        utxo = account.UTXO(
+            address="",
+            txHash=reversed(ByteArray("aa")),
+            vout=0,
+            scriptPubKey=None,
+            satoshis=5,
+        )
+
+        txidToTinfo = {
+            voteTxid: newTinfo("vote"),
+            revocationTxid: newTinfo("revocation"),
+        }
+        acct.blockchain.ticketInfoForSpendingTx = lambda txid, net: txidToTinfo[txid]
+
+        tDB[ticketVotedTxid] = utxo
+        tDB[ticketRevokedTxid] = utxo
+
+        v = msgtx.MsgTx.deserialize(ByteArray(vote))
+
+        acct.spendTicket(v)
+        tinfo = tDB[ticketVotedTxid].tinfo
+        assert tinfo.status == "vote"
+
+        rev = msgtx.MsgTx.deserialize(ByteArray(revocation))
+
+        acct.spendTicket(rev)
+        tinfo = tDB[ticketRevokedTxid].tinfo
+        assert tinfo.status == "revocation"

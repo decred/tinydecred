@@ -23,6 +23,7 @@ def newHash():
     return ByteArray(rando.generateSeed(32))
 
 
+# fmt: off
 def parseShortForm(asm):
     b = ByteArray(b"")
     for token in asm.split():
@@ -234,6 +235,531 @@ def scriptClassTests():
             scriptClass=txscript.NonStandardTy,
         ),
     ]
+
+
+def sstxTxIn():
+    """
+    sstxTxIn is the first input in the reference valid sstx
+    """
+    return msgtx.TxIn(
+        previousOutPoint=msgtx.OutPoint(
+            txHash=ByteArray(
+                [
+                    0x03, 0x2e, 0x38, 0xe9, 0xc0, 0xa8, 0x4c, 0x60,
+                    0x46, 0xd6, 0x87, 0xd1, 0x05, 0x56, 0xdc, 0xac,
+                    0xc4, 0x1d, 0x27, 0x5e, 0xc5, 0x5f, 0xc0, 0x07,
+                    0x79, 0xac, 0x88, 0xfd, 0xf3, 0x57, 0xa1, 0x87,
+                ],
+                length=32,
+            ),  # 87a157f3fd88ac7907c05fc55e271dc4acdc5605d187d646604ca8c0e9382e03
+            idx=0,
+            tree=wire.TxTreeRegular,
+        ),
+        signatureScript=ByteArray(
+            [
+                0x49,  # OP_DATA_73
+                0x30, 0x46, 0x02, 0x21, 0x00, 0xc3, 0x52, 0xd3,
+                0xdd, 0x99, 0x3a, 0x98, 0x1b, 0xeb, 0xa4, 0xa6,
+                0x3a, 0xd1, 0x5c, 0x20, 0x92, 0x75, 0xca, 0x94,
+                0x70, 0xab, 0xfc, 0xd5, 0x7d, 0xa9, 0x3b, 0x58,
+                0xe4, 0xeb, 0x5d, 0xce, 0x82, 0x02, 0x21, 0x00,
+                0x84, 0x07, 0x92, 0xbc, 0x1f, 0x45, 0x60, 0x62,
+                0x81, 0x9f, 0x15, 0xd3, 0x3e, 0xe7, 0x05, 0x5c,
+                0xf7, 0xb5, 0xee, 0x1a, 0xf1, 0xeb, 0xcc, 0x60,
+                0x28, 0xd9, 0xcd, 0xb1, 0xc3, 0xaf, 0x77, 0x48,
+                0x01,  # 73-byte signature
+                0x41,  # OP_DATA_65
+                0x04, 0xf4, 0x6d, 0xb5, 0xe9, 0xd6, 0x1a, 0x9d,
+                0xc2, 0x7b, 0x8d, 0x64, 0xad, 0x23, 0xe7, 0x38,
+                0x3a, 0x4e, 0x6c, 0xa1, 0x64, 0x59, 0x3c, 0x25,
+                0x27, 0xc0, 0x38, 0xc0, 0x85, 0x7e, 0xb6, 0x7e,
+                0xe8, 0xe8, 0x25, 0xdc, 0xa6, 0x50, 0x46, 0xb8,
+                0x2c, 0x93, 0x31, 0x58, 0x6c, 0x82, 0xe0, 0xfd,
+                0x1f, 0x63, 0x3f, 0x25, 0xf8, 0x7c, 0x16, 0x1b,
+                0xc6, 0xf8, 0xa6, 0x30, 0x12, 0x1d, 0xf2, 0xb3,
+                0xd3,  # 65-byte pubkey
+            ]
+        ),
+        sequence=0xFFFFFFFF,
+    )
+
+
+def sstxTxOut0():
+    """
+    sstxTxOut0 is the first output in the reference valid sstx
+    """
+    return msgtx.TxOut(
+        value=0x2123E300,  # 556000000
+        version=0x0000,
+        pkScript=ByteArray(
+            [
+                0xba,  # OP_SSTX
+                0x76,  # OP_DUP
+                0xa9,  # OP_HASH160
+                0x14,  # OP_DATA_20
+                0xc3, 0x98, 0xef, 0xa9,
+                0xc3, 0x92, 0xba, 0x60,
+                0x13, 0xc5, 0xe0, 0x4e,
+                0xe7, 0x29, 0x75, 0x5e,
+                0xf7, 0xf5, 0x8b, 0x32,
+                0x88,  # OP_EQUALVERIFY
+                0xac,  # OP_CHECKSIG
+            ]
+        ),
+    )
+
+
+def sstxTxOut1():
+    """
+    sstxTxOut1 is the second output in the reference valid sstx
+    """
+    return msgtx.TxOut(
+        value=0x00000000,  # 0
+        version=0x0000,
+        pkScript=ByteArray(
+            [
+                0x6a,                   # OP_RETURN
+                0x1e,                   # 30 bytes to be pushed
+                0x94, 0x8c, 0x76, 0x5a,  # 20 byte address
+                0x69, 0x14, 0xd4, 0x3f,
+                0x2a, 0x7a, 0xc1, 0x77,
+                0xda, 0x2c, 0x2f, 0x6b,
+                0x52, 0xde, 0x3d, 0x7c,
+                0x00, 0xe3, 0x23, 0x21,  # Transaction amount
+                0x00, 0x00, 0x00, 0x00,
+                0x44, 0x3f,  # Fee limits
+            ]
+        ),
+    )
+
+
+def sstxTxOut2():
+    """
+    sstxTxOut2 is the third output in the reference valid sstx
+    """
+    return msgtx.TxOut(
+        value=0x2223E300,
+        version=0x0000,
+        pkScript=ByteArray(
+            [
+                0xbd,  # OP_SSTXCHANGE
+                0x76,  # OP_DUP
+                0xa9,  # OP_HASH160
+                0x14,  # OP_DATA_20
+                0xc3, 0x98, 0xef, 0xa9,
+                0xc3, 0x92, 0xba, 0x60,
+                0x13, 0xc5, 0xe0, 0x4e,
+                0xe7, 0x29, 0x75, 0x5e,
+                0xf7, 0xf5, 0x8b, 0x32,
+                0x88,  # OP_EQUALVERIFY
+                0xac,  # OP_CHECKSIG
+            ]
+        ),
+    )
+
+
+def sstxTxOut3():
+    """
+    sstxTxOut3 is another output in an SStx, this time instruction to pay to
+    a P2SH output
+    """
+    return msgtx.TxOut(
+        value=0x00000000,  # 0
+        version=0x0000,
+        pkScript=ByteArray(
+            [
+                0x6a,                   # OP_RETURN
+                0x1e,                   # 30 bytes to be pushed
+                0x94, 0x8c, 0x76, 0x5a,  # 20 byte address
+                0x69, 0x14, 0xd4, 0x3f,
+                0x2a, 0x7a, 0xc1, 0x77,
+                0xda, 0x2c, 0x2f, 0x6b,
+                0x52, 0xde, 0x3d, 0x7c,
+                0x00, 0xe3, 0x23, 0x21,  # Transaction amount
+                0x00, 0x00, 0x00, 0x80,  # Last byte flagged
+                0x44, 0x3f,  # Fee limits
+            ]
+        ),
+    )
+
+
+def sstxTxOut4():
+    """
+    sstxTxOut4 is the another output in the reference valid sstx, and pays change
+    to a P2SH address
+    """
+    return msgtx.TxOut(
+        value=0x2223E300,
+        version=0x0000,
+        pkScript=ByteArray(
+            [
+                0xbd,  # OP_SSTXCHANGE
+                0xa9,  # OP_HASH160
+                0x14,  # OP_DATA_20
+                0xc3, 0x98, 0xef, 0xa9,
+                0xc3, 0x92, 0xba, 0x60,
+                0x13, 0xc5, 0xe0, 0x4e,
+                0xe7, 0x29, 0x75, 0x5e,
+                0xf7, 0xf5, 0x8b, 0x32,
+                0x87,  # OP_EQUAL
+            ]
+        ),
+    )
+
+
+def sstxTxOut4VerBad():
+    """
+    sstxTxOut4VerBad is the third output in the reference valid sstx, with a
+    bad version.
+    """
+    return msgtx.TxOut(
+        value=0x2223E300,
+        version=0x1234,
+        pkScript=ByteArray(
+            [
+                0xbd,  # OP_SSTXCHANGE
+                0xa9,  # OP_HASH160
+                0x14,  # OP_DATA_20
+                0xc3, 0x98, 0xef, 0xa9,
+                0xc3, 0x92, 0xba, 0x60,
+                0x13, 0xc5, 0xe0, 0x4e,
+                0xe7, 0x29, 0x75, 0x5e,
+                0xf7, 0xf5, 0x8b, 0x32,
+                0x87,  # OP_EQUAL
+            ]
+        ),
+    )
+
+
+def sstxBadVersionOut():
+    """
+    sstxBadVersionOut is an invalid SStx MsgTx with an output containing a bad
+    version.
+    """
+    return msgtx.MsgTx(
+        serType=wire.TxSerializeFull,
+        version=1,
+        txIn=[sstxTxIn(), sstxTxIn(), sstxTxIn(),],
+        txOut=[
+            sstxTxOut0(),
+            sstxTxOut1(),
+            sstxTxOut2(),  # emulate change address
+            sstxTxOut1(),  # 3
+            sstxTxOut2(),  # 4
+            sstxTxOut3(),  # 5 P2SH
+            sstxTxOut4VerBad(),  # 6 P2SH change
+        ],
+        lockTime=0,
+        expiry=0,
+        cachedHash=None,
+    )
+
+
+def ssgenTxIn0():
+    """
+    ssgenTxIn0 is the 0th position input in a valid SSGen tx used to test out the
+    IsSSGen function
+    """
+    return msgtx.TxIn(
+        previousOutPoint=msgtx.OutPoint(
+            txHash=ByteArray(b"", length=txscript.HASH_SIZE),
+            idx=0xFFFFFFFF,
+            tree=wire.TxTreeRegular,
+        ),
+        signatureScript=ByteArray([0x04, 0xFF, 0xFF, 0x00, 0x1D, 0x01, 0x04]),
+        blockHeight=wire.NullBlockHeight,
+        blockIndex=wire.NullBlockIndex,
+        sequence=0xFFFFFFFF,
+    )
+
+
+def ssgenTxIn1():
+    """
+    # ssgenTxIn1 is the 1st position input in a valid SSGen tx used to test out the
+    # IsSSGen function
+    """
+    return msgtx.TxIn(
+        previousOutPoint=msgtx.OutPoint(
+            txHash=ByteArray(
+                [
+                    0x03, 0x2e, 0x38, 0xe9, 0xc0, 0xa8, 0x4c, 0x60,
+                    0x46, 0xd6, 0x87, 0xd1, 0x05, 0x56, 0xdc, 0xac,
+                    0xc4, 0x1d, 0x27, 0x5e, 0xc5, 0x5f, 0xc0, 0x07,
+                    0x79, 0xac, 0x88, 0xfd, 0xf3, 0x57, 0xa1, 0x87,
+                ],
+                length=32,
+            ),  # 87a157f3fd88ac7907c05fc55e271dc4acdc5605d187d646604ca8c0e9382e03
+            idx=0,
+            tree=wire.TxTreeStake,
+        ),
+        signatureScript=ByteArray(
+            [
+                0x49,  # OP_DATA_73
+                0x30, 0x46, 0x02, 0x21, 0x00, 0xc3, 0x52, 0xd3,
+                0xdd, 0x99, 0x3a, 0x98, 0x1b, 0xeb, 0xa4, 0xa6,
+                0x3a, 0xd1, 0x5c, 0x20, 0x92, 0x75, 0xca, 0x94,
+                0x70, 0xab, 0xfc, 0xd5, 0x7d, 0xa9, 0x3b, 0x58,
+                0xe4, 0xeb, 0x5d, 0xce, 0x82, 0x02, 0x21, 0x00,
+                0x84, 0x07, 0x92, 0xbc, 0x1f, 0x45, 0x60, 0x62,
+                0x81, 0x9f, 0x15, 0xd3, 0x3e, 0xe7, 0x05, 0x5c,
+                0xf7, 0xb5, 0xee, 0x1a, 0xf1, 0xeb, 0xcc, 0x60,
+                0x28, 0xd9, 0xcd, 0xb1, 0xc3, 0xaf, 0x77, 0x48,
+                0x01,  # 73-byte signature
+                0x41,  # OP_DATA_65
+                0x04, 0xf4, 0x6d, 0xb5, 0xe9, 0xd6, 0x1a, 0x9d,
+                0xc2, 0x7b, 0x8d, 0x64, 0xad, 0x23, 0xe7, 0x38,
+                0x3a, 0x4e, 0x6c, 0xa1, 0x64, 0x59, 0x3c, 0x25,
+                0x27, 0xc0, 0x38, 0xc0, 0x85, 0x7e, 0xb6, 0x7e,
+                0xe8, 0xe8, 0x25, 0xdc, 0xa6, 0x50, 0x46, 0xb8,
+                0x2c, 0x93, 0x31, 0x58, 0x6c, 0x82, 0xe0, 0xfd,
+                0x1f, 0x63, 0x3f, 0x25, 0xf8, 0x7c, 0x16, 0x1b,
+                0xc6, 0xf8, 0xa6, 0x30, 0x12, 0x1d, 0xf2, 0xb3,
+                0xd3,  # 65-byte pubkey
+            ]
+        ),
+        sequence=0xFFFFFFFF,
+    )
+
+
+def ssgenTxOut0():
+    """
+    ssgenTxOut0 is the 0th position output in a valid SSGen tx used to test out the
+    IsSSGen function
+    """
+    return msgtx.TxOut(
+        value=0x00000000,  # 0
+        version=0x0000,
+        pkScript=ByteArray(
+            [
+                0x6a,                   # OP_RETURN
+                0x24,                   # 36 bytes to be pushed
+                0x94, 0x8c, 0x76, 0x5a,  # 32 byte hash
+                0x69, 0x14, 0xd4, 0x3f,
+                0x2a, 0x7a, 0xc1, 0x77,
+                0xda, 0x2c, 0x2f, 0x6b,
+                0x52, 0xde, 0x3d, 0x7c,
+                0xda, 0x2c, 0x2f, 0x6b,
+                0x52, 0xde, 0x3d, 0x7c,
+                0x52, 0xde, 0x3d, 0x7c,
+                0x00, 0xe3, 0x23, 0x21,  # 4 byte height
+            ]
+        ),
+    )
+
+
+def ssgenTxOut1():
+    """
+    # ssgenTxOut1 is the 1st position output in a valid SSGen tx used to test out the
+    # IsSSGen function
+    """
+    return msgtx.TxOut(
+        value=0x00000000,  # 0
+        version=0x0000,
+        pkScript=ByteArray(
+            [0x6A, 0x02, 0x94, 0x8C,]  # OP_RETURN  # 2 bytes to be pushed  # Vote bits
+        ),
+    )
+
+
+def ssgenTxOut2():
+    """
+    # ssgenTxOut2 is the 2nd position output in a valid SSGen tx used to test out the
+    # IsSSGen function
+    """
+    return msgtx.TxOut(
+        value=0x2123E300,  # 556000000
+        version=0x0000,
+        pkScript=ByteArray(
+            [
+                0xbb,  # OP_SSGEN
+                0x76,  # OP_DUP
+                0xa9,  # OP_HASH160
+                0x14,  # OP_DATA_20
+                0xc3, 0x98, 0xef, 0xa9,
+                0xc3, 0x92, 0xba, 0x60,
+                0x13, 0xc5, 0xe0, 0x4e,
+                0xe7, 0x29, 0x75, 0x5e,
+                0xf7, 0xf5, 0x8b, 0x32,
+                0x88,  # OP_EQUALVERIFY
+                0xac,  # OP_CHECKSIG
+            ]
+        ),
+    )
+
+
+def ssgenTxOut3():
+    """
+    ssgenTxOut3 is a P2SH output
+    """
+    return msgtx.TxOut(
+        value=0x2123E300,  # 556000000
+        version=0x0000,
+        pkScript=ByteArray(
+            [
+                0xbb,  # OP_SSGEN
+                0xa9,  # OP_HASH160
+                0x14,  # OP_DATA_20
+                0xc3, 0x98, 0xef, 0xa9,
+                0xc3, 0x92, 0xba, 0x60,
+                0x13, 0xc5, 0xe0, 0x4e,
+                0xe7, 0x29, 0x75, 0x5e,
+                0xf7, 0xf5, 0x8b, 0x32,
+                0x87,  # OP_EQUAL
+            ]
+        ),
+    )
+
+
+def ssgenTxOut3BadVer():
+    """
+    ssgenTxOut3BadVer is a P2SH output with a bad version.
+    """
+    return msgtx.TxOut(
+        value=0x2123E300,  # 556000000
+        version=0x0100,
+        pkScript=ByteArray(
+            [
+                0xbb,  # OP_SSGEN
+                0xa9,  # OP_HASH160
+                0x14,  # OP_DATA_20
+                0xc3, 0x98, 0xef, 0xa9,
+                0xc3, 0x92, 0xba, 0x60,
+                0x13, 0xc5, 0xe0, 0x4e,
+                0xe7, 0x29, 0x75, 0x5e,
+                0xf7, 0xf5, 0x8b, 0x32,
+                0x87,  # OP_EQUAL
+            ]
+        ),
+    )
+
+
+def ssgenMsgTx():
+    """
+    ssgenMsgTx is a valid SSGen MsgTx with an input and outputs and is used in
+    various testing scenarios
+    """
+    return msgtx.MsgTx(
+        serType=wire.TxSerializeFull,
+        version=1,
+        txIn=[ssgenTxIn0(), ssgenTxIn1(),],
+        txOut=[ssgenTxOut0(), ssgenTxOut1(), ssgenTxOut2(), ssgenTxOut3(),],
+        lockTime=0,
+        expiry=0,
+        cachedHash=None,
+    )
+
+
+def ssgenMsgTxExtraInput():
+    """
+    ssgenMsgTxExtraInput is an invalid SSGen MsgTx with too many inputs
+    """
+    return msgtx.MsgTx(
+        serType=wire.TxSerializeFull,
+        version=1,
+        txIn=[ssgenTxIn0(), ssgenTxIn1(), ssgenTxIn1(),],
+        txOut=[ssgenTxOut0(), ssgenTxOut1(), ssgenTxOut2(),],
+        lockTime=0,
+        expiry=0,
+        cachedHash=None,
+    )
+
+
+def ssgenMsgTxExtraOutputs():
+    """
+    ssgenMsgTxExtraOutputs is an invalid SSGen MsgTx with too many outputs
+    """
+    return msgtx.MsgTx(
+        serType=wire.TxSerializeFull,
+        version=1,
+        txIn=[ssgenTxIn0(), ssgenTxIn1(),],
+        txOut=[
+            ssgenTxOut0(),
+            ssgenTxOut1(),
+            ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(),
+            ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(),
+            ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(),
+            ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(),
+            ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(),
+            ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(),
+            ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(),
+            ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(),
+            ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(),
+            ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(),
+            ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(),
+            ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(),
+            ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(),
+            ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(),
+            ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(),
+            ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(), ssgenTxOut2(),
+        ],
+        lockTime=0,
+        expiry=0,
+        cachedHash=None,
+    )
+
+
+def ssgenMsgTxStakeBaseWrong():
+    """
+    ssgenMsgTxStakeBaseWrong is an invalid SSGen tx with the stakebase in the wrong
+    position
+    """
+    return msgtx.MsgTx(
+        serType=wire.TxSerializeFull,
+        version=1,
+        txIn=[ssgenTxIn1(), ssgenTxIn0(),],
+        txOut=[ssgenTxOut0(), ssgenTxOut1(), ssgenTxOut2(),],
+        lockTime=0,
+        expiry=0,
+        cachedHash=None,
+    )
+
+
+def ssgenMsgTxBadVerOut():
+    """
+    ssgenMsgTxBadVerOut is an invalid SSGen tx that contains an output with a bad
+    version
+    """
+    return msgtx.MsgTx(
+        serType=wire.TxSerializeFull,
+        version=1,
+        txIn=[ssgenTxIn0(), ssgenTxIn1(),],
+        txOut=[ssgenTxOut0(), ssgenTxOut1(), ssgenTxOut2(), ssgenTxOut3BadVer(),],
+        lockTime=0,
+        expiry=0,
+        cachedHash=None,
+    )
+
+
+def ssgenMsgTxWrongZeroethOut():
+    """
+    ssgenMsgTxWrongZeroethOut is an invalid SSGen tx with the first output being not
+    an OP_RETURN push
+    """
+    return msgtx.MsgTx(
+        serType=wire.TxSerializeFull,
+        version=1,
+        txIn=[ssgenTxIn0(), ssgenTxIn1(),],
+        txOut=[ssgenTxOut2(), ssgenTxOut1(), ssgenTxOut0(),],
+        lockTime=0,
+        expiry=0,
+        cachedHash=None,
+    )
+
+
+def ssgenMsgTxWrongFirstOut():
+    """
+    ssgenMsgTxWrongFirstOut is an invalid SSGen tx with the second output being not
+    an OP_RETURN push
+    """
+    return msgtx.MsgTx(
+        serType=wire.TxSerializeFull,
+        version=1,
+        txIn=[ssgenTxIn0(), ssgenTxIn1(),],
+        txOut=[ssgenTxOut0(), ssgenTxOut2(), ssgenTxOut1(),],
+        lockTime=0,
+        expiry=0,
+        cachedHash=None,
+    )
 
 
 class TestTxScript(unittest.TestCase):
@@ -664,6 +1190,245 @@ class TestTxScript(unittest.TestCase):
                 % (test_name, tokenizerIdx, test_finalIdx),
             )
 
+        def test_isSSGen(self):
+            """
+            ensures the CheckSSGen and IsSSGen functions correctly recognize stake
+            submission generation transactions.
+            """
+            ssgen = ssgenMsgTx()
+            ssgen.tree = wire.TxTreeStake
+            ssgen.index = 0
+
+            if not txscript.isSSGen(ssgen):
+                raise Exception("isSSGen claimed a valid ssgen is invalid")
+
+            # Test for an OP_RETURN VoteBits push of the maximum size
+            biggestPush = ByteArray(
+                [
+                    0x6a, 0x4b,  # OP_RETURN Push 75-bytes
+                    0x14, 0x94, 0x8c, 0x76, 0x5a, 0x69, 0x14, 0xd4,  # 75 bytes
+                    0x3f, 0x2a, 0x7a, 0xc1, 0x77, 0xda, 0x2c, 0x2f,
+                    0x6b, 0x52, 0xde, 0x3d, 0x7c, 0x7c, 0x7c, 0x7c,
+                    0x6b, 0x52, 0xde, 0x3d, 0x7c, 0x7c, 0x7c, 0x7c,
+                    0x6b, 0x52, 0xde, 0x3d, 0x7c, 0x7c, 0x7c, 0x7c,
+                    0x6b, 0x52, 0xde, 0x3d, 0x7c, 0x7c, 0x7c, 0x7c,
+                    0x6b, 0x52, 0xde, 0x3d, 0x7c, 0x7c, 0x7c, 0x7c,
+                    0x6b, 0x52, 0xde, 0x3d, 0x7c, 0x7c, 0x7c, 0x7c,
+                    0x6b, 0x52, 0xde, 0x3d, 0x7c, 0x7c, 0x7c, 0x7c,
+                    0x6b, 0x52, 0xde,
+                ]
+            )
+
+            ssgen = ssgenMsgTx()
+            ssgen.tree = wire.TxTreeStake
+            ssgen.index = 0
+            ssgen.txOut[1].pkScript = biggestPush
+
+            if not txscript.isSSGen(ssgen):
+                raise Exception("isSSGen claimed a valid ssgen is invalid")
+
+    def test_checkSSGen(self):
+        """
+        Ensures the CheckSSGen and IsSSGen functions correctly
+        identify errors in stake submission generation transactions and does not
+        report them as valid.
+        """
+
+        def ensureErr(tx, name):
+            try:
+                txscript.checkSSGen(tx)
+            except Exception:
+                pass
+            else:
+                raise Exception(
+                    'expected exception in test "{}" did not occur'.format(name)
+                )
+
+            if txscript.isSSGen(tx):
+                raise Exception('expected false for isSSGen for test "{}"'.format(name))
+
+        # ---------------------------------------------------------------------------
+        # Test too many inputs with ssgenMsgTxExtraInputs
+        ssgen = ssgenMsgTxExtraInput()
+        ssgen.tree = wire.TxTreeStake
+        ssgen.index = 0
+
+        ensureErr(ssgen, "extra inputs")
+        # ---------------------------------------------------------------------------
+        # Test too many outputs with sstxMsgTxExtraOutputs
+
+        ssgen = ssgenMsgTxExtraOutputs()
+        ssgen.tree = wire.TxTreeStake
+        ssgen.index = 0
+
+        ensureErr(ssgen, "extra outputs")
+        # ---------------------------------------------------------------------------
+        # Test 0th input not being stakebase error
+
+        ssgen = ssgenMsgTxStakeBaseWrong()
+        ssgen.tree = wire.TxTreeStake
+        ssgen.index = 0
+
+        ensureErr(ssgen, "stake base wrong")
+        # ---------------------------------------------------------------------------
+        # Wrong tree for inputs test
+        ssgen = ssgenMsgTx()
+        b = ssgen.serialize().bytes()
+        # Replace TxTreeStake with TxTreeRegular
+        b = b.replace(
+            bytes(
+                [
+                    0x79, 0xac, 0x88, 0xfd, 0xf3, 0x57, 0xa1, 0x87, 0x00,
+                    0x00, 0x00, 0x00, 0x01
+                ]
+            ),
+            bytes(
+                [
+                    0x79, 0xac, 0x88, 0xfd, 0xf3, 0x57, 0xa1, 0x87, 0x00,
+                    0x00, 0x00, 0x00, 0x00
+                ]
+            ),
+        )
+
+        # Deserialize the manipulated tx
+        tx = msgtx.MsgTx.deserialize(b)
+        tx.tree = wire.TxTreeStake
+        tx.index = 0
+
+        ensureErr(tx, "wrong input")
+        # ---------------------------------------------------------------------------
+        # Test for bad version of output.
+        ssgen = sstxBadVersionOut()
+        ssgen.tree = wire.TxTreeStake
+        ssgen.index = 0
+
+        ensureErr(ssgen, "bad version out")
+        # ---------------------------------------------------------------------------
+        # Test 0th output not being OP_RETURN push
+        ssgen = ssgenMsgTxWrongZeroethOut()
+        ssgen.tree = wire.TxTreeStake
+        ssgen.index = 0
+
+        ensureErr(ssgen, "wrong zeroeth out")
+        # ---------------------------------------------------------------------------
+        # Test for too short of an OP_RETURN push being given in the 0th tx out
+        ssgen = ssgenMsgTx()
+        b = ssgen.serialize().bytes()
+        b = b.replace(
+            bytes(
+                [
+                    0x26, 0x6a, 0x24,
+                    0x94, 0x8c, 0x76, 0x5a, 0x69, 0x14, 0xd4, 0x3f,
+                    0x2a, 0x7a, 0xc1, 0x77, 0xda, 0x2c, 0x2f, 0x6b,
+                    0x52, 0xde, 0x3d, 0x7c, 0xda, 0x2c, 0x2f, 0x6b,
+                    0x52, 0xde, 0x3d, 0x7c, 0x52, 0xde, 0x3d, 0x7c,
+                    0x00, 0xe3, 0x23, 0x21,
+                ]
+            ),
+            bytes(
+                [
+                    0x25, 0x6a, 0x23,
+                    0x94, 0x8c, 0x76, 0x5a, 0x69, 0x14, 0xd4, 0x3f,
+                    0x2a, 0x7a, 0xc1, 0x77, 0xda, 0x2c, 0x2f, 0x6b,
+                    0x52, 0xde, 0x3d, 0x7c, 0xda, 0x2c, 0x2f, 0x6b,
+                    0x52, 0xde, 0x3d, 0x7c, 0x52, 0xde, 0x3d, 0x7c,
+                    0x00, 0xe3, 0x23,
+                ]
+            ),
+        )
+
+        # Deserialize the manipulated tx
+        tx = msgtx.MsgTx.deserialize(b)
+        tx.tree = wire.TxTreeStake
+        tx.index = 0
+
+        ensureErr(tx, "op return too short")
+        # ---------------------------------------------------------------------------
+        # Test for an invalid OP_RETURN prefix
+        ssgen = ssgenMsgTx()
+        b = ssgen.serialize().bytes()
+        b = b.replace(
+            bytes(
+                [
+                    0x26, 0x6a, 0x24,
+                    0x94, 0x8c, 0x76, 0x5a, 0x69, 0x14, 0xd4, 0x3f,
+                    0x2a, 0x7a, 0xc1, 0x77, 0xda, 0x2c, 0x2f, 0x6b,
+                    0x52, 0xde, 0x3d, 0x7c, 0xda, 0x2c, 0x2f, 0x6b,
+                    0x52, 0xde, 0x3d, 0x7c, 0x52, 0xde, 0x3d, 0x7c,
+                    0x00, 0xe3, 0x23, 0x21,
+                ]
+            ),
+            bytes(
+                [
+                    0x26, 0x6a, 0x4c, 0x23,
+                    0x94, 0x8c, 0x76, 0x5a, 0x69, 0x14, 0xd4, 0x3f,
+                    0x2a, 0x7a, 0xc1, 0x77, 0xda, 0x2c, 0x2f, 0x6b,
+                    0x52, 0xde, 0x3d, 0x7c, 0xda, 0x2c, 0x2f, 0x6b,
+                    0x52, 0xde, 0x3d, 0x7c, 0x52, 0xde, 0x3d, 0x7c,
+                    0x00, 0xe3, 0x23,
+                ]
+            ),
+        )
+
+        # Deserialize the manipulated tx
+        tx = msgtx.MsgTx.deserialize(b)
+        tx.tree = wire.TxTreeStake
+        tx.index = 0
+
+        ensureErr(tx, "invalid op return prefix")
+        # ---------------------------------------------------------------------------
+        # Test 1st output not being OP_RETURN push
+        ssgen = ssgenMsgTxWrongFirstOut()
+        ssgen.tree = wire.TxTreeStake
+        ssgen.index = 0
+
+        ensureErr(ssgen, "wrong first out")
+        # ---------------------------------------------------------------------------
+        # Test for too short of an OP_RETURN push being given in the 1st tx out
+        ssgen = ssgenMsgTx()
+        b = ssgen.serialize().bytes()
+        b = b.replace(
+            bytes([0x04, 0x6A, 0x02, 0x94, 0x8C,]), bytes([0x03, 0x6A, 0x01, 0x94,])
+        )
+
+        # Deserialize the manipulated tx
+        tx = msgtx.MsgTx.deserialize(b)
+        tx.tree = wire.TxTreeStake
+        tx.index = 0
+
+        ensureErr(tx, "op return too short")
+        # ---------------------------------------------------------------------------
+        # Test for an invalid OP_RETURN prefix
+        ssgen = ssgenMsgTx()
+        b = ssgen.serialize().bytes()
+        b = b.replace(
+            bytes([0x04, 0x6A, 0x02, 0x94, 0x8C,]),
+            # This uses an OP_PUSHDATA_1 2-byte push to do the push in 5 bytes
+            bytes([0x05, 0x6a, 0x4c, 0x02, 0x00, 0x00,]),
+        )
+
+        # Deserialize the manipulated tx
+        tx = msgtx.MsgTx.deserialize(b)
+        tx.tree = wire.TxTreeStake
+        tx.index = 0
+
+        ensureErr(tx, "invalid op return prefix")
+        # ---------------------------------------------------------------------------
+        # Test for an index 2+ output being not OP_SSGEN tagged
+        ssgen = ssgenMsgTx()
+        b = ssgen.serialize().bytes()
+        b = b.replace(
+            bytes([0x1A, 0xBB, 0x76, 0xA9, 0x14, 0xC3, 0x98,]),
+            bytes([0x19, 0x76, 0xA9, 0x14, 0xC3, 0x98,]),
+        )
+
+        # Deserialize the manipulated tx
+        tx = msgtx.MsgTx.deserialize(b)
+        tx.tree = wire.TxTreeStake
+        tx.index = 0
+
+        ensureErr(tx, "index over 2 not ssgen tagged")
+
     def test_signature(self):
         class test:
             def __init__(self, name, sig, der, isValid):
@@ -672,7 +1437,6 @@ class TestTxScript(unittest.TestCase):
                 self.der = der
                 self.isValid = isValid
 
-        # fmt: off
         tests = [
             # signatures from bitcoin blockchain tx
             # 0437cd7f8525ceed2324359c2d0ba26006d92d85
@@ -944,7 +1708,6 @@ class TestTxScript(unittest.TestCase):
                 False,
             ),
         ]
-        # fmt: on
         for test in tests:
             try:
                 txscript.Signature.parse(ByteArray(test.sig), test.der)

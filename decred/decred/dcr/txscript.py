@@ -41,6 +41,58 @@ PubkeyHashAltTy = 11  # Alternative signature pubkey hash.
 # representing extended Decred script.
 DefaultScriptVersion = 0
 
+# consensusVersion = txscript.consensusVersion
+consensusVersion = 0
+
+# MaxInputsPerSStx is the maximum number of inputs allowed in an SStx.
+MaxInputsPerSStx = 64
+
+# MaxOutputsPerSStx is the maximum number of outputs allowed in an SStx;
+# you need +1 for the tagged SStx output.
+MaxOutputsPerSStx = MaxInputsPerSStx * 2 + 1
+
+# NumInputsPerSSGen is the exact number of inputs for an SSGen
+# (stakebase) tx.  Inputs are a tagged SStx output and a stakebase (null)
+# input.
+NumInputsPerSSGen = 2  # SStx and stakebase
+
+# MaxOutputsPerSSGen is the maximum number of outputs in an SSGen tx,
+# which are all outputs to the addresses specified in the OP_RETURNs of
+# the original SStx referenced as input plus reference and vote
+# OP_RETURN outputs in the zeroeth and first position.
+MaxOutputsPerSSGen = MaxInputsPerSStx + 2
+
+# NumInputsPerSSRtx is the exact number of inputs for an SSRtx (stake
+# revocation tx); the only input should be the SStx output.
+NumInputsPerSSRtx = 1
+
+# MaxOutputsPerSSRtx is the maximum number of outputs in an SSRtx, which
+# are all outputs to the addresses specified in the OP_RETURNs of the
+# original SStx referenced as input plus a reference to the block header
+# hash of the block in which voting was missed.
+MaxOutputsPerSSRtx = MaxInputsPerSStx
+
+# SStxPKHMinOutSize is the minimum size of an OP_RETURN commitment output
+# for an SStx tx.
+# 20 bytes P2SH/P2PKH + 8 byte amount + 4 byte fee range limits
+SStxPKHMinOutSize = 32
+
+# SStxPKHMaxOutSize is the maximum size of an OP_RETURN commitment output
+# for an SStx tx.
+SStxPKHMaxOutSize = 77
+
+# SSGenBlockReferenceOutSize is the size of a block reference OP_RETURN
+# output for an SSGen tx.
+SSGenBlockReferenceOutSize = 38
+
+# SSGenVoteBitsOutputMinSize is the minimum size for a VoteBits push
+# in an SSGen.
+SSGenVoteBitsOutputMinSize = 4
+
+# SSGenVoteBitsOutputMaxSize is the maximum size for a VoteBits push
+# in an SSGen.
+SSGenVoteBitsOutputMaxSize = 77
+
 # Hash type bits from the end of a signature.
 SigHashAll = 0x1
 SigHashNone = 0x2
@@ -179,6 +231,21 @@ MaxInputsPerSStx = 64
 # MaxOutputsPerSStx is the maximum number of outputs allowed in an SStx;
 # you need +1 for the tagged SStx output.
 MaxOutputsPerSStx = MaxInputsPerSStx * 2 + 1
+
+# validSStxAddressOutPrefix is the valid prefix for a 30-byte
+# minimum OP_RETURN push for a commitment for an SStx.
+# Example SStx address out:
+# 0x6a (OP_RETURN)
+# 0x1e (OP_DATA_30, push length: 30 bytes)
+validSStxAddressOutMinPrefix = ByteArray([opcode.OP_RETURN, opcode.OP_DATA_30])
+
+# validSSGenReferenceOutPrefix is the valid prefix for a block
+# reference output for an SSGen tx.
+validSSGenReferenceOutPrefix = ByteArray([opcode.OP_RETURN, opcode.OP_DATA_36])
+
+# validSSGenVoteOutMinPrefix is the valid prefix for a vote output for an
+# SSGen tx.
+validSSGenVoteOutMinPrefix = ByteArray([opcode.OP_RETURN, opcode.OP_DATA_2])
 
 # validSStxAddressOutPrefix is the valid prefix for a 30-byte
 # minimum OP_RETURN push for a commitment for an SStx.
@@ -1153,6 +1220,219 @@ def isNullDataScript(scriptVersion, script):
         )
         and len(tokenizer.data()) <= MaxDataCarrierSize
     )
+
+
+def isNullOutpoint(tx):
+    """
+    isNullOutpoint determines whether or not a previous transaction output point
+    is set.
+    """
+    nullInOP = tx.txIn[0].previousOutPoint
+    if (
+        nullInOP.index == wire.MaxUint32
+        and nullInOP.hash == ByteArray(0, length=HASH_SIZE)
+        and nullInOP.tree == wire.TxTreeRegular
+    ):
+        return True
+
+    return False
+
+
+def isNullFraudProof(tx):
+    """
+    isNullFraudProof determines whether or not a previous transaction fraud proof
+    is set.
+    """
+    txIn = tx.txIn[0]
+    if txIn.blockHeight != wire.NullBlockHeight:
+        return False
+    elif txIn.blockIndex != wire.NullBlockIndex:
+        return False
+
+    return True
+
+
+def isStakeBase(tx):
+    """
+    Whether or not a tx could be considered as having a topically valid stake
+    base present.
+    """
+    # A stake base (SSGen) must only have two transaction inputs.
+    if len(tx.txIn) != 2:
+        return False
+
+    # The previous output of a coin base must have a max value index and
+    # a zero hash, as well as null fraud proofs.
+    if not isNullOutpoint(tx):
+        return False
+
+    if not isNullFraudProof(tx):
+        return False
+
+    return True
+
+
+def isSSGen(tx):
+    """
+    IsSSGen returns whether or not a transaction is a stake submission generation
+    transaction.  These are also known as votes.
+    """
+    try:
+        checkSSGen(tx)
+
+    except Exception as e:
+        log.debug("isSSGen: {}".format(e))
+
+    else:
+        return True
+
+
+def checkSSGen(tx):
+    """
+    CheckSSGen returns an error if a transaction is not a stake submission
+    generation transaction.  It does some simple validation steps to make sure
+    the number of inputs, number of outputs, and the input/output scripts are
+    valid.
+
+    This does NOT check to see if the subsidy is valid or whether or not the
+    value of input[0] + subsidy = value of the outputs.
+
+    SSGen transactions are specified as below.
+    Inputs:
+    Stakebase null input [index 0]
+    SStx-tagged output [index 1]
+
+    Outputs:
+    OP_RETURN push of 40 bytes containing: [index 0]
+        i. 32-byte block header of block being voted on.
+        ii. 8-byte int of this block's height.
+    OP_RETURN push of 2 bytes containing votebits [index 1]
+    SSGen-tagged output to address from SStx-tagged output's tx index output 1
+        [index 2]
+    SSGen-tagged output to address from SStx-tagged output's tx index output 2
+        [index 3]
+    ...
+    SSGen-tagged output to address from SStx-tagged output's tx index output
+        MaxInputsPerSStx [index MaxOutputsPerSSgen - 1]
+    """
+    # Check to make sure there aren't too many or too few inputs.
+    if len(tx.txIn) != NumInputsPerSSGen:
+        raise DecredError("SSgen tx has an invalid number of inputs")
+
+    # Check to make sure there aren't too many outputs.
+    if len(tx.txOut) > MaxOutputsPerSSGen:
+        raise DecredError("SSgen tx has too many outputs")
+
+    # Check to make sure there are enough outputs.
+    if len(tx.txOut) < 2:
+        raise DecredError("SSgen tx does not have enough outputs")
+
+    # Ensure that the first input is a stake base null input.
+    # Also checks to make sure that there aren't too many or too few inputs.
+    if not isStakeBase(tx):
+        raise DecredError(
+            "SSGen tx did not include a stakebase in the zeroeth input position"
+        )
+
+    # Check to make sure that the output used as input came from TxTreeStake.
+    for i, txin in enumerate(tx.txIn):
+        # Skip the stakebase
+        if i == 0:
+            continue
+
+        if txin.previousOutPoint.index != 0:
+            raise DecredError(
+                "SSGen used an invalid input idx (got {}, want 0)".format(
+                    txin.previousOutPoint.index
+                )
+            )
+
+        if txin.previousOutPoint.tree != wire.TxTreeStake:
+            raise DecredError("SSGen used a non-stake input")
+
+    # Check to make sure that all output scripts are the consensus version.
+    for txOut in tx.txOut:
+        if txOut.version != consensusVersion:
+            raise DecredError("invalid script version found in txOut")
+
+    # Ensure the number of outputs is equal to the number of inputs found in
+    # the original SStx + 2.
+    # TODO: Do this in validate, requires DB and valid chain.
+
+    # Ensure that the second input is an SStx tagged output.
+    # TODO: Do this in validate, as we don't want to actually lookup
+    # old tx here.  This function is for more general sorting.
+
+    # Ensure that the first output is an OP_RETURN push.
+    zeroethOutputVersion = tx.txOut[0].version
+    zeroethOutputScript = tx.txOut[0].pkScript
+    if getScriptClass(zeroethOutputVersion, zeroethOutputScript) != NullDataTy:
+        raise DecredError(
+            "First SSGen output should have been an OP_RETURN data push, but was not"
+        )
+
+    # Ensure that the first output is the correct size.
+    if len(zeroethOutputScript) != SSGenBlockReferenceOutSize:
+        raise DecredError(
+            "First SSGen output should have been {} bytes long, but was not".format(
+                SSGenBlockReferenceOutSize
+            )
+        )
+
+    # The OP_RETURN output script prefix for block referencing should
+    # conform to the standard.
+    if zeroethOutputScript[:2] != validSSGenReferenceOutPrefix:
+        raise DecredError("First SSGen output had an invalid prefix")
+
+    # Ensure that the block header hash given in the first 32 bytes of the
+    # OP_RETURN push is a valid block header and found in the main chain.
+    # TODO: This is validate level stuff, do this there.
+
+    # Ensure that the second output is an OP_RETURN push.
+    firstOutputVersion = tx.txOut[1].version
+    firstOutputScript = tx.txOut[1].pkScript
+    if getScriptClass(firstOutputVersion, firstOutputScript) != NullDataTy:
+        raise DecredError(
+            "Second SSGen output should have been an OP_RETURN data push, but was not"
+        )
+
+    # The length of the output script should be between 4 and 77 bytes long.
+    if (
+        len(firstOutputScript) < SSGenVoteBitsOutputMinSize
+        or len(firstOutputScript) > SSGenVoteBitsOutputMaxSize
+    ):
+        raise DecredError(
+            "SSGen votebits output at output index 1 was a NullData (OP_RETURN) push of the wrong size"
+        )
+
+    # The OP_RETURN output script prefix for voting should conform to the
+    # standard.
+    minPush = validSSGenVoteOutMinPrefix[1]
+    maxPush = minPush + (MaxSingleBytePushLength - minPush)
+    pushLen = firstOutputScript[1]
+    pushLengthValid = pushLen >= minPush and pushLen <= maxPush
+    # The first byte should be OP_RETURN, while the second byte should be a
+    # valid push length.
+    if firstOutputScript[0] != validSSGenVoteOutMinPrefix[0] or not pushLengthValid:
+        raise DecredError("Second SSGen output had an invalid prefix")
+
+    # Ensure that the tx height given in the last 8 bytes is StakeMaturity
+    # many blocks ahead of the block in which that SStx appears, otherwise
+    # this ticket has failed to mature and the SStx must be invalid.
+    # TODO: This is validate level stuff, do this there.
+
+    # Ensure that the remaining outputs are OP_SSGEN tagged.
+    for i, outTx in enumerate(tx.txOut[2:]):
+        scrVersion = outTx.version
+        rawScript = outTx.pkScript
+
+        # The script should be a OP_SSGEN tagged output.
+        if getScriptClass(scrVersion, rawScript) != StakeGenTy:
+            raise DecredError(
+                "SSGen tx output at output index {} was not an OP_SSGEN tagged output".format(
+                    i + 2
+                )
+            )
 
 
 def checkSStx(tx):
