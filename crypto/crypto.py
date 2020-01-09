@@ -597,6 +597,7 @@ class ExtendedKey:
         self.childNum = childNum
         self.isPrivate = isPrivate
 
+    @staticmethod
     def new(seed):
         """
         new creates a new crypto.ExtendedKey. Implementation based on dcrd
@@ -1087,7 +1088,7 @@ class KDFParams(object):
         assert ver == 0
         assert len(d) == 5
 
-        params = KDFParams(salt=ByteArray(d[2]), digest=ByteArray(d[3]),)
+        params = KDFParams(salt=ByteArray(d[2]), digest=ByteArray(d[3]))
 
         params.kdfFunc = d[0].decode("utf-8")
         params.hashName = d[1].decode("utf-8")

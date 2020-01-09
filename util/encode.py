@@ -1,5 +1,6 @@
 """
-Copyright (c) 2019, Brian Stafford
+Copyright (c) 2020, Brian Stafford
+Copyright (c) 2020, the Decred developers
 See LICENSE for details
 
 A class that wraps ByteArray and provides some convenient operators.
@@ -349,9 +350,9 @@ class BuildyBytes(ByteArray):
 
     def addData(self, d):
         """
-        addData adds the data to the BuildyBytes, and returns the new
-        BuildyBytes. The data has hard-coded length limit of
-        uint16_max = 65535 bytes.
+        addData adds the data to the BuildyBytes. self is returned to enable
+        chaining. The data has hard-coded length limit of uint16_max = 65535
+        bytes.
         """
         d = decodeBA(d)
         lenBytes = intToBytes(len(d))
@@ -427,7 +428,7 @@ def unblobStrList(b):
 
 def blobStrList(strs):
     """
-    Encode a list of strings a BuildyBytes array.
+    Encode a list of strings a bytes.
 
     Args:
         list(str): The strings to encode.

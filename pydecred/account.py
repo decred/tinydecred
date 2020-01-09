@@ -169,6 +169,7 @@ class TinyBlock(object):
         """
         return ByteArray(TinyBlock.blob(self))
 
+    @staticmethod
     def parse(obj):
         """
         Parse the Python dict to a TinyBlock. The dict should have two keys,
@@ -176,6 +177,9 @@ class TinyBlock(object):
 
         Args:
             obj (dict): The block dict.
+
+        Returns:
+            TinyBlock: The parsed TinyBlock.
         """
         return TinyBlock(ByteArray(obj["hash"]), obj["height"])
 
@@ -185,6 +189,9 @@ class TinyBlock(object):
 
         Args:
             blk (TinyBlock): The block to compare.
+
+        Returns:
+            bool: True if they have the same hash and height.
         """
         return self.hash == blk.hash and self.height == blk.height
 
@@ -715,6 +722,14 @@ class Account(object):
         self.internalAddresses = readAddrs(self.addrIntDB)
         self.addrExtDB = db.child("external_addrs", datatypes=("INTEGER", "TEXT"))
         self.externalAddresses = readAddrs(self.addrExtDB)
+        self.addrTxDB = db.child(
+            "address_txid", datatypes=("TEXT", "BLOB"), unique=False
+        )
+        txs = self.txs
+        for addr, txHash in self.addrTxDB.items():
+            if addr not in txs:
+                txs[addr] = []
+            txs[addr].append(reversed(ByteArray(txHash)).hex())
         self.vspDB = db.child(
             "vsps", datatypes=("TEXT", "BLOB"), blobber=VotingServiceProvider
         )
@@ -832,31 +847,15 @@ class Account(object):
         for utxo in self.utxos.values():
             yield utxo
 
-    def getUTXO(self, txid, vout):
-        """
-        Get a UTXO by txid and tx output index.
-
-        Args:
-            txid (str): The hex-encoded transaction ID.
-            vout (int): The transaction output index.
-
-        Returns:
-            UTXO: The UTXO if found or None.
-        """
-        uKey = UTXO.makeKey(txid, vout)
-        return self.utxos[uKey] if uKey in self.utxos else None
-
-    def UTXOsForTXID(self, txid):
+    def UTXOsForTxID(self, txid):
         """
         Get any UTXOs with the provided transaction ID.
-
         Args:
             txid (str): The hex-encoded transaction ID.
-
         Returns:
             list(UTXO): List of UTXO for the txid.
         """
-        return [utxo for utxo in self.utxoscan() if utxo.txid == txid]
+        return (utxo for utxo in self.utxoscan() if utxo.txid == txid)
 
     def getUTXOs(self, requested, approve=None):
         """
@@ -914,9 +913,11 @@ class Account(object):
             addr (str): Base-58 encoded address.
             txid (str): The hex-encoded transaction ID.
         """
-        if addr not in self.txs:
-            self.txs[addr] = []
-        txids = self.txs[addr]
+        self.addrTxDB[addr] = reversed(ByteArray(txid)).b
+        txs = self.txs
+        if addr not in txs:
+            txs[addr] = []
+        txids = txs[addr]
         if txid not in txids:
             txids.append(txid)
         # Advance the cursors as necessary.
@@ -945,7 +946,7 @@ class Account(object):
         """
         txid = tx.txid()
         self.mempool.pop(txid, None)
-        for utxo in self.UTXOsForTXID(txid):
+        for utxo in self.UTXOsForTxID(txid):
             utxo.height = blockHeight
             if tx.looksLikeCoinbase():
                 # This is a coinbase transaction, set the maturity height.
@@ -965,7 +966,7 @@ class Account(object):
             str: Base-58 encoded address.
         """
 
-        def next():
+        def nextAddr():
             idx = len(branchAddrs)
             try:
                 addr = branchKey.deriveChildAddress(idx, self.net)
@@ -976,14 +977,14 @@ class Account(object):
             return addr
 
         for i in range(3):
-            addr = next()
+            addr = nextAddr()
             if addr != CrazyAddress:
                 return addr
         raise Exception("failed to generate new address")
 
     def nextExternalAddress(self):
         """
-        Return a new external address by advancing the cursor.
+        Return a new external address. Advances the cursor.
 
         Returns:
             addr (str): Base-58 encoded address.
@@ -1008,7 +1009,7 @@ class Account(object):
 
     def nextInternalAddress(self):
         """
-        Return a new internal address
+        Return a new internal address. Advances the cursor.
 
         Returns:
             str: Base-58 encoded address.
@@ -1143,8 +1144,8 @@ class Account(object):
             addr (str): Base-58 encoded address.
 
         Returns:
-            int: Internal (1) or external (0) branch.
-            int: Address index.
+            int: Internal (1) or external (0) branch, or None if not found.
+            int: Address index, or None if not found.
         """
         branch, idx = None, None
         if addr in self.externalAddresses:
@@ -1155,7 +1156,7 @@ class Account(object):
             idx = self.internalAddresses.index(addr)
         return branch, idx
 
-    def getPrivKeyForAddress(self, addr):
+    def privKeyForAddress(self, addr):
         """
         Get the private key for the address.
 
@@ -1205,9 +1206,9 @@ class Account(object):
         Returns:
             bool: `True` if we are watching the txid.
         """
-        return txid in self.mempool or self.hasUTXOwithTXID(txid)
+        return txid in self.mempool or self.hasUTXOwithTxID(txid)
 
-    def hasUTXOwithTXID(self, txid):
+    def hasUTXOwithTxID(self, txid):
         """
         Search watched transaction ids for txid.
 
@@ -1244,7 +1245,11 @@ class Account(object):
 
     def allAddresses(self):
         """
-        Overload the base class to add the voting address.
+        Return a list of all addresses, internal and external, that have been
+        created for this account. Also includes the VSP ticket addresses.
+
+        Returns:
+            list(str): List of base-58 encoded addresses.
         """
         return self.addTicketAddresses(
             filterCrazyAddress(self.internalAddresses + self.externalAddresses)
@@ -1252,7 +1257,12 @@ class Account(object):
 
     def watchAddrs(self):
         """
-        Overload the base class to add the voting address.
+        A list of addresses to monitor. These addresses will be submitted to
+        the BlockChain to receive a feed of updates. This function does not
+        return internal addresses that have already been seen.
+
+        Returns:
+            list(str): List of base-58 encoded addresses.
         """
         a = set()
         a = a.union((utxo.address for utxo in self.utxoscan()))
@@ -1401,7 +1411,7 @@ class Account(object):
             MsgTx: The newly created transaction on success, `False` on failure.
         """
         keysource = KeySource(
-            priv=self.getPrivKeyForAddress, internal=self.nextInternalAddress,
+            priv=self.privKeyForAddress, internal=self.nextInternalAddress,
         )
         tx, spentUTXOs, newUTXOs = self.blockchain.sendToAddress(
             value, address, keysource, self.getUTXOs, feeRate
@@ -1421,7 +1431,7 @@ class Account(object):
         information.
         """
         keysource = KeySource(
-            priv=self.getPrivKeyForAddress, internal=self.nextInternalAddress,
+            priv=self.privKeyForAddress, internal=self.nextInternalAddress,
         )
         pool = self.stakePool()
         pi = pool.purchaseInfo

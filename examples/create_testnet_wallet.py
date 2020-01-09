@@ -8,11 +8,10 @@ testnet wallet. The mnemonic seed and an address are printed.
 import os
 from getpass import getpass
 
-# Set the configuration for testnet before loading TD modules.
 from tinydecred import config
 
+# Set the configuration for testnet before loading TD modules.
 config.load("testnet")
-
 from tinydecred.util.helpers import mkdir
 from tinydecred.wallet.wallet import Wallet
 

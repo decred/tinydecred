@@ -296,10 +296,8 @@ class WebsocketClient(object):
     def activate(self):
         """
         Start the server and begin parsing messages
-        Returns
-        -------
-        True on success. On failure, StrataMinerServer::errMsg is set,
-        and False is returned
+        Returns:
+            bool: True on success.
         """
         self.socket = websocket.WebSocket(sslopt={"cert_reqs": ssl.CERT_NONE})
         self.socket.connect(self.path)
@@ -379,8 +377,7 @@ class WebsocketClient(object):
 
     def close(self):
         """
-        Attempts to shutdown the server gracefully. Equivalent to setting
-        StrataMinerServer::killerBool = True
+        Attempts to shutdown the server gracefully.
         """
         self.killerBool = True
         if self.socket:

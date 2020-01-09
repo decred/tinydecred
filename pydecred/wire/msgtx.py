@@ -454,7 +454,7 @@ class MsgTx:
     def addTxOut(self, txout):
         self.txOut.append(txout)
 
-    def hash(self):  # chainhash.Hash {
+    def hash(self):
         """
         TxHash generates the hash for the transaction prefix.  Since it does not
         contain any witness data, it is not malleable and therefore is stable for

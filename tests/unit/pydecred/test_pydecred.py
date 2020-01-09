@@ -2886,19 +2886,19 @@ class TestAccount(unittest.TestCase):
 
             # Open the account to generate addresses.
             acct.open(cryptoKey, None, None)
-            acct.addTxid(internalAddrs[0], "somerandomtxid")
+            acct.addTxid(internalAddrs[0], "C4fA6958A1847D")
             newAddrs = acct.generateGapAddresses()
             self.assertEqual(len(newAddrs), 1)
             self.assertEqual(newAddrs[0], internalAddrs[5])
 
             # The zeroth external address is considered "seen", so this should not
             # change anything.
-            acct.addTxid(externalAddrs[0], "somerandomtxid")
+            acct.addTxid(externalAddrs[0], "C4fA6958A1847D")
             newAddrs = acct.generateGapAddresses()
             self.assertEqual(len(newAddrs), 0)
 
             # Mark the 1st address as seen.
-            acct.addTxid(externalAddrs[1], "somerandomtxid")
+            acct.addTxid(externalAddrs[1], "C4fA6958A1847D")
             newAddrs = acct.generateGapAddresses()
             self.assertEqual(len(newAddrs), 1)
             self.assertEqual(externalAddrs[1], acct.currentAddress())
@@ -2962,14 +2962,7 @@ class TestAccount(unittest.TestCase):
             self.assertEqual(acct.calcBalance(1).available, satoshis)
             self.assertEqual(acct.calcBalance(0).available, 0)
             # Helper functions.
-            self.assertIsNot(acct.getUTXO(txid, vout), None)
-            self.assertIs(acct.getUTXO("", -1), None)
             self.assertTrue(acct.caresAboutTxid(txid))
-            utxos = acct.UTXOsForTXID(txid)
-            self.assertEqual(len(utxos), 1)
-            # Spend and recheck
-            acct.spendUTXOs(utxos)
-            self.assertEqual(utxocount(), 0)
             acct.addUTXO(utxo)
             self.assertEqual(utxocount(), 1)
             acct.spendUTXO(utxo)

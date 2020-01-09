@@ -10,9 +10,9 @@ Before running this script, send the wallet some DCR from the faucet.
 import os
 from getpass import getpass
 
-# Set the configuration for testnet before loading TD modules.
 from tinydecred import config
 
+# Set the configuration for testnet before loading TD modules.
 config.load("testnet")
 
 from tinydecred.pydecred import testnet
