@@ -83,16 +83,16 @@ class Client(object):
 
         Args:
             address (string): The Decred address to search for
-            verbose (int): Specifies the transaction is returned as a JSON
+            verbose (int, optional, default=1): Specifies the transaction is returned as a JSON
                 object instead of hex-encoded string.
-            skip (int): The number of leading transactions to leave out of the
+            skip (int, optional, default=0): The number of leading transactions to leave out of the
                 final response.
-            count (int): The maximum number of transactions to return.
-            vinextra (int): Specify that extra data from previous output will be
+            count (int, optional, default=100): The maximum number of transactions to return.
+            vinextra (int, optional, default=0): Specify that extra data from previous output will be
                 returned in vin.
-            reverse (bool): Specifies that the transactions should be returned
+            reverse (bool, optional, default=False): Specifies that the transactions should be returned
                 in reverse chronological order.
-            filteraddrs (list(string)): Only inputs or outputs with matching
+            filteraddrs (list(string), optional, default=[]): Only inputs or outputs with matching
                 address will be returned.
 
         Returns:
@@ -112,28 +112,29 @@ class Client(object):
             )
         ]
 
-    def sendRawTransaction(self, hextx, allowhighfees=False):
+    def sendRawTransaction(self, msgTx, allowhighfees=False):
         """
         Submits the serialized, hex-encoded transaction to the local peer and
         relays it to the network.
 
         Args:
-            hextx (string): Serialized, hex-encoded signed transaction.
-            allowhighfees (bool): Whether or not to allow insanely high fees
+            msgTx (object): msgtx.MsgTx signed transaction.
+            allowhighfees (bool, optional, default=False): Whether or not to allow insanely high fees
                 (dcrd does not yet implement this parameter, so it has no effect).
 
         Returns:
-            string: The hash of the transaction.
+            bytes-like: The hash of the transaction.
         """
-        return self.call("sendrawtransaction", hextx, allowhighfees)
+        txid = self.call("sendrawtransaction", msgTx.txHex(), allowhighfees)
+        return reversed(ByteArray(txid))
 
-    def setgenerate(self, generate, genproclimit=-1):
+    def setGenerate(self, generate, genproclimit=-1):
         """
         Set the server to generate coins (mine) or not.
 
         Args:
             generate (bool): Use True to enable generation, False to disable it.
-            genproclimit (int): The number of processors (cores) to limit
+            genproclimit (int, optional, default=-1): The number of processors (cores) to limit
                 generation to or -1 for default.
         """
         self.call("setgenerate", generate, genproclimit)
@@ -153,7 +154,7 @@ class Client(object):
 
         Args:
             hexblock (string): Serialized, hex-encoded block.
-            options (dict[workid]string): This parameter is currently ignored.
+            options (optional, default={}): This parameter is currently ignored.
 
         Returns:
             string: The reason the block was rejected if rejected or None.
@@ -166,9 +167,9 @@ class Client(object):
         difficulty windows (units: DCR/kB).
 
         Args:
-            blocks (int): The number of blocks, starting from the
+            blocks (int, optional, default=None): The number of blocks, starting from the
                 chain tip and descending, to return fee information about.
-            windows (int): The number of difficulty windows to return
+            windows (int, optional, default=None): The number of difficulty windows to return
                 ticket fee information about.
 
         Returns:
@@ -199,8 +200,8 @@ class Client(object):
         blocks (default: full PoS difficulty adjustment depth).
 
         Args:
-            start (int): The start height to begin calculating the VWAP from.
-            end (int): The end height to begin calculating the VWAP from.
+            start (int, optional, default=None): The start height to begin calculating the VWAP from.
+            end (int, optional, default=None): The end height to begin calculating the VWAP from.
 
         Returns:
             float: The volume weighted average price.
@@ -213,11 +214,11 @@ class Client(object):
         blocks, and difficulty windows.
 
         Args:
-            blocks (int): The number of blocks to calculate transaction fees
+            blocks (int, optional, default=None): The number of blocks to calculate transaction fees
                 for, starting from the end of the tip moving backwards.
-            rangeStart (int): The start height of the block range to calculate
+            rangeStart (int, optional, default=None): The start height of the block range to calculate
                 transaction fees for.
-            rangeEnd (int): The end height of the block range to calculate
+            rangeEnd (int, optional, default=None): The end height of the block range to calculate
                 transaction fees for.
 
         Returns:
@@ -290,7 +291,9 @@ def get(k, obj):
 
 
 class FeeInfoResult:
-    """ticketfeeinforesult"""
+    """
+    Models the data returned from ticketFeeInfo and txFeeInfo.
+    """
 
     def __init__(
         self, height, startHeight, endHeight, number, Min, Max, mean, median, stdDev,
@@ -578,7 +581,9 @@ class PrevOut:
         Returns:
             PrevOut: The Parsed PrevOut.
         """
-        return PrevOut(addresses=get("addresses", obj), value=obj["value"],)
+        return PrevOut(
+            addresses=obj["addresses"] if obj["addresses"] else [], value=obj["value"],
+        )
 
 
 class Vin:
