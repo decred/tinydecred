@@ -555,7 +555,6 @@ class MsgTx:
         return b
 
     def btcEncode(self, pver):
-        # w io.Writer, pver uint32) error {
         """
         BtcEncode encodes the receiver to w using the Decred protocol encoding.
         This is part of the Message interface implementation.
@@ -737,7 +736,6 @@ class MsgTx:
 
     @staticmethod
     def btcDecode(b, pver):
-        # r io.Reader, pver uint32) error {
         """
         BtcDecode decodes r using the Decred protocol encoding into the receiver.
         This is part of the Message interface implementation.

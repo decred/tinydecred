@@ -3003,7 +3003,7 @@ class TestAccount(unittest.TestCase):
             status="",
             purchaseBlock=None,
             maturityHeight=0,
-            expirationHeight=-1,
+            expirationHeight=0,
             lotteryBlock=None,
             vote=None,
             revocation=None,

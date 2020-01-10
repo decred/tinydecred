@@ -96,8 +96,12 @@ class PurchaseInfo(object):
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        assert ver == 0
-        assert len(d) == 7
+        if ver != 0:
+            raise AssertionError("invalid PurchaseInfo version %d" % ver)
+        if len(d) != 7:
+            raise AssertionError(
+                "wrong number of pushes for PurchaseInfo. expected 7, got %d" % len(d)
+            )
 
         iFunc = encode.intFromBytes
 
@@ -191,8 +195,13 @@ class VotingServiceProvider(object):
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        assert ver == 0
-        assert len(d) == 4
+        if ver != 0:
+            raise AssertionError("invalid version for VotingServiceProvider %d" % ver)
+        if len(d) != 4:
+            raise AssertionError(
+                "wrong number of pushes for VotingServiceProvider. wanted 4, got %d"
+                % len(d)
+            )
 
         piB = encode.extractNone(d[3])
         pi = PurchaseInfo.unblob(piB) if piB else None

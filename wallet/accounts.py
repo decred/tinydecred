@@ -98,8 +98,12 @@ class AccountManager(object):
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        assert ver == 0
-        assert len(d) == 4
+        if ver != 0:
+            raise AssertionError("invalid AccountManager version %d" % ver)
+        if len(d) != 4:
+            raise AssertionError(
+                "expected 4 pushes for AccountManager, got %d" % len(d)
+            )
 
         am = AccountManager(
             coinType=encode.intFromBytes(d[0]),
@@ -263,9 +267,7 @@ def createAccount(
     pubKeyEncrypted = crypto.encrypt(cryptoKey, acctKeyPub.serialize())
     privKeyEncrypted = crypto.encrypt(cryptoKey, acctKeyPriv.serialize())
     constructor = chains.AccountConstructors[coinType]
-    account = constructor(
-        pubKeyEncrypted, privKeyEncrypted, acctName, chains.BipIDs.decred, netName, db,
-    )
+    account = constructor(pubKeyEncrypted, privKeyEncrypted, acctName, netName, db)
     # Open the account.
     account.open(cryptoKey, chains.chain(coinType), signals)
     # Create the first payment address.

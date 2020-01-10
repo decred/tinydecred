@@ -22,6 +22,8 @@ STAKE_BRANCH = 2
 EXTERNAL_BRANCH = 0
 INTERNAL_BRANCH = 1
 
+BIPID = 42
+
 
 class MetaKeys:
     """Keys for the account meta table."""
@@ -44,6 +46,9 @@ def filterCrazyAddress(addrs):
 
     Args:
         addrs (list(str)): The addresses to filter.
+
+    Returns:
+        list(str): The filtered addresses.
     """
     return [a for a in addrs if a != CrazyAddress]
 
@@ -156,8 +161,10 @@ class TinyBlock(object):
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        assert ver == 0
-        assert len(d) == 2
+        if ver != 0:
+            raise AssertionError("unsupported version")
+        if len(d) != 2:
+            raise AssertionError("wrong number of pushes. expected 2, got %d" % len(d))
         return TinyBlock(d[0], encode.intFromBytes(d[1]))
 
     def serialize(self):
@@ -219,11 +226,12 @@ class TicketInfo(object):
             purchaseBlock (TinyBlock): The ticket purchase block.
             maturityHeight: (int): The height at which the ticket goes live.
             expirationHeight (int): The height at which the ticket expires.
-            lotteryBlock (TinyBlock): Once chosen, the block in which the ticket
-                was selected.
-            vote (ByteArray): The transaction hash of the vote, if voted.
-            revocation (ByteArray): The transaction hash of the revocation, if
-                revoked.
+            lotteryBlock (TinyBlock or None): Once chosen, the block in which
+                the ticket was selected.
+            vote (ByteArray or None): The transaction hash of the vote, if
+                the ticket was spent in a vote.
+            revocation (ByteArray or None): The transaction hash of the
+                revocation, if the ticket was spent in a revocation.
         """
         self.status = status
         self.purchaseBlock = purchaseBlock
@@ -256,15 +264,14 @@ class TicketInfo(object):
     def blob(utxo):
         """Satisfies the encode.Blobber API"""
         f = encode.filterNone
-        iFunc = encode.intToBytes
         return (
             BuildyBytes(0)
             .addData(utxo.status.encode("utf-8"))
             .addData(
                 f(TinyBlock.blob(utxo.purchaseBlock) if utxo.purchaseBlock else None)
             )
-            .addData(iFunc(utxo.maturityHeight))
-            .addData(iFunc(utxo.expirationHeight, signed=True))
+            .addData(utxo.maturityHeight)
+            .addData(utxo.expirationHeight)
             .addData(
                 f(TinyBlock.blob(utxo.lotteryBlock) if utxo.lotteryBlock else None)
             )
@@ -277,8 +284,12 @@ class TicketInfo(object):
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        assert ver == 0
-        assert len(d) == 7
+        if ver != 0:
+            raise AssertionError("invalid TicketInfo version %d" % ver)
+        if len(d) != 7:
+            raise AssertionError(
+                "wrong number of pushes for TicketInfo. wanted 7, got %d" % len(d)
+            )
 
         iFunc = encode.intFromBytes
         f = encode.extractNone
@@ -294,12 +305,11 @@ class TicketInfo(object):
 
         r = f(d[6])
         revocation = ByteArray(r) if r else None
-
         return TicketInfo(
             status=d[0].decode("utf-8"),
             purchaseBlock=purchaseBlock,
             maturityHeight=iFunc(d[2]),
-            expirationHeight=iFunc(d[3], signed=True),
+            expirationHeight=iFunc(d[3]),
             lotteryBlock=lotteryBlock,
             vote=vote,
             revocation=revocation,
@@ -340,13 +350,16 @@ class UTXO(object):
             address (str): The address to which the UTXO pays.
             txHash (ByteArray): The transaction hash of the output's tx.
             vout (int): The output's tx output index.
-            ts (int): The Unix timestamp. default None for mempool.
-            scriptPubKey (ByteArray): The pubkey script.
-            height (int): The output's transaction's block height. default -1
-                signifies a mempool transaction.
-            satoshis (int): The output value.
-            maturity (int): The height at which the output becomes mature.
-            tinfo (TicketInfo): The ticket info. Tickets only.
+            ts (int): optional. default None. The Unix timestamp. default None
+                for mempool.
+            scriptPubKey (ByteArray): optional. default None. The pubkey script.
+            height (int): optional. default -1 signifies mempool. The output's
+                transaction's block height. default -1 signifies a mempool.
+            satoshis (int): optional. default 0. The output value.
+            maturity (int): optional. default 0 signifies mature. The height at
+                which the output becomes that the output is already mature.
+            tinfo (TicketInfo): optional. default None. The ticket info. Tickets
+                only.
         """
         self.address = address
         self.txHash = txHash
@@ -383,8 +396,12 @@ class UTXO(object):
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        assert ver == 0
-        assert len(d) == 9
+        if ver != 0:
+            raise AssertionError("wrong version for UTXO %d" % ver)
+        if len(d) != 9:
+            raise AssertionError(
+                "wrong number of pushes for UTXO. expected 9 got %d" % len(d)
+            )
 
         iFunc = encode.intFromBytes
         f = encode.extractNone
@@ -407,7 +424,6 @@ class UTXO(object):
             tinfo=tinfo,
         )
 
-        utxo._amount = utxo.satoshis / 1e8
         utxo.parseScriptClass()
         return utxo
 
@@ -564,9 +580,10 @@ class Balance(object):
         """
         Constructor for a Balance. Units atoms.
 
-        total (int): The total balance.
-        available (int): The available balance.
-        staked (int): The staked balance.
+        Args:
+            total (int): optional. default 0. The total balance.
+            available (int): optional. default 0. The available balance.
+            staked (int): optional. default 0. The staked balance.
         """
         self.total = total
         self.available = available
@@ -587,8 +604,12 @@ class Balance(object):
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, pushes = encode.decodeBlob(b)
-        assert ver == 0
-        assert len(pushes) == 3
+        if ver != 0:
+            raise AssertionError("invalid version for Balance %d" % ver)
+        if len(pushes) != 3:
+            raise AssertionError(
+                "wrong number of pushes for Balance. wanted 3, got %d" % len(pushes)
+            )
         i = encode.intFromBytes
         return Balance(i(pushes[0]), i(pushes[1]), i(pushes[2]))
 
@@ -608,13 +629,12 @@ class Account(object):
     Account is a Decred account.
     """
 
-    def __init__(self, pubKeyEncrypted, privKeyEncrypted, name, coinID, netID, db=None):
+    def __init__(self, pubKeyEncrypted, privKeyEncrypted, name, netID, db=None):
         """
         Args:
-            pubKeyEncrypted (str): The encrypted public key bytes.
-            privKeyEncrypted (str): The encrypted private key bytes.
+            pubKeyEncrypted (ByteArray): The encrypted public key bytes.
+            privKeyEncrypted (ByteArray): The encrypted private key bytes.
             name (str): Name for the account.
-            coinID (str): The lowercase symbol of the asset this account is for.
             netID (str): An identifier that can identify the network for an
                 asset. Probably a string such as "testnet".
             db (database.Bucket): A database bucket for the account.
@@ -622,7 +642,7 @@ class Account(object):
         self.pubKeyEncrypted = pubKeyEncrypted
         self.privKeyEncrypted = privKeyEncrypted
         self.name = name
-        self.coinID = coinID
+        self.coinID = BIPID
         self.netID = netID
         self.net = nets.parse(netID)
         # For external addresses, the cursor can sit on the last seen address,
@@ -673,7 +693,6 @@ class Account(object):
             .addData(acct.pubKeyEncrypted)
             .addData(acct.privKeyEncrypted)
             .addData(acct.name.encode("utf-8"))
-            .addData(acct.coinID)
             .addData(acct.netID.encode("utf-8"))
             .addData(encode.intToBytes(acct.cursorExt, signed=True))
             .addData(acct.cursorInt)
@@ -685,17 +704,23 @@ class Account(object):
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        assert ver == 0
-        assert len(d) == 8
+        if ver != 0:
+            raise AssertionError("invalid Account version %d" % ver)
+        if len(d) != 7:
+            raise AssertionError(
+                "wrong number of pushes for Account. wanted 7, got %d" % len(d)
+            )
+
+        iFunc = encode.intFromBytes
+
         pubEnc = ByteArray(d[0])
         privEnc = ByteArray(d[1])
         name = d[2].decode("utf-8")
-        coinID = encode.intFromBytes(d[3])
-        netID = d[4].decode("utf-8")
-        acct = Account(pubEnc, privEnc, name, coinID, netID)
-        acct.cursorExt = encode.intFromBytes(d[5], signed=True)
-        acct.cursorInt = encode.intFromBytes(d[6])
-        acct.gapLimit = encode.intFromBytes(d[7])
+        netID = d[3].decode("utf-8")
+        acct = Account(pubEnc, privEnc, name, netID)
+        acct.cursorExt = iFunc(d[4], signed=True)
+        acct.cursorInt = iFunc(d[5])
+        acct.gapLimit = iFunc(d[6])
         return acct
 
     def serialize(self):
@@ -1296,7 +1321,8 @@ class Account(object):
         Args:
             pool (vsp.VotingServiceProvider): The stake pool object.
         """
-        assert isinstance(pool, VotingServiceProvider)
+        if not isinstance(pool, VotingServiceProvider):
+            raise AssertionError("setPool given wrong type %s" % type(pool))
         self.stakePools = [pool] + [
             p for p in self.stakePools if p.apiKey != pool.apiKey
         ]
@@ -1564,5 +1590,6 @@ def readAddrs(db):
         list(string): The list of addresses.
     """
     pairs = sorted(db.items(), key=lambda pair: pair[0])
-    assert not pairs or len(pairs) == pairs[-1][0] + 1
+    if pairs and len(pairs) != pairs[-1][0] + 1:
+        raise AssertionError("address index mismatch")
     return [pair[1] for pair in pairs]

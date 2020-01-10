@@ -90,7 +90,7 @@ def floatFromBytes(b):
     Decode a float from bytes.
 
     Args:
-        bytes-like: The float bytes to decode.
+        b (bytes-like): The float bytes to decode.
 
     Returns:
         float: The decoded float.
@@ -101,6 +101,12 @@ def floatFromBytes(b):
 def boolToBytes(v):
     """
     Encode the boolean value as a byte.
+
+    Args:
+        v (bool): A boolean to encode.
+
+    Returns:
+        int: A byte.
     """
     return 0x01 if v else 0x00
 
@@ -108,8 +114,14 @@ def boolToBytes(v):
 def boolFromBytes(b):
     """
     Decode the byte as True if 0x01, else False.
+
+    Args:
+        b (bytes-like): A length-1 byte buffer with the encoded boolean.
+
+    Returns:
+        bool: The decoded value.
     """
-    return True if b == 0x01 else False
+    return b == 0x01
 
 
 def decodeBA(b, copy=False):
@@ -176,8 +188,11 @@ class ByteArray(object):
 
     def comp(self, a):
         """
-        comp gets the underlying bytearray and length of this ByteArray
-        and the argument.
+        comp gets the underlying bytearray and length of both this ByteArray
+        and a.
+
+        Args:
+            a (ByteArray): The other ByteArray.
 
         Returns:
             bytearray: This ByteArray's bytearray.
@@ -187,7 +202,8 @@ class ByteArray(object):
         """
         a = decodeBA(a)
         aLen, bLen = len(a), len(self.b)
-        assert aLen <= bLen, "decode: invalid length %i > %i" % (aLen, bLen)
+        if aLen > bLen:
+            raise AssertionError("decode: invalid length %i > %i" % (aLen, bLen))
         return a, aLen, self.b, bLen
 
     def __lt__(self, a):
@@ -261,7 +277,8 @@ class ByteArray(object):
 
     def __setitem__(self, i, v):
         v = decodeBA(v, copy=False)
-        assert i + len(v) <= len(self.b), "source bytes too long"
+        if i + len(v) > len(self.b):
+            raise AssertionError("source bytes too long")
         for j in range(len(v)):
             self.b[i + j] = v[j]
 
@@ -357,7 +374,8 @@ class BuildyBytes(ByteArray):
         d = decodeBA(d)
         lenBytes = intToBytes(len(d))
         bLen = len(lenBytes)
-        assert bLen < 3
+        if bLen > 2:
+            raise AssertionError("cannot push data longer than 65535")
         if bLen == 2:
             lBytes = bytearray((0xFF, lenBytes[0], lenBytes[1]))
         elif bLen == 1:

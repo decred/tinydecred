@@ -107,7 +107,8 @@ class PublicKey:
             fmt |= 0x1
         b = ByteArray(fmt)
         b += ByteArray(self.x, length=COORDINATE_LEN)
-        assert len(b) == PUBKEY_COMPRESSED_LEN
+        if len(b) != PUBKEY_COMPRESSED_LEN:
+            raise AssertionError("invalid compressed pubkey length %d", len(b))
         return b
 
     def serializeUncompressed(self):

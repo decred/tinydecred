@@ -579,9 +579,11 @@ class ExtendedKey:
             childNum (int): Child number.
             isPrivate (bool): Whether the key is a private or public key.
         """
-        assert (
-            len(privVer) == 4 and len(pubVer) == 4
-        ), "Network version bytes of incorrect length"
+        if len(privVer) != 4 or len(pubVer) != 4:
+            raise AssertionError(
+                "Network version bytes of incorrect lengths %d and %d"
+                % (len(privVer), len(pubVer))
+            )
         self.privVer = ByteArray(privVer)
         self.pubVer = ByteArray(pubVer)
         self.key = ByteArray(key)
@@ -613,7 +615,8 @@ class ExtendedKey:
             crypto.ExtendedKey: A master hierarchical deterministic key.
         """
         seedLen = len(seed)
-        assert seedLen >= rando.MinSeedBytes and seedLen <= rando.MaxSeedBytes
+        if seedLen < rando.MinSeedBytes or seedLen > rando.MaxSeedBytes:
+            raise AssertionError("invalid seed length %d" % seedLen)
 
         # First take the HMAC-SHA512 of the master key and the seed data:
         # SHA512 hash is 64 bytes.
@@ -1085,8 +1088,10 @@ class KDFParams(object):
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        assert ver == 0
-        assert len(d) == 5
+        if ver != 0:
+            raise AssertionError("invalid version %d" % ver)
+        if len(d) != 5:
+            raise AssertionError("wrong push count. expected 5, got %d" % len(d))
 
         params = KDFParams(salt=ByteArray(d[2]), digest=ByteArray(d[3]))
 
@@ -1168,7 +1173,7 @@ class SecretKey(object):
         `params`.
 
         Args:
-            password ():
+            password (bytes-like): The key password.
             kp (KDFParams): The key parameters from the original generation
                 of the key being regenerated.
 
@@ -1194,11 +1199,11 @@ class SecretKey(object):
 
 def encrypt(key, thing):
     """
-    Encrypt the thing with the key. Arguments must be bytes, not bytearray.
+    Encrypt the thing with the key.
 
     Args:
-        key (ByteArray): The key.
-        thing (ByteArray): The plaintext.
+        key (ByteArray or bytes-like): The key.
+        thing (ByteArray or bytes-like): The plaintext.
 
     Returns:
         ByteArray: The ciphertext.
@@ -1207,22 +1212,23 @@ def encrypt(key, thing):
     box = nacl.secret.SecretBox(bytes(key))
 
     # Encrypt our message, it will be exactly 40 bytes longer than the
-    #   original message as it stores authentication information and the
-    #   nonce alongside it.
+    # original message as it stores authentication information and the
+    # nonce alongside it.
     encrypted = box.encrypt(bytes(thing))
 
-    assert len(encrypted) == len(thing) + box.NONCE_SIZE + box.MACBYTES
+    if len(encrypted) != len(thing) + box.NONCE_SIZE + box.MACBYTES:
+        raise AssertionError("wrong encrypted length %d" % len(encrypted))
 
     return ByteArray(encrypted)
 
 
 def decrypt(key, thing):
     """
-    Decrypt the thing with the key. Arguments must be bytes, not bytearray.
+    Decrypt the thing with the key.
 
     Args:
-        key (ByteArray): The key.
-        thing (ByteArray): The ciphertext.
+        key (ByteArray or bytes-like): The key.
+        thing (ByteArray or bytes-like): The ciphertext.
 
     Returns:
         ByteArray: The decoded plaintext.

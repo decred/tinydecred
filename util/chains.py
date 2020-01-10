@@ -5,7 +5,7 @@ cfg = config.load()
 
 
 class BipIDs:
-    decred = 42
+    decred = dcracct.BIPID
 
 
 IDSymbols = {
@@ -35,9 +35,11 @@ def parseCoinType(coinType):
     """
     if isinstance(coinType, str):
         ticker = coinType.lower()
-        assert ticker in SymbolIDs, "ticker symbol not found"
+        if ticker not in SymbolIDs:
+            raise AssertionError("ticker symbol %d not found" % ticker)
         coinType = SymbolIDs[ticker]
-    assert isinstance(coinType, int)
+    if not isinstance(coinType, int):
+        raise AssertionError("unsupported type for coinType %s" % type(coinType))
     return coinType
 
 

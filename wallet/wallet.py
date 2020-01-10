@@ -105,7 +105,8 @@ class Wallet(object):
             list(str): A mnemonic seed. Only retured when the caller does not
                 provide a seed.
         """
-        assert len(password) > 0
+        if len(password) == 0:
+            raise AssertionError("empty password not allowed")
         seed = rando.generateSeed(crypto.KEY_SIZE)
         wallet = Wallet(path)
         wallet.initialize(seed, password.encode())
@@ -150,7 +151,8 @@ class Wallet(object):
             self.keyParams = crypto.KDFParams.unblob(self.masterDB[DBKeys.keyParams].b)
         pwKey = crypto.SecretKey.rekey(password.encode(), self.keyParams)
         checkPhrase = pwKey.decrypt(self.masterDB[DBKeys.checkKey])
-        assert checkPhrase == CHECKPHRASE
+        if checkPhrase != CHECKPHRASE:
+            raise AssertionError("wrong password")
         return pwKey.decrypt(self.masterDB[DBKeys.cryptoKey])
 
     @staticmethod

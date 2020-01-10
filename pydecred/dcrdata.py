@@ -683,9 +683,7 @@ class DcrdataBlockchain(object):
                 rawTinfo = self.dcrdata.tx.tinfo(utxo.txid)
                 utxo.setTicketInfo(rawTinfo)
             except Exception:
-                utxo.tinfo = account.TicketInfo(
-                    "mempool", None, 0, -1, None, None, None
-                )
+                utxo.tinfo = account.TicketInfo("mempool", None, 0, 0, None, None, None)
         return utxo
 
     def UTXOs(self, addrs):

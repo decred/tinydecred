@@ -11,5 +11,6 @@ MaxSeedBytes = 64  # 512 bits
 
 
 def generateSeed(length=MaxSeedBytes):
-    assert length >= MinSeedBytes and length <= MaxSeedBytes
+    if length < MinSeedBytes or length > MaxSeedBytes:
+        raise AssertionError("invalid seed length %d" % length)
     return os.urandom(length)

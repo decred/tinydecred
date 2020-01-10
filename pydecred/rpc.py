@@ -37,7 +37,10 @@ class Client(object):
         res = tinyhttp.post(
             self.host, data, headers=self.headers, context=self.sslContext
         )
-        assert isinstance(res, dict)
+        if not isinstance(res, dict):
+            raise AssertionError(
+                "rpc.Client call result of unexpected type %s" % type(res)
+            )
         if "error" in res and res["error"]:
             raise Exception("%s error: %r" % (method, res["error"]))
         return res["result"]
