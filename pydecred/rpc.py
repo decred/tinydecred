@@ -12,10 +12,10 @@ class Client(object):
     def __init__(self, host, user, pw, cert=None):
         """
         Args:
-            host (str): The RPC address
-            user (str): The rpcuser set in the dcrd configuration
-            pw   (str): The rpcpass set in the dcrd configuration
-            cert (str): optional. The location of the server's TLS
+            host (str): The RPC address.
+            user (str): The rpcuser set in the dcrd configuration.
+            pw (str): The rpcpass set in the dcrd configuration.
+            cert (str): Optional. The location of the server's TLS.
                 certificate.
         """
         authString = str(base64.b64encode("{0}:{1}".format(user, pw).encode()))[2:-1]
@@ -83,16 +83,16 @@ class Client(object):
 
         Args:
             address (str): The Decred address to search for
-            verbose (int, optional, default=1): Specifies the transaction is returned as a JSON
+            verbose (int): Optional. default=1. Specifies the transaction is returned as a JSON
                 object instead of hex-encoded string.
-            skip (int, optional, default=0): The number of leading transactions to leave out of the
+            skip (int): Optional. Default=0. The number of leading transactions to leave out of the
                 final response.
-            count (int, optional, default=100): The maximum number of transactions to return.
-            vinextra (int, optional, default=0): Specify that extra data from previous output will be
+            count (int): Optional. Default=100. The maximum number of transactions to return.
+            vinextra (int): Optional. Default=0. Specify that extra data from previous output will be
                 returned in vin.
-            reverse (bool, optional, default=False): Specifies that the transactions should be returned
+            reverse (bool): Optional. Default=False. Specifies that the transactions should be returned
                 in reverse chronological order.
-            filteraddrs (list(str), optional, default=[]): Only inputs or outputs with matching
+            filteraddrs (list(str)): Optional. Default=[]. Only inputs or outputs with matching
                 address will be returned.
 
         Returns:
@@ -119,7 +119,7 @@ class Client(object):
 
         Args:
             msgTx (object): msgtx.MsgTx signed transaction.
-            allowhighfees (bool, optional, default=False): Whether or not to allow insanely high fees
+            allowhighfees (bool): Optional. Default=False. Whether or not to allow insanely high fees
                 (dcrd does not yet implement this parameter, so it has no effect).
 
         Returns:
@@ -134,7 +134,7 @@ class Client(object):
 
         Args:
             generate (bool): Use True to enable generation, False to disable it.
-            genproclimit (int, optional, default=-1): The number of processors (cores) to limit
+            genproclimit (int): Optional. Default=-1. The number of processors (cores) to limit
                 generation to or -1 for default.
         """
         self.call("setgenerate", generate, genproclimit)
@@ -154,7 +154,7 @@ class Client(object):
 
         Args:
             hexblock (str): Serialized, hex-encoded block.
-            options (optional, default={}): This parameter is currently ignored.
+            options: Optional. Default={}. This parameter is currently ignored.
 
         Returns:
             str: The reason the block was rejected if rejected or None.
@@ -167,9 +167,9 @@ class Client(object):
         difficulty windows (units: DCR/kB).
 
         Args:
-            blocks (int, optional, default=None): The number of blocks, starting from the
+            blocks (int): Optional. Default=None. The number of blocks, starting from the
                 chain tip and descending, to return fee information about.
-            windows (int, optional, default=None): The number of difficulty windows to return
+            windows (int): Optional. Default=None. The number of difficulty windows to return
                 ticket fee information about.
 
         Returns:
@@ -200,8 +200,8 @@ class Client(object):
         blocks (default: full PoS difficulty adjustment depth).
 
         Args:
-            start (int, optional, default=None): The start height to begin calculating the VWAP from.
-            end (int, optional, default=None): The end height to begin calculating the VWAP from.
+            start (int): Optional. Default=None. The start height to begin calculating the VWAP from.
+            end (int): Optional. Default=None. The end height to begin calculating the VWAP from.
 
         Returns:
             float: The volume weighted average price.
@@ -214,11 +214,11 @@ class Client(object):
         blocks, and difficulty windows.
 
         Args:
-            blocks (int, optional, default=None): The number of blocks to calculate transaction fees
+            blocks (int): Optional. Default=None. The number of blocks to calculate transaction fees
                 for, starting from the end of the tip moving backwards.
-            rangeStart (int, optional, default=None): The start height of the block range to calculate
+            rangeStart (int): Optional. Default=None. The start height of the block range to calculate
                 transaction fees for.
-            rangeEnd (int, optional, default=None): The end height of the block range to calculate
+            rangeEnd (int): Optional. Default=None. The end height of the block range to calculate
                 transaction fees for.
 
         Returns:
@@ -296,29 +296,38 @@ class FeeInfoResult:
     """
 
     def __init__(
-        self, height, startHeight, endHeight, number, Min, Max, mean, median, stdDev,
+        self,
+        number,
+        Min,
+        Max,
+        mean,
+        median,
+        stdDev,
+        height=None,
+        startHeight=None,
+        endHeight=None,
     ):
         """
         Args:
-            height (int): Height (only for blocks) or None.
-            startHeight (int): Start height (only for windows) or None.
-            endHeight (int): End height (only for windows) or None.
             number (int): Number of transactions.
             min (float): Minimum transaction fee.
             max (float): Maximum transaction fee in the block.
             mean (float): Mean of transaction fees in the block.
             median (float): Median of transaction fees in the block.
             stddev (float): Standard deviation of transaction fees in the block.
+            height (int): Height (only for blocks) or None.
+            startHeight (int): Start height (only for windows) or None.
+            endHeight (int): End height (only for windows) or None.
         """
-        self.height = height
-        self.startHeight = startHeight
-        self.endHeight = endHeight
         self.number = number
         self.min = Min
         self.max = Max
         self.mean = mean
         self.median = median
         self.stdDev = stdDev
+        self.height = height
+        self.startHeight = startHeight
+        self.endHeight = endHeight
 
     @staticmethod
     def parse(obj):
@@ -332,15 +341,15 @@ class FeeInfoResult:
             FeeInfoResult: The FeeInfoResult.
         """
         return FeeInfoResult(
-            height=get("height", obj),
-            startHeight=get("startheight", obj),
-            endHeight=get("endheight", obj),
             number=obj["number"],
             Min=obj["min"],
             Max=obj["max"],
             mean=obj["mean"],
             median=obj["median"],
             stdDev=obj["stddev"],
+            height=get("height", obj),
+            startHeight=get("startheight", obj),
+            endHeight=get("endheight", obj),
         )
 
 
@@ -490,67 +499,67 @@ class SearchRawTransactionsResult:
 
     def __init__(
         self,
-        Hex,
         txid,
         version,
         lockTime,
         expiry,
         vin,
         vout,
-        blockHash,
-        blockHeight,
-        blockIndex,
-        confirmations,
-        time,
-        blocktime,
+        Hex=None,
+        blockHash=None,
+        blockHeight=None,
+        blockIndex=None,
+        confirmations=None,
+        time=None,
+        blockTime=None,
     ):
         """
         Args:
-            hex (str): Hex-encoded transaction
-            txid (str):  The hash of the transaction
-            version (int): The transaction version
-            locktime (int): The transaction lock time
-            expiry (int): The transacion expiry
-            vin (list(object)): The transaction inputs as JSON objects
-            vout (list(object)): The transaction outputs as JSON objects
-            blockhash (str): The hash of the block the contains the transaction
-            blockheight (int): The height of the block that contains the transaction
-            blockindex (int): The index within the array of transactions
-                contained by the block
-            confirmations (int): Number of confirmations of the block
-            time (int): Transaction time in seconds since 1 Jan 1970 GMT
-            blocktime (int): Block time in seconds since the 1 Jan 1970 GMT
+            txid (str):  The hash of the transaction.
+            version (int): The transaction version.
+            locktime (int): The transaction lock time.
+            expiry (int): The transacion expiry.
+            vin (list(object)): The transaction inputs as JSON objects.
+            vout (list(object)): The transaction outputs as JSON objects.
+            hex (str): Hex-encoded transaction or None.
+            blockHash (str): The hash of the block the contains the transaction or None.
+            blockHeight (int): The height of the block that contains the transaction or None.
+            blockIndex (int): The index within the array of transactions
+                contained by the block or None.
+            confirmations (int): Number of confirmations of the block or None.
+            time (int): Transaction time in seconds since 1 Jan 1970 GMT or None.
+            blockTime (int): Block time in seconds since the 1 Jan 1970 GMT or None.
         """
-        self.hex = Hex
         self.txid = txid
         self.version = version
         self.lockTime = lockTime
         self.expiry = expiry
-        self.vi = vin
+        self.vin = vin
         self.vout = vout
+        self.hex = Hex
         self.blockHash = blockHash
         self.blockHeight = blockHeight
         self.blockIndex = blockIndex
         self.confirmations = confirmations
         self.time = time
-        self.blocktime = blocktime
+        self.blockTime = blockTime
 
     @staticmethod
     def parse(obj):
         return SearchRawTransactionsResult(
-            Hex=get("hex", obj),
             txid=obj["txid"],
             version=obj["version"],
             lockTime=obj["locktime"],
             expiry=obj["expiry"],
             vin=[Vin.parse(vin) for vin in obj["vin"]],
             vout=[Vout.parse(vout) for vout in obj["vout"]],
+            Hex=get("hex", obj),
             blockHash=get("blockhash", obj),
             blockHeight=get("blockheight", obj),
             blockIndex=get("blockindex", obj),
             confirmations=get("confirmations", obj),
             time=get("time", obj),
-            blocktime=get("blocktime", obj),
+            blockTime=get("blocktime", obj),
         )
 
 
@@ -560,15 +569,15 @@ class PrevOut:
     """
 
     def __init__(
-        self, addresses, value,
+        self, value, addresses=[],
     ):
         """
         Args:
-            addresses (list(str)): previous output addresses or None.
             value (float): previous output value.
+            addresses (list(str)): previous output addresses. Maybe empty.
         """
-        self.addresses = addresses
         self.value = value
+        self.addresses = addresses
 
     @staticmethod
     def parse(obj):
@@ -582,7 +591,7 @@ class PrevOut:
             PrevOut: The Parsed PrevOut.
         """
         return PrevOut(
-            addresses=obj["addresses"] if obj["addresses"] else [], value=obj["value"],
+            value=obj["value"], addresses=obj["addresses"] if obj["addresses"] else [],
         )
 
 
@@ -596,21 +605,22 @@ class Vin:
     def __init__(
         self,
         coinbase,
-        stakebase,
-        txid,
-        vout,
-        tree,
-        sequence,
         amountIn,
-        blockHeight,
-        blockIndex,
-        scriptSig,
-        prevOut,
+        stakebase=None,
+        txid=None,
+        vout=None,
+        tree=None,
+        sequence=None,
+        blockHeight=None,
+        blockIndex=None,
+        scriptSig=None,
+        prevOut=None,
     ):
         """
         Args:
             coinbase (str): The hex-encoded bytes of the signature script
                 (coinbase txns only).
+            amountIn (int): The amount in for this transaction input, in coins.
             stakebase (str): The hash of the stake transaction or None.
             txid (str): The hash of the origin transaction (non-coinbase txns
                 only) or None.
@@ -618,10 +628,9 @@ class Vin:
                 transaction (non-coinbase txns only) or None.
             tree (int): The transaction tree of the origin transaction (non-coinbase
                 txns only) or None.
-            amountin (int): The amount in for this transaction input, in coins.
-            blockheight (int): The height of the block that includes the origin
+            blockHeight (int): The height of the block that includes the origin
                 transaction (non-coinbase txns only) or None.
-            blockindex (int): The merkle tree index of the origin transaction
+            blockIndex (int): The merkle tree index of the origin transaction
                 (non-coinbase txns only) or None.
             scriptSig (object): The signature script used to redeem the origin
                 transaction as a JSON object (non-coinbase txns only) or None.
@@ -630,12 +639,12 @@ class Vin:
             sequence (int) The script sequence number or None.
         """
         self.coinbase = coinbase
+        self.amountIn = amountIn
         self.stakebase = stakebase
         self.txid = txid
         self.vout = vout
         self.tree = tree
         self.sequence = sequence
-        self.amountIn = amountIn
         self.blockHeight = blockHeight
         self.blockIndex = blockIndex
         self.scriptSig = scriptSig
@@ -655,11 +664,11 @@ class Vin:
         """
         Vin(
             coinbase=obj["coinbase"],
+            amountIn=obj["amountin"],
             stakebase=get("stakebase", obj),
             txid=get("txid", obj),
             vout=get("vout", obj),
             tree=get("tree", obj),
-            amountIn=obj["amountin"],
             blockHeight=get("blockheight", obj),
             blockIndex=get("blockindex", obj),
             scriptSig=ScriptSig.parse(obj["scriptSig"]) if "scriptSig" in obj else None,
@@ -680,8 +689,8 @@ class ScriptSig:
     ):
         """
         Args:
-            asm (str): Disassembly of the script
-            hex (str): Hex-encoded bytes of the script
+            asm (str): Disassembly of the script.
+            hex (str): Hex-encoded bytes of the script.
         """
         self.asm = asm
         self.hex = Hex
@@ -713,11 +722,11 @@ class Vout:
     ):
         """
         Args:
-            value (float): The amount in DCR
-            n (int): The index of this transaction output
-            version (int): The version of the vout
+            value (float): The amount in DCR.
+            n (int): The index of this transaction output.
+            version (int): The version of the vout.
             scriptPubKey (object): The public key script used to pay coins as a
-                JSON object
+                JSON object.
         """
         self.value = value
         self.n = n
@@ -750,23 +759,23 @@ class ScriptPubKeyResult:
     """
 
     def __init__(
-        self, asm, Hex, reqSigs, Type, addresses, commitAmt,
+        self, asm, Type, Hex=None, reqSigs=None, addresses=None, commitAmt=None,
     ):
         """
         Args:
-            asm (str): Disassembly of the script
-            Hex (str): Hex-encoded bytes of the script
-            reqSigs (int): The number of required signatures
-            Type (str): The type of the script (e.g. 'pubkeyhash')
+            asm (str): Disassembly of the script.
+            Type (str): The type of the script (e.g. 'pubkeyhash').
+            Hex (str): Hex-encoded bytes of the script or None.
+            reqSigs (int): The number of required signatures or None.
             addresses (list(str)): The Decred addresses associated with this
-                script
+                script or None.
             commitAmt (float): The ticket commitment value if the script is
-                for a staking commitment
+                for a staking commitment or None.
         """
         self.asm = asm
+        self.type = Type
         self.hex = Hex
         self.reqSigs = reqSigs
-        self.type = Type
         self.addresses = addresses
         self.commitAmt = commitAmt
 
@@ -783,9 +792,9 @@ class ScriptPubKeyResult:
         """
         return ScriptPubKeyResult(
             asm=obj["asm"],
+            Type=obj["type"],
             Hex=get("hex", obj),
             reqSigs=get("reqSigs", obj),
-            Type=obj["type"],
             addresses=get("addresses", obj),
             commitAmt=get("commitAmt", obj),
         )
@@ -795,7 +804,7 @@ class ValidateAddressChainResult:
     """validateaddress"""
 
     def __init__(
-        self, isValid, address,
+        self, isValid, address=None,
     ):
         """
         Args:
