@@ -34,6 +34,6 @@ class TestWire(unittest.TestCase):
             val_from_bytes = wire.readVarInt(from_bytes, wire.ProtocolVersion)
             self.assertEqual(val_from_bytes, val)
         self.assertRaises(
-            AssertionError, wire.writeVarInt, wire.ProtocolVersion, wire.MaxUint64 + 1
+            ValueError, wire.writeVarInt, wire.ProtocolVersion, wire.MaxUint64 + 1
         )
         self.assertEqual(wire.readVarInt(ByteArray([0xFC]), wire.ProtocolVersion), 0xFC)

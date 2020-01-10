@@ -74,8 +74,10 @@ def readOutPoint(b, pver, ver):
 
 def readTxInPrefix(b, pver, serType, ver, ti):
     # r io.Reader, pver uint32, serType TxSerializeType, version uint16, ti *TxIn
-    msg = "readTxInPrefix: tried to read a prefix input for a witness only tx"
-    assert serType != wire.TxSerializeOnlyWitness, msg
+    if serType == wire.TxSerializeOnlyWitness:
+        raise ValueError(
+            "readTxInPrefix: tried to read a prefix input for a witness only tx"
+        )
 
     # Outpoint.
     b, ti.previousOutPoint = readOutPoint(b, pver, ver)
@@ -131,8 +133,9 @@ def readScript(b, pver, maxAllowed, fieldName):
     # Prevent byte array larger than the max message size.  It would
     # be possible to cause memory exhaustion and panics without a sane
     # upper bound on this count.
-    msg = "readScript: {} is larger than the max allowed size [count {}, max {}]"
-    assert count <= maxAllowed, msg.format(fieldName, count, maxAllowed)
+    if count > maxAllowed:
+        msg = "readScript: {} is larger than the max allowed size [count {}, max {}]"
+        raise ValueError(msg.format(fieldName, count, maxAllowed))
 
     a = b.pop(count)
 
@@ -684,10 +687,11 @@ class MsgTx:
             # Prevent more input transactions than could possibly fit into a
             # message.  It would be possible to cause memory exhaustion and panics
             # without a sane upper bound on this count.
-            assert count <= maxTxInPerMessage, (
-                "MsgTx.decodeWitness: too many input transactions to fit into"
-                f" max message size [count {count}, max {maxTxInPerMessage}]"
-            )
+            if count > maxTxInPerMessage:
+                raise ValueError(
+                    "MsgTx.decodeWitness: too many input transactions to fit into"
+                    f" max message size [count {count}, max {maxTxInPerMessage}]"
+                )
 
             self.txIn = [TxIn(None, 0) for i in range(count)]
             for txIn in self.txIn:
@@ -701,18 +705,20 @@ class MsgTx:
             # the signature scripts.
             count = wire.readVarInt(b, pver)
 
-            assert count == len(self.txIn), (
-                "MsgTx.decodeWitness: non equal witness and prefix txin"
-                f" quantities (witness {count}, prefix {len(self.txIn)})"
-            )
+            if count != len(self.txIn):
+                raise ValueError(
+                    "MsgTx.decodeWitness: non equal witness and prefix txin"
+                    f" quantities (witness {count}, prefix {len(self.txIn)})"
+                )
 
             # Prevent more input transactions than could possibly fit into a
             # message.  It would be possible to cause memory exhaustion and panics
             # without a sane upper bound on this count.
-            assert count <= maxTxInPerMessage, (
-                "MsgTx.decodeWitness: too many input transactions to fit into"
-                f" max message size [count {count}, max {maxTxInPerMessage}]"
-            )
+            if count > maxTxInPerMessage:
+                raise ValueError(
+                    "MsgTx.decodeWitness: too many input transactions to fit into"
+                    f" max message size [count {count}, max {maxTxInPerMessage}]"
+                )
 
             # Read in the witnesses, and copy them into the already generated
             # by decodePrefix TxIns.

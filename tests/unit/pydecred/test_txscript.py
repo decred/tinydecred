@@ -950,7 +950,7 @@ class TestTxScript(unittest.TestCase):
             try:
                 txscript.Signature.parse(ByteArray(test.sig), test.der)
             except Exception:
-                assert test.isValid is False
+                self.assertFalse(test.isValid)
 
     def test_sign_tx(self):
         """
@@ -2346,8 +2346,10 @@ class TestTxScript(unittest.TestCase):
 
         for num, serialized in tests:
             gotBytes = txscript.scriptNumBytes(num)
-            assert gotBytes == serialized, (
-                str(num) + ": wanted " + serialized.hex() + ", got " + gotBytes.hex()
+            self.assertEqual(
+                gotBytes,
+                serialized,
+                (str(num) + ": wanted " + serialized.hex() + ", got " + gotBytes.hex()),
             )
 
 

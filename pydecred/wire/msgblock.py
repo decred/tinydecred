@@ -202,7 +202,8 @@ class BlockHeader:
         i += extraDataSize
         b[i] = ByteArray(self.stakeVersion, length=uint32).littleEndian()
         i += uint32
-        assert i == MaxHeaderSize, "unexpected BlockHeader encoded size"
+        if i != MaxHeaderSize:
+            raise ValueError(f"unexpected BlockHeader encoded size {i}")
         return b
 
     def hash(self):

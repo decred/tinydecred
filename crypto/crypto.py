@@ -117,9 +117,11 @@ class AddressPubKeyHash:
 
     def __init__(self, netID=None, pkHash=None, sigType=STEcdsaSecp256k1):
         pkh_len = len(pkHash)
-        assert pkh_len == 20, f"AddressPubKeyHash expected 20 bytes, got {pkh_len}"
+        if pkh_len != 20:
+            raise ValueError(f"AddressPubKeyHash expected 20 bytes, got {pkh_len}")
         # For now, just reject anything except secp256k1
-        assert sigType == STEcdsaSecp256k1, f"unsupported signature type {sigType}"
+        if sigType != STEcdsaSecp256k1:
+            raise NotImplementedError(f"unsupported signature type {sigType}")
         self.sigType = sigType
         self.netID = netID
         self.pkHash = pkHash
@@ -403,7 +405,8 @@ def modInv(a, m):
         int: The modular inverse.
     """
     g, x, y = egcd(a, m)
-    assert g == 1, "modular inverse does not exist"
+    if g != 1:
+        raise ValueError("modular inverse does not exist")
     return x % m
 
 
@@ -449,11 +452,13 @@ def b58CheckDecode(s):
         int: The version (leading two) bytes.
     """
     decoded = b58decode(s)
-    assert len(decoded) >= 6, "decoded lacking version/checksum"
+    if len(decoded) < 6:
+        raise ValueError("decoded lacking version/checksum")
     version = decoded[:2]
     included_cksum = decoded[len(decoded) - 4 :]
     computed_cksum = checksum(decoded[: len(decoded) - 4])
-    assert included_cksum == computed_cksum, "checksum error"
+    if included_cksum != computed_cksum:
+        raise ValueError("checksum error")
     payload = ByteArray(decoded[2 : len(decoded) - 4])
     return payload, version
 
@@ -465,7 +470,8 @@ def newAddressPubKey(decoded, net):
     string. The first byte indicates the signature suite. For compressed
     secp256k1 pubkeys, use AddressSecpPubKey directly.
     """
-    assert len(decoded) == 33, f"unable to decode pubkey of length {len(decoded)}"
+    if len(decoded) != 33:
+        raise NotImplementedError(f"unable to decode pubkey of length {len(decoded)}")
     # First byte is the signature suite and ybit.
     suite = decoded[0]
     suite &= 127
@@ -539,7 +545,8 @@ def newAddressScriptHashFromHash(scriptHash, net):
     Returns:
         AddressScriptHash: An address object.
     """
-    assert len(scriptHash) == RIPEMD160_SIZE, "incorrect script hash length"
+    if len(scriptHash) != RIPEMD160_SIZE:
+        raise ValueError("incorrect script hash length")
     return AddressScriptHash(net.ScriptHashAddrID, scriptHash)
 
 
@@ -575,10 +582,8 @@ class ExtendedKey:
             isPrivate (bool): Whether the key is a private or public key.
         """
         if len(privVer) != 4 or len(pubVer) != 4:
-            raise AssertionError(
-                "Network version bytes of incorrect lengths %d and %d"
-                % (len(privVer), len(pubVer))
-            )
+            msg = "Network version bytes of incorrect lengths {} and {}"
+            raise ValueError(msg.format(len(privVer), len(pubVer)))
         self.privVer = ByteArray(privVer)
         self.pubVer = ByteArray(pubVer)
         self.key = ByteArray(key)
@@ -889,7 +894,8 @@ class ExtendedKey:
         Returns:
             ByteArray: The serialized extended key.
         """
-        assert not self.key.iszero(), "unexpected zero key"
+        if self.key.iszero():
+            raise ValueError("unexpected zero key")
 
         childNumBytes = ByteArray(self.childNum, length=4)
         depthByte = ByteArray(self.depth % 256, length=1)
@@ -976,8 +982,9 @@ def decodeExtendedKey(net, cryptoKey, key):
         ExtendedKey: The decoded key.
     """
     decoded = decrypt(cryptoKey, key)
-    if len(decoded) != SERIALIZED_KEY_LENGTH + 4:
-        raise AssertionError("decoded private key is wrong length")
+    decoded_len = len(decoded)
+    if decoded_len != SERIALIZED_KEY_LENGTH + 4:
+        raise ValueError(f"decoded private key is wrong length: {decoded_len}")
 
     # The serialized format is:
     #   version (4) || depth (1) || parent fingerprint (4)) ||
@@ -987,13 +994,14 @@ def decodeExtendedKey(net, cryptoKey, key):
     payload = decoded[: decoded_len - 4]
     included_cksum = decoded[decoded_len - 4 :]
     computed_cksum = checksum(payload.b)[:4]
-    assert included_cksum == computed_cksum, "wrong checksum"
+    if included_cksum != computed_cksum:
+        raise ValueError("wrong checksum")
 
     # Ensure the version encoded in the payload matches the provided network.
     privVersion = net.HDPrivateKeyID
     pubVersion = net.HDPublicKeyID
     version = payload[:4]
-    if version != privVersion and version != pubVersion:
+    if version not in (privVersion, pubVersion):
         raise ValueError(f"Unknown versions {privVersion} {pubVersion} {version}")
 
     # Deserialize the remaining payload fields.
@@ -1011,7 +1019,8 @@ def decodeExtendedKey(net, cryptoKey, key):
         # of the order of the secp256k1 curve and not be 0.
         keyData = keyData[1:]
         # if keyNum.Cmp(secp256k1.S256().N) >= 0 || keyNum.Sign() == 0 {
-        assert keyData < Curve.N and not keyData.iszero(), "unusable key"
+        if (keyData >= Curve.N) or keyData.iszero():
+            raise ValueError("unusable key")
         # Ensure the public key parses correctly and is actually on the
         # secp256k1 curve.
         Curve.publicKey(keyData.int())
@@ -1182,7 +1191,8 @@ class SecretKey(object):
             )
         )
         checkDigest = ByteArray(hashlib.sha256(sk.key.b).digest())
-        assert checkDigest == kp.digest, "rekey digest check failed"
+        if checkDigest != kp.digest:
+            raise ValueError("rekey digest check failed")
         return sk
 
 

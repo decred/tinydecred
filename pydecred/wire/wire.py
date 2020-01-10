@@ -156,7 +156,8 @@ def readVarInt(b, pver):  # r io.Reader, pver uint32) (uint64, error) {
         # The encoding is not canonical if the value could have been
         # encoded using fewer bytes.
         minRv = 0x100000000
-        assert rv >= minRv, err_msg.format(rv, discriminant, minRv)
+        if rv < minRv:
+            raise ValueError(err_msg.format(rv, discriminant, minRv))
 
     elif discriminant == 0xFE:
         rv = b.pop(4).unLittle().int()
@@ -164,7 +165,8 @@ def readVarInt(b, pver):  # r io.Reader, pver uint32) (uint64, error) {
         # The encoding is not canonical if the value could have been
         # encoded using fewer bytes.
         minRv = 0x10000
-        assert rv >= minRv, err_msg.format(rv, discriminant, minRv)
+        if rv < minRv:
+            raise ValueError(err_msg.format(rv, discriminant, minRv))
 
     elif discriminant == 0xFD:
         rv = b.pop(2).unLittle().int()
@@ -172,7 +174,8 @@ def readVarInt(b, pver):  # r io.Reader, pver uint32) (uint64, error) {
         # The encoding is not canonical if the value could have been
         # encoded using fewer bytes.
         minRv = 0xFD
-        assert rv >= minRv, err_msg.format(rv, discriminant, minRv)
+        if rv < minRv:
+            raise ValueError(err_msg.format(rv, discriminant, minRv))
 
     else:
         rv = discriminant

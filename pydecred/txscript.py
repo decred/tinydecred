@@ -1688,7 +1688,8 @@ def signRFC6979(privateKey, inHash):
     inv = crypto.modInv(k, N)
     r = Curve.scalarBaseMult(k)[0] % N
 
-    assert r, "calculated R is zero"
+    if r == 0:
+        raise ValueError("calculated R is zero")
 
     e = hashToInt(inHash)
     s = privateKey.int() * r
@@ -1698,7 +1699,8 @@ def signRFC6979(privateKey, inHash):
 
     if (N >> 1) > 1:
         s = N - s
-    assert s, "calculated S is zero"
+    if s == 0:
+        raise ValueError("calculated S is zero")
 
     return Signature(r, s)
 
@@ -2061,8 +2063,9 @@ def signP2PKHMsgTx(msgtx, prevOutputs, keysource, params):
     Only P2PKH outputs are supported at this point.
     """
     prevOutLen, txInLen = len(prevOutputs), len(msgtx.txIn)
-    msg = "Number of prevOutputs ({}) does not match number of tx inputs ({})"
-    assert prevOutLen == txInLen, msg.format(prevOutLen, txInLen)
+    if prevOutLen != txInLen:
+        msg = "Number of prevOutputs ({}) does not match number of tx inputs ({})"
+        raise ValueError(msg.format(prevOutLen, txInLen))
 
     for i, output in enumerate(prevOutputs):
         # Errors don't matter here, as we only consider the
@@ -2071,8 +2074,8 @@ def signP2PKHMsgTx(msgtx, prevOutputs, keysource, params):
         if len(addrs) != 1:
             continue
         apkh = addrs[0]
-        msg = "previous output address is not P2PKH"
-        assert isinstance(apkh, crypto.AddressPubKeyHash), msg
+        if not isinstance(apkh, crypto.AddressPubKeyHash):
+            raise ValueError("previous output address is not P2PKH")
 
         privKey = keysource.priv(apkh.string())
         sigscript = signatureScript(
@@ -2195,7 +2198,8 @@ def extractPkScriptAddrs(version, pkScript, chainParams):
     value will indicate a nonstandard script type for other script versions along
     with an invalid script version error.
     """
-    assert version == 0, "invalid script version"
+    if version != 0:
+        raise ValueError("invalid script version")
 
     # Check for pay-to-pubkey-hash script.
     pkHash = extractPubKeyHash(pkScript)
@@ -3140,6 +3144,9 @@ def makeTicket(
     if not addrPool or not inputPool:
         raise NotImplementedError("solo tickets not supported")
 
+    if not addrVote:
+        raise ValueError("no voting address provided")
+
     txIn = msgtx.TxIn(previousOutPoint=inputPool.op, valueIn=inputPool.amt)
     mtx.addTxIn(txIn)
 
@@ -3148,8 +3155,6 @@ def makeTicket(
 
     # Create a new script which pays to the provided address with an
     # SStx tagged output.
-    assert addrVote, "no voting address provided"
-
     pkScript = payToSStx(addrVote)
 
     txOut = msgtx.TxOut(value=ticketCost, pkScript=pkScript,)
@@ -3393,4 +3398,4 @@ def makeRevocation(ticketPurchase, feePerKB):
             if not isDustAmount(amount, len(output.pkScript), feePerKB):
                 output.value = amount
                 return revocation
-    raise Exception("missing suitable revocation output to pay relay fee")
+    raise ValueError("missing suitable revocation output to pay relay fee")
