@@ -12,10 +12,10 @@ class Client(object):
     def __init__(self, host, user, pw, cert=None):
         """
         Args:
-            host (string): The RPC address
-            user (string): The rpcuser set in the dcrd configuration
-            pw   (string): The rpcpass set in the dcrd configuration
-            cert (string): optional. The location of the server's TLS
+            host (str): The RPC address
+            user (str): The rpcuser set in the dcrd configuration
+            pw   (str): The rpcpass set in the dcrd configuration
+            cert (str): optional. The location of the server's TLS
                 certificate.
         """
         authString = str(base64.b64encode("{0}:{1}".format(user, pw).encode()))[2:-1]
@@ -82,7 +82,7 @@ class Client(object):
         serving stale data.
 
         Args:
-            address (string): The Decred address to search for
+            address (str): The Decred address to search for
             verbose (int, optional, default=1): Specifies the transaction is returned as a JSON
                 object instead of hex-encoded string.
             skip (int, optional, default=0): The number of leading transactions to leave out of the
@@ -92,7 +92,7 @@ class Client(object):
                 returned in vin.
             reverse (bool, optional, default=False): Specifies that the transactions should be returned
                 in reverse chronological order.
-            filteraddrs (list(string), optional, default=[]): Only inputs or outputs with matching
+            filteraddrs (list(str), optional, default=[]): Only inputs or outputs with matching
                 address will be returned.
 
         Returns:
@@ -144,7 +144,7 @@ class Client(object):
         Shutdown dcrd.
 
         Returns:
-            string: 'dcrd stopping.'
+            str: 'dcrd stopping.'
         """
         return self.call("stop")
 
@@ -153,11 +153,11 @@ class Client(object):
         Attempts to submit a new serialized, hex-encoded block to the network.
 
         Args:
-            hexblock (string): Serialized, hex-encoded block.
+            hexblock (str): Serialized, hex-encoded block.
             options (optional, default={}): This parameter is currently ignored.
 
         Returns:
-            string: The reason the block was rejected if rejected or None.
+            str: The reason the block was rejected if rejected or None.
         """
         return self.call("submitblock", hexblock, options)
 
@@ -187,10 +187,10 @@ class Client(object):
         Request all the tickets for an address.
 
         Args:
-            addr (string): Address to look for.
+            addr (str): Address to look for.
 
         Returns:
-            list(string): Tickets owned by the specified address.
+            list(str): Tickets owned by the specified address.
         """
         return self.call("ticketsforaddress", addr)["tickets"]
 
@@ -236,7 +236,7 @@ class Client(object):
         Validate an address.
 
         Args:
-            addr (string): The address to validate.
+            addr (str): The address to validate.
 
         Returns:
             ValidateAddressChainResult: Whether the address can be verified.
@@ -257,9 +257,9 @@ class Client(object):
         Verify that a message was signed by the private key belonging to addr.
 
         Args:
-            addr (string): The address used to sign.
-            sig (string): The signed message.
-            message (string): The message.
+            addr (str): The address used to sign.
+            sig (str): The signed message.
+            message (str): The message.
 
         Returns:
             bool: Whether the message could be verified.
@@ -281,7 +281,7 @@ def get(k, obj):
     Helper method to check for nil keys and set those values to None.
 
     Args:
-        k (string): dict key
+        k (str): dict key
         obj (dict): the dict to search
 
     Returns:
@@ -506,14 +506,14 @@ class SearchRawTransactionsResult:
     ):
         """
         Args:
-            hex (string): Hex-encoded transaction
-            txid (string):  The hash of the transaction
+            hex (str): Hex-encoded transaction
+            txid (str):  The hash of the transaction
             version (int): The transaction version
             locktime (int): The transaction lock time
             expiry (int): The transacion expiry
             vin (list(object)): The transaction inputs as JSON objects
             vout (list(object)): The transaction outputs as JSON objects
-            blockhash (string): The hash of the block the contains the transaction
+            blockhash (str): The hash of the block the contains the transaction
             blockheight (int): The height of the block that contains the transaction
             blockindex (int): The index within the array of transactions
                 contained by the block
@@ -564,7 +564,7 @@ class PrevOut:
     ):
         """
         Args:
-            addresses (list(string)): previous output addresses or None.
+            addresses (list(str)): previous output addresses or None.
             value (float): previous output value.
         """
         self.addresses = addresses
@@ -609,10 +609,10 @@ class Vin:
     ):
         """
         Args:
-            coinbase (string): The hex-encoded bytes of the signature script
+            coinbase (str): The hex-encoded bytes of the signature script
                 (coinbase txns only).
-            stakebase (string): The hash of the stake transaction or None.
-            txid (string): The hash of the origin transaction (non-coinbase txns
+            stakebase (str): The hash of the stake transaction or None.
+            txid (str): The hash of the origin transaction (non-coinbase txns
                 only) or None.
             vout (int): The index of the output being redeemed from the origin
                 transaction (non-coinbase txns only) or None.
@@ -680,8 +680,8 @@ class ScriptSig:
     ):
         """
         Args:
-            asm (string): Disassembly of the script
-            hex (string): Hex-encoded bytes of the script
+            asm (str): Disassembly of the script
+            hex (str): Hex-encoded bytes of the script
         """
         self.asm = asm
         self.hex = Hex
@@ -754,11 +754,11 @@ class ScriptPubKeyResult:
     ):
         """
         Args:
-            asm (string): Disassembly of the script
-            Hex (string): Hex-encoded bytes of the script
+            asm (str): Disassembly of the script
+            Hex (str): Hex-encoded bytes of the script
             reqSigs (int): The number of required signatures
-            Type (string): The type of the script (e.g. 'pubkeyhash')
-            addresses (list(string)): The Decred addresses associated with this
+            Type (str): The type of the script (e.g. 'pubkeyhash')
+            addresses (list(str)): The Decred addresses associated with this
                 script
             commitAmt (float): The ticket commitment value if the script is
                 for a staking commitment
@@ -800,7 +800,7 @@ class ValidateAddressChainResult:
         """
         Args:
             isValid (bool): Whether the address is valid.
-            address (string): The address or None if not valid.
+            address (str): The address or None if not valid.
         """
         self.isValid = isValid
         self.address = address
@@ -831,12 +831,12 @@ class VersionResult:
     ):
         """
         Args:
-            versionString (string): The semver version as a string.
+            versionString (str): The semver version as a string.
             major (int): The semver major.
             minor (int): The semver minor.
             patch (int): The semver patch.
-            prerelease (string): Prerelease status.
-            buildMetadata (string): The go version used to build the dcrd binary.
+            prerelease (str): Prerelease status.
+            buildMetadata (str): The go version used to build the dcrd binary.
         """
         self.versionString = versionString
         self.major = major
