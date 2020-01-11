@@ -68,7 +68,7 @@ class Client(object):
         count=100,
         vinextra=0,
         reverse=False,
-        filteraddrs=[],
+        filterAddrs=None,
     ):
         """
         Returns raw data for transactions involving the passed address. Returned
@@ -92,7 +92,7 @@ class Client(object):
                 returned in vin.
             reverse (bool): Optional. Default=False. Specifies that the transactions should be returned
                 in reverse chronological order.
-            filteraddrs (list(str)): Optional. Default=[]. Only inputs or outputs with matching
+            filterAddrs (list(str)): Optional. Default=[]. Only inputs or outputs with matching
                 address will be returned.
 
         Returns:
@@ -108,36 +108,36 @@ class Client(object):
                 count,
                 vinextra,
                 reverse,
-                filteraddrs,
+                filterAddrs if filterAddrs else [],
             )
         ]
 
-    def sendRawTransaction(self, msgTx, allowhighfees=False):
+    def sendRawTransaction(self, msgTx, allowHighFees=False):
         """
         Submits the serialized, hex-encoded transaction to the local peer and
         relays it to the network.
 
         Args:
             msgTx (object): msgtx.MsgTx signed transaction.
-            allowhighfees (bool): Optional. Default=False. Whether or not to allow insanely high fees
+            allowHighFees (bool): Optional. Default=False. Whether or not to allow insanely high fees
                 (dcrd does not yet implement this parameter, so it has no effect).
 
         Returns:
             bytes-like: The hash of the transaction.
         """
-        txid = self.call("sendrawtransaction", msgTx.txHex(), allowhighfees)
+        txid = self.call("sendrawtransaction", msgTx.txHex(), allowHighFees)
         return reversed(ByteArray(txid))
 
-    def setGenerate(self, generate, genproclimit=-1):
+    def setGenerate(self, generate, numCPUs=-1):
         """
         Set the server to generate coins (mine) or not.
 
         Args:
             generate (bool): Use True to enable generation, False to disable it.
-            genproclimit (int): Optional. Default=-1. The number of processors (cores) to limit
+            numCPUs (int): Optional. Default=-1. The number of processors (cores) to limit
                 generation to or -1 for default.
         """
-        self.call("setgenerate", generate, genproclimit)
+        self.call("setgenerate", generate, numCPUs)
 
     def stop(self):
         """
@@ -148,18 +148,18 @@ class Client(object):
         """
         return self.call("stop")
 
-    def submitBlock(self, hexblock, options={}):
+    def submitBlock(self, hexBlock, options={}):
         """
         Attempts to submit a new serialized, hex-encoded block to the network.
 
         Args:
-            hexblock (str): Serialized, hex-encoded block.
+            hexBlock (str): Serialized, hex-encoded block.
             options: Optional. Default={}. This parameter is currently ignored.
 
         Returns:
             str: The reason the block was rejected if rejected or None.
         """
-        return self.call("submitblock", hexblock, options)
+        return self.call("submitblock", hexBlock, options)
 
     def ticketFeeInfo(self, blocks=None, windows=None):
         """
@@ -569,7 +569,7 @@ class PrevOut:
     """
 
     def __init__(
-        self, value, addresses=[],
+        self, value, addresses=None,
     ):
         """
         Args:
@@ -577,7 +577,7 @@ class PrevOut:
             addresses (list(str)): previous output addresses. Maybe empty.
         """
         self.value = value
-        self.addresses = addresses
+        self.addresses = addresses if addresses else []
 
     @staticmethod
     def parse(obj):
