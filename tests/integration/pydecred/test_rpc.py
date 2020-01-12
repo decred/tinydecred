@@ -36,6 +36,29 @@ def test_rpc(config):
     blockchainInfo = rpcClient.getBlockchainInfo()
     assert isinstance(blockchainInfo, rpc.GetBlockChainInfoResult)
 
+    # This test will fail if --addrindex is not enabled in dcrd.
+    searchRawTransactions = rpcClient.searchRawTransactions(
+        "Dcur2mcGjmENx4DhNqDctW5wJCVyT3Qeqkx"
+    )
+    assert isinstance(searchRawTransactions[0], rpc.SearchRawTransactionsResult)
+
+    ticketFeeInfo = rpcClient.ticketFeeInfo()
+    assert isinstance(ticketFeeInfo["feeinfomempool"], rpc.FeeInfoResult)
+
+    ticketsForAddress = rpcClient.ticketsForAddress(
+        "DcaephHCqjdfb3gPz778DJZWvwmUUs3ssGk"
+    )
+    assert (
+        "d54d90bcec4146e9ae8c2ec860364f7023f33cad02b3c2bb4bdbb36689e68614"
+        in ticketsForAddress
+    )
+
+    ticketVWAP = rpcClient.ticketVWAP()
+    assert ticketVWAP
+
+    txFeeInfo = rpcClient.txFeeInfo()
+    assert isinstance(txFeeInfo["feeinfomempool"], rpc.FeeInfoResult)
+
     validateAddress = rpcClient.validateAddress("DsUxwT6Kbiur6Nps9q3uGEpJCvrhcxX2nii")
     assert isinstance(validateAddress, rpc.ValidateAddressChainResult)
     assert validateAddress.isValid
