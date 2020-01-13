@@ -37,6 +37,49 @@ def test_rpc(config):
     blockchainInfo = rpcClient.getBlockchainInfo()
     assert isinstance(blockchainInfo, rpc.GetBlockChainInfoResult)
 
+    getGenerate = rpcClient.getGenerate()
+    assert isinstance(getGenerate, bool)
+
+    getHashesPerSec = rpcClient.getHashesPerSec()
+    assert isinstance(getHashesPerSec, int)
+
+    getInfo = rpcClient.getInfo()
+    assert isinstance(getInfo, rpc.InfoChainResult)
+
+    getMempoolInfo = rpcClient.getMempoolInfo()
+    assert isinstance(getMempoolInfo, rpc.GetMempoolInfoResult)
+
+    getMiningInfo = rpcClient.getMiningInfo()
+    assert isinstance(getMiningInfo, rpc.GetMiningInfoResult)
+
+    getNetTotals = rpcClient.getNetTotals()
+    assert isinstance(getNetTotals, rpc.GetNetTotalsResult)
+
+    getNetworkHashPS = rpcClient.getNetworkHashPS()
+    assert isinstance(getNetworkHashPS, int)
+
+    getNetworkInfo = rpcClient.getNetworkInfo()
+    assert isinstance(getNetworkInfo, rpc.GetNetworkInfoResult)
+
+    getPeerInfo = rpcClient.getPeerInfo()
+    assert isinstance(getPeerInfo[0], rpc.GetPeerInfoResult)
+
+    getRawMempool = rpcClient.getRawMempool()
+    assert isinstance(getRawMempool, list)
+    key = getRawMempool[0]
+
+    getRawMempool = rpcClient.getRawMempool(True)
+    assert isinstance(getRawMempool[key], rpc.GetRawMempoolVerboseResult)
+
+    getHeaders = rpcClient.getHeaders(
+        ["00000000000000000224f75f39ae5f464beaf049b40f49baf3fdf07c28bfe53c"],
+        "000000000000000008a0ec8c8d1c700391eefb5dd5a553a14d645bbc25c8a880",
+    )
+    assert (
+        "07000000efbdffeb392b83bc7704757470a218afafa7b1431576ca090000000000000000bdef083cc385b81ace60798d6fb6a6aa1888028eff67a2363338077fb4a070c4da514989c0e4d3305307196cd7e08e9400698718ad20ab7e95051e371ee5d55a0100b292099fea9c05000200df9e00003f042118f2fc9460030000006452060088110000ecfe1b5e26ed6e2ec58d670100000000a10030b0000000000000000000000000000000000000000007000000"
+        in getHeaders
+    )
+
     # This test will fail if --addrindex is not enabled in dcrd.
     getRawTransaction = rpcClient.getRawTransaction(
         "d54d90bcec4146e9ae8c2ec860364f7023f33cad02b3c2bb4bdbb36689e68614"
