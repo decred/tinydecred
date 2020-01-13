@@ -186,7 +186,7 @@ class Client(object):
         Returns:
             list(str): List of live tickets.
         """
-        return self.call("livetickets")
+        return self.call("livetickets")["tickets"]
 
     def missedTickets(self):
         """
@@ -195,7 +195,7 @@ class Client(object):
         Returns:
             list(str): List of missed tickets.
         """
-        return self.call("missedtickets")
+        return self.call("missedtickets")["tickets"]
 
     def node(self, subcmd, target, connectSubCmd=None):
         """

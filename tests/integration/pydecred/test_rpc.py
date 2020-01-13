@@ -62,7 +62,7 @@ def test_rpc(config):
     assert isinstance(getStakeVersions[0], rpc.GetStakeVersionsResult)
 
     getTicketPoolValue = rpcClient.getTicketPoolValue()
-    assert getTicketPoolValue
+    assert isinstance(getTicketPoolValue, float)
 
     getTxOut = rpcClient.getTxOut(
         "28289634ba3c329a92ddb2d8f726429fb096f9b3d5b7104e17f25f2e7dd2709d", 0
@@ -76,16 +76,16 @@ def test_rpc(config):
     assert isinstance(getWork, rpc.GetWorkResult)
 
     dcrdHelp = rpcClient.help()
-    assert dcrdHelp
+    assert isinstance(dcrdHelp, str)
 
     dcrdHelp = rpcClient.help("getinfo")
-    assert dcrdHelp
+    assert isinstance(dcrdHelp, str)
 
     liveTickets = rpcClient.liveTickets()
-    assert liveTickets
+    assert isinstance(liveTickets, list)
 
     missedTickets = rpcClient.missedTickets()
-    assert missedTickets
+    assert isinstance(missedTickets, list)
 
     rpcClient.ping()
 
@@ -106,7 +106,7 @@ def test_rpc(config):
     )
 
     ticketVWAP = rpcClient.ticketVWAP()
-    assert ticketVWAP
+    assert isinstance(ticketVWAP, float)
 
     txFeeInfo = rpcClient.txFeeInfo()
     assert isinstance(txFeeInfo["feeinfomempool"], rpc.FeeInfoResult)
