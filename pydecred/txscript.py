@@ -6,7 +6,7 @@ See LICENSE for details
 Based on dcrd txscript.
 """
 import math
-from tinydecred.crypto.bytearray import ByteArray
+from tinydecred.util.encode import ByteArray
 from tinydecred.pydecred.wire import (
     wire,
     msgtx,

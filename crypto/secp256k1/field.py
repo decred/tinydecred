@@ -7,7 +7,7 @@ See LICENSE for details
 from base64 import b64decode
 from zlib import decompress as zdecompress
 
-from tinydecred.crypto.bytearray import ByteArray
+from tinydecred.util.encode import ByteArray
 from tinydecred.crypto.secp256k1.bytepoints import secp256k1BytePoints
 
 # Constants used to make the code more readable.

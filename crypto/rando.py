@@ -6,9 +6,11 @@ See LICENSE for details
 
 import os
 
-from tinydecred.pydecred import constants as C
+MinSeedBytes = 16  # 128 bits
+MaxSeedBytes = 64  # 512 bits
 
 
-def generateSeed(length=C.MaxSeedBytes):
-    assert length >= C.MinSeedBytes and length <= C.MaxSeedBytes
+def generateSeed(length=MaxSeedBytes):
+    if length < MinSeedBytes or length > MaxSeedBytes:
+        raise AssertionError("invalid seed length %d" % length)
     return os.urandom(length)

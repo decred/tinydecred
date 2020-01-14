@@ -6,14 +6,32 @@ See LICENSE for details
 import unittest
 import os
 import json
+import time
+from base58 import b58decode
+from tempfile import TemporaryDirectory
 from tinydecred.pydecred.calc import SubsidyCache
-from tinydecred.pydecred import mainnet, testnet, txscript, vsp
+from tinydecred.pydecred import mainnet, testnet, txscript, vsp, account
 from tinydecred.pydecred.wire import wire, msgtx
-from tinydecred.crypto.bytearray import ByteArray
-from tinydecred.crypto import crypto, opcode
+from tinydecred.util.encode import ByteArray
+from tinydecred.util import database, chains
+from tinydecred.crypto import crypto, opcode, rando
+from tinydecred.wallet.accounts import createAccount
+from tinydecred.crypto.secp256k1 import curve as Curve
+
+testSeed = ByteArray(
+    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+).b
+
+
+def newHash():
+    return ByteArray(rando.generateSeed(32))
 
 
 class TestSubsidyCache(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        chains.registerChain("dcr", None)
+
     def test_subsidy_cache_calcs(self):
         """
         TestSubsidyCacheCalcs ensures the subsidy cache calculates the various
@@ -1795,9 +1813,6 @@ class TestTxScript(unittest.TestCase):
                     )
 
     def test_sign_stake_p2pkh_outputs(self):
-        from tinydecred.crypto.secp256k1 import curve as Curve
-        from tinydecred.crypto import rando
-
         txIn = msgtx.TxIn(
             previousOutPoint=msgtx.OutPoint(
                 txHash=ByteArray(rando.generateSeed(32)), idx=0, tree=0,
@@ -1841,8 +1856,6 @@ class TestTxScript(unittest.TestCase):
             )
 
     def test_addresses(self):
-        from base58 import b58decode
-
         class test:
             def __init__(
                 self,
@@ -2255,8 +2268,6 @@ class TestTxScript(unittest.TestCase):
             self.assertEqual(addr.scriptAddress(), test.scriptAddress, test.name)
 
     def test_extract_script_addrs(self):
-        from tinydecred.pydecred import mainnet
-
         scriptVersion = 0
         tests = []
 
@@ -2785,38 +2796,300 @@ class TestTxScript(unittest.TestCase):
 
 
 class TestVSP(unittest.TestCase):
-    def setUp(self):
-        self.poolURL = "https://teststakepool.decred.org"
-        self.apiKey = ""
-        # signing address is needed to validate server-reported redeem script.
-        self.signingAddress = ""
-        if not self.apiKey or not self.signingAddress:
-            print(" no stake pool credentials provided. skipping stake pool test")
-            raise unittest.SkipTest
+    def test_blob(self):
+        pi = vsp.PurchaseInfo(
+            addr="someaddr",
+            fees=1.3,
+            script=ByteArray("0a1b2c"),
+            ticketAddr="someotheraddr",
+            vBits=2,
+            vBitsVer=1,
+            stamp=123456,
+        )
+        stakePool = vsp.VotingServiceProvider(
+            "http://localhost:54321", "somerandomkey", mainnet.Name, pi
+        )
+        b = stakePool.serialize()
+        rePool = vsp.VotingServiceProvider.unblob(b.b)
+        self.assertEqual(stakePool.url, rePool.url)
+        self.assertEqual(stakePool.apiKey, rePool.apiKey)
+        self.assertEqual(stakePool.net.Name, rePool.net.Name)
+        rePI = rePool.purchaseInfo
+        self.assertEqual(pi.poolAddress, rePI.poolAddress)
+        self.assertEqual(pi.poolFees, rePI.poolFees)
+        self.assertEqual(pi.script, rePI.script)
+        self.assertEqual(pi.ticketAddress, rePI.ticketAddress)
+        self.assertEqual(pi.voteBits, rePI.voteBits)
+        self.assertEqual(pi.voteBitsVersion, rePI.voteBitsVersion)
+        self.assertEqual(pi.unixTimestamp, rePI.unixTimestamp)
 
-    def stakePool(self):
-        stakePool = vsp.VotingServiceProvider(self.poolURL, self.apiKey)
-        stakePool.authorize(self.signingAddress, testnet)
-        return stakePool
 
-    def test_get_purchase_info(self):
-        stakePool = self.stakePool()
-        pi = stakePool.getPurchaseInfo()
-        print(pi.__tojson__())
+class TestAccount(unittest.TestCase):
+    def test_balance(self):
+        bal = account.Balance(1, 2, 3)
+        encoded = account.Balance.blob(bal)
+        reBal = account.Balance.unblob(encoded)
+        self.assertEqual(bal.available, reBal.available)
+        self.assertEqual(bal.total, reBal.total)
+        self.assertEqual(bal.staked, reBal.staked)
 
-    def test_get_stats(self):
-        stakePool = self.stakePool()
-        stats = stakePool.getStats()
-        print(stats.__tojson__())
+    def test_gap_handling(self):
+        cryptoKey = ByteArray(rando.generateSeed(32))
+        with TemporaryDirectory() as tempDir:
+            db = database.KeyValueDatabase(os.path.join(tempDir, "tmp.db")).child("tmp")
+            internalAddrs = [
+                "DskHpgbEb6hqkuHchHhtyojpehFToEtjQSo",
+                "Dsm4oCLnLraGDedfU5unareezTNT75kPbRb",
+                "DsdN6A9bWhKKJ7PAGdcDLxQrYPKEnjnDv2N",
+                "Dsifz8eRHvQrfaPXgHHLMDHZopFJq2pBPU9",
+                "DsmmzJiTTmpafdt2xx7LGk8ZW8cdAKe53Zx",
+                "DsVB47P4N23PK5C1RyaJdqkQDzVuCDKGQbj",
+                "DsouVzScdUUswvtCAv6nxRzi2MeufpWnELD",
+                "DsSoquT5SiDPfksgnveLv3r524k1v8RamYm",
+                "DsbVDrcfhbdLy4YaSmThmWN47xhxT6FC8XB",
+                "DsoSrtGYKruQLbvhA92xeJ6eeuAR1GGJVQA",
+            ]
 
-    def test_voting(self):
-        stakePool = self.stakePool()
-        pi = stakePool.getPurchaseInfo()
-        if pi.voteBits & (1 << 1) != 0:
-            nextVote = 1 | (1 << 2)
-        else:
-            nextVote = 1 | (1 << 1)
-        print("changing vote from %d to %d" % (pi.voteBits, nextVote))
-        stakePool.setVoteBits(nextVote)
-        pi = stakePool.getPurchaseInfo()
-        self.assertEqual(pi.voteBits, nextVote)
+            externalAddrs = [
+                "DsmP6rBEou9Qr7jaHnFz8jTfrUxngWqrKBw",
+                "DseZQKiWhN3ceBwDJEgGhmwKD3fMbwF4ugf",
+                "DsVxujP11N72PJ46wgU9sewptWztYUy3L7o",
+                "DsYa4UBo379cRMCTpDLxYVfpMvMNBdAGrGS",
+                "DsVSEmQozEnsZ9B3D4Xn4H7kEedDyREgc18",
+                "DsifDp8p9mRocNj7XNNhGAsYtfWhccc2cry",
+                "DsV78j9aF8NBwegbcpPkHYy9cnPM39jWXZm",
+                "DsoLa9Rt1L6qAVT9gSNE5F5XSDLGoppMdwC",
+                "DsXojqzUTnyRciPDuCFFoKyvQFd6nQMn7Gb",
+                "DsWp4nShu8WxefgoPej1rNv4gfwy5AoULfV",
+            ]
+
+            account.DefaultGapLimit = gapLimit = 5
+            root = crypto.ExtendedKey.new(testSeed)
+            coinExtKey = root.deriveCoinTypeKey(mainnet)
+            acct = createAccount(
+                cryptoKey, coinExtKey, 42, 0, mainnet.Name, "default", db, None
+            )
+            acct.gapLimit = gapLimit
+
+            listsAreEqual = lambda a, b: len(a) == len(b) and all(
+                x == y for x, y in zip(a, b)
+            )
+
+            self.assertTrue(
+                listsAreEqual(acct.internalAddresses, internalAddrs[:gapLimit])
+            )
+            # The external branch starts with the "last seen" at the zeroth address, so
+            # has one additional address to start.
+            self.assertTrue(
+                listsAreEqual(acct.externalAddresses, externalAddrs[: gapLimit + 1])
+            )
+
+            # Open the account to generate addresses.
+            acct.open(cryptoKey, None, None)
+            acct.addTxid(internalAddrs[0], "C4fA6958A1847D")
+            newAddrs = acct.generateGapAddresses()
+            self.assertEqual(len(newAddrs), 1)
+            self.assertEqual(newAddrs[0], internalAddrs[5])
+
+            # The zeroth external address is considered "seen", so this should not
+            # change anything.
+            acct.addTxid(externalAddrs[0], "C4fA6958A1847D")
+            newAddrs = acct.generateGapAddresses()
+            self.assertEqual(len(newAddrs), 0)
+
+            # Mark the 1st address as seen.
+            acct.addTxid(externalAddrs[1], "C4fA6958A1847D")
+            newAddrs = acct.generateGapAddresses()
+            self.assertEqual(len(newAddrs), 1)
+            self.assertEqual(externalAddrs[1], acct.currentAddress())
+
+            # cursor should be at index 0, last seen 1, max index 6, so calling
+            # nextExternalAddress 5 time should put the cursor at index 6, which is
+            # the gap limit.
+            for i in range(5):
+                acct.nextExternalAddress()
+            self.assertEqual(acct.currentAddress(), externalAddrs[6])
+
+            # one more should wrap the cursor back to 1, not zero, so the current
+            # address is lastSeenExt(=1) + cursor(=1) = 2
+            a1 = acct.nextExternalAddress()
+            self.assertEqual(acct.currentAddress(), externalAddrs[2])
+            self.assertEqual(a1, acct.currentAddress())
+
+            # Sanity check that internal addresses are wrapping too.
+            for i in range(20):
+                acct.nextInternalAddress()
+            addrs = acct.internalAddresses
+            self.assertEqual(addrs[len(addrs) - 1], internalAddrs[5])
+
+    def test_account(self):
+        """
+        Test account functionality.
+        """
+        cryptoKey = crypto.ByteArray(rando.generateSeed(32))
+        with TemporaryDirectory() as tempDir:
+            db = database.KeyValueDatabase(os.path.join(tempDir, "tmp.db")).child("tmp")
+            root = crypto.ExtendedKey.new(testSeed)
+            coinExtKey = root.deriveCoinTypeKey(mainnet)
+            acct = createAccount(
+                cryptoKey, coinExtKey, 42, 0, mainnet.Name, "default", db, None
+            )
+            for n in range(20):
+                acct.nextExternalAddress()
+            satoshis = int(round(5 * 1e8))
+            txHash = ByteArray(rando.generateSeed(32))
+            txid = reversed(txHash).hex()
+            vout = 2
+            address = acct.nextExternalAddress()
+
+            utxo = account.UTXO(
+                address=address,
+                txHash=txHash,
+                vout=vout,
+                scriptPubKey=ByteArray(0),
+                satoshis=satoshis,
+                maturity=1,
+            )
+
+            # A helper function to get the current utxo count.
+            utxocount = lambda: len(list(acct.utxoscan()))
+
+            # Add the utxo
+            acct.addUTXO(utxo)
+            # Check the count and balance categories.
+            self.assertEqual(utxocount(), 1)
+            self.assertEqual(acct.calcBalance(1).total, satoshis)
+            self.assertEqual(acct.calcBalance(1).available, satoshis)
+            self.assertEqual(acct.calcBalance(0).available, 0)
+            # Helper functions.
+            self.assertTrue(acct.caresAboutTxid(txid))
+            acct.addUTXO(utxo)
+            self.assertEqual(utxocount(), 1)
+            acct.spendUTXO(utxo)
+            self.assertEqual(utxocount(), 0)
+
+            b = acct.serialize()
+            reAcct = account.Account.unblob(b.b)
+
+            self.assertEqual(acct.pubKeyEncrypted, reAcct.pubKeyEncrypted)
+            self.assertEqual(acct.privKeyEncrypted, reAcct.privKeyEncrypted)
+            self.assertEqual(acct.name, reAcct.name)
+            self.assertEqual(acct.coinID, reAcct.coinID)
+            self.assertEqual(acct.netID, reAcct.netID)
+            self.assertEqual(acct.gapLimit, reAcct.gapLimit)
+            self.assertEqual(acct.cursorExt, reAcct.cursorExt)
+            self.assertEqual(acct.cursorInt, reAcct.cursorInt)
+            self.assertEqual(acct.gapLimit, reAcct.gapLimit)
+
+    def test_tiny_block(self):
+        blockHash = newHash()
+        height = 55
+        TinyBlock = account.TinyBlock
+        tb1 = TinyBlock(blockHash, height)
+        tb2 = TinyBlock.parse({"hash": blockHash, "height": height,})
+        self.assertEqual(tb1.hash, tb2.hash)
+        self.assertEqual(tb1.height, tb2.height)
+
+        b = tb1.serialize()
+        reTB = TinyBlock.unblob(b)
+        self.assertEqual(tb1.hash, reTB.hash)
+        self.assertEqual(tb1.height, reTB.height)
+
+    def test_ticket_info(self):
+        TicketInfo = account.TicketInfo
+        TinyBlock = account.TinyBlock
+        # First try with all zero values
+        tktNfo = TicketInfo(
+            status="",
+            purchaseBlock=None,
+            maturityHeight=0,
+            expirationHeight=0,
+            lotteryBlock=None,
+            vote=None,
+            revocation=None,
+        )
+
+        b = tktNfo.serialize()
+        reNfo = TicketInfo.unblob(b.b)
+
+        def check():
+            self.assertEqual(tktNfo.status, reNfo.status)
+            self.assertEqual(tktNfo.purchaseBlock, reNfo.purchaseBlock)
+            self.assertEqual(tktNfo.maturityHeight, reNfo.maturityHeight)
+            self.assertEqual(tktNfo.expirationHeight, reNfo.expirationHeight)
+            self.assertEqual(tktNfo.lotteryBlock, reNfo.lotteryBlock)
+            self.assertEqual(tktNfo.vote, reNfo.vote)
+            self.assertEqual(tktNfo.revocation, reNfo.revocation)
+
+        check()
+
+        tktNfo = TicketInfo(
+            status="immature",
+            purchaseBlock=TinyBlock(newHash(), 55),
+            maturityHeight=500,
+            expirationHeight=1000,
+            lotteryBlock=TinyBlock(newHash(), 66),
+            vote=newHash(),
+            revocation=newHash(),
+        )
+
+        b = tktNfo.serialize()
+        reNfo = TicketInfo.unblob(b.b)
+
+        check()
+
+    def test_utxo(self):
+        UTXO = account.UTXO
+        TicketInfo = account.TicketInfo
+        TinyBlock = account.TinyBlock
+        address = "someaddressanyaddress"
+        txHash = newHash()
+        vout = 55
+
+        utxo = UTXO(address=address, txHash=txHash, vout=vout,)
+
+        b = utxo.serialize()
+        reUTXO = UTXO.unblob(b.b)
+
+        def check():
+            self.assertEqual(utxo.address, reUTXO.address)
+            self.assertEqual(utxo.txHash, reUTXO.txHash)
+            self.assertEqual(utxo.vout, reUTXO.vout)
+            self.assertEqual(utxo.ts, reUTXO.ts)
+            self.assertEqual(utxo.scriptPubKey, reUTXO.scriptPubKey)
+            self.assertEqual(utxo.height, reUTXO.height)
+            self.assertEqual(utxo.amount, reUTXO.amount)
+            self.assertEqual(utxo.satoshis, reUTXO.satoshis)
+            self.assertEqual(utxo.maturity, reUTXO.maturity)
+            self.assertEqual(utxo.scriptClass, reUTXO.scriptClass)
+            if utxo.tinfo:
+                self.assertEqual(utxo.tinfo.serialize(), reUTXO.tinfo.serialize())
+
+        check()
+
+        tktNfo = TicketInfo(
+            status="immature",
+            purchaseBlock=TinyBlock(newHash(), 55),
+            maturityHeight=500,
+            expirationHeight=1000,
+            lotteryBlock=TinyBlock(newHash(), 66),
+            vote=newHash(),
+            revocation=newHash(),
+        )
+
+        utxo = UTXO(
+            address,
+            txHash,
+            vout,
+            ts=int(time.time()),
+            scriptPubKey=newHash(),
+            height=560,
+            satoshis=5000000,
+            maturity=55,
+            tinfo=tktNfo,
+        )
+
+        b = utxo.serialize()
+        reUTXO = UTXO.unblob(b.b)
+
+        check()

@@ -6,7 +6,7 @@ See LICENSE for details
 Based on dcrd MsgTx.
 """
 
-from tinydecred.crypto.bytearray import ByteArray
+from tinydecred.util.encode import ByteArray
 from tinydecred.crypto.crypto import hashH
 from tinydecred.pydecred.wire import wire
 
@@ -410,7 +410,7 @@ class MsgTx:
     """
 
     def __init__(self, cachedHash, serType, version, txIn, txOut, lockTime, expiry):
-        self.cachedHash = cachedHash
+        self.cachedH = cachedHash
         self.serType = serType
         self.version = version
         self.txIn = txIn
@@ -439,7 +439,7 @@ class MsgTx:
         Check equality of all fields. Useful in testing.
         """
         return (
-            self.cachedHash == tx.cachedHash
+            self.cachedH == tx.cachedH
             and self.serType == tx.serType
             and self.version == tx.version
             and all((a == b for a, b in zip(self.txIn, tx.txIn)))
@@ -454,16 +454,32 @@ class MsgTx:
     def addTxOut(self, txout):
         self.txOut.append(txout)
 
-    def hash(self):  # chainhash.Hash {
+    def hash(self):
         """
         TxHash generates the hash for the transaction prefix.  Since it does not
         contain any witness data, it is not malleable and therefore is stable for
         use in unconfirmed transaction chains.
+
+        Returns:
+            ByteArray: The transaction hash.
         """
         # TxHash should always calculate a non-witnessed hash.
         toHash = self.mustSerialize(wire.TxSerializeNoWitness)
         # If this hash is converted to a hex string, it should be reversed first.
         return hashH(toHash.bytes())
+
+    def cachedHash(self):
+        """
+        Returns the cached hash. If the hash has not been generated, generate
+        the cache first.
+
+        Returns:
+            ByteArray: The transaction hash.
+        """
+        if self.cachedH:
+            return self.cachedH
+        self.cachedH = self.hash()
+        return self.cachedH
 
     def txHex(self):
         return self.serialize().hex()
@@ -539,7 +555,6 @@ class MsgTx:
         return b
 
     def btcEncode(self, pver):
-        # w io.Writer, pver uint32) error {
         """
         BtcEncode encodes the receiver to w using the Decred protocol encoding.
         This is part of the Message interface implementation.
@@ -617,11 +632,7 @@ class MsgTx:
                 n += txOut.serializeSize()
         return n
 
-    def serialize(self):
-        return self.btcEncode(0)
-
     def decodePrefix(self, b, pver):
-        # r io.Reader, pver uint32) (uint64, error) {
         """
         decodePrefix decodes a transaction prefix and stores the contents
         in the embedded msgTx.
@@ -725,7 +736,6 @@ class MsgTx:
 
     @staticmethod
     def btcDecode(b, pver):
-        # r io.Reader, pver uint32) error {
         """
         BtcDecode decodes r using the Decred protocol encoding into the receiver.
         This is part of the Message interface implementation.
@@ -735,6 +745,7 @@ class MsgTx:
         # The serialized encoding of the version includes the real transaction
         # version in the lower 16 bits and the transaction serialization type
         # in the upper 16 bits.
+        b = ByteArray(b)
         ver = b.pop(4).unLittle().int()
 
         tx = MsgTx.new()
@@ -759,9 +770,28 @@ class MsgTx:
 
         return tx
 
+    def serialize(self):
+        """
+        Serialize the MsgTx.
+
+        Returns:
+            ByteArray: The serialized MsgTx.
+        """
+        return self.btcEncode(0)
+
     @staticmethod
     def deserialize(b):
         return MsgTx.btcDecode(b, 0)
+
+    @staticmethod
+    def blob(msgTx):
+        """Satisfies the encode.Blobber API"""
+        return msgTx.serialize().b
+
+    @staticmethod
+    def unblob(b):
+        """Satisfies the encode.Blobber API"""
+        return MsgTx.deserialize(b)
 
     def pkScriptLocs(self):  # []int {
         """

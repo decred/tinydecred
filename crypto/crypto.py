@@ -11,11 +11,12 @@ import hmac
 
 from base58 import b58encode, b58decode
 from blake256.blake256 import blake_hash
+import nacl.secret
 
-from tinydecred.crypto.bytearray import ByteArray
-from tinydecred.crypto.rando import generateSeed
+from tinydecred.util.encode import ByteArray
+from tinydecred.crypto import rando
 from tinydecred.crypto.secp256k1.curve import curve as Curve, PublicKey, PrivateKey
-from tinydecred.util import tinyjson
+from tinydecred.util import encode
 
 
 KEY_SIZE = 32
@@ -28,10 +29,13 @@ MAX_COIN_TYPE = HARDENED_KEY_START - 1
 MAX_ACCOUNT_NUM = HARDENED_KEY_START - 2
 RADIX = 58
 ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+MASTER_KEY = b"Bitcoin seed"
+MAX_SECRET_INT = (
+    115792089237316195423570985008687907852837564279074904382605163141518161494337
+)
 
-# ExternalBranch is the child number to use when performing BIP0044
-# style hierarchical deterministic key derivation for the external
-# branch.
+# ExternalBranch is the child number to use when performing BIP0044 style
+# hierarchical deterministic key derivation for the external branch.
 EXTERNAL_BRANCH = 0
 
 # InternalBranch is the child number to use when performing BIP0044
@@ -76,6 +80,14 @@ class CrazyKeyError(Exception):
 class ParameterRangeError(Exception):
     """
     An input parameter is out of the acceptable range.
+    """
+
+    pass
+
+
+class KeyLengthException(Exception):
+    """
+    A KeyLengthException indicates a hash input that is of an unexpected length.
     """
 
     pass
@@ -567,9 +579,11 @@ class ExtendedKey:
             childNum (int): Child number.
             isPrivate (bool): Whether the key is a private or public key.
         """
-        assert (
-            len(privVer) == 4 and len(pubVer) == 4
-        ), "Network version bytes of incorrect length"
+        if len(privVer) != 4 or len(pubVer) != 4:
+            raise AssertionError(
+                "Network version bytes of incorrect lengths %d and %d"
+                % (len(privVer), len(pubVer))
+            )
         self.privVer = ByteArray(privVer)
         self.pubVer = ByteArray(pubVer)
         self.key = ByteArray(key)
@@ -585,7 +599,67 @@ class ExtendedKey:
         self.childNum = childNum
         self.isPrivate = isPrivate
 
-    def deriveCoinTypeKey(self, coinType):
+    @staticmethod
+    def new(seed):
+        """
+        new creates a new crypto.ExtendedKey. Implementation based on dcrd
+        hdkeychain newMaster. The ExtendedKey created does not have a network
+        specified. The extended key returned from newMaster can be used to
+        generate coin-type and account keys in accordance with BIP-0032 and
+        BIP-0044.
+
+        Args:
+            seed (bytes-like): A random seed from which the extended key is made.
+
+        Returns:
+            crypto.ExtendedKey: A master hierarchical deterministic key.
+        """
+        seedLen = len(seed)
+        if seedLen < rando.MinSeedBytes or seedLen > rando.MaxSeedBytes:
+            raise AssertionError("invalid seed length %d" % seedLen)
+
+        # First take the HMAC-SHA512 of the master key and the seed data:
+        # SHA512 hash is 64 bytes.
+        lr = hmacDigest(MASTER_KEY, seed)
+
+        # Split "I" into two 32-byte sequences Il and Ir where:
+        #   Il = master secret key
+        #   Ir = master chain code
+        lrLen = int(len(lr) / 2)
+        secretKey = lr[:lrLen]
+        chainCode = lr[lrLen:]
+
+        # Ensure the key is usable.
+        secretInt = int.from_bytes(secretKey, byteorder="big")
+        if secretInt > MAX_SECRET_INT or secretInt <= 0:
+            raise KeyLengthException("generated key was outside acceptable range")
+
+        parentFp = bytes.fromhex("00 00 00 00")
+
+        return ExtendedKey(
+            privVer=ByteArray([0, 0, 0, 0]),
+            pubVer=ByteArray([0, 0, 0, 0]),
+            key=secretKey,
+            pubKey="",
+            chainCode=chainCode,
+            parentFP=parentFp,
+            depth=0,
+            childNum=0,
+            isPrivate=True,
+        )
+
+    def setNetwork(self, chainParams):
+        """
+        Sets the privVer and pubVer fields. This should be used when deriving
+        the coin-type extended keys from the root wallet key.
+
+        Args:
+            chainParams (object): The network parameters.
+        """
+        self.privVer = chainParams.HDPrivateKeyID
+        self.pubVer = chainParams.HDPublicKeyID
+
+    def deriveCoinTypeKey(self, chainParams):
         """
         First two hardened child derivations in accordance with BIP0044.
 
@@ -596,6 +670,7 @@ class ExtendedKey:
         Returns:
             ExtendedKey: The coin-type key.
         """
+        coinType = chainParams.SLIP0044CoinType
         if coinType > MAX_COIN_TYPE:
             raise ParameterRangeError(
                 "coinType too high. %i > %i" % (coinType, MAX_COIN_TYPE)
@@ -604,7 +679,10 @@ class ExtendedKey:
         purpose = self.child(44 + HARDENED_KEY_START)
 
         # Derive the purpose key as a child of the master node.
-        return purpose.child(coinType + HARDENED_KEY_START)
+        coinKey = purpose.child(coinType + HARDENED_KEY_START)
+        coinKey.privVer = chainParams.HDPrivateKeyID
+        coinKey.pubVer = chainParams.HDPublicKeyID
+        return coinKey
 
     def child(self, i):
         """
@@ -752,7 +830,7 @@ class ExtendedKey:
             isPrivate=isPrivate,
         )
 
-    def deriveAccountKey(self, account):
+    def deriveAccountKey(self, acct):
         """
         deriveAccountKey derives the extended key for an account according to
         the hierarchy described by BIP0044 given the master node.
@@ -767,13 +845,13 @@ class ExtendedKey:
             ExtendedKey: Account key.
         """
         # Enforce maximum account number.
-        if account > MAX_ACCOUNT_NUM:
+        if acct > MAX_ACCOUNT_NUM:
             raise ParameterRangeError(
                 "deriveAccountKey: account number greater than MAX_ACCOUNT_NUM"
             )
 
         # Derive the account key as a child of the coin type key.
-        return self.child(account + HARDENED_KEY_START)
+        return self.child(acct + HARDENED_KEY_START)
 
     def neuter(self):
         """
@@ -809,13 +887,12 @@ class ExtendedKey:
             isPrivate=False,
         )
 
-    def string(self):
+    def serialize(self):
         """
-        string returns the extended key as a base58-encoded string. See
-        `decodeExtendedKey` for decoding.
+        Return the extended key in serialized form.
 
         Returns:
-            str: The encoded extended key.
+            ByteArray: The serialized extended key.
         """
         if self.key.iszero():
             raise Exception("unexpected zero key")
@@ -846,7 +923,17 @@ class ExtendedKey:
 
         checkSum = checksum(serializedBytes.b)[:4]
         serializedBytes += checkSum
-        return b58encode(serializedBytes.bytes()).decode()
+        return serializedBytes
+
+    def string(self):
+        """
+        string returns the extended key as a base58-encoded string. See
+        `decodeExtendedKey` for decoding.
+
+        Returns:
+            str: The encoded extended key.
+        """
+        return b58encode(self.serialize().bytes()).decode()
 
     def deriveChildAddress(self, i, net):
         """
@@ -883,18 +970,18 @@ class ExtendedKey:
         return Curve.parsePubKey(self.pubKey)
 
 
-def decodeExtendedKey(net, pw, key):
+def decodeExtendedKey(net, cryptoKey, key):
     """
     Decode an base58 ExtendedKey using the passphrase and network parameters.
 
     Args:
-        pw (SecretKey or ByteAray): The encryption key.
+        cryptoKey (ByteAray): The encryption key.
         key (str): Base-58 encoded extended key.
 
     Returns:
         ExtendedKey: The decoded key.
     """
-    decoded = ByteArray(b58decode(pw.decrypt(key.bytes())))
+    decoded = decrypt(cryptoKey, key)
     if len(decoded) != SERIALIZED_KEY_LENGTH + 4:
         raise Exception("decoded private key is wrong length")
 
@@ -913,7 +1000,9 @@ def decodeExtendedKey(net, pw, key):
     pubVersion = net.HDPublicKeyID
     version = payload[:4]
     if version != privVersion and version != pubVersion:
-        raise Exception("unknown version")
+        raise Exception(
+            "unknown versions %r %r %r" % (privVersion, pubVersion, version)
+        )
 
     # Deserialize the remaining payload fields.
     depth = payload[4:5].int()
@@ -982,69 +1071,44 @@ class KDFParams(object):
         self.digest = digest
         self.iterations = its
 
-    def __tojson__(self):
-        return {
-            "kdfFunc": self.kdfFunc,
-            "hashName": self.hashName,
-            "salt": self.salt,
-            "digest": self.digest,
-            "iterations": self.iterations,
-        }
+    @staticmethod
+    def blob(params):
+        """Satisfies the encode.Blobber API"""
+        return (
+            encode.BuildyBytes(0)
+            .addData(params.kdfFunc.encode("utf-8"))
+            .addData(params.hashName.encode("utf-8"))
+            .addData(params.salt)
+            .addData(params.digest)
+            .addData(params.iterations)
+            .b
+        )
 
     @staticmethod
-    def __fromjson__(obj):
-        p = KDFParams(salt=obj["salt"], digest=obj["digest"],)
-        p.iterations = obj["iterations"]
-        p.hashName = obj["hashName"]
-        p.kdfFunc = obj["kdfFunc"]
-        return p
+    def unblob(b):
+        """Satisfies the encode.Blobber API"""
+        ver, d = encode.decodeBlob(b)
+        if ver != 0:
+            raise AssertionError("invalid version %d" % ver)
+        if len(d) != 5:
+            raise AssertionError("wrong push count. expected 5, got %d" % len(d))
 
-    def __repr__(self):
-        return repr(self.__tojson__())
+        params = KDFParams(salt=ByteArray(d[2]), digest=ByteArray(d[3]))
 
+        params.kdfFunc = d[0].decode("utf-8")
+        params.hashName = d[1].decode("utf-8")
+        params.iterations = encode.intFromBytes(d[4])
 
-tinyjson.register(KDFParams, "KDFParams")
+        return params
 
-
-class ScryptParams(object):
-    """
-    A set of scrypt parameters. Can be stored and retreived in plain text to
-    regenerate encryption keys.
-    """
-
-    def __init__(self, salt, digest, n, r, p):
+    def serialize(self):
         """
-        Args:
-            salt (ByteArray): A randomized salt.
-            digest: Key hash used as a checksum.
-            n (int): Scrypt iteration count, N.
-            r (int): Scrypt memory factor, r.
-            p (int): Scrypt parallelization factor, p.
+        Serialize the KDFParams.
+
+        Returns:
+            ByteArray: The serialized KDFParams.
         """
-        self.n = n
-        self.r = r
-        self.p = p
-        self.salt = salt
-        self.digest = digest
-
-    def __tojson__(self):
-        return {
-            "n": self.n,
-            "r": self.r,
-            "p": self.p,
-            "salt": self.salt,
-            "digest": self.digest,
-        }
-
-    @staticmethod
-    def __fromjson__(obj):
-        return ScryptParams(obj["salt"], obj["digest"], obj["n"], obj["r"], obj["p"])
-
-    def __repr__(self):
-        return repr(self.__tojson__())
-
-
-tinyjson.register(ScryptParams, "ScryptParams")
+        return ByteArray(KDFParams.blob(self))
 
 
 class SecretKey(object):
@@ -1059,7 +1123,7 @@ class SecretKey(object):
             pw (byte-like): A password that deterministically generates the key.
         """
         super().__init__()
-        salt = ByteArray(generateSeed(KEY_SIZE))
+        salt = ByteArray(rando.generateSeed(KEY_SIZE))
         b = lambda v: ByteArray(v).bytes()
         func, hashName, iterations = defaultKDFParams()
         self.key = ByteArray(
@@ -1088,7 +1152,7 @@ class SecretKey(object):
         Returns:
             ByteArray: The thing, encrypted.
         """
-        return self.key.encrypt(thing)
+        return ByteArray(encrypt(self.key, thing))
 
     def decrypt(self, thing):
         """
@@ -1100,7 +1164,7 @@ class SecretKey(object):
         Returns:
             ByteArray: The thing, decrypted.
         """
-        return self.key.decrypt(thing)
+        return ByteArray(decrypt(self.key, thing))
 
     @staticmethod
     def rekey(password, kp):
@@ -1109,6 +1173,7 @@ class SecretKey(object):
         `params`.
 
         Args:
+            password (bytes-like): The key password.
             kp (KDFParams): The key parameters from the original generation
                 of the key being regenerated.
 
@@ -1117,11 +1182,12 @@ class SecretKey(object):
         """
         sk = SecretKey(b"")
         sk.keyParams = kp
-        b = lambda v: ByteArray(v).bytes()
         func = kp.kdfFunc
         if func == "pbkdf2_hmac":
             sk.key = ByteArray(
-                hashlib.pbkdf2_hmac(kp.hashName, b(password), b(kp.salt), kp.iterations)
+                hashlib.pbkdf2_hmac(
+                    kp.hashName, bytes(password), bytes(kp.salt), kp.iterations
+                )
             )
         else:
             raise Exception("unkown key derivation function")
@@ -1129,3 +1195,42 @@ class SecretKey(object):
         if checkDigest != kp.digest:
             raise Exception("rekey digest check failed")
         return sk
+
+
+def encrypt(key, thing):
+    """
+    Encrypt the thing with the key.
+
+    Args:
+        key (ByteArray or bytes-like): The key.
+        thing (ByteArray or bytes-like): The plaintext.
+
+    Returns:
+        ByteArray: The ciphertext.
+    """
+    # This is your safe, you can use it to encrypt or decrypt messages
+    box = nacl.secret.SecretBox(bytes(key))
+
+    # Encrypt our message, it will be exactly 40 bytes longer than the
+    # original message as it stores authentication information and the
+    # nonce alongside it.
+    encrypted = box.encrypt(bytes(thing))
+
+    if len(encrypted) != len(thing) + box.NONCE_SIZE + box.MACBYTES:
+        raise AssertionError("wrong encrypted length %d" % len(encrypted))
+
+    return ByteArray(encrypted)
+
+
+def decrypt(key, thing):
+    """
+    Decrypt the thing with the key.
+
+    Args:
+        key (ByteArray or bytes-like): The key.
+        thing (ByteArray or bytes-like): The ciphertext.
+
+    Returns:
+        ByteArray: The decoded plaintext.
+    """
+    return ByteArray(nacl.secret.SecretBox(bytes(key)).decrypt(bytes(thing)))

@@ -6,7 +6,7 @@ See LICENSE for details
 PGP-based mnemonic seed generation.
 """
 
-from tinydecred.crypto.bytearray import ByteArray
+from tinydecred.util.encode import ByteArray
 from tinydecred.crypto.crypto import sha256ChecksumByte
 
 alternatingWords = """aardvark

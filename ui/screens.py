@@ -10,7 +10,7 @@ from PyQt5 import QtGui, QtCore, QtWidgets
 from tinydecred import config
 from tinydecred.ui import qutilities as Q, ui
 from tinydecred.wallet.wallet import Wallet
-from tinydecred.util import helpers
+from tinydecred.util import helpers, chains
 from tinydecred.pydecred import constants as DCR
 from tinydecred.pydecred.vsp import VotingServiceProvider
 
@@ -747,8 +747,8 @@ class InitializationScreen(Screen):
                 try:
                     app.dcrdata.connect()
                     app.emitSignal(ui.BLOCKCHAIN_CONNECTED)
-                    words, wallet = Wallet.create(app.walletFilename(), pw, cfg.net)
-                    wallet.open(0, pw, app.dcrdata, app.blockchainSignals)
+                    words, wallet = Wallet.create(app.walletFilename(), pw)
+                    wallet.open("dcr", 0, pw, app.blockchainSignals)
                     return words, wallet
                 except Exception as e:
                     log.error("failed to create wallet: %s" % formatTraceback(e))
@@ -771,7 +771,7 @@ class InitializationScreen(Screen):
 
     def loadClicked(self):
         """
-        The user has selected the "load from from" option. Prompt for a file
+        The user has selected the "load from file" option. Prompt for a file
         location and load the wallet.
         """
         app = self.app
@@ -790,39 +790,15 @@ class InitializationScreen(Screen):
         log.debug("loading wallet from %r" % walletPath)
         if walletPath == "":
             app.appWindow.showError("no file selected")
+            return
         elif not os.path.isfile(walletPath):
             log.error("no file found at %s" % walletPath)
             app.showMessaage("file error. try again")
-        else:
+            return
 
-            def load(pw, userPath):
-                if pw is None or pw == "":
-                    app.appWindow.showError(
-                        "you must enter the password for this wallet"
-                    )
-                else:
-                    try:
-                        appWalletPath = app.walletFilename()
-                        app.dcrdata.connect()
-                        app.emitSignal(ui.BLOCKCHAIN_CONNECTED)
-                        wallet = Wallet.openFile(userPath, pw)
-                        wallet.open(0, pw, app.dcrdata, app.blockchainSignals)
-                        # Save the wallet to the standard location.
-                        wallet.path = appWalletPath
-                        wallet.save()
-                        app.setWallet(wallet)
-                        app.home()
-                    except Exception as e:
-                        log.warning(
-                            "exception encountered while attempting to open wallet: %s"
-                            % formatTraceback(e)
-                        )
-                        app.appWindow.showError(
-                            "error opening this wallet."
-                            " password correct? correct network?"
-                        )
-
-            app.getPassword(load, walletPath)
+        destination = app.walletFilename()
+        helpers.moveFile(walletPath, destination)
+        app.initialize()
 
     def restoreClicked(self):
         """
@@ -830,17 +806,6 @@ class InitializationScreen(Screen):
         """
         restoreScreen = MnemonicRestorer(self.app)
         self.app.appWindow.stack(restoreScreen)
-
-
-def sendToAddress(wallet, val, addr):
-    """
-    Send the value in DCR to the provided address.
-    """
-    try:
-        return wallet.sendToAddress(int(round(val * 1e8)), addr)  # raw transaction
-    except Exception as e:
-        log.error("failed to send: %s" % formatTraceback(e))
-    return False
 
 
 class SendScreen(Screen):
@@ -894,7 +859,17 @@ class SendScreen(Screen):
         val = float(self.valField.text())
         address = self.addressField.text()
         log.debug("sending %f to %s" % (val, address))
-        self.app.withUnlockedWallet(sendToAddress, self.sent, val, address)
+
+        def send(wallet, val, addr):
+            try:
+                return wallet.openAccount.sendToAddress(
+                    int(round(val * 1e8)), addr
+                )  # raw transaction
+            except Exception as e:
+                log.error("failed to send: %s" % formatTraceback(e))
+            return False
+
+        self.app.withUnlockedWallet(send, self.sent, val, address)
 
     def sent(self, res):
         """
@@ -1055,9 +1030,9 @@ class MnemonicRestorer(Screen):
                             app.dcrdata.connect()
                             app.emitSignal(ui.BLOCKCHAIN_CONNECTED)
                             wallet = Wallet.createFromMnemonic(
-                                words, app.walletFilename(), pw, cfg.net
+                                words, app.walletFilename(), pw
                             )
-                            wallet.open(0, pw, app.dcrdata, app.blockchainSignals)
+                            wallet.open("dcr", 0, pw, app.blockchainSignals)
                             return wallet
                         except Exception as e:
                             log.error(
@@ -1122,7 +1097,7 @@ class StakingScreen(Screen):
         self.balance = None
         self.wgt.setContentsMargins(5, 5, 5, 5)
         self.wgt.setMinimumWidth(400)
-        self.blockchain = app.dcrdata
+        self.blockchain = chains.chain("dcr")
         self.revocableTicketsCount = 0
 
         # Register for a few key signals.
@@ -1373,14 +1348,11 @@ class StakingScreen(Screen):
         Returns:
             list(msgtx.MsgTx): The purchased tickets.
         """
-        tip = self.blockchain.tip["height"]
         acct = wallet.openAccount
         txs = acct.purchaseTickets(qty, self.lastPrice)
         if txs:
-            wallet.signals.balance(acct.calcBalance(tip))
             self.app.home()
         self.app.appWindow.showSuccess("bought %s tickets" % qty)
-        wallet.save()
         return txs
 
     def ticketsBought(self, res):
@@ -1540,7 +1512,7 @@ class PoolScreen(Screen):
         pools = self.pools
         count = len(pools)
         if count == 0:
-            log.warn("no stake pools returned from server")
+            log.warning("no stake pools returned from server")
         lastIdx = self.poolIdx
         if count == 1:
             self.poolIdx = 0
@@ -1582,15 +1554,14 @@ class PoolScreen(Screen):
             err("invalid URL")
             return
         baseUrl = parsedURL.scheme + "://" + parsedURL.netloc
-        pool = VotingServiceProvider(baseUrl, apiKey)
+        pool = VotingServiceProvider(baseUrl, apiKey, cfg.net.Name)
 
         def registerPool(wallet):
             try:
                 addr = wallet.openAccount.votingAddress()
-                pool.authorize(addr, cfg.net)
+                pool.authorize(addr)
                 app.appWindow.showSuccess("pool authorized")
                 wallet.openAccount.setPool(pool)
-                wallet.save()
                 # Notify that vote data should be updated.
                 self.app.emitSignal(ui.PURCHASEINFO_SIGNAL)
                 return True
@@ -1639,10 +1610,11 @@ class AgendasScreen(Screen):
 
         # Currently shown agenda dropdowns are saved here.
         self.dropdowns = []
+        self.agendas = []
         self.pages = []
         self.page = 0
         self.voteSet = False
-        self.blockchain = None
+        self.blockchain = chains.chain("dcr")
 
         self.app.registerSignal(ui.PURCHASEINFO_SIGNAL, self.setVote)
         self.app.registerSignal(ui.BLOCKCHAIN_CONNECTED, self.setBlockchain)
@@ -1710,14 +1682,19 @@ class AgendasScreen(Screen):
         """
         Set the dcrdata blockchain on connected signal. Then set agendas.
         """
-        self.blockchain = self.app.dcrdata
         self.setAgendas()
 
     def setAgendas(self):
         """
         Set agendas from dcrdata.
         """
-        self.agendas = self.blockchain.getAgendasInfo().agendas
+        # dcrdata will send 422 Unprocessible Entity if on simnet.
+        try:
+            self.agendas = self.blockchain.getAgendasInfo().agendas
+        except Exception:
+            log.warning("error fetching agendas. OK on simnet")
+            return
+
         self.pages = [
             self.agendas[i * 2 : i * 2 + 2] for i in range((len(self.agendas) + 1) // 2)
         ]

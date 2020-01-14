@@ -6,7 +6,7 @@ See LICENSE for details
 Constants and common routines from the dcrd wire package.
 """
 
-from tinydecred.crypto.bytearray import ByteArray
+from tinydecred.util.encode import ByteArray
 
 # fmt: off
 MaxInt8   = (1 << 7) - 1

@@ -5,10 +5,10 @@ See LICENSE for details
 DcrdataClient.endpointList() for available enpoints.
 """
 import time
-from tinydecred.util import tinyhttp, tinyjson
-from tinydecred.pydecred import txscript, constants
+from tinydecred.util import tinyhttp, encode
+from tinydecred.pydecred import txscript, constants, nets
 from tinydecred.crypto import crypto
-from tinydecred.crypto.bytearray import ByteArray
+from tinydecred.util.encode import ByteArray
 
 # The duration purchase info is good for.
 PURCHASE_INFO_LIFE = constants.HOUR
@@ -39,38 +39,81 @@ class PurchaseInfo(object):
     This information is required for validating the pool and creating tickets.
     """
 
-    def __init__(self, pi):
+    def __init__(self, addr, fees, script, ticketAddr, vBits, vBitsVer, stamp):
+        """
+        Constructor for a PurchaseInfo.
+
+        Args;
+            addr (str): The pool address.
+            fees (float): The pool ticket fee rate, as percent.
+            script (ByteArray): The P2SH ticket script.
+            ticketAddr (str): The P2SH address derived from the script.
+            vBits (int): Current account vote bits.
+            vBitsVer: (int): The vote bits version.
+            stamp (int): Unix timestamp that the purchase info was last updated.
+        """
+        self.poolAddress = addr
+        self.poolFees = fees
+        self.script = script
+        self.ticketAddress = ticketAddr
+        self.voteBits = vBits
+        self.voteBitsVersion = vBitsVer
+        self.unixTimestamp = stamp
+
+    @staticmethod
+    def parse(pi):
         """
         Args:
             pi (object): The response from the 'getpurchaseinfo' request.
         """
         get = lambda k, default=None: pi[k] if k in pi else default
-        self.poolAddress = get("PoolAddress")
-        self.poolFees = get("PoolFees")
-        self.script = get("Script")
-        self.ticketAddress = get("TicketAddress")
-        self.voteBits = get("VoteBits")
-        self.voteBitsVersion = get("VoteBitsVersion")
-        self.unixTimestamp = get("unixTimestamp", default=time.time())
-
-    def __tojson__(self):
-        # using upper-camelcase to match keys in api response
-        return {
-            "PoolAddress": self.poolAddress,
-            "PoolFees": self.poolFees,
-            "Script": self.script,
-            "TicketAddress": self.ticketAddress,
-            "VoteBits": self.voteBits,
-            "VoteBitsVersion": self.voteBitsVersion,
-            "unixTimestamp": self.unixTimestamp,
-        }
+        return PurchaseInfo(
+            addr=get("PoolAddress"),
+            fees=get("PoolFees"),
+            script=ByteArray(get("Script")),
+            ticketAddr=get("TicketAddress"),
+            vBits=get("VoteBits"),
+            vBitsVer=get("VoteBitsVersion"),
+            stamp=get("unixTimestamp", default=int(time.time())),
+        )
 
     @staticmethod
-    def __fromjson__(obj):
-        return PurchaseInfo(obj)
+    def blob(pi):
+        """Satisfies the encode.Blobber API"""
+        return (
+            encode.BuildyBytes(0)
+            .addData(pi.poolAddress.encode("utf-8"))
+            .addData(encode.floatToBytes(pi.poolFees))
+            .addData(pi.script)
+            .addData(pi.ticketAddress.encode("utf-8"))
+            .addData(pi.voteBits)
+            .addData(pi.voteBitsVersion)
+            .addData(pi.unixTimestamp)
+            .b
+        )
 
+    @staticmethod
+    def unblob(b):
+        """Satisfies the encode.Blobber API"""
+        ver, d = encode.decodeBlob(b)
+        if ver != 0:
+            raise AssertionError("invalid PurchaseInfo version %d" % ver)
+        if len(d) != 7:
+            raise AssertionError(
+                "wrong number of pushes for PurchaseInfo. expected 7, got %d" % len(d)
+            )
 
-tinyjson.register(PurchaseInfo, "PurchaseInfo")
+        iFunc = encode.intFromBytes
+
+        return PurchaseInfo(
+            addr=d[0].decode("utf-8"),
+            fees=encode.floatFromBytes(d[1]),
+            script=ByteArray(d[2]),
+            ticketAddr=d[3].decode("utf-8"),
+            vBits=iFunc(d[4]),
+            vBitsVer=iFunc(d[5]),
+            stamp=iFunc(d[6]),
+        )
 
 
 class PoolStats(object):
@@ -107,83 +150,77 @@ class PoolStats(object):
         self.userCountActive = get("UserCountActive")
         self.version = get("Version")
 
-    def __tojson__(self):
-        return {
-            "AllMempoolTix": self.allMempoolTix,
-            "APIVersionsSupported": self.apiVersionsSupported,
-            "BlockHeight": self.blockHeight,
-            "Difficulty": self.difficulty,
-            "Expired": self.expired,
-            "Immature": self.immature,
-            "Live": self.live,
-            "Missed": self.missed,
-            "OwnMempoolTix": self.ownMempoolTix,
-            "PoolSize": self.poolSize,
-            "ProportionLive": self.proportionLive,
-            "ProportionMissed": self.proportionMissed,
-            "Revoked": self.revoked,
-            "TotalSubsidy": self.totalSubsidy,
-            "Voted": self.voted,
-            "Network": self.network,
-            "PoolEmail": self.poolEmail,
-            "PoolFees": self.poolFees,
-            "PoolStatus": self.poolStatus,
-            "UserCount": self.userCount,
-            "UserCountActive": self.userCountActive,
-            "Version": self.version,
-        }
-
-    @staticmethod
-    def __fromjson__(obj):
-        return PoolStats(obj)
-
-
-tinyjson.register(PoolStats, "PoolStats")
-
 
 class VotingServiceProvider(object):
     """
     A VotingServiceProvider is a voting service provider, uniquely defined by
     its URL. The VotingServiceProvider class has methods for interacting with
-    the VSP API. VotingServiceProvider is JSON-serializable if used with
-    tinyjson, so can be stored as part of an Account in the wallet.
+    the VSP API.
     """
 
-    def __init__(self, url, apiKey):
+    def __init__(self, url, apiKey, netName, purchaseInfo=None):
         """
         Args:
             url (string): The stake pool URL.
             apiKey (string): The API key assigned to the VSP account during
                 registration.
+            netName (string): The network for this vsp account.
+            purchaseInfo (PurchaseInfo): optional. The current purchaseInfo for
+                this vsp.
         """
         self.url = url
         # The network parameters are not JSON-serialized, so must be set during
         # a call to VotingServiceProvider.authorize before using the
         # VotingServiceProvider.
-        self.net = None
-        # The signingAddress (also called a votingAddress in other contexts) is
-        # the P2SH 1-of-2 multi-sig address that spends SSTX outputs.
-        self.signingAddress = None
         self.apiKey = apiKey
-        self.lastConnection = 0
-        self.purchaseInfo = None
+        self.net = nets.parse(netName)
+        self.purchaseInfo = purchaseInfo
         self.stats = None
         self.err = None
 
-    def __tojson__(self):
-        return {
-            "url": self.url,
-            "apiKey": self.apiKey,
-            "purchaseInfo": self.purchaseInfo,
-            "stats": self.stats,
-        }
+    @staticmethod
+    def blob(vsp):
+        """Satisfies the encode.Blobber API"""
+        pi = PurchaseInfo.blob(vsp.purchaseInfo) if vsp.purchaseInfo else None
+        return (
+            encode.BuildyBytes(0)
+            .addData(vsp.url.encode("utf-8"))
+            .addData(vsp.apiKey.encode("utf-8"))
+            .addData(vsp.net.Name.encode("utf-8"))
+            .addData(encode.filterNone(pi))
+            .b
+        )
 
     @staticmethod
-    def __fromjson__(obj):
-        sp = VotingServiceProvider(obj["url"], obj["apiKey"])
-        sp.purchaseInfo = obj["purchaseInfo"]
-        sp.stats = obj["stats"]
-        return sp
+    def unblob(b):
+        """Satisfies the encode.Blobber API"""
+        ver, d = encode.decodeBlob(b)
+        if ver != 0:
+            raise AssertionError("invalid version for VotingServiceProvider %d" % ver)
+        if len(d) != 4:
+            raise AssertionError(
+                "wrong number of pushes for VotingServiceProvider. wanted 4, got %d"
+                % len(d)
+            )
+
+        piB = encode.extractNone(d[3])
+        pi = PurchaseInfo.unblob(piB) if piB else None
+
+        return VotingServiceProvider(
+            url=d[0].decode("utf-8"),
+            apiKey=d[1].decode("utf-8"),
+            netName=d[2].decode("utf-8"),
+            purchaseInfo=pi,
+        )
+
+    def serialize(self):
+        """
+        Serialize the VotingServiceProvider.
+
+        Returns:
+            ByteArray: The serialized VotingServiceProvider.
+        """
+        return ByteArray(VotingServiceProvider.blob(self))
 
     @staticmethod
     def providers(net):
@@ -232,7 +269,7 @@ class VotingServiceProvider(object):
                 uses to vote.
         """
         pi = self.purchaseInfo
-        redeemScript = ByteArray(pi.script)
+        redeemScript = pi.script
         scriptAddr = crypto.newAddressScriptHash(redeemScript, self.net)
         if scriptAddr.string() != pi.ticketAddress:
             raise Exception(
@@ -254,7 +291,7 @@ class VotingServiceProvider(object):
         if not found:
             raise Exception("signing pubkey not found in redeem script")
 
-    def authorize(self, address, net):
+    def authorize(self, address):
         """
         Authorize the stake pool for the provided address and network. Exception
         is raised on failure to authorize.
@@ -262,24 +299,22 @@ class VotingServiceProvider(object):
         Args:
             address (string): The base58-encoded pubkey address that the wallet
                 uses to vote.
-            net (object): The network parameters.
         """
         # An error is returned if the address is already set
         # {'status': 'error', 'code': 6,
         #     'message': 'address error - address already submitted'}
         # First try to get the purchase info directly.
-        self.net = net
         try:
             self.getPurchaseInfo()
             self.validate(address)
         except Exception as e:
+            # code 9 is address not set
             alreadyRegistered = (
                 isinstance(self.err, dict)
                 and "code" in self.err
                 and self.err["code"] == 9
             )
             if not alreadyRegistered:
-                # code 9 is address not set
                 raise e
             # address is not set
             data = {"UserPubKeyAddr": address}
@@ -301,10 +336,12 @@ class VotingServiceProvider(object):
         """
         # An error is returned if the address isn't yet set
         # {'status': 'error', 'code': 9,
-        #     'message': 'purchaseinfo error - no address submitted', 'data': None}
+        #  'message': 'purchaseinfo error - no address submitted',
+        # 'data': None}
+        self.err = None
         res = tinyhttp.get(self.apiPath("getpurchaseinfo"), headers=self.headers())
         if resultIsSuccess(res):
-            pi = PurchaseInfo(res["data"])
+            pi = PurchaseInfo.parse(res["data"])
             # check the script hash
             self.purchaseInfo = pi
             return self.purchaseInfo
@@ -346,6 +383,3 @@ class VotingServiceProvider(object):
             self.purchaseInfo.voteBits = voteBits
             return True
         raise Exception("unexpected response from 'voting': %s" % repr(res))
-
-
-tinyjson.register(VotingServiceProvider, "VotingServiceProvider")
