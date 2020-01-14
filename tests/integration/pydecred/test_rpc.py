@@ -94,11 +94,10 @@ def test_rpc(config):
     assert isinstance(searchRawTransactions[0], rpc.RawTransactionsResult)
 
     ticketFeeInfo = rpcClient.ticketFeeInfo()
-    assert isinstance(ticketFeeInfo["feeinfomempool"], rpc.FeeInfoResult)
+    assert isinstance(ticketFeeInfo, rpc.TicketFeeInfoResult)
 
     ticketFeeInfo = rpcClient.ticketFeeInfo(5, 5)
-    assert isinstance(ticketFeeInfo["feeinfoblocks"][0], rpc.FeeInfoResult)
-    assert isinstance(ticketFeeInfo["feeinfowindows"][0], rpc.FeeInfoResult)
+    assert isinstance(ticketFeeInfo, rpc.TicketFeeInfoResult)
 
     ticketsForAddress = rpcClient.ticketsForAddress(
         "DcaephHCqjdfb3gPz778DJZWvwmUUs3ssGk"
@@ -118,14 +117,14 @@ def test_rpc(config):
     assert isinstance(ticketVWAP, float)
 
     txFeeInfo = rpcClient.txFeeInfo()
-    assert isinstance(txFeeInfo["feeinfomempool"], rpc.FeeInfoResult)
+    assert isinstance(txFeeInfo, rpc.TxFeeInfoResult)
 
     txFeeInfo = rpcClient.txFeeInfo(5)
-    assert isinstance(txFeeInfo["feeinfoblocks"][0], rpc.FeeInfoResult)
-    tip = txFeeInfo["feeinfoblocks"][0].height
+    assert isinstance(txFeeInfo, rpc.TxFeeInfoResult)
+    tip = txFeeInfo.feeInfoBlocks[0].height
 
     txFeeInfo = rpcClient.txFeeInfo(5, tip - 5, tip)
-    assert isinstance(txFeeInfo["feeinforange"], rpc.FeeInfoResult)
+    assert isinstance(txFeeInfo, rpc.TxFeeInfoResult)
 
     validateAddress = rpcClient.validateAddress("DsUxwT6Kbiur6Nps9q3uGEpJCvrhcxX2nii")
     assert isinstance(validateAddress, rpc.ValidateAddressChainResult)

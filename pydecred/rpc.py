@@ -341,26 +341,9 @@ class Client(object):
                 ticket fee information about.
 
         Returns:
-            dict[str]FeeInfoResult: FeeInfoResults for the key "feeinfomempool",
-            and a list of results for "feeinfoblocks", and "feeinfowindows".
+            TicketFeeInfoResult: The ticket fee info.
         """
-        info = self.call("ticketfeeinfo", blocks, windows)
-        k1, k2, k3 = "feeinfomempool", "feeinfoblocks", "feeinfowindows"
-        result = {}
-        # k1 holds a dictionary.
-        result[k1] = FeeInfoResult.parse(info[k1])
-        # k2 and k3 hold arrays of dictionaries, or nothing.
-        result[k2] = (
-            [FeeInfoResult.parse(i) for i in info[k2]]
-            if k2 in info and info[k2]
-            else []
-        )
-        result[k3] = (
-            [FeeInfoResult.parse(i) for i in info[k3]]
-            if k3 in info and info[k2]
-            else []
-        )
-        return result
+        return TicketFeeInfoResult.parse(self.call("ticketfeeinfo", blocks, windows))
 
     def ticketsForAddress(self, addr):
         """
@@ -404,22 +387,11 @@ class Client(object):
                 range to calculate transaction fees for.
 
         Returns:
-            dict[str]FeeInfoResult: FeeInfoResults for the keys "feeinfomempool"
-                and "feeinforange" or None, and a list of FeeInfoResults for "feeinfoblocks".
+            TxFeeInfoResult: The tx fee info.
         """
-        info = self.call("txfeeinfo", blocks, rangeStart, rangeEnd)
-        k1, k2, k3 = "feeinfomempool", "feeinfoblocks", "feeinforange"
-        result = {}
-        # k1 and k3 hold a dictionary.
-        result[k1] = FeeInfoResult.parse(info[k1])
-        result[k3] = FeeInfoResult.parse(info[k3]) if k3 in info else None
-        # k2 holds an array of dictionaries, or nothing.
-        result[k2] = (
-            [FeeInfoResult.parse(i) for i in info[k2]]
-            if k2 in info and info[k2]
-            else []
+        return TxFeeInfoResult.parse(
+            self.call("txfeeinfo", blocks, rangeStart, rangeEnd)
         )
-        return result
 
     def validateAddress(self, addr):
         """
@@ -980,6 +952,70 @@ class FeeInfoResult:
             height=get("height", obj),
             startHeight=get("startheight", obj),
             endHeight=get("endheight", obj),
+        )
+
+
+class TicketFeeInfoResult:
+    """ticketfeeinforesult"""
+
+    def __init__(
+        self, feeInfoMempool, feeInfoBlocks=None, feeInfoWindows=None,
+    ):
+        """
+        Args:
+            feeInfoMempool (FeeInfoResult): Ticket fee information for all
+                tickets in the mempool (units: DCR/kB)
+            feeInfoBlocks (list(FeeInfoResult)): Ticket fee information for a
+                given list of blocks descending from the chain tip (units: DCR/kB)
+            feeInfoWindows (list(FeeInfoResult)): Ticket fee information for a
+                window period where the stake difficulty was the same (units: DCR/kB)
+        """
+        self.feeInfoMempool = feeInfoMempool
+        self.feeInfoBlocks = feeInfoBlocks if feeInfoBlocks else []
+        self.feeInfoWindows = feeInfoWindows if feeInfoWindows else []
+
+    @staticmethod
+    def parse(obj):
+        return TicketFeeInfoResult(
+            feeInfoMempool=obj["feeinfomempool"],
+            feeInfoBlocks=[FeeInfoResult.parse(info) for info in obj["feeinfoblocks"]]
+            if obj["feeinfoblocks"]
+            else [],
+            feeInfoWindows=[FeeInfoResult.parse(info) for info in obj["feeinfowindows"]]
+            if obj["feeinfowindows"]
+            else [],
+        )
+
+
+class TxFeeInfoResult:
+    """txfeeinforesult"""
+
+    def __init__(
+        self, feeInfoMempool, feeInfoBlocks=None, feeInfoRange=None,
+    ):
+        """
+        Args:
+            feeinfomempool (FeeInfoResult): Transaction fee information for all
+                regular transactions in the mempool (units: DCR/kB)
+            feeinfoblocks (list(FeeInfoResult)): Transaction fee information
+                for a given list of blocks descending from the chain tip (units: DCR/kB)
+            feeinforange (FeeInfoResult): Transaction fee information for a
+                window period where the stake difficulty was the same (units: DCR/kB)
+        """
+        self.feeInfoMempool = feeInfoMempool
+        self.feeInfoBlocks = feeInfoBlocks if feeInfoBlocks else []
+        self.feeInfoRange = feeInfoRange
+
+    @staticmethod
+    def parse(obj):
+        return TxFeeInfoResult(
+            feeInfoMempool=obj["feeinfomempool"],
+            feeInfoBlocks=[FeeInfoResult.parse(info) for info in obj["feeinfoblocks"]]
+            if obj["feeinfoblocks"]
+            else [],
+            feeInfoRange=FeeInfoResult.parse(obj["feeinforange"])
+            if obj["feeinforange"]
+            else None,
         )
 
 
