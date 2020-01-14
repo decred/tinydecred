@@ -69,16 +69,21 @@ class Client(object):
         Returns information about a transaction given its hash.
 
         Args:
-            txid (str): The hash of the transaction
+            txid (str): The hash of the transaction.
             verbose (bool): Optional. Default=False. Specifies the transaction is
-                returned as a msgtx.MsgTx object instead of a hex-encoded string
+                returned as a RawTransactionsResult instead of a msgtx.MsgTx.
 
         Returns:
-            msgtx.MsgTx or string: msgtx.MsgTx if verbose, hex string for the
-                transaction if default.
+            msgtx.MsgTx or RawTransactionsResult: RawTransactionsResult if
+                verbose, msgtx.MsgTx for the transaction if default.
         """
-        res = self.call("getrawtransaction", txid, 0)
-        return MsgTx.deserialize(ByteArray(res)) if verbose else res
+        verb = 1 if verbose else 0
+        res = self.call("getrawtransaction", txid, verb)
+        return (
+            RawTransactionsResult.parse(res)
+            if verbose
+            else MsgTx.deserialize(ByteArray(res))
+        )
 
     def getStakeDifficulty(self):
         """
