@@ -78,7 +78,6 @@ class TestEncode(unittest.TestCase):
         z[2] = 255
         self.assertEqual(makeA(), z)
 
-<<<<<<< HEAD:tests/unit/util/test_encode.py
     def test_BuildyBytes(self):
         d0 = ByteArray([0x01, 0x02])
         d1 = ByteArray([0x03, 0x04, 0x05])
@@ -97,7 +96,3 @@ class TestEncode(unittest.TestCase):
         self.assertEqual(d1, pushes[1])
         self.assertEqual(d2, pushes[2])
         self.assertEqual(dBig, pushes[3])
-=======
-    def test_decodeBA_bad(self):
-        self.assertRaises(TypeError, decodeBA, None)
->>>>>>> Changes per review.:tests/unit/crypto/test_bytearray.py

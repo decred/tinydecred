@@ -6,6 +6,7 @@ See LICENSE for details
 
 import calendar
 import configparser
+import json
 import logging
 from logging.handlers import RotatingFileHandler
 import os
@@ -18,13 +19,6 @@ import time
 import traceback
 
 from appdirs import AppDirs
-<<<<<<< HEAD
-import configparser
-import json
-=======
-
-from tinydecred.util import tinyjson
->>>>>>> Substituted most plain assert checks with proper exceptions.
 
 
 def formatTraceback(e):
