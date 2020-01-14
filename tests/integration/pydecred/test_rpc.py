@@ -2,6 +2,7 @@ import pytest
 import os
 from tinydecred.pydecred import rpc
 from tinydecred.util import helpers
+from tinydecred.pydecred.wire.msgtx import MsgTx
 
 
 @pytest.fixture
@@ -48,7 +49,7 @@ def test_rpc(config):
     getRawTransaction = rpcClient.getRawTransaction(
         "d54d90bcec4146e9ae8c2ec860364f7023f33cad02b3c2bb4bdbb36689e68614", 1
     )
-    assert isinstance(getRawTransaction, rpc.RawTransactionsResult)
+    assert isinstance(getRawTransaction, MsgTx)
 
     getStakeDifficulty = rpcClient.getStakeDifficulty()
     assert isinstance(getStakeDifficulty, rpc.GetStakeDifficultyResult)
@@ -72,8 +73,9 @@ def test_rpc(config):
     getVoteInfo = rpcClient.getVoteInfo(7)
     assert isinstance(getVoteInfo, rpc.GetVoteInfoResult)
 
-    getWork = rpcClient.getWork()
-    assert isinstance(getWork, rpc.GetWorkResult)
+    # getWork will fail if --mininaddr is not set when starting dcrd
+    # getWork = rpcClient.getWork()
+    # assert isinstance(getWork, rpc.GetWorkResult)
 
     dcrdHelp = rpcClient.help()
     assert isinstance(dcrdHelp, str)
@@ -97,6 +99,10 @@ def test_rpc(config):
     ticketFeeInfo = rpcClient.ticketFeeInfo()
     assert isinstance(ticketFeeInfo["feeinfomempool"], rpc.FeeInfoResult)
 
+    ticketFeeInfo = rpcClient.ticketFeeInfo(5, 5)
+    assert isinstance(ticketFeeInfo["feeinfoblocks"][0], rpc.FeeInfoResult)
+    assert isinstance(ticketFeeInfo["feeinfowindows"][0], rpc.FeeInfoResult)
+
     ticketsForAddress = rpcClient.ticketsForAddress(
         "DcaephHCqjdfb3gPz778DJZWvwmUUs3ssGk"
     )
@@ -108,8 +114,21 @@ def test_rpc(config):
     ticketVWAP = rpcClient.ticketVWAP()
     assert isinstance(ticketVWAP, float)
 
+    ticketVWAP = rpcClient.ticketVWAP(414500)
+    assert isinstance(ticketVWAP, float)
+
+    ticketVWAP = rpcClient.ticketVWAP(414500, 414510)
+    assert isinstance(ticketVWAP, float)
+
     txFeeInfo = rpcClient.txFeeInfo()
     assert isinstance(txFeeInfo["feeinfomempool"], rpc.FeeInfoResult)
+
+    txFeeInfo = rpcClient.txFeeInfo(5)
+    assert isinstance(txFeeInfo["feeinfoblocks"][0], rpc.FeeInfoResult)
+    tip = txFeeInfo["feeinfoblocks"][0].height
+
+    txFeeInfo = rpcClient.txFeeInfo(5, tip - 5, tip)
+    assert isinstance(txFeeInfo["feeinforange"], rpc.FeeInfoResult)
 
     validateAddress = rpcClient.validateAddress("DsUxwT6Kbiur6Nps9q3uGEpJCvrhcxX2nii")
     assert isinstance(validateAddress, rpc.ValidateAddressChainResult)

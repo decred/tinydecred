@@ -2,6 +2,7 @@ import base64
 import ssl
 from tinydecred.util import tinyhttp
 from tinydecred.util.encode import ByteArray
+from tinydecred.pydecred.wire.msgtx import MsgTx
 
 
 class Client(object):
@@ -63,21 +64,21 @@ class Client(object):
         """
         return GetBlockChainInfoResult.parse(self.call("getblockchaininfo"))
 
-    def getRawTransaction(self, txid, verbose=0):
+    def getRawTransaction(self, txid, verbose=False):
         """
         Returns information about a transaction given its hash.
 
         Args:
             txid (str): The hash of the transaction
-            verbose (int): Optional. Default=0. Specifies the transaction is
-                returned as a JSON object instead of a hex-encoded string
+            verbose (bool): Optional. Default=False. Specifies the transaction is
+                returned as a msgtx.MsgTx object instead of a hex-encoded string
 
         Returns:
-            RawTransactionResult or string: RawTransactionResult if verbose=1,
-                hex string for the transaction if default
+            msgtx.MsgTx or string: msgtx.MsgTx if verbose, hex string for the
+                transaction if default.
         """
-        res = self.call("getrawtransaction", txid, verbose,)
-        return RawTransactionsResult.parse(res) if verbose else res
+        res = self.call("getrawtransaction", txid, 0)
+        return MsgTx.deserialize(ByteArray(res)) if verbose else res
 
     def getStakeDifficulty(self):
         """
@@ -88,24 +89,24 @@ class Client(object):
         """
         return GetStakeDifficultyResult.parse(self.call("getstakedifficulty"))
 
-    def getStakeVersionInfo(self, count=None):
+    def getStakeVersionInfo(self, count=1):
         """
         Returns stake version statistics for one or more stake version intervals.
 
         Args:
-            count (int): Optional. Default=None. Number of intervals to return.
+            count (int): Optional. Default=1. Number of intervals to return.
 
         Returns:
             GetStakeVersionInfoResult: The stake version statistics.
         """
         return GetStakeVersionInfoResult.parse(self.call("getstakeversioninfo", count))
 
-    def getStakeVersions(self, Hash, count):
+    def getStakeVersions(self, blockHash, count):
         """
         Returns the stake versions statistics.
 
         Args:
-            Hash (str) The start block hash.
+            blockHash (str) The start block hash.
             count (int) The number of blocks that will be returned.
 
         Returns:
@@ -113,7 +114,7 @@ class Client(object):
         """
         return [
             GetStakeVersionsResult.parse(ver)
-            for ver in self.call("getstakeversions", Hash, count)["stakeversions"]
+            for ver in self.call("getstakeversions", blockHash, count)["stakeversions"]
         ]
 
     def getTicketPoolValue(self):
@@ -164,7 +165,7 @@ class Client(object):
                 else returns whether or not the solved data is valid and was
                 added to the chain
         """
-        res = self.call("getwork", data)
+        res = self.call("getwork", *([data] if data else []))
         return res if data else GetWorkResult.parse(res)
 
     def help(self, command=None):
@@ -177,7 +178,7 @@ class Client(object):
         Returns:
             str: List of commands or help for specified command.
         """
-        return self.call("help", command)
+        return self.call("help", *([command] if command else []))
 
     def liveTickets(self):
         """
@@ -211,7 +212,9 @@ class Client(object):
                 connected peer a permanent one, 'temp' to try a single connect
                 to a peer
         """
-        self.call("node", self, subcmd, target, connectSubCmd)
+        self.call(
+            "node", self, subcmd, target, *([connectSubCmd] if connectSubCmd else [])
+        )
 
     def ping(self):
         """
@@ -308,7 +311,7 @@ class Client(object):
         """
         return self.call("stop")
 
-    def submitBlock(self, hexBlock, options={}):
+    def submitBlock(self, hexBlock, options=None):
         """
         Attempts to submit a new serialized, hex-encoded block to the network.
 
@@ -319,28 +322,40 @@ class Client(object):
         Returns:
             str: The reason the block was rejected if rejected or None.
         """
-        return self.call("submitblock", hexBlock, options)
+        return self.call("submitblock", hexBlock, options if options else {})
 
-    def ticketFeeInfo(self, blocks=None, windows=None):
+    def ticketFeeInfo(self, blocks=0, windows=0):
         """
         Get various information about ticket fees from the mempool, blocks, and
         difficulty windows (units: DCR/kB).
 
         Args:
-            blocks (int): Optional. Default=None. The number of blocks, starting from the
+            blocks (int): Optional. Default=0. The number of blocks, starting from the
                 chain tip and descending, to return fee information about.
-            windows (int): Optional. Default=None. The number of difficulty windows to return
+            windows (int): Optional. Default=0. The number of difficulty windows to return
                 ticket fee information about.
 
         Returns:
-            dict[str]FeeInfoResult: FeeInfoResults for the keys
-                "feeinfomempool", "feeinfoblocks", and "feeinfowindows".
+            dict[str]FeeInfoResult: FeeInfoResults for the key "feeinfomempool",
+            and a list of results for "feeinfoblocks", and "feeinfowindows".
         """
-        return {
-            k: FeeInfoResult.parse(v)
-            for k, v in self.call("ticketfeeinfo", blocks, windows).items()
-            if v
-        }
+        info = self.call("ticketfeeinfo", blocks, windows)
+        k1, k2, k3 = "feeinfomempool", "feeinfoblocks", "feeinfowindows"
+        result = {}
+        # k1 holds a dictionary.
+        result[k1] = FeeInfoResult.parse(info[k1])
+        # k2 and k3 hold arrays of dictionaries, or nothing.
+        result[k2] = (
+            [FeeInfoResult.parse(i) for i in info[k2]]
+            if k2 in info and info[k2]
+            else []
+        )
+        result[k3] = (
+            [FeeInfoResult.parse(i) for i in info[k3]]
+            if k3 in info and info[k2]
+            else []
+        )
+        return result
 
     def ticketsForAddress(self, addr):
         """
@@ -366,30 +381,40 @@ class Client(object):
         Returns:
             float: The volume weighted average price.
         """
-        return self.call("ticketvwap", start, end)
+        return self.call(
+            "ticketvwap", *([start] if start else []), *([end] if start and end else [])
+        )
 
-    def txFeeInfo(self, blocks=None, rangeStart=None, rangeEnd=None):
+    def txFeeInfo(self, blocks=0, rangeStart=0, rangeEnd=0):
         """
         Get various information about regular transaction fees from the mempool,
         blocks, and difficulty windows.
 
         Args:
-            blocks (int): Optional. Default=None. The number of blocks to calculate transaction fees
-                for, starting from the end of the tip moving backwards.
-            rangeStart (int): Optional. Default=None. The start height of the block range to calculate
-                transaction fees for.
-            rangeEnd (int): Optional. Default=None. The end height of the block range to calculate
-                transaction fees for.
+            blocks (int): Optional. Default=0. The number of blocks to calculate
+                transaction fees for, starting from the end of the tip moving backwards.
+            rangeStart (int): Optional. Default=0. The start height of the block
+                range to calculate transaction fees for.
+            rangeEnd (int): Optional. Default=0. The end height of the block
+                range to calculate transaction fees for.
 
         Returns:
-            dict[str]FeeInfoResult: FeeInfoResults for the keys
-                "feeinfomempool", "feeinfoblocks", and "feeinforange".
+            dict[str]FeeInfoResult: FeeInfoResults for the keys "feeinfomempool"
+                and "feeinforange" or None, and a list of FeeInfoResults for "feeinfoblocks".
         """
-        return {
-            k: FeeInfoResult.parse(v)
-            for k, v in self.call("txfeeinfo", blocks, rangeStart, rangeEnd).items()
-            if v
-        }
+        info = self.call("txfeeinfo", blocks, rangeStart, rangeEnd)
+        k1, k2, k3 = "feeinfomempool", "feeinfoblocks", "feeinforange"
+        result = {}
+        # k1 and k3 hold a dictionary.
+        result[k1] = FeeInfoResult.parse(info[k1])
+        result[k3] = FeeInfoResult.parse(info[k3]) if k3 in info else None
+        # k2 holds an array of dictionaries, or nothing.
+        result[k2] = (
+            [FeeInfoResult.parse(i) for i in info[k2]]
+            if k2 in info and info[k2]
+            else []
+        )
+        return result
 
     def validateAddress(self, addr):
         """
@@ -475,7 +500,7 @@ class GetWorkResult:
         Returns:
             GetWorkResult: The GetWorkResult.
         """
-        return GetWorkResult(data=obj["data"], target=obj["target"],)
+        return GetWorkResult(data=obj["data"], target=obj["target"])
 
 
 class GetTxOutResult:
@@ -529,11 +554,11 @@ class Choice:
     """
 
     def __init__(
-        self, ID, description, bits, isAbstain, isNo, count, progress,
+        self, choiceID, description, bits, isAbstain, isNo, count, progress,
     ):
         """
         Args:
-            ID (str): Unique identifier of this choice.
+            choiceID (str): Unique identifier of this choice.
             description (str): Description of this choice.
             bits (int): Bits that identify this choice.
             isAbstain (bool): This choice is to abstain from change.
@@ -541,7 +566,7 @@ class Choice:
             count (int): How many votes received.
             progress (float): Progress of the overall count.
         """
-        self.id = ID
+        self.choiceID = choiceID
         self.description = description
         self.bits = bits
         self.isAbstain = isAbstain
@@ -561,7 +586,7 @@ class Choice:
             Choice: The parsed Choice.
         """
         return Choice(
-            ID=obj["id"],
+            choiceID=obj["id"],
             description=obj["description"],
             bits=obj["bits"],
             isAbstain=obj["isabstain"],
@@ -578,7 +603,7 @@ class Agenda:
 
     def __init__(
         self,
-        ID,
+        agendaID,
         description,
         mask,
         startTime,
@@ -598,7 +623,7 @@ class Agenda:
             quorumProgress (float): Progress of quorum reached.
             choices list(Choice): All choices in this agenda.
         """
-        self.id = ID
+        self.agendaID = agendaID
         self.description = description
         self.mask = mask
         self.startTime = startTime
@@ -618,7 +643,7 @@ class Agenda:
             Agenda: The parsed Agenda info.
         """
         return Agenda(
-            ID=obj["id"],
+            agendaID=obj["id"],
             description=obj["description"],
             mask=obj["mask"],
             startTime=obj["starttime"],
@@ -637,7 +662,7 @@ class GetVoteInfoResult:
         currentHeight,
         startHeight,
         endHeight,
-        Hash,
+        blockHash,
         voteVersion,
         quorum,
         totalVotes,
@@ -656,7 +681,7 @@ class GetVoteInfoResult:
         self.currentHeight = currentHeight
         self.startHeight = startHeight
         self.endHeight = endHeight
-        self.Hash = Hash
+        self.blockHash = blockHash
         self.voteVersion = voteVersion
         self.quorum = quorum
         self.totalVotes = totalVotes
@@ -677,7 +702,7 @@ class GetVoteInfoResult:
             currentHeight=obj["currentheight"],
             startHeight=obj["startheight"],
             endHeight=obj["endheight"],
-            Hash=obj["hash"],
+            blockHash=obj["hash"],
             voteVersion=obj["voteversion"],
             quorum=obj["quorum"],
             totalVotes=obj["totalvotes"],
@@ -714,25 +739,25 @@ class VersionBits:
         Returns:
             VersionBits: The parsed VersionBits.
         """
-        return VersionBits(version=obj["version"], bits=obj["bits"],)
+        return VersionBits(version=obj["version"], bits=obj["bits"])
 
 
 class GetStakeVersionsResult:
     """getstakeversionsresult"""
 
     def __init__(
-        self, Hash, height, blockVersion, stakeVersion, votes,
+        self, blockHash, height, blockVersion, stakeVersion, votes,
     ):
         """
         Args:
-            hash (str): Hash of the block.
+            blockHash (str): Hash of the block.
             height (int): Height of the block.
             blockVersion (int): The block version.
             stakeVersion (int): The stake version of the block.
             votes list(VersionBits): The version and bits of each vote in the
                 block.
         """
-        self.hash = Hash
+        self.blockHash = blockHash
         self.height = height
         self.blockVersion = blockVersion
         self.stakeVersion = stakeVersion
@@ -750,7 +775,7 @@ class GetStakeVersionsResult:
             StakeVersionsResult: The StakeVersionsResult.
         """
         return GetStakeVersionsResult(
-            Hash=obj["hash"],
+            blockHash=obj["hash"],
             height=obj["height"],
             blockVersion=obj["blockversion"],
             stakeVersion=obj["stakeversion"],
@@ -784,12 +809,12 @@ class VersionCount:
         Returns:
             VersionCount: The parsed VersionCount.
         """
-        return VersionCount(version=obj["version"], count=obj["count"],)
+        return VersionCount(version=obj["version"], count=obj["count"])
 
 
 class VersionInterval:
     """
-    VersionInterval models a cooked version count for an interval.
+    VersionInterval models a version count for an interval.
     """
 
     def __init__(
@@ -830,7 +855,7 @@ class GetStakeVersionInfoResult:
     """getstakeversioninforesult"""
 
     def __init__(
-        self, currentHeight, Hash, intervals,
+        self, currentHeight, blockHash, intervals,
     ):
         """
         Args:
@@ -839,7 +864,7 @@ class GetStakeVersionInfoResult:
             intervals list(VersionInterval): Array of total stake and vote counts.
         """
         self.currentHeight = currentHeight
-        self.hash = Hash
+        self.blockHash = blockHash
         self.intervals = intervals
 
     @staticmethod
@@ -855,7 +880,7 @@ class GetStakeVersionInfoResult:
         """
         return GetStakeVersionInfoResult(
             currentHeight=obj["currentheight"],
-            Hash=obj["hash"],
+            blockHash=obj["hash"],
             intervals=[VersionInterval.parse(ver) for ver in obj["intervals"]],
         )
 
@@ -1010,7 +1035,7 @@ class GetBlockChainInfoResult(object):
                 a multiple of the minimum difficulty.
             verificationProgress (float): The chain verification progress
                 estimate.
-            chainWork (str):  Hex encoded total work done for the chain.
+            chainWork (str): Hex encoded total work done for the chain.
             initialBlockDownload (bool): Best guess of whether this node is
                 in the initial block download mode used to catch up the chain
                 when it is far behind
@@ -1105,7 +1130,7 @@ class RawTransactionsResult:
         expiry,
         vin,
         vout,
-        Hex=None,
+        txHex=None,
         blockHash=None,
         blockHeight=None,
         blockIndex=None,
@@ -1121,7 +1146,7 @@ class RawTransactionsResult:
             expiry (int): The transacion expiry.
             vin (list(object)): The transaction inputs as JSON objects.
             vout (list(object)): The transaction outputs as JSON objects.
-            hex (str): Hex-encoded transaction or None.
+            txHex (str): Hex-encoded transaction or None.
             blockHash (str): The hash of the block the contains the transaction or None.
             blockHeight (int): The height of the block that contains the transaction or None.
             blockIndex (int): The index within the array of transactions
@@ -1136,7 +1161,7 @@ class RawTransactionsResult:
         self.expiry = expiry
         self.vin = vin
         self.vout = vout
-        self.hex = Hex
+        self.txHex = txHex
         self.blockHash = blockHash
         self.blockHeight = blockHeight
         self.blockIndex = blockIndex
@@ -1153,7 +1178,7 @@ class RawTransactionsResult:
             expiry=obj["expiry"],
             vin=[Vin.parse(vin) for vin in obj["vin"]],
             vout=[Vout.parse(vout) for vout in obj["vout"]],
-            Hex=get("hex", obj),
+            txHex=get("hex", obj),
             blockHash=get("blockhash", obj),
             blockHeight=get("blockheight", obj),
             blockIndex=get("blockindex", obj),
@@ -1285,15 +1310,15 @@ class ScriptSig:
     """
 
     def __init__(
-        self, asm, Hex,
+        self, asm, scriptHex,
     ):
         """
         Args:
             asm (str): Disassembly of the script.
-            hex (str): Hex-encoded bytes of the script.
+            scriptHex (str): Hex-encoded bytes of the script.
         """
         self.asm = asm
-        self.hex = Hex
+        self.scriptHex = scriptHex
 
     @staticmethod
     def parse(obj):
@@ -1307,7 +1332,7 @@ class ScriptSig:
             ScriptSig: The Parsed ScriptSig.
         """
         ScriptSig(
-            asm=obj["asm"], Hex=obj["hex"],
+            asm=obj["asm"], scriptHex=obj["hex"],
         )
 
 
@@ -1359,13 +1384,13 @@ class ScriptPubKeyResult:
     """
 
     def __init__(
-        self, asm, Type, Hex=None, reqSigs=None, addresses=None, commitAmt=None,
+        self, asm, Type, scriptHex=None, reqSigs=None, addresses=None, commitAmt=None,
     ):
         """
         Args:
             asm (str): Disassembly of the script.
             Type (str): The type of the script (e.g. 'pubkeyhash').
-            Hex (str): Hex-encoded bytes of the script or None.
+            scriptHex (str): Hex-encoded bytes of the script or None.
             reqSigs (int): The number of required signatures or None.
             addresses (list(str)): The Decred addresses associated with this
                 script or None.
@@ -1374,7 +1399,7 @@ class ScriptPubKeyResult:
         """
         self.asm = asm
         self.type = Type
-        self.hex = Hex
+        self.scriptHex = scriptHex
         self.reqSigs = reqSigs
         self.addresses = addresses
         self.commitAmt = commitAmt
@@ -1393,7 +1418,7 @@ class ScriptPubKeyResult:
         return ScriptPubKeyResult(
             asm=obj["asm"],
             Type=obj["type"],
-            Hex=get("hex", obj),
+            scriptHex=get("hex", obj),
             reqSigs=get("reqSigs", obj),
             addresses=get("addresses", obj),
             commitAmt=get("commitAmt", obj),
