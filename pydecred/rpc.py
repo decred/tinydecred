@@ -64,6 +64,155 @@ class Client(object):
         """
         return GetBlockChainInfoResult.parse(self.call("getblockchaininfo"))
 
+    def getBlockCount(self):
+        """
+        Returns the number of blocks in the longest block chain.
+
+        Returns:
+            int: The current block count.
+        """
+        return self.call("getblockcount")
+
+    def getBlockHash(self, index):
+        """
+        Returns hash of the block in best block chain at the given height.
+
+        Args:
+            index (int): The block height.
+
+        Returns:
+            string: The block hash.
+        """
+        return self.call("getblockhash", index)
+
+    def getBlockHeader(self, blockHash, verbose=True):
+        """
+        Returns information about a block header given its hash.
+
+        Args:
+            hash (string): The hash of the block.
+            verbose (boolean): Optional. Default=True. Specifies the block
+                header is returned as a GetBlockHeaderVerboseResult instead of
+                hex-encoded string.
+        Returns:
+            GetBlockHeaderVerboseResult or string: The GetBlockHeaderVerboseResult
+                if vebose or the serialized block header otherwise.
+        """
+        res = self.call("getblockheader", blockHash, verbose)
+        return GetBlockHeaderVerboseResult.parse(res) if verbose else res
+
+    def getBlockSubsidy(self, height, voters):
+        """
+        Returns information regarding subsidy amounts.
+
+        Args:
+            height (int) The block height.
+            voters (int) The number of voters.
+
+        Returns:
+            GetBlockSubsidyResult: The subsidy amounts.
+        """
+        return GetBlockSubsidyResult.parse(self.call("getblocksubsidy", height, voters))
+
+    def getCFilter(self, blockHash, filterType):
+        """
+        Returns the committed filter for a block
+
+        Args:
+            blockHash (string): The block hash of the filter being queried.
+            filterType (string): The type of committed filter to return.
+        Returns:
+            string: The committed filter serialized with the N value and encoded
+                as a hex string.
+        """
+        return self.call("getcfilter", blockHash, filterType)
+
+    def getCFilterHeader(self, blockHash, filterType):
+        """
+        Returns the filter header hash committing to all filters in the chain up
+        through a block.
+
+        Args:
+            blockHash (string): The block hash of the filter header being queried.
+            filterType (string): The type of committed filter to return the
+                header commitment for.
+
+        Returns:
+            string: The filter header commitment hash.
+        """
+        return self.call("getcfilterheader", blockHash, filterType)
+
+    def getCFilterV2(self, blockHash):
+        """
+        Returns the version 2 block filter for the given block along with a
+            proof that can be used to prove the filter is committed to by the
+            block header.
+
+        Args:
+            blockHash (string): The block hash of the filter to retrieve.
+
+        Returns:
+            GetCFilterV2Result: The version 2 block filter.
+        """
+        return GetCFilterV2Result.parse(self.call("getcfilterv2", blockHash))
+
+    def getChainTips(self):
+        """
+        Returns information about all known chain tips the in the block tree.
+
+        The statuses in the result have the following meanings:
+            active: The current best chain tip.
+            invalid: The block or one of its ancestors is invalid.
+            headers-only: The block or one of its ancestors does not have the
+                full block data available which also means the block can't be
+                validated or connected.
+            valid-fork: The block is fully validated which implies it was
+                probably part of the main chain at one point and was reorganized.
+            valid-headers: The full block data is available and the header is
+                valid, but the block was never validated which implies it was
+                probably never part of the main chain.
+
+        Returns:
+            list(GetChainTipsResult): The tips.
+        """
+        return [GetChainTipsResult.parse(tip) for tip in self.call("getchaintips")]
+
+    def getCoinSupply(self):
+        """
+        Returns current total coin supply in atoms.
+
+        Returns:
+            int: Current coin supply in atoms.
+        """
+        return self.call("getcoinsupply")
+
+    def getConnectionCount(self):
+        """
+        Returns the number of active connections to other peers.
+
+        Returns:
+            int: The number of connections.
+        """
+        return self.call("getconnectioncount")
+
+    def getCurrentNet(self):
+        """
+        Get Decred network the server is running on.
+
+        Returns:
+            int: The network identifier.
+        """
+        return self.call("getcurrentnet")
+
+    def getDifficulty(self):
+        """
+        Returns the proof-of-work difficulty as a multiple of the minimum difficulty.
+
+        Returns:
+            float: The difficulty.
+        """
+        return self.call("getdifficulty")
+
     def getGenerate(self):
         """
         Returns if the server is set to generate coins (mine) or not.
@@ -583,6 +732,236 @@ def get(k, obj):
         object: the thing found at k or None.
     """
     return obj[k] if k in obj else None
+
+
+class GetChainTipsResult:
+    def __init__(
+        self, height, blockHash, branchLen, status,
+    ):
+        """
+        Args:
+            height (int): The height of the chain tip.
+            blockHash (str): The block hash of the chain tip.
+            branchLen (int): The length of the branch that connects the tip to
+                the main chain (0 for the main chain tip).
+            status (str): The status of the chain (active, invalid, headers-only,
+                valid-fork, valid-headers).
+        """
+        self.height = height
+        self.blockHash = blockHash
+        self.branchLen = branchLen
+        self.status = status
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the GetChainTipsResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            GetChainTipsResult: The GetChainTipsResult.
+        """
+        return GetChainTipsResult(
+            height=obj["height"],
+            blockHash=obj["hash"],
+            branchLen=obj["branchlen"],
+            status=obj["status"],
+        )
+
+
+class GetBlockSubsidyResult:
+    """getblocksubsidyresult"""
+
+    def __init__(
+        self, developer, subsidyPoS, subsidyPoW, total,
+    ):
+        """
+        Args:
+            developer (int): The developer subsidy.
+            subsidyPoS (int): The Proof-of-Stake subsidy.
+            subsidyPoW (int): The Proof-of-Work subsidy.
+            total (int): The total subsidy.
+        """
+        self.developer = developer
+        self.subsidyPoS = subsidyPoS
+        self.subsidyPoW = subsidyPoW
+        self.total = total
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the GetBlockSubsidyResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            GetBlockSubsidyResult: The GetBlockSubsidyResult.
+        """
+        return GetBlockSubsidyResult(
+            developer=obj["developer"],
+            subsidyPoS=obj["pos"],
+            subsidyPoW=obj["pow"],
+            total=obj["total"],
+        )
+
+
+class GetCFilterV2Result:
+    def __init__(
+        self, blockHash, data, proofIndex, proofHashes,
+    ):
+        """
+        Args:
+            blockHash (str): The block hash for which the filter includes data.
+            data (str): Hex-encoded bytes of the serialized filter.
+            proofIndex (int): The index of the leaf that represents the filter
+                hash in the header commitment.
+            proofHashes (list(str)): The hashes needed to prove the filter is
+                committed to by the header commitment.
+        """
+        self.blockHash = blockHash
+        self.data = data
+        self.proofIndex = proofIndex
+        self.proofHashes = proofHashes
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the GetCFilterV2Result from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            GetCFilterV2Result: The GetCFilterV2Result.
+        """
+        return GetCFilterV2Result(
+            blockHash=obj["blockhash"],
+            data=obj["data"],
+            proofIndex=obj["proofindex"],
+            proofHashes=obj["proofhashes"],
+        )
+
+
+class GetBlockHeaderVerboseResult:
+    """getblockheaderverboseresult"""
+
+    def __init__(
+        self,
+        blockHash,
+        confirmations,
+        version,
+        merkleRoot,
+        stakeRoot,
+        voteBits,
+        finalState,
+        voters,
+        freshStake,
+        revocations,
+        poolSize,
+        bits,
+        sBits,
+        height,
+        size,
+        time,
+        nonce,
+        extraData,
+        stakeVersion,
+        difficulty,
+        chainWork,
+        previousHash=None,
+        nextHash=None,
+    ):
+        """
+        Args:
+            blockHash (str): The hash of the block (same as provided).
+            confirmations (int): The number of confirmations.
+            version (int): The block version.
+            merkleRoot (str): The merkle root of the regular transaction tree.
+            stakeRoot (str): The merkle root of the stake transaction tree.
+            voteBits (int): The vote bits.
+            finalState (str): The final state value of the ticket pool.
+            voters (int): The number of votes in the block.
+            freshStake (int): The number of new tickets in the block.
+            revocations (int): The number of revocations in the block.
+            poolSize (int): The size of the live ticket pool.
+            bits (str): The bits which represent the block difficulty.
+            sBits (float): The stake difficulty in coins.
+            height (int): The height of the block in the block chain.
+            size (int): The size of the block in bytes.
+            time (int): The block time in seconds since 1 Jan 1970 GMT.
+            nonce (int): The block nonce.
+            extraData (str): Extra data field for the requested block.
+            stakeVersion (int): The stake version of the block.
+            difficulty (float): The proof-of-work difficulty as a multiple of
+                the minimum difficulty.
+            chainWork (str): The total number of hashes expected to produce
+                the chain up to the block in hex.
+            previousHash (str): The hash of the previous block or None.
+            nextHash (str): The hash of the next block or None.
+        """
+        self.blockHash = blockHash
+        self.confirmations = confirmations
+        self.version = version
+        self.merkleRoot = merkleRoot
+        self.stakeRoot = stakeRoot
+        self.voteBits = voteBits
+        self.finalState = finalState
+        self.voters = voters
+        self.freshStake = freshStake
+        self.revocations = revocations
+        self.poolSize = poolSize
+        self.bits = bits
+        self.sBits = sBits
+        self.height = height
+        self.size = size
+        self.time = time
+        self.nonce = nonce
+        self.extraData = extraData
+        self.stakeVersion = stakeVersion
+        self.difficulty = difficulty
+        self.chainWork = chainWork
+        self.previousHash = previousHash
+        self.nextHash = nextHash
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the GetBlockHeaderVerboseResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            GetBlockHeaderVerboseResult: The GetBlockHeaderVerboseResult.
+        """
+        return GetBlockHeaderVerboseResult(
+            blockHash=obj["hash"],
+            confirmations=obj["confirmations"],
+            version=obj["version"],
+            merkleRoot=obj["merkleroot"],
+            stakeRoot=obj["stakeroot"],
+            voteBits=obj["votebits"],
+            finalState=obj["finalstate"],
+            voters=obj["voters"],
+            freshStake=obj["freshstake"],
+            revocations=obj["revocations"],
+            poolSize=obj["poolsize"],
+            bits=obj["bits"],
+            sBits=obj["sbits"],
+            height=obj["height"],
+            size=obj["size"],
+            time=obj["time"],
+            nonce=obj["nonce"],
+            extraData=obj["extradata"],
+            stakeVersion=obj["stakeversion"],
+            difficulty=obj["difficulty"],
+            chainWork=obj["chainwork"],
+            previousHash=get("previoushash", obj),
+            nextHash=get("nexthash", obj),
+        )
 
 
 class GetRawMempoolVerboseResult:
