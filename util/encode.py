@@ -143,7 +143,7 @@ def decodeBA(b, copy=False):
     if isinstance(b, bytes):
         return bytearray(b)
     if isinstance(b, int):
-        return intToBytes(b)
+        return intToBytes(b) if b else bytearray([0])
     if isinstance(b, str):
         return bytearray.fromhex(b)
     if hasattr(b, "__iter__"):
