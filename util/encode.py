@@ -22,7 +22,7 @@ def filterNone(b):
     Returns:
         bytes-like
     """
-    if b == None:
+    if b is None:
         return NONE
     return b
 
@@ -203,7 +203,7 @@ class ByteArray(object):
         a = decodeBA(a)
         aLen, bLen = len(a), len(self.b)
         if aLen > bLen:
-            raise AssertionError("decode: invalid length %i > %i" % (aLen, bLen))
+            raise ValueError("decode: invalid length %i > %i" % (aLen, bLen))
         return a, aLen, self.b, bLen
 
     def __lt__(self, a):

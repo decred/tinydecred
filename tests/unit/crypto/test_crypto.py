@@ -6,8 +6,9 @@ See LICENSE for details
 import unittest
 
 from tinydecred.crypto import crypto, rando
-from tinydecred.util.encode import ByteArray
 from tinydecred.pydecred import mainnet
+from tinydecred.util.encode import ByteArray
+
 
 testSeed = ByteArray(
     "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
@@ -21,13 +22,14 @@ class TestCrypto(unittest.TestCase):
         """
         a = crypto.SecretKey("abc".encode())
         aEnc = a.encrypt(
-            b"dprv3n8wmhMhC7p7QuzHn4fYgq2d87hQYAxWH3RJ6pYFrd7LAV71RcBQWrFFmSG3yYWVKrJCbYTBGiniTvKcuuQmi1hA8duKaGM8paYRQNsD1P6"
+            b"dprv3n8wmhMhC7p7QuzHn4fYgq2d87hQYAxWH3RJ6pYFrd7LAV71RcBQ"
+            b"WrFFmSG3yYWVKrJCbYTBGiniTvKcuuQmi1hA8duKaGM8paYRQNsD1P6"
         )
         b = crypto.SecretKey.rekey("abc".encode(), a.params())
         aUnenc = b.decrypt(aEnc)
         self.assertTrue(a, aUnenc)
 
-    def test_addr_pubkey(self):
+    def test_addr_secp_pubkey(self):
         pairs = [
             (
                 "033b26959b2e1b0d88a050b111eeebcf776a38447f7ae5806b53c9b46e07c267ad",
@@ -78,10 +80,11 @@ class TestCrypto(unittest.TestCase):
             ),
         ]
         for pubkeyHash, addrStr in pairs:
-            addr = crypto.AddressPubKeyHash(
-                mainnet.PubKeyHashAddrID, ByteArray(pubkeyHash)
-            )
+            pubkeyHashBA = ByteArray(pubkeyHash)
+            addr = crypto.AddressPubKeyHash(mainnet.PubKeyHashAddrID, pubkeyHashBA)
             self.assertEqual(addr.string(), addrStr)
+            self.assertEqual(addr.scriptAddress(), pubkeyHashBA)
+            self.assertEqual(addr.hash160(), pubkeyHashBA)
 
     def test_addr_script_hash(self):
         pairs = [

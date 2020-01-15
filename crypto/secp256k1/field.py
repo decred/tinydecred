@@ -1115,8 +1115,7 @@ BytePoints = []
 
 
 def loadS256BytePoints():
-    if len(secp256k1BytePoints) == 0:
-        raise Exception("basepoint string empty")
+    assert len(secp256k1BytePoints), "basepoint string empty"
 
     # Decompress the pre-computed table used to accelerate scalar base
     # multiplication.

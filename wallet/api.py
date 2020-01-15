@@ -8,14 +8,6 @@ node type.
 """
 
 
-class Unimplemented(Exception):
-    """
-    Unimplemented method.
-    """
-
-    pass
-
-
 class InsufficientFundsError(Exception):
     """
     Available account balance too low for requested funds.
@@ -48,7 +40,7 @@ class UTXO:
         Args:
             tipHeight (int): The height of the best block.
         """
-        raise Unimplemented("isSpendable not implemented")
+        raise NotImplementedError("isSpendable not implemented")
 
     def key(self):
         """
@@ -57,7 +49,7 @@ class UTXO:
         Returns:
             str: A unique ID for this UTXO.
         """
-        raise Unimplemented("key not implemented")
+        raise NotImplementedError("key not implemented")
 
     @staticmethod
     def makeKey(txid, vout):
@@ -102,7 +94,7 @@ class Blockchain:
             receiver (func(object)): A function or method that accepts the block
                 notifications.
         """
-        raise Unimplemented("subscribeBlocks not implemented")
+        raise NotImplementedError("subscribeBlocks not implemented")
 
     def subscribeAddresses(self, addrs, receiver):
         """
@@ -113,7 +105,7 @@ class Blockchain:
             receiver (func(object)): A function or method that accepts the address
                 notifications.
         """
-        raise Unimplemented("subscribeAddresses not implemented")
+        raise NotImplementedError("subscribeAddresses not implemented")
 
     def UTXOs(self, addrs):
         """
@@ -122,7 +114,7 @@ class Blockchain:
         Args:
             addrs (list(str)): List of base-58 encoded addresses.
         """
-        raise Unimplemented("UTXOs not implemented")
+        raise NotImplementedError("UTXOs not implemented")
 
     def tx(self, txid):
         """
@@ -136,7 +128,7 @@ class Blockchain:
             Transaction: A transction object which implements the Transaction
                 API
         """
-        raise Unimplemented("tx not implemented")
+        raise NotImplementedError("tx not implemented")
 
     def blockHeader(self, bHash):
         """
@@ -148,7 +140,7 @@ class Blockchain:
         Returns:
             BlockHeader: An object which implements the BlockHeader API.
         """
-        raise Unimplemented("blockHeader not implemented")
+        raise NotImplementedError("blockHeader not implemented")
 
     def blockHeaderByHeight(self, height):
         """
@@ -160,13 +152,13 @@ class Blockchain:
         Returns:
             BlockHeader: An object which implements the BlockHeader API.
         """
-        raise Unimplemented("blockHeaderByHeight not implemented")
+        raise NotImplementedError("blockHeaderByHeight not implemented")
 
     def bestBlock(self):
         """
         bestBlock will produce a decoded block as a Python dict.
         """
-        raise Unimplemented("bestBlock not implemented")
+        raise NotImplementedError("bestBlock not implemented")
 
     def sendToAddress(self, value, address, feeRate=None):
         """
@@ -183,7 +175,7 @@ class Blockchain:
             list(UTXO): The spent UTXOs.
             list(UTXO): Any newly generated UTXOs, such as change.
         """
-        raise Unimplemented("sendToAddress not implemented")
+        raise NotImplementedError("sendToAddress not implemented")
 
 
 class BlockHeader:
@@ -204,7 +196,7 @@ class BlockHeader:
         Args:
             b (ByteArray): A serialized block header.
         """
-        raise Unimplemented("deserialize not implemented")
+        raise NotImplementedError("deserialize not implemented")
 
     def serialize(self):
         """
@@ -213,7 +205,7 @@ class BlockHeader:
         Returns:
             ByteArray: The serialized block header.
         """
-        raise Unimplemented("serialize not implemented")
+        raise NotImplementedError("serialize not implemented")
 
     def blockHash(self):
         """
@@ -222,7 +214,7 @@ class BlockHeader:
         Returns:
             ByteArray: Hash of the serialized block header.
         """
-        raise Unimplemented("blockHash not implemented")
+        raise NotImplementedError("blockHash not implemented")
 
     def id(self):
         """
@@ -231,7 +223,7 @@ class BlockHeader:
         Returns:
             str: A block ID.
         """
-        raise Unimplemented("id not implemented")
+        raise NotImplementedError("id not implemented")
 
 
 class Transaction:
@@ -246,7 +238,7 @@ class Transaction:
         Args:
             tx (Transaction): Another object, presumably of the same class.
         """
-        raise Unimplemented("__eq__ not implemented")
+        raise NotImplementedError("__eq__ not implemented")
 
     def txHash(self):
         """
@@ -255,7 +247,7 @@ class Transaction:
         Returns:
             ByteArray: The hashed transaction.
         """
-        raise Unimplemented("txHash not implemented")
+        raise NotImplementedError("txHash not implemented")
 
     def txid(self):
         """
@@ -264,7 +256,7 @@ class Transaction:
         Returns:
             str: The transaction id.
         """
-        raise Unimplemented("txid not implemented")
+        raise NotImplementedError("txid not implemented")
 
     def serialize(self):
         """
@@ -273,7 +265,7 @@ class Transaction:
         Returns:
             ByteArray: The serialized transaction.
         """
-        raise Unimplemented("serialize not implemented")
+        raise NotImplementedError("serialize not implemented")
 
     @staticmethod
     def deserialize(b):
@@ -284,7 +276,7 @@ class Transaction:
         Args:
             b (ByteArray): The serialized transaction.
         """
-        raise Unimplemented("deserialize not implemented")
+        raise NotImplementedError("deserialize not implemented")
 
 
 class Balance:
@@ -312,7 +304,7 @@ class Signals:
         Args:
             balance (Balance): The updated balance.
         """
-        raise Unimplemented("Signals not implemented")
+        raise NotImplementedError("Signals not implemented")
 
 
 class PublicKey:
@@ -338,7 +330,7 @@ class PublicKey:
         Returns:
             ByteArray: Compressed public key.
         """
-        raise Unimplemented("serializeCompressed not implemented")
+        raise NotImplementedError("serializeCompressed not implemented")
 
     def serializeUncompressed(self):
         """
@@ -347,7 +339,7 @@ class PublicKey:
         Returns:
             ByteArray: Uncompressed public key
         """
-        raise Unimplemented("serializeUncompressed not implemented")
+        raise NotImplementedError("serializeUncompressed not implemented")
 
 
 class PrivateKey:
@@ -383,7 +375,7 @@ class KeySource:
         Returns:
             PrivateKey: Private key.
         """
-        raise Unimplemented("KeySource not implemented")
+        raise NotImplementedError("KeySource not implemented")
 
     def internal(self):
         """
@@ -392,4 +384,4 @@ class KeySource:
         Returns:
             str: A new base-58 encoded change address.
         """
-        raise Unimplemented("internal not implemented")
+        raise NotImplementedError("internal not implemented")

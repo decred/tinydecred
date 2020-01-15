@@ -49,7 +49,6 @@ MaxTxInSequenceNum = 0xFFFFFFFF
 
 
 def writeOutPoint(pver, ver, op):
-    # w io.Writer, pver uint32, version uint16, op *OutPoint) error {
     """
     writeOutPoint encodes op to the Decred protocol encoding for an OutPoint
     to w.
@@ -61,7 +60,6 @@ def writeOutPoint(pver, ver, op):
 
 
 def readOutPoint(b, pver, ver):
-    # r io.Reader, pver uint32, version uint16, op *OutPoint) error {
     """
     readOutPoint reads the next sequence of bytes from r as an OutPoint.
     """
@@ -73,9 +71,8 @@ def readOutPoint(b, pver, ver):
 
 
 def readTxInPrefix(b, pver, serType, ver, ti):
-    # r io.Reader, pver uint32, serType TxSerializeType, version uint16, ti *TxIn) error {
     if serType == wire.TxSerializeOnlyWitness:
-        raise Exception(
+        raise ValueError(
             "readTxInPrefix: tried to read a prefix input for a witness only tx"
         )
 
@@ -87,7 +84,6 @@ def readTxInPrefix(b, pver, serType, ver, ti):
 
 
 def writeTxInPrefix(pver, ver, ti):
-    # pver uint32, version uint16, ti *TxIn) error {
     """
     writeTxInPrefixs encodes ti to the Decred protocol encoding for a transaction
     input (TxIn) prefix to w.
@@ -98,7 +94,6 @@ def writeTxInPrefix(pver, ver, ti):
 
 
 def writeTxInWitness(pver, ver, ti):
-    # w io.Writer, pver uint32, version uint16, ti *TxIn) error {
     """
     writeTxWitness encodes ti to the Decred protocol encoding for a transaction
     input (TxIn) witness to w.
@@ -118,7 +113,6 @@ def writeTxInWitness(pver, ver, ti):
 
 
 def readScript(b, pver, maxAllowed, fieldName):
-    # r io.Reader, pver uint32, maxAllowed uint32, fieldName string) ([]byte, error) {
     """
     readScript reads a variable length byte array that represents a transaction
     script.  It is encoded as a varInt containing the length of the array
@@ -134,10 +128,8 @@ def readScript(b, pver, maxAllowed, fieldName):
     # be possible to cause memory exhaustion and panics without a sane
     # upper bound on this count.
     if count > maxAllowed:
-        raise Exception(
-            "readScript: %s is larger than the max allowed size [count %d, max %d]"
-            % (fieldName, count, maxAllowed)
-        )
+        msg = "readScript: {} is larger than the max allowed size [count {}, max {}]"
+        raise ValueError(msg.format(fieldName, count, maxAllowed))
 
     a = b.pop(count)
 
@@ -145,7 +137,6 @@ def readScript(b, pver, maxAllowed, fieldName):
 
 
 def readTxInWitness(b, pver, ver, ti):
-    # r io.Reader, pver uint32, version uint16, ti *TxIn) error {
     """
     readTxInWitness reads the next sequence of bytes from r as a transaction input
     (TxIn) in the transaction witness.
@@ -168,7 +159,6 @@ def readTxInWitness(b, pver, ver, ti):
 
 
 def readTxOut(b, pver, ver, to):
-    # r io.Reader, pver uint32, version uint16, to *TxOut) error {
     """
     # readTxOut reads the next sequence of bytes from r as a transaction output (TxOut).
     """
@@ -181,7 +171,6 @@ def readTxOut(b, pver, ver, to):
 
 
 def writeTxOut(pver, ver, to):
-    # w io.Writer, pver uint32, version uint16, to *TxOut) error {
     """
     writeTxOut encodes to into the Decred protocol encoding for a transaction
     output (TxOut) to w.
@@ -577,7 +566,7 @@ class MsgTx:
             b += self.encodeWitness(pver)
 
         else:
-            raise Exception("MsgTx.BtcEncode: unsupported transaction type")
+            raise NotImplementedError("MsgTx.BtcEncode: unsupported transaction type")
 
         return b
 
@@ -690,9 +679,9 @@ class MsgTx:
             # message.  It would be possible to cause memory exhaustion and panics
             # without a sane upper bound on this count.
             if count > maxTxInPerMessage:
-                raise Exception(
+                raise ValueError(
                     "MsgTx.decodeWitness: too many input transactions to fit into"
-                    " max message size [count %d, max %d]" % (count, maxTxInPerMessage)
+                    f" max message size [count {count}, max {maxTxInPerMessage}]"
                 )
 
             self.txIn = [TxIn(None, 0) for i in range(count)]
@@ -708,18 +697,18 @@ class MsgTx:
             count = wire.readVarInt(b, pver)
 
             if count != len(self.txIn):
-                raise Exception(
-                    "MsgTx.decodeWitness: non equal witness and prefix txin quantities"
-                    " (witness %v, prefix %v)" % (count, len(self.txIn))
+                raise ValueError(
+                    "MsgTx.decodeWitness: non equal witness and prefix txin"
+                    f" quantities (witness {count}, prefix {len(self.txIn)})"
                 )
 
             # Prevent more input transactions than could possibly fit into a
             # message.  It would be possible to cause memory exhaustion and panics
             # without a sane upper bound on this count.
             if count > maxTxInPerMessage:
-                raise Exception(
+                raise ValueError(
                     "MsgTx.decodeWitness: too many input transactions to fit into"
-                    " max message size [count %d, max %d]" % (count, maxTxInPerMessage)
+                    f" max message size [count {count}, max {maxTxInPerMessage}]"
                 )
 
             # Read in the witnesses, and copy them into the already generated
@@ -766,7 +755,7 @@ class MsgTx:
             b, _ = tx.decodeWitness(b, pver, True)
 
         else:
-            raise Exception("MsgTx.BtcDecode: unsupported transaction type")
+            raise NotImplementedError("MsgTx.BtcDecode: unsupported transaction type")
 
         return tx
 
@@ -839,8 +828,11 @@ class MsgTx:
 
 # fmt: off
 
-# multiTxPrefix is a MsgTx prefix with an input and output and used in various tests.
+
 def multiTxPrefix():
+    """
+    multiTxPrefix is a MsgTx prefix with an input and output and used in various tests.
+    """
     return MsgTx(
         cachedHash=None,
         serType=wire.TxSerializeNoWitness,

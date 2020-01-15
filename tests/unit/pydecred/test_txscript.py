@@ -3,20 +3,23 @@ Copyright (c) 2019, the Decred developers
 See LICENSE for details
 """
 
-import unittest
-import os
-import json
-import time
 from base58 import b58decode
+import json
+import os
+import unittest
 from tempfile import TemporaryDirectory
-from tinydecred.pydecred.calc import SubsidyCache
-from tinydecred.pydecred import mainnet, testnet, txscript, vsp, account
-from tinydecred.pydecred.wire import wire, msgtx
-from tinydecred.util.encode import ByteArray
-from tinydecred.util import database, chains
+import time
+
+
 from tinydecred.crypto import crypto, opcode, rando
-from tinydecred.wallet.accounts import createAccount
 from tinydecred.crypto.secp256k1 import curve as Curve
+from tinydecred.pydecred import account, mainnet, testnet, txscript, vsp
+from tinydecred.pydecred.calc import SubsidyCache
+from tinydecred.pydecred.wire import msgtx, wire
+from tinydecred.util import database
+from tinydecred.util.encode import ByteArray
+from tinydecred.wallet.accounts import createAccount
+
 
 testSeed = ByteArray(
     "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
@@ -25,492 +28,6 @@ testSeed = ByteArray(
 
 def newHash():
     return ByteArray(rando.generateSeed(32))
-
-
-class TestSubsidyCache(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        chains.registerChain("dcr", None)
-
-    def test_subsidy_cache_calcs(self):
-        """
-        TestSubsidyCacheCalcs ensures the subsidy cache calculates the various
-        subsidy proportions and values as expected.
-        """
-
-        class test:
-            def __init__(
-                self,
-                name=None,
-                params=None,
-                height=None,
-                numVotes=None,
-                wantFull=None,
-                wantWork=None,
-                wantVote=None,
-                wantTreasury=None,
-            ):
-                self.name = name
-                self.params = params
-                self.height = height
-                self.numVotes = numVotes
-                self.wantFull = wantFull
-                self.wantWork = wantWork
-                self.wantVote = wantVote
-                self.wantTreasury = wantTreasury
-
-        tests = [
-            test(
-                name="negative height",
-                params=mainnet,
-                height=-1,
-                numVotes=0,
-                wantFull=0,
-                wantWork=0,
-                wantVote=0,
-                wantTreasury=0,
-            ),
-            test(
-                name="height 0",
-                params=mainnet,
-                height=0,
-                numVotes=0,
-                wantFull=0,
-                wantWork=0,
-                wantVote=0,
-                wantTreasury=0,
-            ),
-            test(
-                name="height 1 (initial payouts)",
-                params=mainnet,
-                height=1,
-                numVotes=0,
-                wantFull=168000000000000,
-                wantWork=168000000000000,
-                wantVote=0,
-                wantTreasury=0,
-            ),
-            test(
-                name="height 2 (first non-special block prior voting start)",
-                params=mainnet,
-                height=2,
-                numVotes=0,
-                wantFull=3119582664,
-                wantWork=1871749598,
-                wantVote=0,
-                wantTreasury=311958266,
-            ),
-            test(
-                name="height 4094 (two blocks prior to voting start)",
-                params=mainnet,
-                height=4094,
-                numVotes=0,
-                wantFull=3119582664,
-                wantWork=1871749598,
-                wantVote=0,
-                wantTreasury=311958266,
-            ),
-            test(
-                name="height 4095 (final block prior to voting start)",
-                params=mainnet,
-                height=4095,
-                numVotes=0,
-                wantFull=3119582664,
-                wantWork=1871749598,
-                wantVote=187174959,
-                wantTreasury=311958266,
-            ),
-            test(
-                name="height 4096 (voting start), 5 votes",
-                params=mainnet,
-                height=4096,
-                numVotes=5,
-                wantFull=3119582664,
-                wantWork=1871749598,
-                wantVote=187174959,
-                wantTreasury=311958266,
-            ),
-            test(
-                name="height 4096 (voting start), 4 votes",
-                params=mainnet,
-                height=4096,
-                numVotes=4,
-                wantFull=3119582664,
-                wantWork=1497399678,
-                wantVote=187174959,
-                wantTreasury=249566612,
-            ),
-            test(
-                name="height 4096 (voting start), 3 votes",
-                params=mainnet,
-                height=4096,
-                numVotes=3,
-                wantFull=3119582664,
-                wantWork=1123049758,
-                wantVote=187174959,
-                wantTreasury=187174959,
-            ),
-            test(
-                name="height 4096 (voting start), 2 votes",
-                params=mainnet,
-                height=4096,
-                numVotes=2,
-                wantFull=3119582664,
-                wantWork=0,
-                wantVote=187174959,
-                wantTreasury=0,
-            ),
-            test(
-                name="height 6143 (final block prior to 1st reduction), 5 votes",
-                params=mainnet,
-                height=6143,
-                numVotes=5,
-                wantFull=3119582664,
-                wantWork=1871749598,
-                wantVote=187174959,
-                wantTreasury=311958266,
-            ),
-            test(
-                name="height 6144 (1st block in 1st reduction), 5 votes",
-                params=mainnet,
-                height=6144,
-                numVotes=5,
-                wantFull=3088695706,
-                wantWork=1853217423,
-                wantVote=185321742,
-                wantTreasury=308869570,
-            ),
-            test(
-                name="height 6144 (1st block in 1st reduction), 4 votes",
-                params=mainnet,
-                height=6144,
-                numVotes=4,
-                wantFull=3088695706,
-                wantWork=1482573938,
-                wantVote=185321742,
-                wantTreasury=247095656,
-            ),
-            test(
-                name="height 12287 (last block in 1st reduction), 5 votes",
-                params=mainnet,
-                height=12287,
-                numVotes=5,
-                wantFull=3088695706,
-                wantWork=1853217423,
-                wantVote=185321742,
-                wantTreasury=308869570,
-            ),
-            test(
-                name="height 12288 (1st block in 2nd reduction), 5 votes",
-                params=mainnet,
-                height=12288,
-                numVotes=5,
-                wantFull=3058114560,
-                wantWork=1834868736,
-                wantVote=183486873,
-                wantTreasury=305811456,
-            ),
-            test(
-                name="height 307200 (1st block in 50th reduction), 5 votes",
-                params=mainnet,
-                height=307200,
-                numVotes=5,
-                wantFull=1896827356,
-                wantWork=1138096413,
-                wantVote=113809641,
-                wantTreasury=189682735,
-            ),
-            test(
-                name="height 307200 (1st block in 50th reduction), 3 votes",
-                params=mainnet,
-                height=307200,
-                numVotes=3,
-                wantFull=1896827356,
-                wantWork=682857847,
-                wantVote=113809641,
-                wantTreasury=113809641,
-            ),
-            test(
-                name="height 10911744 (first zero vote subsidy 1776th reduction), 5 votes",
-                params=mainnet,
-                height=10911744,
-                numVotes=5,
-                wantFull=16,
-                wantWork=9,
-                wantVote=0,
-                wantTreasury=1,
-            ),
-            test(
-                name="height 10954752 (first zero treasury subsidy 1783rd reduction), 5 votes",
-                params=mainnet,
-                height=10954752,
-                numVotes=5,
-                wantFull=9,
-                wantWork=5,
-                wantVote=0,
-                wantTreasury=0,
-            ),
-            test(
-                name="height 11003904 (first zero work subsidy 1791st reduction), 5 votes",
-                params=mainnet,
-                height=11003904,
-                numVotes=5,
-                wantFull=1,
-                wantWork=0,
-                wantVote=0,
-                wantTreasury=0,
-            ),
-            test(
-                name="height 11010048 (first zero full subsidy 1792nd reduction), 5 votes",
-                params=mainnet,
-                height=11010048,
-                numVotes=5,
-                wantFull=0,
-                wantWork=0,
-                wantVote=0,
-                wantTreasury=0,
-            ),
-        ]
-
-        for t in tests:
-            # Ensure the full subsidy is the expected value.
-            cache = SubsidyCache(t.params)
-            fullSubsidyResult = cache.calcBlockSubsidy(t.height)
-            self.assertEqual(fullSubsidyResult, t.wantFull, t.name)
-
-            # Ensure the PoW subsidy is the expected value.
-            workResult = cache.calcWorkSubsidy(t.height, t.numVotes)
-            self.assertEqual(workResult, t.wantWork, t.name)
-
-            # Ensure the vote subsidy is the expected value.
-            voteResult = cache.calcStakeVoteSubsidy(t.height)
-            self.assertEqual(voteResult, t.wantVote, t.name)
-
-            # Ensure the treasury subsidy is the expected value.
-            treasuryResult = cache.calcTreasurySubsidy(t.height, t.numVotes)
-            self.assertEqual(treasuryResult, t.wantTreasury, t.name)
-
-    def test_total_subsidy(self):
-        """
-        TestTotalSubsidy ensures the total subsidy produced matches the expected
-        value.
-        """
-        # Locals for convenience.
-        reductionInterval = mainnet.SubsidyReductionInterval
-        stakeValidationHeight = mainnet.StakeValidationHeight
-        votesPerBlock = mainnet.TicketsPerBlock
-
-        # subsidySum returns the sum of the individual subsidy types for the given
-        # height.  Note that this value is not exactly the same as the full subsidy
-        # originally used to calculate the individual proportions due to the use
-        # of integer math.
-        cache = SubsidyCache(mainnet)
-
-        def subsidySum(height):
-            work = cache.calcWorkSubsidy(height, votesPerBlock)
-            vote = cache.calcStakeVoteSubsidy(height) * votesPerBlock
-            treasury = cache.calcTreasurySubsidy(height, votesPerBlock)
-            return work + vote + treasury
-
-        # Calculate the total possible subsidy.
-        totalSubsidy = mainnet.BlockOneSubsidy
-        reductionNum = -1
-        while True:
-            reductionNum += 1
-            # The first interval contains a few special cases:
-            # 1) Block 0 does not produce any subsidy
-            # 2) Block 1 consists of a special initial coin distribution
-            # 3) Votes do not produce subsidy until voting begins
-            if reductionNum == 0:
-                # Account for the block up to the point voting begins ignoring the
-                # first two special blocks.
-                subsidyCalcHeight = 2
-                nonVotingBlocks = stakeValidationHeight - subsidyCalcHeight
-                totalSubsidy += subsidySum(subsidyCalcHeight) * nonVotingBlocks
-
-                # Account for the blocks remaining in the interval once voting
-                # begins.
-                subsidyCalcHeight = stakeValidationHeight
-                votingBlocks = reductionInterval - subsidyCalcHeight
-                totalSubsidy += subsidySum(subsidyCalcHeight) * votingBlocks
-                continue
-
-            # Account for the all other reduction intervals until all subsidy has
-            # been produced.
-            subsidyCalcHeight = reductionNum * reductionInterval
-            subSum = subsidySum(subsidyCalcHeight)
-            if subSum == 0:
-                break
-            totalSubsidy += subSum * reductionInterval
-
-        # Ensure the total calculated subsidy is the expected value.
-        self.assertEqual(totalSubsidy, 2099999999800912)
-
-    # TestCalcBlockSubsidySparseCaching ensures the cache calculations work
-    # properly when accessed sparsely and out of order.
-    def test_calc_block_subsidy_sparse_caching(self):
-        # Mock params used in tests.
-        # perCacheTest describes a test to run against the same cache.
-        class perCacheTest:
-            def __init__(self, name, height, want):
-                self.name = name
-                self.height = height
-                self.want = want
-
-        class test:
-            def __init__(self, name, params, perCacheTests):
-                self.name = name
-                self.params = params
-                self.perCacheTests = perCacheTests
-
-        tests = [
-            test(
-                name="negative/zero/one (special cases, no cache)",
-                params=mainnet,
-                perCacheTests=[
-                    perCacheTest(
-                        name="would be negative interval", height=-6144, want=0,
-                    ),
-                    perCacheTest(name="negative one", height=-1, want=0,),
-                    perCacheTest(name="height 0", height=0, want=0,),
-                    perCacheTest(name="height 1", height=1, want=168000000000000,),
-                ],
-            ),
-            test(
-                name="clean cache, negative height",
-                params=mainnet,
-                perCacheTests=[
-                    perCacheTest(
-                        name="would be negative interval", height=-6144, want=0,
-                    ),
-                    perCacheTest(name="height 0", height=0, want=0,),
-                ],
-            ),
-            test(
-                name="clean cache, max int64 height twice",
-                params=mainnet,
-                perCacheTests=[
-                    perCacheTest(name="max int64", height=9223372036854775807, want=0,),
-                    perCacheTest(
-                        name="second max int64", height=9223372036854775807, want=0,
-                    ),
-                ],
-            ),
-            test(
-                name="sparse out order interval requests with cache hits",
-                params=mainnet,
-                perCacheTests=[
-                    perCacheTest(name="height 0", height=0, want=0,),
-                    perCacheTest(name="height 1", height=1, want=168000000000000,),
-                    perCacheTest(
-                        name="height 2 (cause interval 0 cache addition)",
-                        height=2,
-                        want=3119582664,
-                    ),
-                    perCacheTest(
-                        name="height 2 (interval 0 cache hit)",
-                        height=2,
-                        want=3119582664,
-                    ),
-                    perCacheTest(
-                        name="height 3 (interval 0 cache hit)",
-                        height=2,
-                        want=3119582664,
-                    ),
-                    perCacheTest(
-                        name="height 6145 (interval 1 cache addition)",
-                        height=6145,
-                        want=3088695706,
-                    ),
-                    perCacheTest(
-                        name="height 6145 (interval 1 cache hit)",
-                        height=6145,
-                        want=3088695706,
-                    ),
-                    perCacheTest(
-                        name="interval 20 cache addition most recent cache interval 1",
-                        height=6144 * 20,
-                        want=2556636713,
-                    ),
-                    perCacheTest(
-                        name="interval 20 cache hit", height=6144 * 20, want=2556636713,
-                    ),
-                    perCacheTest(
-                        name="interval 10 cache addition most recent cache interval 20",
-                        height=6144 * 10,
-                        want=2824117486,
-                    ),
-                    perCacheTest(
-                        name="interval 10 cache hit", height=6144 * 10, want=2824117486,
-                    ),
-                    perCacheTest(
-                        name="interval 15 cache addition between cached 10 and 20",
-                        height=6144 * 15,
-                        want=2687050883,
-                    ),
-                    perCacheTest(
-                        name="interval 15 cache hit", height=6144 * 15, want=2687050883,
-                    ),
-                    perCacheTest(
-                        name="interval 1792 (first with 0 subsidy) cache addition",
-                        height=6144 * 1792,
-                        want=0,
-                    ),
-                    perCacheTest(
-                        name="interval 1792 cache hit", height=6144 * 1792, want=0,
-                    ),
-                    perCacheTest(
-                        name="interval 1795 (skipping final 0 subsidy)",
-                        height=6144 * 1795,
-                        want=0,
-                    ),
-                ],
-            ),
-            test(
-                name="clean cache, reverse interval requests",
-                params=mainnet,
-                perCacheTests=[
-                    perCacheTest(
-                        name="interval 5 cache addition",
-                        height=6144 * 5,
-                        want=2968175862,
-                    ),
-                    perCacheTest(
-                        name="interval 3 cache addition",
-                        height=6144 * 3,
-                        want=3027836198,
-                    ),
-                    perCacheTest(
-                        name="interval 3 cache hit", height=6144 * 3, want=3027836198,
-                    ),
-                ],
-            ),
-            test(
-                name="clean cache, forward non-zero start interval requests",
-                params=mainnet,
-                perCacheTests=[
-                    perCacheTest(
-                        name="interval 2 cache addition",
-                        height=6144 * 2,
-                        want=3058114560,
-                    ),
-                    perCacheTest(
-                        name="interval 12 cache addition",
-                        height=6144 * 12,
-                        want=2768471213,
-                    ),
-                    perCacheTest(
-                        name="interval 12 cache hit", height=6144 * 12, want=2768471213,
-                    ),
-                ],
-            ),
-        ]
-
-        for t in tests:
-            cache = SubsidyCache(t.params)
-            for pcTest in t.perCacheTests:
-                result = cache.calcBlockSubsidy(pcTest.height)
-                self.assertEqual(result, pcTest.want, t.name)
 
 
 def parseShortForm(asm):
@@ -812,7 +329,9 @@ class TestTxScript(unittest.TestCase):
             )
 
     def test_calc_signature_hash(self):
-        """ TestCalcSignatureHash does some rudimentary testing of msg hash calculation. """
+        """
+        TestCalcSignatureHash does some rudimentary testing of msg hash calculation.
+        """
         tx = msgtx.MsgTx.new()
         for i in range(3):
             txIn = msgtx.TxIn(
@@ -1431,7 +950,7 @@ class TestTxScript(unittest.TestCase):
             try:
                 txscript.Signature.parse(ByteArray(test.sig), test.der)
             except Exception:
-                assert test.isValid is False
+                self.assertFalse(test.isValid)
 
     def test_sign_tx(self):
         """
@@ -1965,7 +1484,8 @@ class TestTxScript(unittest.TestCase):
                 scriptAddress=ByteArray("f0b4e85100aee1a996f22915eb3c3f764d53779a"),
                 f=lambda: addrSH(
                     ByteArray(
-                        "512103aa43f0a6c15730d886cc1f0342046d20175483d90d7ccb657f90c489111d794c51ae"
+                        "512103aa43f0a6c15730d886cc1f0342046d2"
+                        "0175483d90d7ccb657f90c489111d794c51ae"
                     ),
                     mainnet,
                 ),
@@ -2061,11 +1581,13 @@ class TestTxScript(unittest.TestCase):
                 valid=True,
                 saddr="0264c44653d6567eff5753c5d24a682ddc2b2cadfe1b0c6433b16374dace6778f0",
                 scriptAddress=ByteArray(
-                    "0464c44653d6567eff5753c5d24a682ddc2b2cadfe1b0c6433b16374dace6778f0b87ca4279b565d2130ce59f75bfbb2b88da794143d7cfd3e80808a1fa3203904"
+                    "0464c44653d6567eff5753c5d24a682ddc2b2cadfe1b0c6433b16374dace6778f"
+                    "0b87ca4279b565d2130ce59f75bfbb2b88da794143d7cfd3e80808a1fa3203904"
                 ),
                 f=lambda: addrPK(
                     ByteArray(
-                        "0464c44653d6567eff5753c5d24a682ddc2b2cadfe1b0c6433b16374dace6778f0b87ca4279b565d2130ce59f75bfbb2b88da794143d7cfd3e80808a1fa3203904"
+                        "0464c44653d6567eff5753c5d24a682ddc2b2cadfe1b0c6433b16374dace6778f"
+                        "0b87ca4279b565d2130ce59f75bfbb2b88da794143d7cfd3e80808a1fa3203904"
                     ),
                     mainnet,
                 ),
@@ -2116,11 +1638,13 @@ class TestTxScript(unittest.TestCase):
                 valid=True,
                 saddr="026a40c403e74670c4de7656a09caa2353d4b383a9ce66eef51e1220eacf4be06e",
                 scriptAddress=ByteArray(
-                    "046a40c403e74670c4de7656a09caa2353d4b383a9ce66eef51e1220eacf4be06ed548c8c16fb5eb9007cb94220b3bb89491d5a1fd2d77867fca64217acecf2244"
+                    "046a40c403e74670c4de7656a09caa2353d4b383a9ce66eef51e1220eacf4be06"
+                    "ed548c8c16fb5eb9007cb94220b3bb89491d5a1fd2d77867fca64217acecf2244"
                 ),
                 f=lambda: addrPK(
                     ByteArray(
-                        "046a40c403e74670c4de7656a09caa2353d4b383a9ce66eef51e1220eacf4be06ed548c8c16fb5eb9007cb94220b3bb89491d5a1fd2d77867fca64217acecf2244"
+                        "046a40c403e74670c4de7656a09caa2353d4b383a9ce66eef51e1220eacf4be06"
+                        "ed548c8c16fb5eb9007cb94220b3bb89491d5a1fd2d77867fca64217acecf2244"
                     ),
                     testnet,
                 ),
@@ -2136,7 +1660,8 @@ class TestTxScript(unittest.TestCase):
                 valid=False,
                 f=lambda: addrPK(
                     ByteArray(
-                        "0664c44653d6567eff5753c5d24a682ddc2b2cadfe1b0c6433b16374dace6778f0b87ca4279b565d2130ce59f75bfbb2b88da794143d7cfd3e80808a1fa3203904"
+                        "0664c44653d6567eff5753c5d24a682ddc2b2cadfe1b0c6433b16374dace6778f"
+                        "0b87ca4279b565d2130ce59f75bfbb2b88da794143d7cfd3e80808a1fa3203904"
                     ),
                     mainnet,
                 ),
@@ -2150,7 +1675,8 @@ class TestTxScript(unittest.TestCase):
                 valid=False,
                 f=lambda: addrPK(
                     ByteArray(
-                        "07348d8aeb4253ca52456fe5da94ab1263bfee16bb8192497f666389ca964f84798375129d7958843b14258b905dc94faed324dd8a9d67ffac8cc0a85be84bac5d"
+                        "07348d8aeb4253ca52456fe5da94ab1263bfee16bb8192497f666389ca964f847"
+                        "98375129d7958843b14258b905dc94faed324dd8a9d67ffac8cc0a85be84bac5d"
                     ),
                     mainnet,
                 ),
@@ -2164,7 +1690,8 @@ class TestTxScript(unittest.TestCase):
                 valid=False,
                 f=lambda: addrPK(
                     ByteArray(
-                        "066a40c403e74670c4de7656a09caa2353d4b383a9ce66eef51e1220eacf4be06ed548c8c16fb5eb9007cb94220b3bb89491d5a1fd2d77867fca64217acecf2244"
+                        "066a40c403e74670c4de7656a09caa2353d4b383a9ce66eef51e1220eacf4be06"
+                        "ed548c8c16fb5eb9007cb94220b3bb89491d5a1fd2d77867fca64217acecf2244"
                     ),
                     testnet,
                 ),
@@ -2178,7 +1705,8 @@ class TestTxScript(unittest.TestCase):
                 valid=False,
                 f=lambda: addrPK(
                     ByteArray(
-                        "07edd40747de905a9becb14987a1a26c1adbd617c45e1583c142a635bfda9493dfa1c6d36735974965fe7b861e7f6fcc087dc7fe47380fa8bde0d9c322d53c0e89"
+                        "07edd40747de905a9becb14987a1a26c1adbd617c45e1583c142a635bfda9493d"
+                        "fa1c6d36735974965fe7b861e7f6fcc087dc7fe47380fa8bde0d9c322d53c0e89"
                     ),
                     testnet,
                 ),
@@ -2196,7 +1724,7 @@ class TestTxScript(unittest.TestCase):
             self.assertEqual(err is None, test.valid, "%s error: %s" % (test.name, err))
 
             if err is None:
-                # Ensure the stringer returns the same address as theoriginal.
+                # Ensure the stringer returns the same address as the original.
                 self.assertEqual(test.addr, decoded.string(), test.name)
 
                 # Encode again and compare against the original.
@@ -2315,14 +1843,14 @@ class TestTxScript(unittest.TestCase):
             test(
                 name="standard p2pk with uncompressed pubkey (0x04)",
                 script=ByteArray(
-                    "410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddf"
-                    "b84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac"
+                    "410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5"
+                    "cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac"
                 ),
                 addrs=[
                     pkAddr(
                         ByteArray(
-                            "0411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482eca"
-                            "d7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3"
+                            "0411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5"
+                            "cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3"
                         )
                     ),
                 ],
@@ -2351,14 +1879,14 @@ class TestTxScript(unittest.TestCase):
             test(
                 name="2nd standard p2pk with uncompressed pubkey (0x04)",
                 script=ByteArray(
-                    "4104b0bd634234abbb1ba1e986e884185c61cf43e001f9137f23c2c409273eb16e6537a576782"
-                    "eba668a7ef8bd3b3cfb1edb7117ab65129b8a2e681f3c1e0908ef7bac"
+                    "4104b0bd634234abbb1ba1e986e884185c61cf43e001f9137f23c2c409273eb16e6"
+                    "537a576782eba668a7ef8bd3b3cfb1edb7117ab65129b8a2e681f3c1e0908ef7bac"
                 ),
                 addrs=[
                     pkAddr(
                         ByteArray(
-                            "04b0bd634234abbb1ba1e986e884185c61cf43e001f9137f23c2"
-                            "c409273eb16e6537a576782eba668a7ef8bd3b3cfb1edb7117ab65129b8a2e681f3c1e0908ef7b"
+                            "04b0bd634234abbb1ba1e986e884185c61cf43e001f9137f23c2c409273eb16e6"
+                            "537a576782eba668a7ef8bd3b3cfb1edb7117ab65129b8a2e681f3c1e0908ef7b"
                         )
                     ),
                 ],
@@ -2399,21 +1927,25 @@ class TestTxScript(unittest.TestCase):
             test(
                 name="standard 1 of 2 multisig",
                 script=ByteArray(
-                    "514104cc71eb30d653c0c3163990c47b976f3fb3f37cccdcbedb169a1dfef58bbfbfaff7d8a47"
-                    "3e7e2e6d317b87bafe8bde97e3cf8f065dec022b51d11fcdd0d348ac4410461cbdcc5409fb4b4d42b51d3338"
-                    "1354d80e550078cb532a34bfa2fcfdeb7d76519aecc62770f5b0e4ef8551946d8a540911abe3e7854a26f39f58b25c15342af52ae"
+                    "514104cc71eb30d653c0c3163990c47b976f3fb3f37cccdcbedb169a1"
+                    "dfef58bbfbfaff7d8a473e7e2e6d317b87bafe8bde97e3cf8f065dec0"
+                    "22b51d11fcdd0d348ac4410461cbdcc5409fb4b4d42b51d33381354d8"
+                    "0e550078cb532a34bfa2fcfdeb7d76519aecc62770f5b0e4ef8551946"
+                    "d8a540911abe3e7854a26f39f58b25c15342af52ae"
                 ),
                 addrs=[
                     pkAddr(
                         ByteArray(
-                            "04cc71eb30d653c0c3163990c47b976f3fb3f37cccdcbedb169a"
-                            "1dfef58bbfbfaff7d8a473e7e2e6d317b87bafe8bde97e3cf8f065dec022b51d11fcdd0d348ac4"
+                            "04cc71eb30d653c0c3163990c47b976f3fb3f37cccdcbedb1"
+                            "69a1dfef58bbfbfaff7d8a473e7e2e6d317b87bafe8bde97e"
+                            "3cf8f065dec022b51d11fcdd0d348ac4"
                         )
                     ),
                     pkAddr(
                         ByteArray(
-                            "0461cbdcc5409fb4b4d42b51d33381354d80e550078cb532a34b"
-                            "fa2fcfdeb7d76519aecc62770f5b0e4ef8551946d8a540911abe3e7854a26f39f58b25c15342af"
+                            "0461cbdcc5409fb4b4d42b51d33381354d80e550078cb532a"
+                            "34bfa2fcfdeb7d76519aecc62770f5b0e4ef8551946d8a540"
+                            "911abe3e7854a26f39f58b25c15342af"
                         )
                     ),
                 ],
@@ -2426,29 +1958,34 @@ class TestTxScript(unittest.TestCase):
             test(
                 name="standard 2 of 3 multisig",
                 script=ByteArray(
-                    "524104cb9c3c222c5f7a7d3b9bd152f363a0b6d54c9eb312c4d4f9af1e8551b6c421a6a4ab0e2"
-                    "9105f24de20ff463c1c91fcf3bf662cdde4783d4799f787cb7c08869b4104ccc588420deeebea22a7e900cc8"
-                    "b68620d2212c374604e3487ca08f1ff3ae12bdc639514d0ec8612a2d3c519f084d9a00cbbe3b53d071e9b09e"
-                    "71e610b036aa24104ab47ad1939edcb3db65f7fedea62bbf781c5410d3f22a7a3a56ffefb2238af8627363bd"
-                    "f2ed97c1f89784a1aecdb43384f11d2acc64443c7fc299cef0400421a53ae"
+                    "524104cb9c3c222c5f7a7d3b9bd152f363a0b6d54c9eb312c4d4f9af1e"
+                    "8551b6c421a6a4ab0e29105f24de20ff463c1c91fcf3bf662cdde4783d"
+                    "4799f787cb7c08869b4104ccc588420deeebea22a7e900cc8b68620d22"
+                    "12c374604e3487ca08f1ff3ae12bdc639514d0ec8612a2d3c519f084d9"
+                    "a00cbbe3b53d071e9b09e71e610b036aa24104ab47ad1939edcb3db65f"
+                    "7fedea62bbf781c5410d3f22a7a3a56ffefb2238af8627363bdf2ed97c"
+                    "1f89784a1aecdb43384f11d2acc64443c7fc299cef0400421a53ae"
                 ),
                 addrs=[
                     pkAddr(
                         ByteArray(
-                            "04cb9c3c222c5f7a7d3b9bd152f363a0b6d54c9eb312c4d4f9af"
-                            "1e8551b6c421a6a4ab0e29105f24de20ff463c1c91fcf3bf662cdde4783d4799f787cb7c08869b"
+                            "04cb9c3c222c5f7a7d3b9bd152f363a0b6d54c9eb312c4d4f9"
+                            "af1e8551b6c421a6a4ab0e29105f24de20ff463c1c91fcf3bf"
+                            "662cdde4783d4799f787cb7c08869b"
                         )
                     ),
                     pkAddr(
                         ByteArray(
-                            "04ccc588420deeebea22a7e900cc8b68620d2212c374604e3487"
-                            "ca08f1ff3ae12bdc639514d0ec8612a2d3c519f084d9a00cbbe3b53d071e9b09e71e610b036aa2"
+                            "04ccc588420deeebea22a7e900cc8b68620d2212c374604e3"
+                            "487ca08f1ff3ae12bdc639514d0ec8612a2d3c519f084d9a0"
+                            "0cbbe3b53d071e9b09e71e610b036aa2"
                         )
                     ),
                     pkAddr(
                         ByteArray(
-                            "04ab47ad1939edcb3db65f7fedea62bbf781c5410d3f22a7a3a5"
-                            "6ffefb2238af8627363bdf2ed97c1f89784a1aecdb43384f11d2acc64443c7fc299cef0400421a"
+                            "04ab47ad1939edcb3db65f7fedea62bbf781c5410d3f22a7a"
+                            "3a56ffefb2238af8627363bdf2ed97c1f89784a1aecdb4338"
+                            "4f11d2acc64443c7fc299cef0400421a"
                         )
                     ),
                 ],
@@ -2465,8 +2002,8 @@ class TestTxScript(unittest.TestCase):
             test(
                 name="p2pk with uncompressed pk missing OP_CHECKSIG",
                 script=ByteArray(
-                    "410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddf"
-                    "b84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3"
+                    "410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a"
+                    "5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3"
                 ),
                 addrs=[],
                 exception="unsupported script",
@@ -2476,8 +2013,8 @@ class TestTxScript(unittest.TestCase):
             test(
                 name="valid signature from a sigscript - no addresses",
                 script=ByteArray(
-                    "47304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd41022"
-                    "0181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901"
+                    "47304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd"
+                    "410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901"
                 ),
                 addrs=[],
                 exception="unsupported script",
@@ -2491,9 +2028,11 @@ class TestTxScript(unittest.TestCase):
             test(
                 name="valid sigscript to redeem p2pk - no addresses",
                 script=ByteArray(
-                    "493046022100ddc69738bf2336318e4e041a5a77f305da87428ab1606f023260017854350ddc0"
-                    "22100817af09d2eec36862d16009852b7e3a0f6dd76598290b7834e1453660367e07a014104cd4240c198e12"
-                    "523b6f9cb9f5bed06de1ba37e96a1bbd13745fcf9d11c25b1dff9a519675d198804ba9962d3eca2d5937d58e5a75a71042d40388a4d307f887d"
+                    "493046022100ddc69738bf2336318e4e041a5a77f305da87428ab1606"
+                    "f023260017854350ddc022100817af09d2eec36862d16009852b7e3a0"
+                    "f6dd76598290b7834e1453660367e07a014104cd4240c198e12523b6f"
+                    "9cb9f5bed06de1ba37e96a1bbd13745fcf9d11c25b1dff9a519675d19"
+                    "8804ba9962d3eca2d5937d58e5a75a71042d40388a4d307f887d"
                 ),
                 addrs=[],
                 reqSigs=0,
@@ -2507,11 +2046,13 @@ class TestTxScript(unittest.TestCase):
             test(
                 name="1 of 3 multisig with invalid pubkeys",
                 script=ByteArray(
-                    "5141042200007353455857696b696c65616b73204361626c6567617465204261636b75700a0a6"
-                    "361626c65676174652d3230313031323034313831312e377a0a0a446f41046e6c6f61642074686520666f6c6"
-                    "c6f77696e67207472616e73616374696f6e732077697468205361746f736869204e616b616d6f746f2773206"
-                    "46f776e6c6f61410420746f6f6c2077686963680a63616e20626520666f756e6420696e207472616e7361637"
-                    "4696f6e2036633533636439383731313965663739376435616463636453ae"
+                    "5141042200007353455857696b696c65616b73204361626c6567617465"
+                    "204261636b75700a0a6361626c65676174652d32303130313230343138"
+                    "31312e377a0a0a446f41046e6c6f61642074686520666f6c6c6f77696e"
+                    "67207472616e73616374696f6e732077697468205361746f736869204e"
+                    "616b616d6f746f277320646f776e6c6f61410420746f6f6c2077686963"
+                    "680a63616e20626520666f756e6420696e207472616e73616374696f6e"
+                    "2036633533636439383731313965663739376435616463636453ae"
                 ),
                 addrs=[],
                 exception="isn't on secp256k1 curve",
@@ -2524,10 +2065,12 @@ class TestTxScript(unittest.TestCase):
             test(
                 name="1 of 3 multisig with invalid pubkeys 2",
                 script=ByteArray(
-                    "514104633365633235396337346461636536666430383862343463656638630a6336366263313"
-                    "9393663386239346133383131623336353631386665316539623162354104636163636539393361333938386"
-                    "134363966636336643664616266640a323636336366613963663463303363363039633539336333653931666"
-                    "56465373032392102323364643432643235363339643338613663663530616234636434340a00000053ae"
+                    "514104633365633235396337346461636536666430383862343463656"
+                    "638630a63363662633139393663386239346133383131623336353631"
+                    "386665316539623162354104636163636539393361333938386134363"
+                    "966636336643664616266640a32363633636661396366346330336336"
+                    "303963353933633365393166656465373032392102323364643432643"
+                    "235363339643338613663663530616234636434340a00000053ae"
                 ),
                 addrs=[],
                 exception="isn't on secp256k1 curve",
@@ -2601,7 +2144,8 @@ class TestTxScript(unittest.TestCase):
 
         # # disabled until Schnorr signatures implemented
         # # mainnet p2pk 13CG6SJ3yHUXo4Cr2RY4THLLJrNFuG3gUg
-        # p2pkCompressedMain = crypto.newAddressPubKey(ByteArray("02192d74d0cb94344c9569c2e77901573d8d7903c3ebec3a957724895dca52c6b4"),
+        # p2pkCompressedMain = crypto.newAddressPubKey(ByteArray(
+        #     "02192d74d0cb94344c9569c2e77901573d8d7903c3ebec3a957724895dca52c6b4"),
         #     mainnet)
 
         p2pkCompressed2Main = crypto.AddressSecpPubKey(
@@ -2613,7 +2157,8 @@ class TestTxScript(unittest.TestCase):
 
         p2pkUncompressedMain = crypto.AddressSecpPubKey(
             ByteArray(
-                "0411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3"
+                "0411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5"
+                "cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3"
             ),
             mainnet,
         )
@@ -2655,13 +2200,21 @@ class TestTxScript(unittest.TestCase):
             # pay-to-pubkey address on mainnet. compressed key. 2
             # test(
             #     p2pkCompressedMain,
-            #     "DATA_33 0x02192d74d0cb94344c9569c2e77901573d8d7903c3ebec3a957724895dca52c6b4 CHECKSIG",
+            #     (
+            #         "DATA_33"
+            #         " 0x02192d74d0cb94344c9569c2e77901573d8d7903c3ebec3a957724895dca52c6b4"
+            #         " CHECKSIG"
+            #     ),
             #     False,
             # ),
             # pay-to-pubkey address on mainnet. compressed key (other way). 3
             test(
                 p2pkCompressed2Main,
-                "DATA_33 0x03b0bd634234abbb1ba1e986e884185c61cf43e001f9137f23c2c409273eb16e65 CHECKSIG",
+                (
+                    "DATA_33"
+                    " 0x03b0bd634234abbb1ba1e986e884185c61cf43e001f9137f23c2c409273eb16e65"
+                    " CHECKSIG"
+                ),
                 False,
             ),
             # pay-to-pubkey address on mainnet. for Decred this would
@@ -2669,7 +2222,10 @@ class TestTxScript(unittest.TestCase):
             # compressed public keys.
             test(
                 p2pkUncompressedMain,
-                "DATA_33 0x0311db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cac",
+                (
+                    "DATA_33"
+                    " 0x0311db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cac"
+                ),
                 False,
             ),
             # Unsupported address type.
@@ -2790,8 +2346,10 @@ class TestTxScript(unittest.TestCase):
 
         for num, serialized in tests:
             gotBytes = txscript.scriptNumBytes(num)
-            assert gotBytes == serialized, (
-                str(num) + ": wanted " + serialized.hex() + ", got " + gotBytes.hex()
+            self.assertEqual(
+                gotBytes,
+                serialized,
+                (str(num) + ": wanted " + serialized.hex() + ", got " + gotBytes.hex()),
             )
 
 

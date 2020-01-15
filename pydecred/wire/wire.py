@@ -62,7 +62,7 @@ MaxBlockPayloadV3 = 1000000  # Not actually 1MB which would be 1024 * 1024
 # MaxBlockPayload is the maximum bytes a block message can be in bytes.
 MaxBlockPayload = 1310720  # 1.25MB
 
-# ProtocolVersion is the latest protocol version this package supports.
+# ProtocolVersion (pver) is the latest protocol version this package supports.
 ProtocolVersion = 6
 
 # TxTreeRegular is the value for a normal transaction tree for a
@@ -149,6 +149,7 @@ def readVarInt(b, pver):  # r io.Reader, pver uint32) (uint64, error) {
     """
     discriminant = b.pop(1).int()
     rv = 0
+    err_msg = "ReadVarInt noncanon error: {} - {} <= {}"
     if discriminant == 0xFF:
         rv = b.pop(8).unLittle().int()
 
@@ -156,9 +157,8 @@ def readVarInt(b, pver):  # r io.Reader, pver uint32) (uint64, error) {
         # encoded using fewer bytes.
         minRv = 0x100000000
         if rv < minRv:
-            raise Exception(
-                "ReadVarInt noncanon error: %d - %d <= %d" % (rv, discriminant, minRv)
-            )
+            raise ValueError(err_msg.format(rv, discriminant, minRv))
+
     elif discriminant == 0xFE:
         rv = b.pop(4).unLittle().int()
 
@@ -166,9 +166,7 @@ def readVarInt(b, pver):  # r io.Reader, pver uint32) (uint64, error) {
         # encoded using fewer bytes.
         minRv = 0x10000
         if rv < minRv:
-            raise Exception(
-                "ReadVarInt noncanon error: %d - %d <= %d" % (rv, discriminant, minRv)
-            )
+            raise ValueError(err_msg.format(rv, discriminant, minRv))
 
     elif discriminant == 0xFD:
         rv = b.pop(2).unLittle().int()
@@ -177,9 +175,7 @@ def readVarInt(b, pver):  # r io.Reader, pver uint32) (uint64, error) {
         # encoded using fewer bytes.
         minRv = 0xFD
         if rv < minRv:
-            raise Exception(
-                "ReadVarInt noncanon error: %d - %d <= %d" % (rv, discriminant, minRv)
-            )
+            raise ValueError(err_msg.format(rv, discriminant, minRv))
 
     else:
         rv = discriminant

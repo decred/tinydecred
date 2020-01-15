@@ -43,3 +43,8 @@ class TestMnemonic(unittest.TestCase):
             )
             unSeed = mnemonic.decode(words.split())
             self.assertEqual(seed, unSeed)
+
+    def test_bad_paths(self):
+        wordlists = (["", "meme"], ["acme", "kiwi"])
+        for wordlist in wordlists:
+            self.assertRaises(Exception, mnemonic.decode, wordlist)

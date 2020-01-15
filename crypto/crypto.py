@@ -68,7 +68,7 @@ class CrazyKeyError(Exception):
     """
     Both derived public or private keys rely on treating the left 32-byte
     sequence calculated above (Il) as a 256-bit integer that must be within the
-    valid range for a secp256k1 private key.  There is a small chance
+    valid range for a secp256k1 private key.  There is an extremely tiny chance
     (< 1 in 2^127) this condition will not hold, and in that case, a child
     extended key can't be created for this index and the caller should simply
     increment to the next index.
@@ -116,11 +116,12 @@ class AddressPubKeyHash:
     """
 
     def __init__(self, netID=None, pkHash=None, sigType=STEcdsaSecp256k1):
-        if len(pkHash) != 20:
-            raise Exception("AddressPubKeyHash expected 20 bytes, got %d" % len(pkHash))
+        pkh_len = len(pkHash)
+        if pkh_len != 20:
+            raise ValueError(f"AddressPubKeyHash expected 20 bytes, got {pkh_len}")
         # For now, just reject anything except secp256k1
         if sigType != STEcdsaSecp256k1:
-            raise Exception("unsupported signature type %v", self.sigType)
+            raise NotImplementedError(f"unsupported signature type {sigType}")
         self.sigType = sigType
         self.netID = netID
         self.pkHash = pkHash
@@ -183,7 +184,7 @@ class AddressSecpPubKey:
         elif fmt == 0x04:
             pkFormat = PKFUncompressed
         else:
-            raise Exception("unknown pubkey format %d", fmt)
+            raise NotImplementedError("unknown pubkey format %d", fmt)
         self.pubkeyFormat = pkFormat
         self.netID = self.pubkeyID = net.PubKeyAddrID
         self.pubkeyHashID = net.PubKeyHashAddrID
@@ -199,7 +200,7 @@ class AddressSecpPubKey:
             return self.pubkey.serializeUncompressed()
         elif fmt == PKFCompressed:
             return self.pubkey.serializeCompressed()
-        raise Exception("unknown pubkey format")
+        raise NotImplementedError("unknown pubkey format")
 
     def string(self):
         """
@@ -405,9 +406,8 @@ def modInv(a, m):
     """
     g, x, y = egcd(a, m)
     if g != 1:
-        raise Exception("modular inverse does not exist")
-    else:
-        return x % m
+        raise ValueError("modular inverse does not exist")
+    return x % m
 
 
 def hashH(b):
@@ -453,43 +453,45 @@ def b58CheckDecode(s):
     """
     decoded = b58decode(s)
     if len(decoded) < 6:
-        raise Exception("decoded lacking version/checksum")
+        raise ValueError("decoded lacking version/checksum")
     version = decoded[:2]
-    cksum = decoded[len(decoded) - 4 :]
-    if checksum(decoded[: len(decoded) - 4]) != cksum:
-        raise Exception("checksum error")
+    included_cksum = decoded[len(decoded) - 4 :]
+    computed_cksum = checksum(decoded[: len(decoded) - 4])
+    if included_cksum != computed_cksum:
+        raise ValueError("checksum error")
     payload = ByteArray(decoded[2 : len(decoded) - 4])
     return payload, version
 
 
 def newAddressPubKey(decoded, net):
     """
-    NewAddressPubKey returns a new Address. decoded must be 33 bytes. This
+    newAddressPubKey returns a new Address. decoded must be 33 bytes. This
     constructor takes the decoded pubkey such as would be decoded from a base58
     string. The first byte indicates the signature suite. For compressed
     secp256k1 pubkeys, use AddressSecpPubKey directly.
     """
-    if len(decoded) == 33:
-        # First byte is the signature suite and ybit.
-        suite = decoded[0]
-        suite &= 127
-        ybit = not (decoded[0] & (1 << 7) == 0)
-        toAppend = 0x02
-        if ybit:
-            toAppend = 0x03
+    if len(decoded) != 33:
+        raise NotImplementedError(f"unable to decode pubkey of length {len(decoded)}")
+    # First byte is the signature suite and ybit.
+    suite = decoded[0]
+    suite &= 127
+    ybit = not (decoded[0] & (1 << 7) == 0)
+    toAppend = 0x02
+    if ybit:
+        toAppend = 0x03
 
-        if suite == STEcdsaSecp256k1:
-            b = ByteArray(toAppend) + decoded[1:]
-            return AddressSecpPubKey(b, net)
-        elif suite == STEd25519:
-            # return NewAddressEdwardsPubKey(decoded, net)
-            raise Exception("Edwards signatures not implemented")
-        elif suite == STSchnorrSecp256k1:
-            # return NewAddressSecSchnorrPubKey(append([]byte{toAppend}, decoded[1:]...), net)
-            raise Exception("Schnorr signatures not implemented")
-        else:
-            raise Exception("unknown address type %d" % suite)
-    raise Exception("unable to decode pubkey of length %d" % len(decoded))
+    if suite == STEcdsaSecp256k1:
+        b = ByteArray(toAppend) + decoded[1:]
+        return AddressSecpPubKey(b, net)
+    elif suite == STEd25519:  # nocover
+        # return NewAddressEdwardsPubKey(decoded, net)
+        raise NotImplementedError("Edwards signatures not implemented")
+    elif suite == STSchnorrSecp256k1:  # nocover
+        # return NewAddressSecSchnorrPubKey(
+        #     append([]byte{toAppend}, decoded[1:]...), net)
+        raise NotImplementedError("Schnorr signatures not implemented")
+    else:
+        raise NotImplementedError("unknown address type %d" % suite)
 
 
 def newAddressPubKeyHash(pkHash, net, algo):
@@ -506,15 +508,15 @@ def newAddressPubKeyHash(pkHash, net, algo):
     """
     if algo == STEcdsaSecp256k1:
         netID = net.PubKeyHashAddrID
-    elif algo == STEd25519:
+        return AddressPubKeyHash(netID, pkHash)
+    elif algo == STEd25519:  # nocover
         # netID = net.PKHEdwardsAddrID
-        raise Exception("Edwards not implemented")
-    elif algo == STSchnorrSecp256k1:
+        raise NotImplementedError("Edwards not implemented")
+    elif algo == STSchnorrSecp256k1:  # nocover
         # netID = net.PKHSchnorrAddrID
-        raise Exception("Schnorr not implemented")
+        raise NotImplementedError("Schnorr not implemented")
     else:
-        raise Exception("unknown ECDSA algorithm")
-    return AddressPubKeyHash(netID, pkHash)
+        raise NotImplementedError("unknown ECDSA algorithm")
 
 
 def newAddressScriptHash(script, net):
@@ -544,7 +546,7 @@ def newAddressScriptHashFromHash(scriptHash, net):
         AddressScriptHash: An address object.
     """
     if len(scriptHash) != RIPEMD160_SIZE:
-        raise Exception("incorrect script hash length")
+        raise ValueError("incorrect script hash length")
     return AddressScriptHash(net.ScriptHashAddrID, scriptHash)
 
 
@@ -580,10 +582,8 @@ class ExtendedKey:
             isPrivate (bool): Whether the key is a private or public key.
         """
         if len(privVer) != 4 or len(pubVer) != 4:
-            raise AssertionError(
-                "Network version bytes of incorrect lengths %d and %d"
-                % (len(privVer), len(pubVer))
-            )
+            msg = "Network version bytes of incorrect lengths {} and {}"
+            raise ValueError(msg.format(len(privVer), len(pubVer)))
         self.privVer = ByteArray(privVer)
         self.pubVer = ByteArray(pubVer)
         self.key = ByteArray(key)
@@ -895,7 +895,7 @@ class ExtendedKey:
             ByteArray: The serialized extended key.
         """
         if self.key.iszero():
-            raise Exception("unexpected zero key")
+            raise ValueError("unexpected zero key")
 
         childNumBytes = ByteArray(self.childNum, length=4)
         depthByte = ByteArray(self.depth % 256, length=1)
@@ -982,27 +982,27 @@ def decodeExtendedKey(net, cryptoKey, key):
         ExtendedKey: The decoded key.
     """
     decoded = decrypt(cryptoKey, key)
-    if len(decoded) != SERIALIZED_KEY_LENGTH + 4:
-        raise Exception("decoded private key is wrong length")
+    decoded_len = len(decoded)
+    if decoded_len != SERIALIZED_KEY_LENGTH + 4:
+        raise ValueError(f"decoded private key is wrong length: {decoded_len}")
 
     # The serialized format is:
     #   version (4) || depth (1) || parent fingerprint (4)) ||
     #   child num (4) || chain code (32) || key data (33) || checksum (4)
 
     # Split the payload and checksum up and ensure the checksum matches.
-    payload = decoded[: len(decoded) - 4]
-    checkSum = decoded[len(decoded) - 4 :]
-    if checkSum != checksum(payload.b)[:4]:
-        raise Exception("wrong checksum")
+    payload = decoded[: decoded_len - 4]
+    included_cksum = decoded[decoded_len - 4 :]
+    computed_cksum = checksum(payload.b)[:4]
+    if included_cksum != computed_cksum:
+        raise ValueError("wrong checksum")
 
     # Ensure the version encoded in the payload matches the provided network.
     privVersion = net.HDPrivateKeyID
     pubVersion = net.HDPublicKeyID
     version = payload[:4]
-    if version != privVersion and version != pubVersion:
-        raise Exception(
-            "unknown versions %r %r %r" % (privVersion, pubVersion, version)
-        )
+    if version not in (privVersion, pubVersion):
+        raise ValueError(f"Unknown versions {privVersion} {pubVersion} {version}")
 
     # Deserialize the remaining payload fields.
     depth = payload[4:5].int()
@@ -1019,8 +1019,8 @@ def decodeExtendedKey(net, cryptoKey, key):
         # of the order of the secp256k1 curve and not be 0.
         keyData = keyData[1:]
         # if keyNum.Cmp(secp256k1.S256().N) >= 0 || keyNum.Sign() == 0 {
-        if keyData >= Curve.N or keyData.iszero():
-            raise Exception("unusable key")
+        if (keyData >= Curve.N) or keyData.iszero():
+            raise ValueError("unusable key")
         # Ensure the public key parses correctly and is actually on the
         # secp256k1 curve.
         Curve.publicKey(keyData.int())
@@ -1040,8 +1040,8 @@ def decodeExtendedKey(net, cryptoKey, key):
 
 DEFAULT_KDF_PARAMS = {
     "func": "pbkdf2_hmac",
-    "iterations": 100000,
     "hash_name": "sha256",
+    "iterations": 100000,
 }
 
 
@@ -1064,11 +1064,11 @@ class KDFParams(object):
     """
 
     def __init__(self, salt, digest):
+        self.salt = salt
+        self.digest = digest
         func, hn, its = defaultKDFParams()
         self.kdfFunc = func
         self.hashName = hn
-        self.salt = salt
-        self.digest = digest
         self.iterations = its
 
     @staticmethod
@@ -1125,7 +1125,7 @@ class SecretKey(object):
         super().__init__()
         salt = ByteArray(rando.generateSeed(KEY_SIZE))
         b = lambda v: ByteArray(v).bytes()
-        func, hashName, iterations = defaultKDFParams()
+        _, hashName, iterations = defaultKDFParams()
         self.key = ByteArray(
             hashlib.pbkdf2_hmac(hashName, b(pw), salt.bytes(), iterations)
         )
@@ -1183,17 +1183,16 @@ class SecretKey(object):
         sk = SecretKey(b"")
         sk.keyParams = kp
         func = kp.kdfFunc
-        if func == "pbkdf2_hmac":
-            sk.key = ByteArray(
-                hashlib.pbkdf2_hmac(
-                    kp.hashName, bytes(password), bytes(kp.salt), kp.iterations
-                )
+        if func != "pbkdf2_hmac":
+            raise ValueError("unknown key derivation function")
+        sk.key = ByteArray(
+            hashlib.pbkdf2_hmac(
+                kp.hashName, bytes(password), bytes(kp.salt), kp.iterations
             )
-        else:
-            raise Exception("unkown key derivation function")
+        )
         checkDigest = ByteArray(hashlib.sha256(sk.key.b).digest())
         if checkDigest != kp.digest:
-            raise Exception("rekey digest check failed")
+            raise ValueError("rekey digest check failed")
         return sk
 
 

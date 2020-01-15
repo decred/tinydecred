@@ -1,22 +1,24 @@
 """
 Copyright (c) 2019, Brian Stafford
+Copyright (c) 2019, The Decred developers
 See LICENSE for details
 """
 
 import calendar
+import configparser
+import json
 import logging
 from logging.handlers import RotatingFileHandler
 import os
+from os.path import expanduser
+import platform
 import shutil
 import sys
 from tempfile import TemporaryDirectory
 import time
 import traceback
-from os.path import expanduser
-import platform
+
 from appdirs import AppDirs
-import configparser
-import json
 
 
 def formatTraceback(e):
