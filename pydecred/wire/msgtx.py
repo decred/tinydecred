@@ -49,7 +49,6 @@ MaxTxInSequenceNum = 0xFFFFFFFF
 
 
 def writeOutPoint(pver, ver, op):
-    # w io.Writer, pver uint32, version uint16, op *OutPoint) error {
     """
     writeOutPoint encodes op to the Decred protocol encoding for an OutPoint
     to w.
@@ -61,7 +60,6 @@ def writeOutPoint(pver, ver, op):
 
 
 def readOutPoint(b, pver, ver):
-    # r io.Reader, pver uint32, version uint16, op *OutPoint) error {
     """
     readOutPoint reads the next sequence of bytes from r as an OutPoint.
     """
@@ -73,7 +71,6 @@ def readOutPoint(b, pver, ver):
 
 
 def readTxInPrefix(b, pver, serType, ver, ti):
-    # r io.Reader, pver uint32, serType TxSerializeType, version uint16, ti *TxIn
     if serType == wire.TxSerializeOnlyWitness:
         raise ValueError(
             "readTxInPrefix: tried to read a prefix input for a witness only tx"
@@ -87,7 +84,6 @@ def readTxInPrefix(b, pver, serType, ver, ti):
 
 
 def writeTxInPrefix(pver, ver, ti):
-    # pver uint32, version uint16, ti *TxIn) error {
     """
     writeTxInPrefixs encodes ti to the Decred protocol encoding for a transaction
     input (TxIn) prefix to w.
@@ -98,7 +94,6 @@ def writeTxInPrefix(pver, ver, ti):
 
 
 def writeTxInWitness(pver, ver, ti):
-    # w io.Writer, pver uint32, version uint16, ti *TxIn) error {
     """
     writeTxWitness encodes ti to the Decred protocol encoding for a transaction
     input (TxIn) witness to w.
@@ -118,7 +113,6 @@ def writeTxInWitness(pver, ver, ti):
 
 
 def readScript(b, pver, maxAllowed, fieldName):
-    # r io.Reader, pver uint32, maxAllowed uint32, fieldName string) ([]byte, error) {
     """
     readScript reads a variable length byte array that represents a transaction
     script.  It is encoded as a varInt containing the length of the array
@@ -143,7 +137,6 @@ def readScript(b, pver, maxAllowed, fieldName):
 
 
 def readTxInWitness(b, pver, ver, ti):
-    # r io.Reader, pver uint32, version uint16, ti *TxIn) error {
     """
     readTxInWitness reads the next sequence of bytes from r as a transaction input
     (TxIn) in the transaction witness.
@@ -166,7 +159,6 @@ def readTxInWitness(b, pver, ver, ti):
 
 
 def readTxOut(b, pver, ver, to):
-    # r io.Reader, pver uint32, version uint16, to *TxOut) error {
     """
     # readTxOut reads the next sequence of bytes from r as a transaction output (TxOut).
     """
@@ -179,7 +171,6 @@ def readTxOut(b, pver, ver, to):
 
 
 def writeTxOut(pver, ver, to):
-    # w io.Writer, pver uint32, version uint16, to *TxOut) error {
     """
     writeTxOut encodes to into the Decred protocol encoding for a transaction
     output (TxOut) to w.
@@ -837,8 +828,11 @@ class MsgTx:
 
 # fmt: off
 
-# multiTxPrefix is a MsgTx prefix with an input and output and used in various tests.
+
 def multiTxPrefix():
+    """
+    multiTxPrefix is a MsgTx prefix with an input and output and used in various tests.
+    """
     return MsgTx(
         cachedHash=None,
         serType=wire.TxSerializeNoWitness,

@@ -493,7 +493,7 @@ class ScriptTokenizer:
 
         # The only remaining case is an opcode with length zero which is
         # impossible.
-        assert False, "unreachable"
+        raise AssertionError("unreachable")
 
     def done(self):
         """
