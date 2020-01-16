@@ -36,10 +36,9 @@ class TestEncode(unittest.TestCase):
         c |= 0
         self.assertEqual(a, zero)
 
-        # FIXME: This new test is failing, not sure why.
-        # a = makeA()
-        # c = makeC()
-        # self.assertEqual(a & c, zero)
+        a = makeA()
+        c = makeC()
+        self.assertEqual(a & c, zero)
 
         self.assertFalse(makeA().iseven())
         self.assertTrue(makeB().iseven())
