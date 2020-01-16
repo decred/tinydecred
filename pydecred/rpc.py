@@ -105,7 +105,7 @@ class Client(object):
 
     def getInfo(self):
         """
-        Returns a JSON object containing various state info.
+        Returns various state info.
 
         Returns:
             InfoChainResult: Various state info.
@@ -123,7 +123,7 @@ class Client(object):
 
     def getMiningInfo(self):
         """
-        Returns a JSON object containing mining-related information.
+        Returns mining-related information.
 
         Returns:
             GetMiningInfoResult: The minig information.
@@ -132,7 +132,7 @@ class Client(object):
 
     def getNetTotals(self):
         """
-        Returns a JSON object containing network traffic statistics.
+        Returns network traffic statistics.
 
         Returns:
             GetNetTotalsResult: The network traffic stats.
@@ -156,7 +156,7 @@ class Client(object):
 
     def getNetworkInfo(self):
         """
-        Returns a JSON object containing network-related information.
+        Returns network-related information.
 
         Returns:
             GetNetworkInfoResult: The network-related info.
@@ -178,8 +178,9 @@ class Client(object):
         memory pool.
 
         Arg:
-            verbose (bool) Optional. Default=false. Returns JSON object when
-                true or an array of transaction hashes when false.
+            verbose (bool) Optional. Default=false. Returns a list of
+                GetRawMempoolVerboseResult when true or a list of transaction
+                hashes when false.
             txtype (str) Optional. Default=None. Type of tx to return.
                 (all/regular/tickets/votes/revocations).
 
@@ -362,7 +363,7 @@ class Client(object):
     def searchRawTransactions(
         self,
         address,
-        verbose=1,
+        verbose=True,
         skip=0,
         count=100,
         vinextra=0,
@@ -382,34 +383,35 @@ class Client(object):
 
         Args:
             address (str): The Decred address to search for
-            verbose (int): Optional. default=1. Specifies the transaction is returned as a JSON
-                object instead of hex-encoded string.
-            skip (int): Optional. Default=0. The number of leading transactions to leave out of the
-                final response.
-            count (int): Optional. Default=100. The maximum number of transactions to return.
-            vinextra (int): Optional. Default=0. Specify that extra data from previous output will be
-                returned in vin.
-            reverse (bool): Optional. Default=False. Specifies that the transactions should be returned
-                in reverse chronological order.
-            filterAddrs (list(str)): Optional. Default=[]. Only inputs or outputs with matching
-                address will be returned.
+            verbose (bool): Optional. default=True. Specifies the transaction
+                is returned as a list of RawTransactionsResult instead of
+                hex-encoded strings.
+            skip (int): Optional. Default=0. The number of leading transactions
+                to leave out of the final response.
+            count (int): Optional. Default=100. The maximum number of
+                transactions to return.
+            vinextra (int): Optional. Default=0. Specify that extra data from
+                previous output will be returned in vin.
+            reverse (bool): Optional. Default=False. Specifies that the
+                transactions should be returned in reverse chronological order.
+            filterAddrs (list(str)): Optional. Default=[]. Only inputs or
+                outputs with matching address will be returned.
 
         Returns:
             list(RawTransactionResult): The RawTransactionResults.
         """
-        return [
-            RawTransactionsResult.parse(rawTx)
-            for rawTx in self.call(
-                "searchrawtransactions",
-                address,
-                verbose,
-                skip,
-                count,
-                vinextra,
-                reverse,
-                filterAddrs if filterAddrs else [],
-            )
-        ]
+        verb = 1 if verbose else 0
+        res = self.call(
+            "searchrawtransactions",
+            address,
+            verb,
+            skip,
+            count,
+            vinextra,
+            reverse,
+            filterAddrs if filterAddrs else [],
+        )
+        return [RawTransactionsResult.parse(rawTx) for rawTx in res] if verbose else res
 
     def sendRawTransaction(self, msgTx, allowHighFees=False):
         """
@@ -1119,7 +1121,7 @@ class GetTxOutResult:
             confirmations (int): The number of confirmations
             value (float): The transaction amount in DCR
             scriptPubKey (ScriptPubKeyResult): The public key script used to pay
-                coins as a JSON object
+                coins.
             version (int): The transaction version
             coinbase (bool): Whether or not the transaction is a coinbase
         """
@@ -1811,8 +1813,8 @@ class RawTransactionsResult:
             version (int): The transaction version.
             locktime (int): The transaction lock time.
             expiry (int): The transacion expiry.
-            vin (list(object)): The transaction inputs as JSON objects.
-            vout (list(object)): The transaction outputs as JSON objects.
+            vin (list(object)): The transaction inputs.
+            vout (list(object)): The transaction outputs.
             txHex (str): Hex-encoded transaction or None.
             blockHash (str): The hash of the block the contains the transaction or None.
             blockHeight (int): The height of the block that contains the transaction or None.
@@ -1925,7 +1927,7 @@ class Vin:
             blockIndex (int): The merkle tree index of the origin transaction
                 (non-coinbase txns only) or None.
             scriptSig (object): The signature script used to redeem the origin
-                transaction as a JSON object (non-coinbase txns only) or None.
+                transaction (non-coinbase txns only) or None.
             prevOut (object): Data from the origin transaction output with index
                 vout or None.
             sequence (int) The script sequence number or None.
@@ -2017,8 +2019,7 @@ class Vout:
             value (float): The amount in DCR.
             n (int): The index of this transaction output.
             version (int): The version of the vout.
-            scriptPubKey (object): The public key script used to pay coins as a
-                JSON object.
+            scriptPubKey (object): The public key script used to pay coins.
         """
         self.value = value
         self.n = n

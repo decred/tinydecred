@@ -136,6 +136,11 @@ def test_rpc(config):
     )
     assert isinstance(searchRawTransactions[0], rpc.RawTransactionsResult)
 
+    searchRawTransactions = rpcClient.searchRawTransactions(
+        "Dcur2mcGjmENx4DhNqDctW5wJCVyT3Qeqkx", 0,
+    )
+    assert isinstance(searchRawTransactions[0], str)
+
     ticketFeeInfo = rpcClient.ticketFeeInfo()
     assert isinstance(ticketFeeInfo, rpc.TicketFeeInfoResult)
 
