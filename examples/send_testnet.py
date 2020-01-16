@@ -15,8 +15,8 @@ from tinydecred import config
 # Set the configuration for testnet before loading TD modules.
 config.load("testnet")
 
-from tinydecred.pydecred import testnet
-from tinydecred.pydecred.dcrdata import DcrdataBlockchain
+from tinydecred.dcr import testnet
+from tinydecred.dcr.dcrdata import DcrdataBlockchain
 from tinydecred.wallet.wallet import Wallet
 
 

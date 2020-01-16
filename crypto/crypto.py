@@ -13,10 +13,10 @@ from base58 import b58encode, b58decode
 from blake256.blake256 import blake_hash
 import nacl.secret
 
-from tinydecred.util.encode import ByteArray
-from tinydecred.crypto import rando
-from tinydecred.crypto.secp256k1.curve import curve as Curve, PublicKey, PrivateKey
-from tinydecred.util import encode
+from ..util import encode
+from ..util.encode import ByteArray
+from . import rando
+from .secp256k1.curve import curve as Curve, PublicKey, PrivateKey
 
 
 KEY_SIZE = 32

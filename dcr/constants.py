@@ -4,7 +4,9 @@ See LICENSE for details
 
 Just some constants.
 """
+
 import os
+
 
 PYDECRED_PACKAGEDIR = os.path.dirname(os.path.realpath(__file__))
 FAVICON = os.path.join(PYDECRED_PACKAGEDIR, "favicon-32x32.png")

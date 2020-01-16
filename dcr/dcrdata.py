@@ -5,24 +5,26 @@ See LICENSE for details
 
 DcrdataClient.endpointList() for available enpoints.
 """
+
 from urllib.parse import urlparse, urlencode
 
-import time
+import atexit
 import calendar
-import threading
+import json
+import select
 import ssl
 import sys
-import select
-import atexit
+import threading
+import time
 import websocket
-import json
-from tinydecred.util import helpers, database, tinyhttp
-from tinydecred.crypto import crypto
-from tinydecred.util import encode, chains
-from tinydecred.wallet import api
-from tinydecred.pydecred import txscript, calc, account
-from tinydecred.pydecred.wire import msgtx, wire, msgblock
-from tinydecred.util.database import KeyValueDatabase
+
+from ..crypto import crypto
+from ..util import chains, database, encode, helpers, tinyhttp
+from ..util.database import KeyValueDatabase
+from ..wallet import api
+from . import account, calc, txscript
+from .wire import msgblock, msgtx, wire
+
 
 ByteArray = encode.ByteArray
 BuildyBytes = encode.BuildyBytes

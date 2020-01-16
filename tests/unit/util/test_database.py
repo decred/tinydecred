@@ -6,8 +6,7 @@ See LICENSE for details
 import os.path
 import unittest
 
-from tinydecred.util import database
-from tinydecred.util import helpers
+from tinydecred.util import database, helpers
 from tinydecred.util.encode import ByteArray
 
 

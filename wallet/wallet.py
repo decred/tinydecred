@@ -3,12 +3,16 @@ Copyright (c) 2019, Brian Stafford
 Copyright (c) 2019, The Decred developers
 See LICENSE for details
 """
+
 from threading import Lock as Mutex
-from tinydecred.util import helpers, encode, chains
-from tinydecred.util.database import KeyValueDatabase
-from tinydecred.crypto import crypto, mnemonic, rando
-from tinydecred.wallet import accounts
+
 from tinydecred import config
+
+from ..util import chains, encode, helpers
+from ..util.database import KeyValueDatabase
+from ..crypto import crypto, mnemonic, rando
+from . import accounts
+
 
 cfg = config.load()
 

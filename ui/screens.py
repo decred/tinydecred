@@ -2,17 +2,22 @@
 Copyright (c) 2019, Brian Stafford
 See LICENSE for detail
 """
+
 import os
-import time
 import random
+import time
 from urllib.parse import urlparse
+
 from PyQt5 import QtGui, QtCore, QtWidgets
+
 from tinydecred import config
-from tinydecred.ui import qutilities as Q, ui
-from tinydecred.wallet.wallet import Wallet
+from tinydecred.dcr import constants as DCR
+from tinydecred.dcr.vsp import VotingServiceProvider
 from tinydecred.util import helpers, chains
-from tinydecred.pydecred import constants as DCR
-from tinydecred.pydecred.vsp import VotingServiceProvider
+from tinydecred.wallet.wallet import Wallet
+
+from . import qutilities as Q, ui
+
 
 UI_DIR = os.path.dirname(os.path.realpath(__file__))
 log = helpers.getLogger("APPUI")  # , logLvl=0)
@@ -530,10 +535,10 @@ class HomeScreen(Screen):
         """
         A BALANCE_SIGNAL receiver that updates the displayed balance.
         """
-        dcr = bal.total * 1e-8 // 0.01 * 0.01
+        dcrs = bal.total * 1e-8 // 0.01 * 0.01
         availStr = "%.8f" % (bal.available * 1e-8,)
-        self.totalBalance.setText("{0:,.2f}".format(dcr))
-        self.totalBalance.setToolTip("%.8f" % dcr)
+        self.totalBalance.setText("{0:,.2f}".format(dcrs))
+        self.totalBalance.setToolTip("%.8f" % dcrs)
         self.availBalance.setText("%s spendable" % availStr.rstrip("0").rstrip("."))
         staked = bal.staked / bal.total if bal.total > 0 else 0
         self.statsLbl.setText("%s%% staked" % helpers.formatNumber(staked * 100))

@@ -6,16 +6,16 @@ See LICENSE for details
 from base58 import b58decode
 import json
 import os
-import unittest
 from tempfile import TemporaryDirectory
 import time
+import unittest
 
 
 from tinydecred.crypto import crypto, opcode, rando
 from tinydecred.crypto.secp256k1 import curve as Curve
-from tinydecred.pydecred import account, mainnet, testnet, txscript, vsp
-from tinydecred.pydecred.calc import SubsidyCache
-from tinydecred.pydecred.wire import msgtx, wire
+from tinydecred.dcr import account, mainnet, testnet, txscript, vsp
+from tinydecred.dcr.calc import SubsidyCache
+from tinydecred.dcr.wire import msgtx, wire
 from tinydecred.util import database
 from tinydecred.util.encode import ByteArray
 from tinydecred.wallet.accounts import createAccount

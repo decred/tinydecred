@@ -6,7 +6,7 @@ matplotlib. The matplotlib package is not a tinydecred dependency, so it should
 be installed separately with `pip3 install matplotlib`.
 """
 
-from tinydecred.pydecred.dcrdata import DcrdataClient
+from tinydecred.dcr.dcrdata import DcrdataClient
 from tinydecred.util.helpers import mktime
 
 try:

@@ -4,7 +4,8 @@ See LICENSE for details
 """
 
 import unittest
-from tinydecred.pydecred import testnet, vsp
+
+from tinydecred.dcr import testnet, vsp
 
 
 class TestVSPLive(unittest.TestCase):

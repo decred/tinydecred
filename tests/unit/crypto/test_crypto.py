@@ -6,7 +6,7 @@ See LICENSE for details
 import unittest
 
 from tinydecred.crypto import crypto, rando
-from tinydecred.pydecred import mainnet
+from tinydecred.dcr import mainnet
 from tinydecred.util.encode import ByteArray
 
 

@@ -3,13 +3,13 @@ Copyright (c) 2019, the Decred developers
 See LICENSE for details
 """
 
-import unittest
 import time
+import unittest
 
-from tinydecred.util.encode import ByteArray
-from tinydecred.pydecred.wire import msgtx, wire
 from tinydecred.crypto import rando
+from tinydecred.dcr.wire import msgtx, wire
 from tinydecred.util import helpers
+from tinydecred.util.encode import ByteArray
 
 
 def newHash():

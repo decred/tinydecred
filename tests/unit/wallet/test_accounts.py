@@ -3,15 +3,16 @@ Copyright (c) 2019, the Decred developers
 See LICENSE for details
 """
 
-import unittest
 import os
 from tempfile import TemporaryDirectory
+import unittest
 
 from tinydecred.crypto import crypto, rando
+from tinydecred.dcr import nets
+from tinydecred.util import chains, database, helpers
 from tinydecred.util.encode import ByteArray
-from tinydecred.pydecred import nets
-from tinydecred.util import helpers, database, chains
 from tinydecred.wallet import accounts
+
 
 testSeed = ByteArray(
     "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"

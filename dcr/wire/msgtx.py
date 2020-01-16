@@ -6,9 +6,9 @@ See LICENSE for details
 Based on dcrd MsgTx.
 """
 
-from tinydecred.util.encode import ByteArray
-from tinydecred.crypto.crypto import hashH
-from tinydecred.pydecred.wire import wire
+from ...crypto.crypto import hashH
+from ...util.encode import ByteArray
+from . import wire
 
 
 # TxVersion is the current latest supported transaction version.

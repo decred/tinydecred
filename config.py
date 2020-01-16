@@ -11,8 +11,9 @@ import os
 
 from appdirs import AppDirs
 
-from tinydecred.pydecred import nets
+from tinydecred.dcr import nets
 from tinydecred.util import helpers
+
 
 # Set the data directory in a OS-appropriate location.
 _ad = AppDirs("TinyDecred", False)

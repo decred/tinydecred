@@ -5,9 +5,8 @@ See LICENSE for details
 
 import unittest
 
-from tinydecred.pydecred import mainnet
-from tinydecred.pydecred.calc import SubsidyCache
-
+from tinydecred.dcr import mainnet
+from tinydecred.dcr.calc import SubsidyCache
 from tinydecred.util import chains
 
 

@@ -3,11 +3,11 @@ Copyright (c) 2019, Brian Stafford
 See LICENSE for details
 """
 
-from tinydecred.util import helpers, encode
-from tinydecred.crypto import opcode, crypto
-from tinydecred.pydecred import txscript
-from tinydecred.pydecred.vsp import VotingServiceProvider
-from tinydecred.pydecred import nets
+from ..crypto import opcode, crypto
+from ..util import encode, helpers
+from . import nets, txscript
+from .vsp import VotingServiceProvider
+
 
 log = helpers.getLogger("DCRACCT")
 

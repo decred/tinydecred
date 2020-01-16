@@ -1,10 +1,10 @@
-## PyDecred
+## dcr
 
-PyDecred is a set of modules that enable Decred-compatible blockchain
-applications. The **dcrdata** module contains a dcrdata client and a TinyDecred
-*Blockchain API* implementation.
+dcr is a package that enables Decred-compatible blockchain applications. The
+**dcrdata** module contains a dcrdata client and a TinyDecred *Blockchain API*
+implementation.
 
-The **wire** module mirrors it's dcrd golang counterpart, providing serializable
+The **wire** module mirrors its dcrd golang counterpart, providing serializable
 transactions and blocks.
 
 Network parameters are implemented as modules **mainnet**, **testnet**, and
@@ -19,7 +19,7 @@ including protocol, e.g. `https://explorer.dcrdata.org`. The available endpoints
 are gathered from the server when the client is created.
 
 ```
-from tinydecred.pydecred.dcrdata import DcrdataClient
+from tinydecred.dcr.dcrdata import DcrdataClient
 import json
 
 client = DcrdataClient("https://explorer.dcrdata.org")

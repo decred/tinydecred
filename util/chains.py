@@ -1,4 +1,9 @@
-from tinydecred.pydecred import account as dcracct, nets as dcrnets
+"""
+Copyright (c) 2019, The Decred developers
+See LICENSE for details
+"""
+
+from ..dcr import account as dcracct, nets as dcrnets
 
 
 class BipIDs:

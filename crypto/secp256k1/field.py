@@ -7,8 +7,9 @@ See LICENSE for details
 from base64 import b64decode
 from zlib import decompress as zdecompress
 
-from tinydecred.util.encode import ByteArray
-from tinydecred.crypto.secp256k1.bytepoints import secp256k1BytePoints
+from ...util.encode import ByteArray
+from .bytepoints import secp256k1BytePoints
+
 
 # Constants used to make the code more readable.
 twoBitsMask = 0x03

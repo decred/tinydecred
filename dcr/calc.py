@@ -4,10 +4,13 @@ See LICENSE for details
 
 Some network math.
 """
-import math
+
 import bisect
-from tinydecred.util import helpers
-from tinydecred.pydecred import constants as C, mainnet
+import math
+
+from ..util import helpers
+from . import constants as C, mainnet
+
 
 NETWORK = mainnet
 MODEL_DEVICE = {

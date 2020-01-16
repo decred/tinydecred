@@ -1,9 +1,15 @@
+"""
+Copyright (c) 2019, The Decred developers
+See LICENSE for details
+"""
+
 import base64
 import ssl
-from tinydecred.util import tinyhttp
-from tinydecred.util.encode import ByteArray
-from tinydecred.pydecred.wire.msgtx import MsgTx
-from tinydecred.pydecred.wire.msgblock import BlockHeader
+
+from ..util import tinyhttp
+from ..util.encode import ByteArray
+from .wire.msgblock import BlockHeader
+from .wire.msgtx import MsgTx
 
 
 class Client(object):

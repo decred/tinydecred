@@ -6,7 +6,9 @@ See LICENSE for details
 mainnet holds mainnet parameters. Any values should mirror exactly
 https://github.com/decred/dcrd/blob/master/chaincfg/mainnetparams.go
 """
-import tinydecred.pydecred.constants as C
+
+from . import constants as C
+
 
 Name = "mainnet"
 DefaultPort = "9108"

@@ -1,8 +1,10 @@
 """
-Copyright (c) 2019, Brian Stafford
+Copyright (c) 2019, The Decred developers
+See LICENSE for details
 """
 
-from tinydecred.pydecred import mainnet, testnet, simnet
+from . import mainnet, testnet, simnet
+
 
 mainnet = mainnet
 testnet = testnet

@@ -8,6 +8,7 @@ A class that wraps ByteArray and provides some convenient operators.
 
 import struct
 
+
 NONE = "None".encode()
 
 

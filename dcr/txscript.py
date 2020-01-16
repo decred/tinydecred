@@ -8,11 +8,11 @@ Based on dcrd txscript.
 
 import math
 
-from tinydecred.crypto import crypto, opcode
-from tinydecred.crypto.secp256k1.curve import curve as Curve
-from tinydecred.pydecred.wire import msgtx, wire
-from tinydecred.util import helpers
-from tinydecred.util.encode import ByteArray
+from ..crypto import crypto, opcode
+from ..crypto.secp256k1.curve import curve as Curve
+from ..util import helpers
+from ..util.encode import ByteArray
+from .wire import msgtx, wire
 
 
 log = helpers.getLogger("TXSCRIPT")

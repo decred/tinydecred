@@ -12,8 +12,8 @@ import sys
 from PyQt5 import QtGui, QtCore, QtWidgets
 
 from tinydecred import config
-from tinydecred.pydecred import constants as DCR
-from tinydecred.pydecred.dcrdata import DcrdataBlockchain
+from tinydecred.dcr import constants as DCR
+from tinydecred.dcr.dcrdata import DcrdataBlockchain
 from tinydecred.ui import screens, ui, qutilities as Q
 from tinydecred.util import helpers, database
 from tinydecred.wallet.wallet import Wallet

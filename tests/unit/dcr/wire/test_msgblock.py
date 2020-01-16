@@ -5,8 +5,8 @@ See LICENSE for details
 
 import unittest
 
+from tinydecred.dcr.wire import msgblock
 from tinydecred.util.encode import ByteArray
-from tinydecred.pydecred.wire import msgblock
 
 
 class TestBlockHeader(unittest.TestCase):

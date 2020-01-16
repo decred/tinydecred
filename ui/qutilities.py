@@ -4,9 +4,13 @@ See LICENSE for detail
 
 PyQt5 utilities.
 """
+
 import re
-from tinydecred.util import helpers
+
 from PyQt5 import QtCore, QtWidgets, QtGui
+
+from tinydecred.util import helpers
+
 
 log = helpers.getLogger("QUTIL")  # , logLvl=0)
 

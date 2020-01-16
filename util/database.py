@@ -15,7 +15,6 @@ Blobber API:
 
 import sqlite3
 import threading
-import time
 
 
 class NoValue(Exception):

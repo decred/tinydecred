@@ -4,15 +4,16 @@ See LICENSE for details
 """
 
 import os
-import unittest
 from tempfile import TemporaryDirectory
 import time
+import unittest
 
-from tinydecred.pydecred import mainnet, testnet, txscript, dcrdata, account
-from tinydecred.pydecred.wire import msgtx
 from tinydecred.crypto import crypto, rando
-from tinydecred.util import encode
 from tinydecred.crypto.secp256k1 import curve as Curve
+from tinydecred.dcr import account, dcrdata, mainnet, testnet, txscript
+from tinydecred.dcr.wire import msgtx
+from tinydecred.util import encode
+
 
 ByteArray = encode.ByteArray
 

@@ -1,10 +1,17 @@
-import pytest
+"""
+Copyright (c) 2019, the Decred developers
+See LICENSE for details
+"""
+
 import os
-from tinydecred.pydecred import rpc
-from tinydecred.util.encode import ByteArray
+
+import pytest
+
+from tinydecred.dcr import rpc
+from tinydecred.dcr.wire.msgblock import BlockHeader
+from tinydecred.dcr.wire.msgtx import MsgTx
 from tinydecred.util import helpers
-from tinydecred.pydecred.wire.msgtx import MsgTx
-from tinydecred.pydecred.wire.msgblock import BlockHeader
+from tinydecred.util.encode import ByteArray
 
 
 @pytest.fixture

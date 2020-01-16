@@ -8,10 +8,10 @@ DcrdataClient.endpointList() for available endpoints.
 
 import time
 
-from tinydecred.crypto import crypto
-from tinydecred.pydecred import constants, nets, txscript
-from tinydecred.util import encode, tinyhttp
-from tinydecred.util.encode import ByteArray
+from ..crypto import crypto
+from ..util import encode, tinyhttp
+from ..util.encode import ByteArray
+from . import constants, nets, txscript
 
 
 # The duration purchase info is good for.

@@ -5,7 +5,7 @@ See LICENSE for details
 
 import unittest
 
-from tinydecred.pydecred.wire import wire
+from tinydecred.dcr.wire import wire
 from tinydecred.util import helpers
 from tinydecred.util.encode import ByteArray
 

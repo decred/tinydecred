@@ -8,9 +8,10 @@ module curve
     dcrd golang version.
 """
 
-from tinydecred.util.encode import ByteArray
-from tinydecred.crypto.rando import generateSeed
-from tinydecred.crypto.secp256k1.field import FieldVal, BytePoints
+from ...util.encode import ByteArray
+from ..rando import generateSeed
+from .field import BytePoints, FieldVal
+
 
 COORDINATE_LEN = 32
 PUBKEY_COMPRESSED_LEN = COORDINATE_LEN + 1

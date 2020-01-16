@@ -4,10 +4,12 @@ See LICENSE for details
 
 DcrdataClient.endpointList() for available enpoints.
 """
+
 import json
 from urllib.parse import urlencode
 import urllib.request as urlrequest
-from tinydecred.util.helpers import formatTraceback
+
+from .helpers import formatTraceback
 
 
 def get(uri, **kwargs):

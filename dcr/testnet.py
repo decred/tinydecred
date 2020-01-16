@@ -6,6 +6,7 @@ See LICENSE for details
 testnet holds testnet3 parameters. Any values should mirror exactly
 https://github.com/decred/dcrd/blob/master/chaincfg/testnetparams.go
 """
+
 Name = "testnet3"
 DefaultPort = "19108"
 DNSSeeds = [
