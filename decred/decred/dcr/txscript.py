@@ -228,6 +228,27 @@ mac = crypto.mac
 hashH = crypto.hashH
 
 
+def scriptTree(scriptClass):
+    """
+    Returns wire.TxTreeStake for stake related scripts, else wire.TxTreeRegular.
+
+    Args:
+        scriptClass(int): The script's class.
+
+    Returns:
+        int: The script's tree.
+    """
+    if scriptClass < 0 or scriptClass > 11:
+        raise Exception("unknown script class: {}".format(scriptClass))
+
+    return (
+        wire.TxTreeStake
+        if scriptClass
+        in (StakeSubmissionTy, StakeSubChangeTy, StakeGenTy, StakeRevocationTy)
+        else wire.TxTreeRegular
+    )
+
+
 def canonicalPadding(b):
     """
     canonicalPadding checks whether a big-endian encoded integer could
@@ -996,12 +1017,8 @@ def getStakeOutSubclass(pkScript):
     if err is not None:
         raise err
 
-    if getScriptClass(scriptVersion, pkScript) not in (
-        StakeSubmissionTy,
-        StakeGenTy,
-        StakeRevocationTy,
-        StakeSubChangeTy,
-    ):
+    scriptClass = getScriptClass(scriptVersion, pkScript)
+    if scriptTree(scriptClass) != wire.TxTreeStake:
         raise Exception("not a stake output")
 
     return getScriptClass(scriptVersion, pkScript[1:])
@@ -3120,7 +3137,14 @@ def sstxNullOutputAmounts(amounts, changeAmounts, amountTicket):
 
 
 def makeTicket(
-    params, inputPool, inputMain, addrVote, addrSubsidy, ticketCost, addrPool
+    params,
+    inputPool,
+    inputMain,
+    addrVote,
+    addrSubsidy,
+    ticketCost,
+    addrPool,
+    limits=defaultTicketFeeLimits,
 ):
     """
     makeTicket creates a ticket from a split transaction output. It can optionally
@@ -3135,6 +3159,7 @@ def makeTicket(
         addrSubsidy (Address): Wallet's stake commitment address.
         ticketCost (int): The ticket price.
         addrPool (Address): The pool's commitment address.
+        limits (int): Fee limits to invoke on the spending tx.
 
     Returns:
         wire.MsgTx: The ticket.
@@ -3172,7 +3197,6 @@ def makeTicket(
     addrZeroed = crypto.newAddressPubKeyHash(zeroed, params, crypto.STEcdsaSecp256k1)
 
     # 2. Make an extra commitment to the pool.
-    limits = defaultTicketFeeLimits
     pkScript = generateSStxAddrPush(addrPool, amountsCommitted[0], limits)
     txout = msgtx.TxOut(value=0, pkScript=pkScript,)
     mtx.addTxOut(txout)

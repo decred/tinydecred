@@ -10,8 +10,9 @@ import types
 from decred.util import tinyhttp
 from decred.util.encode import ByteArray
 
+from . import txscript
 from .wire.msgblock import BlockHeader
-from .wire.msgtx import MsgTx
+from .wire.msgtx import MsgTx, TxOut, TxTreeStake
 
 
 def stringify(thing):
@@ -79,6 +80,229 @@ class Client(object):
         if "error" in res and res["error"]:
             raise Exception("%s error: %r" % (method, res["error"]))
         return res["result"]
+
+    def addNode(self, addr, subCmd):
+        """
+        Attempts to add or remove a persistent peer.
+
+        Args:
+            addr (str) IP address and port of the peer to operate on
+            subCmd (str) 'add' to add a persistent peer, 'remove' to remove a
+                persistent peer, or 'onetry' to try a single connection to a peer
+        """
+        self.call("addnode", addr, subCmd)
+
+    def createRawSSRTx(self, ticket, relayFee=None):
+        """
+        Returns a new unsigned transaction revoking the ticket.
+
+        Args:
+            ticket (msgTx.MsgTx): The ticket to revoke.
+            fee (int): Optional. Default=None. The fee to apply to the
+                revocation in atoms/kb.
+
+        Returns:
+            MstTx.msgtx: The revocation.
+        """
+        if relayFee:
+            outs = []
+            # Parse the ticket purchase transaction to determine the required output
+            # destinations for vote rewards or revocations.
+            (
+                ticketPayKinds,
+                ticketHash160s,
+                ticketValues,
+                _,
+                _,
+                _,
+            ) = txscript.sstxStakeOutputInfo(ticket.txOut)
+
+            # Calculate the output values for the revocation.  Revocations do not
+            # contain any subsidy.
+            values = txscript.calculateRewards(ticketValues, ticket.txOut[0].value, 0)
+
+            # All remaining outputs pay to the output destinations and amounts tagged
+            # by the ticket purchase.
+            for i in range(len(ticketHash160s)):
+                scriptFn = txscript.payToSSRtxPKHDirect
+                # P2SH
+                if ticketPayKinds[i]:
+                    scriptFn = txscript.payToSSRtxSHDirect
+                script = scriptFn(ticketHash160s[i])
+                outs.append(TxOut(values[i], script))
+
+            # Calculate the estimated signed serialize size.
+            scriptSizes = [txscript.RedeemP2SHSigScriptSize]
+            sizeEstimate = txscript.estimateSerializeSize(scriptSizes, outs, 0)
+            fee = txscript.calcMinRequiredTxRelayFee(relayFee, sizeEstimate)
+            # dcrd takes amounts in coins
+            fee /= 1e8
+
+        vOuts = [
+            {
+                "txid": ticket.txid(),
+                # dcrd takes amounts in coins
+                "amount": ticket.txOut[0].value / 1e8,
+                "vout": 0,
+                "tree": TxTreeStake,
+            }
+        ]
+        res = self.call("createrawssrtx", vOuts, *([fee] if fee else []))
+        return MsgTx.deserialize(ByteArray(res))
+
+    def createRawSSTx(self, inputs, amount, couts):
+        """
+        Returns a new transaction spending the provided inputs and sending to
+        the provided addresses. The transaction inputs are not signed in the
+        created transaction. The signrawtransaction RPC command provided by
+        wallet must be used to sign the resulting transaction.
+
+        Args:
+            inputs (list(UTXO)): The inputs to the transaction.
+            amount (dict[str]float): Dictionary with the destination addresses
+                as keys and amounts in atoms as values.
+            couts (list(COut)): Array of sstx commit outs to use.
+
+        Result:
+            msgtx.MsgTx: The serialized transaction
+        """
+        vOuts = [
+            {
+                "txid": reversed(utxo.txHash).hex(),
+                "vout": utxo.vout,
+                "tree": txscript.scriptTree(utxo.scriptClass),
+                "amt": utxo.satoshis,
+            }
+            for utxo in inputs
+        ]
+        cs = [cout.toJSON() for cout in couts]
+        res = self.call("createrawsstx", vOuts, amount, cs)
+        return MsgTx.deserialize(ByteArray(res))
+
+    def createRawTransaction(self, inputs, amounts, locktime=None, expiry=None):
+        """
+        Returns a new transaction spending the provided inputs and sending to
+        the provided addresses. The transaction inputs are not signed in the
+        created transaction. The signrawtransaction RPC command provided by
+        wallet must be used to sign the resulting transaction.
+
+        Args:
+            inputs (list(UTXO)): The inputs to the transaction.
+            amounts (dict[str]int) JSON object with the destination addresses
+                as keys and amounts as values in atoms.
+            locktime (int): Optional. Default=None. Locktime value; a non-zero
+                value will also locktime-activate the inputs.
+            expiry (int) Optional. Default=None. Expiry value. a non-zero value
+                when the transaction expires.
+
+        Result:
+            msgtx.MsgTx: The serialized transaction
+        """
+        vOuts = [
+            {
+                "txid": reversed(utxo.txHash).hex(),
+                "vout": utxo.vout,
+                "tree": txscript.scriptTree(utxo.scriptClass),
+                # dcrd takes amounts in coins
+                "amount": utxo.satoshis / 1e8,
+            }
+            for utxo in inputs
+        ]
+        # dcrd takes amounts in coins
+        for k, v in amounts.items():
+            amounts[k] = v / 1e8
+        res = self.call(
+            "createrawtransaction",
+            vOuts,
+            amounts,
+            *([locktime] if locktime else []),
+            *([expiry] if expiry and locktime else [])
+        )
+        return MsgTx.deserialize(ByteArray(res))
+
+    def debugLevel(self, levelSpec):
+        """
+        Dynamically changes the debug logging level. The levelspec can either a
+        debug level or of the form:
+        <subsystem>=<level>,<subsystem2>=<level2>,...
+        The valid debug levels are trace, debug, info, warn, error, and critical.
+        The valid subsystems are AMGR, ADXR, BCDB, BMGR, DCRD, CHAN, DISC, PEER,
+        RPCS, SCRP, SRVR, and TXMP. Finally, the keyword 'show' will return a
+        list of the available subsystems.
+
+        Args:
+            levelSpec (str): The debug level(s) to use or the
+                keyword 'show'
+
+        Returns:
+            str: The string 'Done.' if levelspec != 'show', else the list of
+                subsystems.
+        """
+        return self.call("debuglevel", levelSpec)
+
+    def decodeRawTransaction(self, tx):
+        """
+        Returns a JSON object representing the provided serialized, hex-encoded
+        transaction.
+
+        Args:
+            tx (msgtx.MsgTx): Serialized transaction.
+
+        Returns:
+            RawTransactionResult: The decoded transaction.
+        """
+        return RawTransactionResult.parse(self.call("decoderawtransaction", tx.txHex()))
+
+    def decodeScript(self, script, version=0):
+        """
+        Information about the provided hex-encoded script.
+
+        Args:
+            script (ByteArray): The script.
+            version (int): Optional. Default=0 The script version.
+
+        Returns:
+            DecodeScriptResult: The script, decoded.
+        """
+        return DecodeScriptResult.parse(
+            self.call("decodescript", script.hex(), version)
+        )
+
+    def estimateFee(self):
+        """
+        Returns the estimated fee in dcr/kb.
+
+        Returns:
+            float: Estimated fee.
+        """
+        return self.call("estimatefee", 0)
+
+    def estimateSmartFee(self, confirmations):
+        """
+        Returns the estimated fee using the historical fee data in dcr/kb.
+
+        Args:
+            confirmations (int): Max 32. Estimate the fee rate a transaction requires so
+                that it is mined in up to this number of blocks.
+
+        Returns:
+            float: Estimated fee rate (in DCR/KB).
+        """
+        return self.call("estimatesmartfee", confirmations, "conservative")
+
+    def estimateStakeDiff(self, tickets):
+        """
+        Estimate the next minimum, maximum, expected, and user-specified stake
+        difficulty.
+
+        Args:
+            tickets (int): Use this number of new tickets in blocks
+                to estimate the next difficulty.
+
+        Returns:
+            EstimateStakeDiffResult: The estimated difficulty.
+        """
+        return EstimateStakeDiffResult.parse(self.call("estimatestakediff", tickets))
 
     def existsAddress(self, address):
         """
@@ -232,7 +456,7 @@ class Client(object):
             verbose (bool): Optional. Default=True. Specifies the block is
                 returned as a GetBlockVerboseResult instead of serialized bytes.
             verboseTx (bool): Optional. Default=False. Specifies that each
-                transaction is returned as a RawTransactionsResult and only
+                transaction is returned as a RawTransactionResult and only
                 applies if the verbose flag is true (dcrd extension).
 
         Returns:
@@ -943,6 +1167,120 @@ def get(k, obj):
     return obj[k] if k in obj else None
 
 
+class COut:
+    def __init__(
+        self, addr, commitAmt, changeAddr, changeAmt,
+    ):
+        """
+        addr (str) Address to send sstx commit.
+        commitAmt (int) Amount to commit.
+        changeAddr (str) Address for change.
+        changeAmt (int) Amount for change.
+        """
+        self.addr = addr
+        self.commitAmt = commitAmt
+        self.changeAddr = changeAddr
+        self.changeAmt = changeAmt
+
+    def toJSON(self):
+        """
+        Encode the COuts to JSON.
+
+        Returns:
+            JSON: The encoded couts.
+        """
+        return {
+            "addr": self.addr,
+            "commitamt": self.commitAmt,
+            "changeaddr": self.changeAddr,
+            "changeamt": self.changeAmt,
+        }
+
+
+class DecodeScriptResult:
+    """DecodeScriptResult"""
+
+    def __init__(
+        self, asm, scriptType, reqSigs=None, addresses=None, p2sh=None,
+    ):
+        """
+
+        Args:
+            asm (str): Disassembly of the script.
+            type (str): The type of the script (e.g. 'pubkeyhash').
+            reqSigs (int): The number of required signatures or None.
+            addresses (list(str)): The Decred addresses associated with this
+                script or None.
+            p2sh (str): The script hash for use in pay-to-script-hash transactions
+                or None (only present if the provided redeem script is not already
+                a pay-to-script-hash script).
+        """
+        self.asm = asm
+        self.type = scriptType
+        self.reqSigs = reqSigs
+        self.addresses = addresses if addresses else []
+        self.p2sh = p2sh
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the DecodeScriptResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            DecodeScriptResult: The DecodeScriptResult.
+        """
+        return DecodeScriptResult(
+            asm=obj["asm"],
+            scriptType=obj["type"],
+            reqSigs=get("reqSigs", obj),
+            addresses=[addr for addr in obj["addresses"]] if "addresses" in obj else [],
+            p2sh=get("p2sh", obj),
+        )
+
+
+class EstimateStakeDiffResult:
+    """
+    EstimateStakeDiffResult models the data returned from the estimatestakediff
+    command.
+    """
+
+    def __init__(
+        self, diffMin, diffMax, expected, user=None,
+    ):
+        """
+        diffMin (float): Minimum estimate for stake difficulty.
+        diffMax (float): Maximum estimate for stake difficulty.
+        expected (float): Expected estimate for stake difficulty.
+        user (float): Estimate for stake difficulty with the passed user
+            amount of tickets.
+        """
+        self.diffMin = diffMin
+        self.diffMax = diffMax
+        self.expected = expected
+        self.user = user
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the EstimateStakeDiffResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            EstimateStakeDiffResult: The EstimateStakeDiffResult.
+        """
+        return EstimateStakeDiffResult(
+            diffMin=obj["min"],
+            diffMax=obj["max"],
+            expected=obj["expected"],
+            user=get("user", obj),
+        )
+
+
 class GetBlockVerboseResult:
     def __init__(
         self,
@@ -1039,6 +1377,15 @@ class GetBlockVerboseResult:
 
     @staticmethod
     def parse(obj):
+        """
+        Parse the GetBlockVerboseResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            GetBlockVerboseResult: The GetBlockVerboseResult.
+        """
         return GetBlockVerboseResult(
             blockHash=reversed(ByteArray(obj["hash"])),
             confirmations=obj["confirmations"],
@@ -1098,6 +1445,15 @@ class GetAddedNodeInfoResultAddr:
 
     @staticmethod
     def parse(obj):
+        """
+        Parse the GetAddedNodeInfoResultAddr from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            GetAddedNodeInfoResultAddr: The GetAddedNodeInfoResultAddr.
+        """
         return GetAddedNodeInfoResultAddr(
             address=obj["address"], connected=obj["connected"],
         )
@@ -1123,6 +1479,15 @@ class GetAddedNodeInfoResult:
 
     @staticmethod
     def parse(obj):
+        """
+        Parse the GetAddedNodeInfoResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            GetAddedNodeInfoResult: The GetAddedNodeInfoResult.
+        """
         return GetAddedNodeInfoResult(
             addedNode=obj["addednode"],
             connected=get("connected", obj),

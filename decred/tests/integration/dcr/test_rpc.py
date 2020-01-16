@@ -5,13 +5,15 @@ See LICENSE for details
 
 import os
 
+from base58 import b58decode, b58encode
 import pytest
 
 from decred.crypto import crypto, opcode
-from decred.dcr import rpc, txscript
+from decred.dcr import account, rpc, txscript
 from decred.dcr.nets import mainnet
+from decred.dcr.wire import wire
 from decred.dcr.wire.msgblock import BlockHeader
-from decred.dcr.wire.msgtx import MsgTx
+from decred.dcr.wire.msgtx import MsgTx, OutPoint, TxIn, TxOut
 from decred.util import helpers
 from decred.util.encode import ByteArray
 
@@ -101,6 +103,21 @@ def test_rpc(config):
         "0df0adba",
     ]
 
+    debugLevel = rpcClient.debugLevel("show")
+    assert isinstance(debugLevel, str)
+
+    debugLevel = rpcClient.debugLevel("info")
+    assert debugLevel == "Done."
+
+    estimateFee = rpcClient.estimateFee()
+    assert isinstance(estimateFee, float)
+
+    estimateSmartFee = rpcClient.estimateSmartFee(32)
+    assert isinstance(estimateSmartFee, float)
+
+    estimateStakeDiff = rpcClient.estimateStakeDiff(0)
+    assert isinstance(estimateStakeDiff, rpc.EstimateStakeDiffResult)
+
     existsAddress = rpcClient.existsAddress(mainnetAddress)
     assert existsAddress
 
@@ -124,6 +141,19 @@ def test_rpc(config):
     assert isinstance(liveTickets, list)
 
     aTicket = liveTickets[0]
+
+    for ticket in liveTickets:
+        getRawTransaction = rpcClient.getRawTransaction(ticket)
+
+        script = getRawTransaction.txOut[0].pkScript
+
+        if txscript.extractStakeScriptHash(script, opcode.OP_SSTX):
+            decodeScript = rpcClient.decodeScript(script)
+            assert isinstance(decodeScript, rpc.DecodeScriptResult)
+            break
+
+    else:
+        raise Exception("did not find a suitable script to decode")
 
     existsExpiredTickets = rpcClient.existsExpiredTickets([aTicket, aTicket])
     assert existsExpiredTickets == [False, False]
@@ -220,14 +250,14 @@ def test_rpc(config):
 
     getRawMempool = rpcClient.getRawMempool()
     assert isinstance(getRawMempool, list)
-    mempoolTxs = getRawMempool[0]
+    mempoolTx = getRawMempool[0]
 
     existsMempoolTxs = rpcClient.existsMempoolTxs(getRawMempool[:3] + [aTicket])
     assert existsMempoolTxs == [True, True, True, False]
 
     getRawMempool = rpcClient.getRawMempool(True)
     assert isinstance(
-        getRawMempool[reversed(mempoolTxs).hex()], rpc.GetRawMempoolVerboseResult
+        getRawMempool[reversed(mempoolTx).hex()], rpc.GetRawMempoolVerboseResult
     )
 
     getHeaders = rpcClient.getHeaders([blkHash414000], blkHash414005)
@@ -237,9 +267,16 @@ def test_rpc(config):
     getRawTransaction = rpcClient.getRawTransaction(aTicket)
     assert isinstance(getRawTransaction, MsgTx)
 
+    decodeRawTransaction = rpcClient.decodeRawTransaction(getRawTransaction)
+    assert isinstance(decodeRawTransaction, rpc.RawTransactionResult)
+
     rawaddr = txscript.extractStakeScriptHash(
         getRawTransaction.txOut[0].pkScript, opcode.OP_SSTX
     ).bytes()
+    if not rawaddr:
+        rawaddr = txscript.extractStakePubKeyHash(
+            getRawTransaction.txOut[0].pkScript, opcode.OP_SSTX
+        )
     addressWithTickets = crypto.AddressScriptHash(
         mainnet.ScriptHashAddrID, rawaddr
     ).string()
@@ -274,6 +311,90 @@ def test_rpc(config):
 
     missedTickets = rpcClient.missedTickets()
     assert isinstance(missedTickets, list)
+
+    revocableTicket = rpcClient.getRawTransaction(missedTickets[0])
+
+    # create a ticket revoking transaction using txscript
+    revocation = txscript.makeRevocation(revocableTicket, 3000)
+    createRawSSRTx = rpcClient.createRawSSRTx(revocableTicket, 3000)
+
+    # ours is just missing the block index
+    revocation.txIn[0].blockIndex = createRawSSRTx.txIn[0].blockIndex
+    assert createRawSSRTx.txHex() == revocation.txHex()
+
+    # Using the revocation as an unspent output
+    amt = revocableTicket.txOut[0].value
+    script = revocableTicket.txOut[0].pkScript
+
+    utxo = account.UTXO(
+        address="",
+        txHash=revocableTicket.hash(),
+        vout=0,
+        ts=None,
+        scriptPubKey=script,
+        satoshis=1,
+        maturity=0,
+        tinfo=None,
+    )
+    utxo2 = account.UTXO(
+        address="",
+        txHash=revocableTicket.hash(),
+        vout=0,
+        ts=None,
+        scriptPubKey=script,
+        satoshis=amt,
+        maturity=0,
+        tinfo=None,
+    )
+    amount = {cookedAddress2: amt + 1}
+
+    zeroed = ByteArray(b"", length=20)
+    changeAddr = crypto.newAddressPubKeyHash(
+        zeroed, mainnet, crypto.STEcdsaSecp256k1
+    ).string()
+    # only the first argument for couts is a non-zero value
+    cout = rpc.COut(
+        addr=mainnetAddress, commitAmt=0, changeAddr=changeAddr, changeAmt=0,
+    )
+
+    op = OutPoint(txHash=revocableTicket.hash(), idx=0, tree=wire.TxTreeStake)
+    inputPool = txscript.ExtendedOutPoint(op=op, amt=1, pkScript=script,)
+    inputMain = txscript.ExtendedOutPoint(op=op, amt=amt, pkScript=script,)
+    ticketAddr = crypto.newAddressScriptHashFromHash(
+        ByteArray(b58decode(cookedAddress2)[2:-4]), mainnet
+    )
+    mainAddr = crypto.newAddressScriptHashFromHash(
+        ByteArray(b58decode(mainnetAddress)[2:-4]), mainnet
+    )
+
+    # create a ticket purchasing transaction using txscript
+    ticketPurchase = txscript.makeTicket(
+        mainnet, inputPool, inputMain, ticketAddr, mainAddr, amt + 1, mainAddr, 0
+    )
+    createRawSSTx = rpcClient.createRawSSTx([utxo, utxo2], amount, [cout, cout])
+
+    # ours is just missing the block index
+    ticketPurchase.txIn[0].blockIndex = createRawSSTx.txIn[0].blockIndex
+    ticketPurchase.txIn[1].blockIndex = createRawSSTx.txIn[1].blockIndex
+    assert createRawSSTx.txHex() == ticketPurchase.txHex()
+
+    amount = {mainnetAddress: amt}
+    txIn = TxIn(previousOutPoint=op, valueIn=amt)
+    txOut = TxOut(value=amt, version=0, pkScript=txscript.payToAddrScript(mainAddr),)
+    rawTx = MsgTx(
+        serType=wire.TxSerializeFull,
+        version=1,
+        txIn=[txIn],
+        txOut=[txOut],
+        lockTime=0,
+        expiry=0,
+        cachedHash=None,
+    )
+
+    createRawTransaction = rpcClient.createRawTransaction([utxo2], amount)
+
+    rawTx.txIn[0].blockIndex = createRawTransaction.txIn[0].blockIndex
+    assert createRawTransaction.txHex() == rawTx.txHex()
 
     getTxOut = rpcClient.getTxOut(missedTickets[0], 0)
     assert isinstance(getTxOut, rpc.GetTxOutResult)
