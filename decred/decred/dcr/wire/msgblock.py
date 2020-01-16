@@ -6,8 +6,8 @@ See LICENSE for details
 Based on dcrd MsgBlock.
 """
 
-from ...crypto.crypto import hashH
-from ...util.encode import ByteArray
+from decred.crypto.crypto import hashH
+from decred.util.encode import ByteArray
 
 
 # chainhash.HashSize in go

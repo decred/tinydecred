@@ -3,7 +3,7 @@ Copyright (c) 2019, The Decred developers
 See LICENSE for details
 """
 
-from ..dcr import account as dcracct, nets as dcrnets
+from decred.dcr import account as dcracct, nets as dcrnets
 
 
 class BipIDs:

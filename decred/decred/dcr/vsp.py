@@ -8,9 +8,9 @@ DcrdataClient.endpointList() for available endpoints.
 
 import time
 
-from ..crypto import crypto
-from ..util import encode, tinyhttp
-from ..util.encode import ByteArray
+from decred.crypto import crypto
+from decred.util import encode, tinyhttp
+from decred.util.encode import ByteArray
 from . import constants, nets, txscript
 
 

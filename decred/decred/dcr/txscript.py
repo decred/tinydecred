@@ -8,10 +8,10 @@ Based on dcrd txscript.
 
 import math
 
-from ..crypto import crypto, opcode
-from ..crypto.secp256k1.curve import curve as Curve
-from ..util import helpers
-from ..util.encode import ByteArray
+from decred.crypto import crypto, opcode
+from decred.crypto.secp256k1.curve import curve as Curve
+from decred.util import helpers
+from decred.util.encode import ByteArray
 from .wire import msgtx, wire
 
 

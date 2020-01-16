@@ -6,7 +6,7 @@ See LICENSE for details
 Constants and common routines from the dcrd wire package.
 """
 
-from ...util.encode import ByteArray
+from decred.util.encode import ByteArray
 
 
 # fmt: off

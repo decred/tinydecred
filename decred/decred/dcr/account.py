@@ -3,8 +3,8 @@ Copyright (c) 2019, Brian Stafford
 See LICENSE for details
 """
 
-from ..crypto import opcode, crypto
-from ..util import encode, helpers
+from decred.crypto import opcode, crypto
+from decred.util import encode, helpers
 from . import nets, txscript
 from .vsp import VotingServiceProvider
 

@@ -8,7 +8,7 @@ Some network math.
 import bisect
 import math
 
-from ..util import helpers
+from decred.util import helpers
 from . import constants as C, mainnet
 
 

@@ -6,8 +6,8 @@ See LICENSE for details
 import base64
 import ssl
 
-from ..util import tinyhttp
-from ..util.encode import ByteArray
+from decred.util import tinyhttp
+from decred.util.encode import ByteArray
 from .wire.msgblock import BlockHeader
 from .wire.msgtx import MsgTx
 

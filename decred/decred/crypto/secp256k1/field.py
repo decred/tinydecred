@@ -7,7 +7,7 @@ See LICENSE for details
 from base64 import b64decode
 from zlib import decompress as zdecompress
 
-from ...util.encode import ByteArray
+from decred.util.encode import ByteArray
 from .bytepoints import secp256k1BytePoints
 
 

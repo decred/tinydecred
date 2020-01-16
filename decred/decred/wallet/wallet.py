@@ -6,10 +6,10 @@ See LICENSE for details
 
 from threading import Lock as Mutex
 
-from .. import config
-from ..util import chains, encode, helpers
-from ..util.database import KeyValueDatabase
-from ..crypto import crypto, mnemonic, rando
+from decred import config
+from decred.crypto import crypto, mnemonic, rando
+from decred.util import chains, encode, helpers
+from decred.util.database import KeyValueDatabase
 from . import accounts
 
 

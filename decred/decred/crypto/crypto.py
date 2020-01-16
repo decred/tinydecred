@@ -13,8 +13,8 @@ from base58 import b58encode, b58decode
 from blake256.blake256 import blake_hash
 import nacl.secret
 
-from ..util import encode
-from ..util.encode import ByteArray
+from decred.util import encode
+from decred.util.encode import ByteArray
 from . import rando
 from .secp256k1.curve import curve as Curve, PublicKey, PrivateKey
 

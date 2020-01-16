@@ -6,7 +6,7 @@ See LICENSE for details
 PGP-based mnemonic seed generation.
 """
 
-from ..util.encode import ByteArray
+from decred.util.encode import ByteArray
 from .crypto import sha256ChecksumByte
 
 

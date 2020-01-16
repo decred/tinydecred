@@ -33,4 +33,5 @@ jobs:
     - name: Test with pytest
       run: |
         pip install pytest
-        python -m pytest ./decred/tests/unit/
+        cd ./decred/
+        python -m pytest ./tests/unit/

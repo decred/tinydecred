@@ -9,8 +9,8 @@ accounts module
     The tinycrypto package relies heavily on the lower-level crypto modules.
 """
 
-from ..crypto import crypto
-from ..util import chains, encode, helpers
+from decred.crypto import crypto
+from decred.util import chains, encode, helpers
 
 
 ByteArray = encode.ByteArray

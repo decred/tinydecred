@@ -6,8 +6,8 @@ See LICENSE for details
 Based on dcrd MsgTx.
 """
 
-from ...crypto.crypto import hashH
-from ...util.encode import ByteArray
+from decred.crypto.crypto import hashH
+from decred.util.encode import ByteArray
 from . import wire
 
 
