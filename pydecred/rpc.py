@@ -864,6 +864,15 @@ class GetNetworkInfoResult:
 
     @staticmethod
     def parse(obj):
+        """
+        Parse the GetNetworkInfoResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            GetNetworkInfoResult: The GetNetworkInfoResult.
+        """
         return GetNetworkInfoResult(
             version=obj["version"],
             subVersion=obj["subversion"],
@@ -1002,6 +1011,7 @@ class GetMempoolInfoResult:
         self.size = size
         self.bytes = Bytes
 
+    @staticmethod
     def parse(obj):
         """
         Parse the GetMempoolInfoResult from the decoded RPC response.
@@ -1237,6 +1247,7 @@ class Agenda:
         self.quorumProgress = quorumProgress
         self.choices = choices
 
+    @staticmethod
     def parse(obj):
         """
         Parse the Agenda from the decoded RPC response.
@@ -1604,6 +1615,15 @@ class TicketFeeInfoResult:
 
     @staticmethod
     def parse(obj):
+        """
+        Parse the TicketFeeInfoResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            TicketFeeInfoResult: The TicketFeeInfoResult.
+        """
         return TicketFeeInfoResult(
             feeInfoMempool=obj["feeinfomempool"],
             feeInfoBlocks=[FeeInfoResult.parse(info) for info in obj["feeinfoblocks"]]
@@ -1636,6 +1656,15 @@ class TxFeeInfoResult:
 
     @staticmethod
     def parse(obj):
+        """
+        Parse the TxFeeInfoResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            TxFeeInfoResult: The TxFeeInfoResult.
+        """
         return TxFeeInfoResult(
             feeInfoMempool=obj["feeinfomempool"],
             feeInfoBlocks=[FeeInfoResult.parse(info) for info in obj["feeinfoblocks"]]
@@ -1770,6 +1799,7 @@ class AgendaInfo(object):
         self.startTime = startTime
         self.expireTime = expireTime
 
+    @staticmethod
     def parse(obj):
         """
         Parse the AgendaInfo from the decoded RPC response.
@@ -1840,6 +1870,15 @@ class RawTransactionsResult:
 
     @staticmethod
     def parse(obj):
+        """
+        Parse the RawTransactionsResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            RawTransactionsResult: The RawTransactionsResult.
+        """
         return RawTransactionsResult(
             txid=obj["txid"],
             version=obj["version"],
