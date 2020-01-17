@@ -64,6 +64,138 @@ class Client(object):
         """
         return GetBlockChainInfoResult.parse(self.call("getblockchaininfo"))
 
+    def getGenerate(self):
+        """
+        Returns if the server is set to generate coins (mine) or not.
+
+        Returns:
+            bool: True if mining, false if not.
+        """
+        return self.call("getgenerate")
+
+    def getHashesPerSec(self):
+        """
+        Returns a recent hashes per second performance measurement while
+        generating coins (mining).
+
+        Returns:
+            int: The number of hashes per second.
+        """
+        return self.call("gethashespersec")
+
+    def getHeaders(self, blockLocators, hashStop):
+        """
+        Returns block headers starting with the first known block hash from the
+        request.
+
+        Args:
+            blockLocators (list(string)): Array of block locator hashes.
+                Headers are returned starting from the first known hash in this
+                list.
+            hashStop (string): Block hash to stop including block headers for.
+                Set to zero to get as many blocks as possible.
+
+        Returns:
+            list(string): Serialized block headers of all located blocks,
+                limited to some arbitrary maximum number of hashes (currently
+                2000, which matches the wire protocol headers message, but this
+                is not guaranteed).
+        """
+        return self.call("getheaders", blockLocators, hashStop)["headers"]
+
+    def getInfo(self):
+        """
+        Returns various state info.
+
+        Returns:
+            InfoChainResult: Various state info.
+        """
+        return InfoChainResult.parse(self.call("getinfo"))
+
+    def getMempoolInfo(self):
+        """
+        Returns memory pool information.
+
+        Returns:
+            GetMempoolInfoResult: The mempool information.
+        """
+        return GetMempoolInfoResult.parse(self.call("getmempoolinfo"))
+
+    def getMiningInfo(self):
+        """
+        Returns mining-related information.
+
+        Returns:
+            GetMiningInfoResult: The minig information.
+        """
+        return GetMiningInfoResult.parse(self.call("getmininginfo"))
+
+    def getNetTotals(self):
+        """
+        Returns network traffic statistics.
+
+        Returns:
+            GetNetTotalsResult: The network traffic stats.
+        """
+        return GetNetTotalsResult.parse(self.call("getnettotals"))
+
+    def getNetworkHashPS(self, blocks=120, height=-1):
+        """
+        Returns the estimated network hashes per second for the block heights provided by the parameters.
+
+        Args:
+            blocks (int) Optional. Default=120. The number of blocks, or -1 for
+                blocks since last difficulty change.
+            height (int) Optional. Default=-1. Perform estimate ending with this
+                height or -1 for current best chain block height.
+
+        Returns:
+            int: Estimated hashes per second.
+        """
+        return self.call("getnetworkhashps", blocks, height)
+
+    def getNetworkInfo(self):
+        """
+        Returns network-related information.
+
+        Returns:
+            GetNetworkInfoResult: The network-related info.
+        """
+        return GetNetworkInfoResult.parse(self.call("getnetworkinfo"))
+
+    def getPeerInfo(self):
+        """
+        Returns data about each connected network peer.
+
+        Returns:
+            list(GetPeerInfoResult): The peer info.
+        """
+        return [GetPeerInfoResult.parse(peer) for peer in self.call("getpeerinfo")]
+
+    def getRawMempool(self, verbose=False, txtype=None):
+        """
+        Returns information about all of the transactions currently in the
+        memory pool.
+
+        Arg:
+            verbose (bool) Optional. Default=false. Returns a list of
+                GetRawMempoolVerboseResult when true or a list of transaction
+                hashes when false.
+            txtype (str) Optional. Default=None. Type of tx to return.
+                (all/regular/tickets/votes/revocations).
+
+        Returns:
+            list(str) or dict[str]GetRawMempoolVerboseResult: Array of
+                transaction hashes if not verbose. A dict of transaction hashes
+                to GetRawMempoolVerboseResult if verbose.
+        """
+        res = self.call("getrawmempool", verbose, *([txtype] if txtype else []))
+        return (
+            {k: GetRawMempoolVerboseResult.parse(v) for k, v in res.items()}
+            if verbose
+            else res
+        )
+
     def getRawTransaction(self, txid, verbose=False):
         """
         Returns information about a transaction given its hash.
@@ -231,7 +363,7 @@ class Client(object):
     def searchRawTransactions(
         self,
         address,
-        verbose=1,
+        verbose=True,
         skip=0,
         count=100,
         vinextra=0,
@@ -251,34 +383,35 @@ class Client(object):
 
         Args:
             address (str): The Decred address to search for
-            verbose (int): Optional. default=1. Specifies the transaction is returned as a JSON
-                object instead of hex-encoded string.
-            skip (int): Optional. Default=0. The number of leading transactions to leave out of the
-                final response.
-            count (int): Optional. Default=100. The maximum number of transactions to return.
-            vinextra (int): Optional. Default=0. Specify that extra data from previous output will be
-                returned in vin.
-            reverse (bool): Optional. Default=False. Specifies that the transactions should be returned
-                in reverse chronological order.
-            filterAddrs (list(str)): Optional. Default=[]. Only inputs or outputs with matching
-                address will be returned.
+            verbose (bool): Optional. default=True. Specifies the transaction
+                is returned as a list of RawTransactionsResult instead of
+                hex-encoded strings.
+            skip (int): Optional. Default=0. The number of leading transactions
+                to leave out of the final response.
+            count (int): Optional. Default=100. The maximum number of
+                transactions to return.
+            vinextra (int): Optional. Default=0. Specify that extra data from
+                previous output will be returned in vin.
+            reverse (bool): Optional. Default=False. Specifies that the
+                transactions should be returned in reverse chronological order.
+            filterAddrs (list(str)): Optional. Default=[]. Only inputs or
+                outputs with matching address will be returned.
 
         Returns:
             list(RawTransactionResult): The RawTransactionResults.
         """
-        return [
-            RawTransactionsResult.parse(rawTx)
-            for rawTx in self.call(
-                "searchrawtransactions",
-                address,
-                verbose,
-                skip,
-                count,
-                vinextra,
-                reverse,
-                filterAddrs if filterAddrs else [],
-            )
-        ]
+        verb = 1 if verbose else 0
+        res = self.call(
+            "searchrawtransactions",
+            address,
+            verb,
+            skip,
+            count,
+            vinextra,
+            reverse,
+            filterAddrs if filterAddrs else [],
+        )
+        return [RawTransactionsResult.parse(rawTx) for rawTx in res] if verbose else res
 
     def sendRawTransaction(self, msgTx, allowHighFees=False):
         """
@@ -452,6 +585,511 @@ def get(k, obj):
     return obj[k] if k in obj else None
 
 
+class GetRawMempoolVerboseResult:
+    """getrawmempoolverboseresult"""
+
+    def __init__(
+        self, size, fee, time, height, startingPriority, currentPriority, depends,
+    ):
+        """
+        Args:
+            size (int): Transaction size in bytes.
+            fee (float): Transaction fee in decred.
+            time (int): Local time transaction entered pool in seconds since
+                1 Jan 1970 GMT.
+            height (int): Block height when transaction entered the pool.
+            startingPriority (float): Priority when transaction entered the pool.
+            currentPriority (float): Current priority.
+            depends (list(str)): Unconfirmed transactions used as inputs for
+                this transaction.
+        """
+        self.size = size
+        self.fee = fee
+        self.time = time
+        self.height = height
+        self.startingPriority = startingPriority
+        self.currentPriority = currentPriority
+        self.depends = depends
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the GetRawMempoolVerboseResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            GetRawMempoolVerboseResult: The GetRawMempoolVerboseResult.
+        """
+        return GetRawMempoolVerboseResult(
+            size=obj["size"],
+            fee=obj["fee"],
+            time=obj["time"],
+            height=obj["height"],
+            startingPriority=obj["startingpriority"],
+            currentPriority=obj["currentpriority"],
+            depends=obj["depends"],
+        )
+
+
+class GetPeerInfoResult:
+    """getpeerinforesult"""
+
+    def __init__(
+        self,
+        nodeID,
+        addr,
+        services,
+        relayTxes,
+        lastSend,
+        lastRecv,
+        bytesSent,
+        bytesRecv,
+        connTime,
+        timeOffset,
+        pingTime,
+        version,
+        subVer,
+        inbound,
+        startingHeight,
+        banScore,
+        syncNode,
+        addrLocal=None,
+        pingWait=None,
+        currentHeight=None,
+    ):
+        """
+        Args:
+            nodeID (int): A unique node ID.
+            addr (str): The ip address and port of the peer.
+            services (str): Services bitmask which represents the services
+                supported by the peer.
+            relayTxes (bool): Peer has requested transactions be relayed to it.
+            lastSend (int): Time the last message was received in seconds since
+                1 Jan 1970 GMT.
+            lastRecv (int): Time the last message was sent in seconds since 1
+                Jan 1970 GMT.
+            bytesSent (int): Total bytes sent.
+            bytesRecv (int): Total bytes received.
+            connTime (int): Time the connection was made in seconds since 1 Jan
+                1970 GMT.
+            timeOffset (int): The time offset of the peer.
+            pingTime (float): Number of microseconds the last ping took.
+            version (int): The protocol version of the peer.
+            subVer (str): The user agent of the peer.
+            inbound (bool): Whether or not the peer is an inbound connection.
+            startingHeight (int): The latest block height the peer knew about
+                when the connection was established.
+            banScore (int): The ban score.
+            syncNode (bool): Whether or not the peer is the sync peer.
+            addrLocal (str): Local address or None.
+            pingWait (float): Number of microseconds a queued ping has been
+                waiting for a response or None.
+            currentHeight (int): The current height of the peer or None.
+        """
+        self.nodeID = nodeID
+        self.addr = addr
+        self.services = services
+        self.relayTxes = relayTxes
+        self.lastSend = lastSend
+        self.lastRecv = lastRecv
+        self.bytesSent = bytesSent
+        self.bytesRecv = bytesRecv
+        self.connTime = connTime
+        self.timeOffset = timeOffset
+        self.pingTime = pingTime
+        self.version = version
+        self.subVer = subVer
+        self.inbound = inbound
+        self.startingHeight = startingHeight
+        self.banScore = banScore
+        self.syncNode = syncNode
+        self.addrLocal = addrLocal
+        self.pingWait = pingWait
+        self.currentHeight = currentHeight
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the GetPeerInfoResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            GetPeerInfoResult: The GetPeerInfoResult.
+        """
+        return GetPeerInfoResult(
+            nodeID=obj["id"],
+            addr=obj["addr"],
+            services=obj["services"],
+            relayTxes=obj["relaytxes"],
+            lastSend=obj["lastsend"],
+            lastRecv=obj["lastrecv"],
+            bytesSent=obj["bytessent"],
+            bytesRecv=obj["bytesrecv"],
+            connTime=obj["conntime"],
+            timeOffset=obj["timeoffset"],
+            pingTime=obj["pingtime"],
+            version=obj["version"],
+            subVer=obj["subver"],
+            inbound=obj["inbound"],
+            startingHeight=obj["startingheight"],
+            banScore=obj["banscore"],
+            syncNode=obj["syncnode"],
+            addrLocal=get("addrlocal", obj),
+            pingWait=get("pingwait", obj),
+            currentHeight=get("currentheight", obj),
+        )
+
+
+class LocalAddressesResult:
+    """
+    LocalAddressesResult models the localaddresses data from the getnetworkinfo
+    command.
+    """
+
+    def __init__(
+        self, address, port, score,
+    ):
+        """
+        address (str): The local address being listened on.
+        port (int): The port being listened on for the associated local address.
+        score (int): Reserved.
+        """
+        self.address = address
+        self.port = port
+        self.score = score
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the LocalAddressesResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            LocalAddressesResult: The LocalAddressesResult.
+        """
+        return LocalAddressesResult(
+            address=obj["address"], port=obj["port"], score=obj["score"],
+        )
+
+
+class NetworksResult:
+    """
+    NetworksResult models the networks data from the getnetworkinfo command.
+    """
+
+    def __init__(
+        self, name, limited, reachable, proxy, proxyRandomizeCredentials,
+    ):
+        """
+        Args:
+            name (str): The name of the network interface.
+            limited (bool): True if only connections to the network are allowed.
+            reachable (bool): True if connections can be made to or from the
+                network.
+            proxy (str): The proxy set for the network.
+            proxyRandomizeCredentials (bool): True if randomized credentials are
+                set for the proxy.
+        """
+        self.name = name
+        self.limited = limited
+        self.reachable = reachable
+        self.proxy = proxy
+        self.proxyRandomizeCredentials = proxyRandomizeCredentials
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the NetworkResults from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            NetworkResults: The NetworkResults.
+        """
+        return NetworksResult(
+            name=obj["name"],
+            limited=obj["limited"],
+            reachable=obj["reachable"],
+            proxy=obj["proxy"],
+            proxyRandomizeCredentials=obj["proxyrandomizecredentials"],
+        )
+
+
+class GetNetworkInfoResult:
+    """getnetworkinforesult"""
+
+    def __init__(
+        self,
+        version,
+        subVersion,
+        protocolVersion,
+        timeOffset,
+        connections,
+        networks,
+        relayFee,
+        localAddresses,
+        localServices,
+    ):
+        """
+        Args:
+            version (int): The version of the node as a numeric.
+            subVersion (str): The subversion of the node, as advertised to peers.
+            protocolVersion (int): The protocol version of the node.
+            timeOffset (int): The node clock offset in seconds.
+            connections (int): The total number of open connections for the node.
+            networks (list(NetworksResult)): An array of objects describing
+                IPV4, IPV6 and Onion network interface states.
+            relayFee (float): The minimum required transaction fee for the node.
+            localAddresses (list(LocalAddressesResult)): An array of objects.
+                describing local addresses being listened on by the node.
+            localServices (string): The services supported by the node, as
+                advertised in its version message.
+        """
+        self.version = version
+        self.subVersion = subVersion
+        self.protocolVersion = protocolVersion
+        self.timeOffset = timeOffset
+        self.connections = connections
+        self.networks = networks
+        self.relayFee = relayFee
+        self.localAddresses = localAddresses
+        self.localServices = localServices
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the GetNetworkInfoResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            GetNetworkInfoResult: The GetNetworkInfoResult.
+        """
+        return GetNetworkInfoResult(
+            version=obj["version"],
+            subVersion=obj["subversion"],
+            protocolVersion=obj["protocolversion"],
+            timeOffset=obj["timeoffset"],
+            connections=obj["connections"],
+            networks=[NetworksResult.parse(net) for net in obj["networks"]],
+            relayFee=obj["relayfee"],
+            localAddresses=[
+                LocalAddressesResult.parse(addr) for addr in obj["localaddresses"]
+            ],
+            localServices=obj["localservices"],
+        )
+
+
+class GetNetTotalsResult:
+    """getnettotalsresult"""
+
+    def __init__(
+        self, totalBytesRecv, totalBytesSent, timeMillis,
+    ):
+        """
+        totalBytesRecv (int): Total bytes received.
+        totalBytesSent (int): Total bytes sent.
+        timeMillis (int): Number of milliseconds since 1 Jan 1970 GMT.
+        """
+        self.totalBytesRecv = totalBytesRecv
+        self.totalBytesSent = totalBytesSent
+        self.timeMillis = timeMillis
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the GetNetTotalResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            GetNetTotalsResult: The GetNetTotalsResult.
+        """
+        return GetNetTotalsResult(
+            totalBytesRecv=obj["totalbytesrecv"],
+            totalBytesSent=obj["totalbytessent"],
+            timeMillis=obj["timemillis"],
+        )
+
+
+class GetMiningInfoResult:
+    """getmininginforesult"""
+
+    def __init__(
+        self,
+        blocks,
+        currentBlockSize,
+        currentBlockTx,
+        difficulty,
+        stakeDifficulty,
+        errors,
+        generate,
+        numCPUs,
+        hashesPerSec,
+        networkHashPS,
+        pooledTx,
+        testNet,
+    ):
+        """
+        Args:
+            blocks (int): Height of the latest best block.
+            currentBlockSize (int): Size of the latest best block.
+            currentBlockTx (int): Number of transactions in the latest best block.
+            difficulty (int): Current target difficulty.
+            stakeDifficulty (int): Stake difficulty required for the next block.
+            errors (str):  Any current errors.
+            generate (bool): Whether or not server is set to generate coins.
+            numCPUs (int): Number of processors to use for coin generation
+                (-1 when disabled).
+            hashesPerSec (int): Recent hashes per second performance measurement
+                while generating coins.
+            networkHashPS (int): Estimated network hashes per second for the
+                most recent blocks.
+            pooledTx (int): Number of transactions in the memory pool.
+            testNet (bool): Whether or not server is using testnet.
+        """
+        self.blocks = blocks
+        self.currentBlockSize = currentBlockSize
+        self.currentBlockTx = currentBlockTx
+        self.difficulty = difficulty
+        self.stakeDifficulty = stakeDifficulty
+        self.errors = errors
+        self.generate = generate
+        self.numCPUs = numCPUs
+        self.hashesPerSec = hashesPerSec
+        self.networkHashPS = networkHashPS
+        self.pooledTx = pooledTx
+        self.testNet = testNet
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the GetMiningInfoResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            GetMiningInfoResult: The GetMiningInfoResult.
+        """
+        return GetMiningInfoResult(
+            blocks=obj["blocks"],
+            currentBlockSize=obj["currentblocksize"],
+            currentBlockTx=obj["currentblocktx"],
+            difficulty=obj["difficulty"],
+            stakeDifficulty=obj["stakedifficulty"],
+            errors=obj["errors"],
+            generate=obj["generate"],
+            numCPUs=obj["genproclimit"],
+            hashesPerSec=obj["hashespersec"],
+            networkHashPS=obj["networkhashps"],
+            pooledTx=obj["pooledtx"],
+            testNet=obj["testnet"],
+        )
+
+
+class GetMempoolInfoResult:
+    """getmempoolinforesult"""
+
+    def __init__(
+        self, size, Bytes,
+    ):
+        """
+        Args:
+            size (int): Number of transactions in the mempool.
+            bytes (int): Size in bytes of the mempool.
+        """
+        self.size = size
+        self.bytes = Bytes
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the GetMempoolInfoResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            GetMempoolInfoResult: The GetMempoolInfoResult.
+        """
+        return GetMempoolInfoResult(size=obj["size"], Bytes=obj["bytes"])
+
+
+class InfoChainResult:
+    """infochainresult"""
+
+    def __init__(
+        self,
+        version,
+        protocolVersion,
+        blocks,
+        timeOffset,
+        connections,
+        proxy,
+        difficulty,
+        testNet,
+        relayFee,
+        errors,
+    ):
+        """
+        Args:
+            version (int): The version of the server.
+            protocolVersion (int): The latest supported protocol version.
+            blocks (int): The number of blocks processed.
+            timeOffset (int): The time offset.
+            connections (int): The number of connected peers.
+            proxy (str): The proxy used by the server.
+            difficulty (int): The current target difficulty.
+            testnet (bool): Whether or not server is using testnet.
+            relayFee (int): The minimum relay fee for non-free transactions in DCR/KB.
+            errors (str): Any current errors.
+        """
+        self.version = version
+        self.protocolVersion = protocolVersion
+        self.blocks = blocks
+        self.timeOffset = timeOffset
+        self.connections = connections
+        self.proxy = proxy
+        self.difficulty = difficulty
+        self.testNet = testNet
+        self.relayFee = relayFee
+        self.errors = errors
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the InfoChainResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            InfoChainResult: The InfoChainResult.
+        """
+        return InfoChainResult(
+            version=obj["version"],
+            protocolVersion=obj["protocolversion"],
+            blocks=obj["blocks"],
+            timeOffset=obj["timeoffset"],
+            connections=obj["connections"],
+            proxy=obj["proxy"],
+            difficulty=obj["difficulty"],
+            testNet=obj["testnet"],
+            relayFee=obj["relayfee"],
+            errors=obj["errors"],
+        )
+
+
 class GetWorkResult:
     """getworkresult"""
 
@@ -493,7 +1131,7 @@ class GetTxOutResult:
             confirmations (int): The number of confirmations
             value (float): The transaction amount in DCR
             scriptPubKey (ScriptPubKeyResult): The public key script used to pay
-                coins as a JSON object
+                coins.
             version (int): The transaction version
             coinbase (bool): Whether or not the transaction is a coinbase
         """
@@ -591,7 +1229,7 @@ class Agenda:
     ):
         """
         Args:
-            id (str): Unique identifier of this agenda.
+            AgendaID (str): Unique identifier of this agenda.
             description (str): Description of this agenda.
             mask (int): Agenda mask.
             startTime (int): Time agenda becomes valid.
@@ -609,6 +1247,7 @@ class Agenda:
         self.quorumProgress = quorumProgress
         self.choices = choices
 
+    @staticmethod
     def parse(obj):
         """
         Parse the Agenda from the decoded RPC response.
@@ -976,6 +1615,15 @@ class TicketFeeInfoResult:
 
     @staticmethod
     def parse(obj):
+        """
+        Parse the TicketFeeInfoResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            TicketFeeInfoResult: The TicketFeeInfoResult.
+        """
         return TicketFeeInfoResult(
             feeInfoMempool=obj["feeinfomempool"],
             feeInfoBlocks=[FeeInfoResult.parse(info) for info in obj["feeinfoblocks"]]
@@ -1008,6 +1656,15 @@ class TxFeeInfoResult:
 
     @staticmethod
     def parse(obj):
+        """
+        Parse the TxFeeInfoResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            TxFeeInfoResult: The TxFeeInfoResult.
+        """
         return TxFeeInfoResult(
             feeInfoMempool=obj["feeinfomempool"],
             feeInfoBlocks=[FeeInfoResult.parse(info) for info in obj["feeinfoblocks"]]
@@ -1142,6 +1799,7 @@ class AgendaInfo(object):
         self.startTime = startTime
         self.expireTime = expireTime
 
+    @staticmethod
     def parse(obj):
         """
         Parse the AgendaInfo from the decoded RPC response.
@@ -1185,8 +1843,8 @@ class RawTransactionsResult:
             version (int): The transaction version.
             locktime (int): The transaction lock time.
             expiry (int): The transacion expiry.
-            vin (list(object)): The transaction inputs as JSON objects.
-            vout (list(object)): The transaction outputs as JSON objects.
+            vin (list(object)): The transaction inputs.
+            vout (list(object)): The transaction outputs.
             txHex (str): Hex-encoded transaction or None.
             blockHash (str): The hash of the block the contains the transaction or None.
             blockHeight (int): The height of the block that contains the transaction or None.
@@ -1212,6 +1870,15 @@ class RawTransactionsResult:
 
     @staticmethod
     def parse(obj):
+        """
+        Parse the RawTransactionsResult from the decoded RPC response.
+
+        Args:
+            obj (object): The decoded dcrd RPC response.
+
+        Returns:
+            RawTransactionsResult: The RawTransactionsResult.
+        """
         return RawTransactionsResult(
             txid=obj["txid"],
             version=obj["version"],
@@ -1299,7 +1966,7 @@ class Vin:
             blockIndex (int): The merkle tree index of the origin transaction
                 (non-coinbase txns only) or None.
             scriptSig (object): The signature script used to redeem the origin
-                transaction as a JSON object (non-coinbase txns only) or None.
+                transaction (non-coinbase txns only) or None.
             prevOut (object): Data from the origin transaction output with index
                 vout or None.
             sequence (int) The script sequence number or None.
@@ -1391,8 +2058,7 @@ class Vout:
             value (float): The amount in DCR.
             n (int): The index of this transaction output.
             version (int): The version of the vout.
-            scriptPubKey (object): The public key script used to pay coins as a
-                JSON object.
+            scriptPubKey (object): The public key script used to pay coins.
         """
         self.value = value
         self.n = n
