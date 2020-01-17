@@ -1,8 +1,22 @@
 [tool.poetry]
 name = "decred"
 version = "0.1.0"
-description = ""
-authors = ["Nicola 'tekNico' Larosa <github@teknico.net>"]
+description = "A Python 3 Decred toolkit."
+license = "ISC"
+homepage = "https://decred.org/"
+repository = "https://github.com/decred/tinydecred/"
+authors = [
+    "Brian Stafford <https://github.com/buck54321>",
+    "The Decred developers <https://decred.org/community>"
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: ISC License (ISCL)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.7",
+    "Topic :: Office/Business :: Financial"
+]
 
 [tool.poetry.dependencies]
 python = "^3.7"
