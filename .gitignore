@@ -1,8 +1,11 @@
-__pycache__/
-*.sublime-project
-*.sublime-workspace
 examples/testnet
+decred/dist
+tinywallet/dist
+decred/poetry.lock
+__pycache__/
+.pytest_cache
 .coverage
 .venv
 *.egg-info
-poetry.lock
+*.sublime-project
+*.sublime-workspace

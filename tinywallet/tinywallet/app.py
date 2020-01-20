@@ -11,14 +11,16 @@ import sys
 
 from PyQt5 import QtGui, QtCore, QtWidgets
 
-from tinydecred import config
-from tinydecred.dcr import constants as DCR
-from tinydecred.dcr.dcrdata import DcrdataBlockchain
-from tinydecred.ui import screens, ui, qutilities as Q
-from tinydecred.util import helpers, database
-from tinydecred.wallet.wallet import Wallet
+from decred import config
+from decred.dcr import constants as DCR
+from decred.dcr.dcrdata import DcrdataBlockchain
+from decred.util import helpers, database
+from decred.wallet.wallet import Wallet
 
-# the directory of the tinydecred package
+from tinywallet import screens, ui, qutilities as Q
+
+
+# the directory of the tinywallet package
 PACKAGEDIR = os.path.dirname(os.path.realpath(__file__))
 
 # some commonly used ui constants
@@ -86,13 +88,14 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
     qRawSignal = QtCore.pyqtSignal(tuple)
     homeSig = QtCore.pyqtSignal()
 
-    def __init__(self, qApp):
+    def __init__(self, qApp, cfg):
         """
         Args:
             qApp (QApplication): An initialized QApplication.
         """
         super().__init__()
         self.qApp = qApp
+        self.cfg = cfg
         self.wallet = None
         # trackedCssItems are CSS-styled elements to be updated if dark mode is
         # enabled/disabled.
@@ -117,12 +120,12 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         self.loadSettings()
 
         dcrdataDB = database.KeyValueDatabase(
-            os.path.join(self.netDirectory(), "dcr.db")
+            os.path.join(self.netDirectory(), "wallet.db")
         )
         # The initialized DcrdataBlockchain will not be connected, as that is a
         # blocking operation. It will be called when the wallet is open.
         self.dcrdata = DcrdataBlockchain(
-            dcrdataDB, cfg.net, self.getNetSetting("dcrdata"), skipConnect=True,
+            dcrdataDB, self.cfg.net, self.getNetSetting("dcrdata"), skipConnect=True,
         )
 
         self.registerSignal(ui.WALLET_CONNECTED, self.syncWallet)
@@ -263,16 +266,16 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         Returns:
             str: Absolute filepath of the directory for the selected network.
         """
-        return os.path.join(config.DATA_DIR, cfg.net.Name)
+        return os.path.join(config.DATA_DIR, self.cfg.net.Name)
 
     def loadSettings(self):
         """
         Load settings from the TinyConfig.
         """
-        settings = self.settings = cfg.get("settings")
+        settings = self.settings = self.cfg.get("settings")
         if not settings:
             self.settings = settings = {}
-            cfg.set("settings", self.settings)
+            self.cfg.set("settings", self.settings)
         for k, v in (("theme", Q.LIGHT_THEME),):
             if k not in settings:
                 settings[k] = v
@@ -280,13 +283,13 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         # if currentWallet not in netSettings:
         netSettings[currentWallet] = os.path.join(self.netDirectory(), WALLET_FILE_NAME)
         helpers.mkdir(self.netDirectory())
-        cfg.save()
+        self.cfg.save()
 
     def saveSettings(self):
         """
         Save the current settings.
         """
-        cfg.save()
+        self.cfg.save()
 
     def getSetting(self, *keys):
         """
@@ -298,7 +301,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         Returns:
             mixed: Value of setting for *keys.
         """
-        return cfg.get("settings", *keys)
+        return self.cfg.get("settings", *keys)
 
     def getNetSetting(self, *keys):
         """
@@ -310,7 +313,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         Returns:
             mixed: Value of network setting for *keys.
         """
-        return cfg.get("networks", cfg.net.Name, *keys)
+        return self.cfg.get("networks", self.cfg.net.Name, *keys)
 
     def setNetSetting(self, k, v):
         """
@@ -320,7 +323,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
             k (str): Network setting key string.
             v (value): Network setting value.
         """
-        cfg.get("networks", cfg.net.Name)[k] = v
+        self.cfg.get("networks", self.cfg.net.Name)[k] = v
 
     def registerSignal(self, sig, cb, *a, **k):
         """
@@ -547,7 +550,7 @@ def exception_hook(exctype, value, tb):
     sys.exit(1)
 
 
-def runTinyDecred():
+def runTinyDecred(cfg):
     """
     Start the TinyDecred application.
     """
@@ -563,7 +566,7 @@ def runTinyDecred():
     qApp.setApplicationName("Tiny Decred")
     loadFonts()
 
-    decred = TinyDecred(qApp)
+    decred = TinyDecred(qApp, cfg)
     try:
         qApp.exec_()
     except Exception as e:
@@ -573,7 +576,7 @@ def runTinyDecred():
     return
 
 
-if __name__ == "__main__":
+def main():
     # Initialize logging for the entire app.
     logDir = os.path.join(config.DATA_DIR, "logs")
     helpers.mkdir(logDir)
@@ -581,4 +584,8 @@ if __name__ == "__main__":
     log.info("configuration file at %s" % config.CONFIG_PATH)
     log.info("data directory at %s" % config.DATA_DIR)
     cfg = config.load()
-    runTinyDecred()
+    runTinyDecred(cfg)
+
+
+if __name__ == "__main__":
+    main()

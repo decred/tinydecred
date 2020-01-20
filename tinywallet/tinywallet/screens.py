@@ -1,5 +1,6 @@
 """
 Copyright (c) 2019, Brian Stafford
+Copyright (c) 2019, the Decred developers
 See LICENSE for detail
 """
 
@@ -10,11 +11,11 @@ from urllib.parse import urlparse
 
 from PyQt5 import QtGui, QtCore, QtWidgets
 
-from tinydecred import config
-from tinydecred.dcr import constants as DCR
-from tinydecred.dcr.vsp import VotingServiceProvider
-from tinydecred.util import helpers, chains
-from tinydecred.wallet.wallet import Wallet
+from decred import config
+from decred.dcr import constants as DCR
+from decred.dcr.vsp import VotingServiceProvider
+from decred.util import helpers, chains
+from decred.wallet.wallet import Wallet
 
 from . import qutilities as Q, ui
 

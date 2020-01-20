@@ -1,5 +1,6 @@
 """
 Copyright (c) 2019, Brian Stafford
+Copyright (c) 2019, the Decred developers
 See LICENSE for detail
 
 PyQt5 utilities.
@@ -9,7 +10,7 @@ import re
 
 from PyQt5 import QtCore, QtWidgets, QtGui
 
-from tinydecred.util import helpers
+from decred.util import helpers
 
 
 log = helpers.getLogger("QUTIL")  # , logLvl=0)
