@@ -1,7 +1,4 @@
-from tinydecred import config
 from tinydecred.pydecred import account as dcracct, nets as dcrnets
-
-cfg = config.load()
 
 
 class BipIDs:
