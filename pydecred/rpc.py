@@ -3,6 +3,7 @@ import ssl
 from tinydecred.util import tinyhttp
 from tinydecred.util.encode import ByteArray
 from tinydecred.pydecred.wire.msgtx import MsgTx
+from tinydecred.pydecred.wire.msgblock import BlockHeader
 
 
 class Client(object):
@@ -83,31 +84,37 @@ class Client(object):
         Returns:
             string: The block hash.
         """
-        return self.call("getblockhash", index)
+        s = self.call("getblockhash", index)
+        return reversed(ByteArray(s))
 
     def getBlockHeader(self, blockHash, verbose=True):
         """
         Returns information about a block header given its hash.
 
         Args:
-            hash (string): The hash of the block.
-            verbose (boolean): Optional. Default=True. Specifies the block
+            blockHash (str): The hash of the block.
+            verbose (bool): Optional. Default=True. Specifies the block
                 header is returned as a GetBlockHeaderVerboseResult instead of
-                hex-encoded string.
+                a msgblock.BlockHeader.
         Returns:
-            GetBlockHeaderVerboseResult or string: The GetBlockHeaderVerboseResult
-                if vebose or the serialized block header otherwise.
+            GetBlockHeaderVerboseResult or msgblock.BlockHeader: The
+                GetBlockHeaderVerboseResult if vebose or the msgblock.BlockHeader
+                otherwise.
         """
         res = self.call("getblockheader", blockHash, verbose)
-        return GetBlockHeaderVerboseResult.parse(res) if verbose else res
+        return (
+            GetBlockHeaderVerboseResult.parse(res)
+            if verbose
+            else BlockHeader.btcDecode(ByteArray(res), 0)
+        )
 
     def getBlockSubsidy(self, height, voters):
         """
         Returns information regarding subsidy amounts.
 
         Args:
-            height (int) The block height.
-            voters (int) The number of voters.
+            height (int): The block height.
+            voters (int): The number of voters.
 
         Returns:
             GetBlockSubsidyResult: The subsidy amounts.
@@ -775,18 +782,18 @@ class GetBlockSubsidyResult:
     """getblocksubsidyresult"""
 
     def __init__(
-        self, developer, subsidyPoS, subsidyPoW, total,
+        self, developer, pos, sPoW, total,
     ):
         """
         Args:
             developer (int): The developer subsidy.
-            subsidyPoS (int): The Proof-of-Stake subsidy.
-            subsidyPoW (int): The Proof-of-Work subsidy.
+            pos (int): The Proof-of-Stake subsidy.
+            sPoW (int): The Proof-of-Work subsidy.
             total (int): The total subsidy.
         """
         self.developer = developer
-        self.subsidyPoS = subsidyPoS
-        self.subsidyPoW = subsidyPoW
+        self.pos = pos
+        self.sPoW = sPoW
         self.total = total
 
     @staticmethod
@@ -802,8 +809,8 @@ class GetBlockSubsidyResult:
         """
         return GetBlockSubsidyResult(
             developer=obj["developer"],
-            subsidyPoS=obj["pos"],
-            subsidyPoW=obj["pow"],
+            pos=obj["pos"],
+            sPoW=obj["pow"],
             total=obj["total"],
         )
 

@@ -1,8 +1,10 @@
 import pytest
 import os
 from tinydecred.pydecred import rpc
+from tinydecred.util.encode import ByteArray
 from tinydecred.util import helpers
 from tinydecred.pydecred.wire.msgtx import MsgTx
+from tinydecred.pydecred.wire.msgblock import BlockHeader
 
 
 @pytest.fixture
@@ -41,19 +43,16 @@ def test_rpc(config):
     assert isinstance(getBlockCount, int)
 
     getBlockHash = rpcClient.getBlockHash(0)
-    assert (
-        getBlockHash
-        == "298e5cc3d985bfe7f81dc135f360abe089edd4396b86d2de66b0cef42b21d980"
+    assert getBlockHash == reversed(
+        ByteArray("298e5cc3d985bfe7f81dc135f360abe089edd4396b86d2de66b0cef42b21d980")
     )
+    blockHash = str(reversed(getBlockHash).hex())
 
-    getBlockHeader = rpcClient.getBlockHeader(getBlockHash)
+    getBlockHeader = rpcClient.getBlockHeader(blockHash)
     assert isinstance(getBlockHeader, rpc.GetBlockHeaderVerboseResult)
 
-    getBlockHeader = rpcClient.getBlockHeader(getBlockHash, False)
-    assert (
-        getBlockHeader
-        == "0100000000000000000000000000000000000000000000000000000000000000000000000dc101dfc3c6a2eb10ca0c5374e10d28feb53f7eabcc850511ceadb99174aa66000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffff011b00c2eb0b000000000000000000000000a0d7b85600000000000000000000000000000000000000000000000000000000000000000000000000000000"
-    )
+    getBlockHeader = rpcClient.getBlockHeader(blockHash, False)
+    assert isinstance(getBlockHeader, BlockHeader)
 
     getBlockSubsidy = rpcClient.getBlockSubsidy(414500, 5)
     assert isinstance(getBlockSubsidy, rpc.GetBlockSubsidyResult)
