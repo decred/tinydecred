@@ -37,27 +37,6 @@ formatTraceback = helpers.formatTraceback
 currentWallet = "current.wallet"
 
 
-def tryExecute(f, *a, **k):
-    """
-    Execute the function, catching exceptions and logging as an error. Return
-    False to indicate an exception.
-
-    Args:
-        f (func): The function.
-        *a (tuple): Optional positional arguments.
-        **k (dict): Optional keyword arguments.
-
-    Returns:
-        value or bool: `False` on failure, the function's return value on
-            success.
-    """
-    try:
-        return f(*a, **k)
-    except Exception as e:
-        log.error("tryExecute %s failed: %s" % (f.__name__, formatTraceback(e)))
-    return False
-
-
 class TinySignals(object):
     """
     Implements the Signals API as defined in tinydecred.api. TinySignals is used
@@ -88,14 +67,15 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
     qRawSignal = QtCore.pyqtSignal(tuple)
     homeSig = QtCore.pyqtSignal()
 
-    def __init__(self, qApp, cfg):
+    def __init__(self, qApp):
         """
         Args:
             qApp (QApplication): An initialized QApplication.
         """
         super().__init__()
         self.qApp = qApp
-        self.cfg = cfg
+        self.cfg = config.load()
+        self.log = self.init_logging()
         self.wallet = None
         # trackedCssItems are CSS-styled elements to be updated if dark mode is
         # enabled/disabled.
@@ -153,6 +133,18 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
 
         self.initialize()
 
+    def init_logging(self):
+        """
+        Initialize logging for the entire app.
+        """
+        logDir = os.path.join(config.DATA_DIR, "logs")
+        helpers.mkdir(logDir)
+        logFilePath = os.path.join(logDir, "tinydecred.log")
+        log = helpers.prepareLogger("APP", logFilePath, logLvl=0)
+        log.info("configuration file at %s" % config.CONFIG_PATH)
+        log.info("data directory at %s" % config.DATA_DIR)
+        return log
+
     def initialize(self):
         """
         Show the initial screen based on the presence of a wallet file.
@@ -180,6 +172,27 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         """
         self.appWindow.stack(self.waitingScreen)
 
+    def tryExecute(self, f, *a, **k):
+        """
+        Execute the function, catching exceptions and logging as an error. Return
+        False to indicate an exception.
+
+        Args:
+            f (func): The function.
+            *a (tuple): Optional positional arguments.
+            **k (dict): Optional keyword arguments.
+
+        Returns:
+            value or bool: `False` on failure, the function's return value on
+                success.
+        """
+        try:
+            return f(*a, **k)
+        except Exception as e:
+            err_msg = "tryExecute {} failed: {}"
+            self.log.error(err_msg.format(f.__name__, formatTraceback(e)))
+        return False
+
     def waitThread(self, f, cb, *a, **k):
         """
         Wait thread shows a waiting screen while the provided function is run
@@ -198,7 +211,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
             self.appWindow.pop(self.waitingScreen)
             cb(*cba, **cbk)
 
-        self.makeThread(tryExecute, unwaiting, f, *a, **k)
+        self.makeThread(self.tryExecute, unwaiting, f, *a, **k)
 
     def openWallet(self, path, pw):
         """
@@ -215,7 +228,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
             self.setWallet(w)
             self.home()
         except Exception as e:
-            log.warning(
+            self.log.warning(
                 "exception encountered while attempting to open wallet: %s"
                 % formatTraceback(e)
             )
@@ -357,7 +370,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         """
         sr = self.signalRegistry
         if sig not in sr:
-            # log.warning("attempted to call un-registered signal %s" % sig)
+            # self.log.warning("attempted to call un-registered signal %s" % sig)
             return
         for s in sr[sig]:
             sa, sk = s[1], s[3]
@@ -421,7 +434,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
                     self.appWindow.pop(self.pwDialog)
                     return r
             except Exception as e:
-                log.warning(
+                self.log.warning(
                     "exception encountered while performing wallet action: %s"
                     % formatTraceback(e)
                 )
@@ -550,7 +563,7 @@ def exception_hook(exctype, value, tb):
     sys.exit(1)
 
 
-def runTinyDecred(cfg):
+def main():
     """
     Start the TinyDecred application.
     """
@@ -566,7 +579,7 @@ def runTinyDecred(cfg):
     qApp.setApplicationName("Tiny Decred")
     loadFonts()
 
-    decred = TinyDecred(qApp, cfg)
+    decred = TinyDecred(qApp)
     try:
         qApp.exec_()
     except Exception as e:
@@ -574,17 +587,6 @@ def runTinyDecred(cfg):
     decred.sysTray.hide()
     qApp.deleteLater()
     return
-
-
-def main():
-    # Initialize logging for the entire app.
-    logDir = os.path.join(config.DATA_DIR, "logs")
-    helpers.mkdir(logDir)
-    log = helpers.prepareLogger("APP", os.path.join(logDir, "tinydecred.log"), logLvl=0)
-    log.info("configuration file at %s" % config.CONFIG_PATH)
-    log.info("data directory at %s" % config.DATA_DIR)
-    cfg = config.load()
-    runTinyDecred(cfg)
 
 
 if __name__ == "__main__":
