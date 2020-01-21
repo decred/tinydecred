@@ -1,8 +1,10 @@
 import pytest
 import os
 from tinydecred.pydecred import rpc
+from tinydecred.util.encode import ByteArray
 from tinydecred.util import helpers
 from tinydecred.pydecred.wire.msgtx import MsgTx
+from tinydecred.pydecred.wire.msgblock import BlockHeader
 
 
 @pytest.fixture
@@ -36,6 +38,60 @@ def test_rpc(config):
 
     blockchainInfo = rpcClient.getBlockchainInfo()
     assert isinstance(blockchainInfo, rpc.GetBlockChainInfoResult)
+
+    getBlockCount = rpcClient.getBlockCount()
+    assert isinstance(getBlockCount, int)
+
+    getBlockHash = rpcClient.getBlockHash(0)
+    assert getBlockHash == reversed(
+        ByteArray("298e5cc3d985bfe7f81dc135f360abe089edd4396b86d2de66b0cef42b21d980")
+    )
+    blockHash = str(reversed(getBlockHash).hex())
+
+    getBlockHeader = rpcClient.getBlockHeader(blockHash)
+    assert isinstance(getBlockHeader, rpc.GetBlockHeaderVerboseResult)
+
+    getBlockHeader = rpcClient.getBlockHeader(blockHash, False)
+    assert isinstance(getBlockHeader, BlockHeader)
+
+    getBlockSubsidy = rpcClient.getBlockSubsidy(414500, 5)
+    assert isinstance(getBlockSubsidy, rpc.GetBlockSubsidyResult)
+
+    getCFilter = rpcClient.getCFilter(
+        "000000000000000018744e708a39ad6e0cc22a85d5b902aa2067c9cd0002df85", "extended"
+    )
+    assert (
+        getCFilter
+        == "0000000e590860091d85960f114d2e457d101825e82c901465e94aa768191dcae08475a842086ad954d6"
+    )
+
+    getCFilterHeader = rpcClient.getCFilterHeader(
+        "000000000000000018744e708a39ad6e0cc22a85d5b902aa2067c9cd0002df85", "extended"
+    )
+    assert (
+        getCFilterHeader
+        == "412f12ed5bd92df6a8b17cf396697cd44d84ada67f5ca3b1c3f23f3b7619984b"
+    )
+
+    getCFilterV2 = rpcClient.getCFilterV2(
+        "000000000000000018744e708a39ad6e0cc22a85d5b902aa2067c9cd0002df85"
+    )
+    assert isinstance(getCFilterV2, rpc.GetCFilterV2Result)
+
+    getChainTips = rpcClient.getChainTips()
+    assert isinstance(getChainTips[0], rpc.GetChainTipsResult)
+
+    getCoinSupply = rpcClient.getCoinSupply()
+    assert isinstance(getCoinSupply, int)
+
+    getConnectionCount = rpcClient.getConnectionCount()
+    assert isinstance(getConnectionCount, int)
+
+    getCurrentNet = rpcClient.getCurrentNet()
+    assert isinstance(getCurrentNet, int)
+
+    getDifficulty = rpcClient.getDifficulty()
+    assert isinstance(getDifficulty, float)
 
     getGenerate = rpcClient.getGenerate()
     assert isinstance(getGenerate, bool)
