@@ -1,25 +1,43 @@
+# decred
+
+The `decred` package contains everything needed to create wallets to send and
+receive [DCR](https://decred.org/).
+
+## Features
+
+1. Pure-Python secp256k1 elliptic curve.
+
+1. Serializable and de-serializable python versions of important types
+from the `dcrd/wire` package: `MsgTx`, `BlockHeader`, `OutPoint`, etc.
+
+1. BIP-0044 keys. Account creation and management. PGP mnemonic seeds.
+
+1. Network parameters for mainnet, testnet3, and simnet.
+
+1. Clients for the dcrdata block explorer API (websockets, pubsub, HTTP).
+
 ## dcr
 
 dcr is a package that enables Decred-compatible blockchain applications. The
-**dcrdata** module contains a dcrdata client and a TinyDecred *Blockchain API*
+`dcrdata` module contains a dcrdata client and a TinyDecred *Blockchain API*
 implementation.
 
-The **wire** module mirrors its dcrd golang counterpart, providing serializable
+The `wire` module mirrors its dcrd Go counterpart, providing serializable
 transactions and blocks.
 
-Network parameters are implemented as modules **mainnet**, **testnet**, and
-**simnet**.
+Network parameters are implemented as modules `mainnet`, `testnet`, and
+`simnet`.
 
-## DcrdataClient
+### DcrdataClient
 
 DcrdataClient is a dcrdata API client written in Python 3.
 
 The constructor takes a single argument, which is the path to a dcrdata server,
-including protocol, e.g. `https://explorer.dcrdata.org`. The available endpoints
-are gathered from the server when the client is created.
+including protocol, e.g. `https://explorer.dcrdata.org/`. The available
+endpoints are gathered from the server when the client is created.
 
 ```
-from tinydecred.dcr.dcrdata import DcrdataClient
+from decred.dcr.dcrdata import DcrdataClient
 import json
 
 client = DcrdataClient("https://explorer.dcrdata.org")
@@ -33,13 +51,17 @@ The acquired list does not include some endpoints, particularly the Insight API
 endpoints.
 
 You can print an endpoint guide to the console with  `client.endpointGuide()`,
-
 or a Python list of URLs is returned from `client.endpointList()`.
 
 Depending on the version of dcrdata they are running, different servers might
 have different sets of endpoints.
 
-### Examples
+## Examples
+
+In the [`examples`](./examples) directory there are scripts for creating and
+using wallets, and for using dcrdata and matplotlib to plot Decred network data.
+
+Here are some more examples:
 
 ```
 def dumpResponse(obj):
