@@ -9,8 +9,8 @@ TinyDecred is a Python 3 toolkit that can be used to integrate
 The [`decred`](./decred) package contains everything needed to create wallets
 to send and receive DCR.
 
-The [`tinywallet`](./tinywallet) package contains such a light wallet based on
-PyQt5.
+The [`tinywallet`](./tinywallet) package contains a wallet based on the
+`decred` toolkit.
 
 Each package may be installed from the [Python Package Index](https://pypi.org/)
 using the [`pip`](https://pip.pypa.io/) command as usual.

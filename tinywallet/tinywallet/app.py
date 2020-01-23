@@ -100,7 +100,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         self.loadSettings()
 
         dcrdataDB = database.KeyValueDatabase(
-            os.path.join(self.netDirectory(), "wallet.db")
+            os.path.join(self.netDirectory(), "dcr.db")
         )
         # The initialized DcrdataBlockchain will not be connected, as that is a
         # blocking operation. It will be called when the wallet is open.

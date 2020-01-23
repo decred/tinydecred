@@ -13,14 +13,14 @@ If you found a bug, before creating an issue please search among the
 useful details as you can.
 
 If you'd like to request a new feature, either create an issue (again, after
-searching first) or, preferably, discuss your request with the developers as
-mentioned above.
+searching first) or chat with us on Matrix (see above).
 
 ## Development
 
-This project is managed via the [Poetry](https://python-poetry.org/) tool.
-You'll reformat your changes with the [Black](https://black.readthedocs.io/)
-tool and run tests using [pytest](https://www.pytest.org/).
+The [Poetry](https://python-poetry.org/) tool is used for dependency management
+and packaging. You'll reformat your changes with the
+[Black](https://black.readthedocs.io/) tool and run tests using
+[pytest](https://www.pytest.org/).
 
 Before each pull request is merged, a Github workflow action is run to make
 sure that the changes meet some minimum requirements. The action definition

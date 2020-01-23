@@ -24,7 +24,7 @@ classifiers = [
 [tool.poetry.dependencies]
 python = "^3.7"
 decred = {path = "../decred/"}
-pyqt5 = "=5.9.2"
+pyqt5 = "=5.12.3"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"

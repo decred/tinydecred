@@ -1,7 +1,7 @@
 # decred
 
-The `decred` package contains everything needed to create wallets to send and
-receive [DCR](https://decred.org/).
+The `decred` package contains everything needed to create
+[Decred](https://decred.org/) applications in Python.
 
 ## Features
 
@@ -16,19 +16,7 @@ from the `dcrd/wire` package: `MsgTx`, `BlockHeader`, `OutPoint`, etc.
 
 1. Clients for the dcrdata block explorer API (websockets, pubsub, HTTP).
 
-## dcr
-
-dcr is a package that enables Decred-compatible blockchain applications. The
-`dcrdata` module contains a dcrdata client and a TinyDecred *Blockchain API*
-implementation.
-
-The `wire` module mirrors its dcrd Go counterpart, providing serializable
-transactions and blocks.
-
-Network parameters are implemented as modules `mainnet`, `testnet`, and
-`simnet`.
-
-### DcrdataClient
+## DcrdataClient
 
 DcrdataClient is a dcrdata API client written in Python 3.
 
