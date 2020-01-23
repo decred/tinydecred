@@ -17,12 +17,14 @@ classifiers = [
     "License :: OSI Approved :: ISC License (ISCL)",
     "Natural Language :: English",
     "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.6",
     "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
     "Topic :: Office/Business :: Financial"
 ]
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.6"
 decred = {path = "../decred/"}
 pyqt5 = "=5.12.3"
 

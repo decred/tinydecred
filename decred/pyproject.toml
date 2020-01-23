@@ -15,12 +15,14 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: ISC License (ISCL)",
     "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.6",
     "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
     "Topic :: Office/Business :: Financial"
 ]
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.6"
 appdirs = "^1.4.3"
 base58 = "^2.0.0"
 blake256 = "^0.1.1"
