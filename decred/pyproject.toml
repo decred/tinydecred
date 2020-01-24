@@ -1,0 +1,39 @@
+[tool.poetry]
+name = "decred"
+version = "0.0.1"
+description = "A Python 3 Decred toolkit."
+license = "ISC"
+homepage = "https://decred.org/"
+repository = "https://github.com/decred/tinydecred/"
+documentation = "https://github.com/decred/tinydecred/blob/master/decred"
+authors = [
+    "Brian Stafford <buck@decred.org>",
+    "The Decred developers <https://decred.org/community>"
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: ISC License (ISCL)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Topic :: Office/Business :: Financial"
+]
+
+[tool.poetry.dependencies]
+python = "^3.6"
+appdirs = "^1.4.3"
+base58 = "^2.0.0"
+blake256 = "^0.1.1"
+pynacl = "^1.3.0"
+websocket_client = "^0.57.0"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+pyflakes = "^2.1.1"
+black = "^19.10b0"
+
+[build-system]
+requires = ["poetry>=1.0.2"]
+build-backend = "poetry.masonry.api"
