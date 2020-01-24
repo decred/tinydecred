@@ -1,13 +1,13 @@
 [tool.poetry]
 name = "tinywallet"
-version = "0.1.0"
+version = "0.0.1"
 description = "A Python 3 Decred wallet."
 license = "ISC"
 homepage = "https://decred.org/"
 repository = "https://github.com/decred/tinydecred/"
 documentation = "https://github.com/decred/tinydecred/blob/master/tinywallet"
 authors = [
-    "Brian Stafford <https://github.com/buck54321>",
+    "Brian Stafford <buck@decred.org>",
     "The Decred developers <https://decred.org/community>"
 ]
 classifiers = [
