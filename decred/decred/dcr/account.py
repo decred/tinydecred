@@ -1496,7 +1496,7 @@ class Account(object):
         revocableTickets = (
             utxo.txid for utxo in self.utxos.values() if utxo.isRevocableTicket()
         )
-        txs = (self.blockchain.tx(txid) for txid in revocableTickets)
+        txs = [self.blockchain.tx(txid) for txid in revocableTickets]
         for tx in txs:
             redeemHash = crypto.AddressScriptHash(
                 self.net.ScriptHashAddrID,
