@@ -69,12 +69,20 @@ def test_rpc(config):
     assert not existsAddress
 
     existsAddresses = rpcClient.existsAddresses(
-        [cookedAddress1, cookedAddress2, mainnetAddress]
+        [
+            cookedAddress1,
+            cookedAddress2,
+            mainnetAddress,
+            cookedAddress2,
+            cookedAddress1,
+            cookedAddress2,
+            mainnetAddress,
+        ]
     )
-    assert existsAddresses == "04"
+    assert existsAddresses == [False, False, True, False, False, False, True]
 
-    existsExpiredTickets = rpcClient.existsExpiredTickets([someTicket])
-    assert existsExpiredTickets == "00"
+    existsExpiredTickets = rpcClient.existsExpiredTickets([someTicket, someTicket])
+    assert existsExpiredTickets == [False, False]
 
     bestBlock = rpcClient.getBestBlock()
     assert isinstance(bestBlock, rpc.GetBestBlockResult)
@@ -170,8 +178,8 @@ def test_rpc(config):
     assert isinstance(getRawMempool, list)
     mempoolTxs = getRawMempool[0]
 
-    existsMempoolTxs = rpcClient.existsMempoolTxs(getRawMempool[:3])
-    assert existsMempoolTxs == "07"
+    existsMempoolTxs = rpcClient.existsMempoolTxs(getRawMempool[:3] + [someTicket])
+    assert existsMempoolTxs == [True, True, True, False]
 
     getRawMempool = rpcClient.getRawMempool(True)
     assert isinstance(getRawMempool[mempoolTxs], rpc.GetRawMempoolVerboseResult)
@@ -229,19 +237,17 @@ def test_rpc(config):
     existsLiveTickets = rpcClient.existsLiveTickets(
         liveTickets[:5] + missedTickets[:1] + liveTickets[:2]
     )
-    assert existsLiveTickets == "df"
+    assert existsLiveTickets == [True, True, True, True, True, False, True, True]
 
-    existsMissedTickets = rpcClient.existsMissedTickets(missedTickets[0:2])
-    assert existsMissedTickets == "03"
+    existsMissedTickets = rpcClient.existsMissedTickets(missedTickets[:8])
+    assert existsMissedTickets == [True for _ in range(8)]
 
     rpcClient.ping()
 
     searchRawTransactions = rpcClient.searchRawTransactions(mainnetAddress)
     assert isinstance(searchRawTransactions[0], rpc.RawTransactionsResult)
 
-    searchRawTransactions = rpcClient.searchRawTransactions(
-        "Dcur2mcGjmENx4DhNqDctW5wJCVyT3Qeqkx", 0,
-    )
+    searchRawTransactions = rpcClient.searchRawTransactions(mainnetAddress, 0)
     assert isinstance(searchRawTransactions[0], str)
 
     ticketFeeInfo = rpcClient.ticketFeeInfo()
