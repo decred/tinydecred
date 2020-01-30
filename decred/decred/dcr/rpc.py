@@ -211,10 +211,10 @@ class Client(object):
         Args:
             blockHash (ByteArray): The hash of the block.
             verbose (bool): Optional. Default=True. Specifies the block is
-                returned as a JSON object instead of serialized bytes.
+                returned as a GetBlockVerboseResult instead of serialized bytes.
             verboseTx (bool): Optional. Default=False. Specifies that each
-                transaction is returned as a JSON object and only applies if
-                the verbose flag is true (dcrd extension).
+                transaction is returned as a RawTransactionsResult and only
+                applies if the verbose flag is true (dcrd extension).
 
         Returns:
             ByteArray or GetBlockVerboseResult: GetBlockVerboseResult if verbose
@@ -629,7 +629,7 @@ class Client(object):
         Returns formatted hash data to work on or checks and submits solved data.
 
         Args:
-            data (ByteArray): Optional. Default=None. Hex-encoded data to check
+            data (ByteArray): Optional. Default=None. Data to check
 
         Returns:
             GetWorkResult or bool: If data is not provided, returns GetWorkResult,
@@ -750,13 +750,12 @@ class Client(object):
         return (
             [RawTransactionResult.parse(rawTx) for rawTx in res]
             if verbose
-            else [MsgTx.btcDecode(ByteArray(rawTx), 0) for rawTx in res]
+            else [MsgTx.deserialize(ByteArray(rawTx)) for rawTx in res]
         )
 
     def sendRawTransaction(self, msgTx, allowHighFees=False):
         """
-        Submits the serialized, hex-encoded transaction to the local peer and
-        relays it to the network.
+        Submits the transaction to the local peer and relays it to the network.
 
         Args:
             msgTx (object): msgtx.MsgTx signed transaction.
@@ -789,18 +788,18 @@ class Client(object):
         """
         return self.call("stop")
 
-    def submitBlock(self, hexBlock, options=None):
+    def submitBlock(self, block, options=None):
         """
         Attempts to submit a new serialized block to the network.
 
         Args:
-            hexBlock (ByteArray): Serialized  block.
+            block (ByteArray): The block.
             options: Optional. Default={}. This parameter is currently ignored.
 
         Returns:
             str: The reason the block was rejected if rejected or None.
         """
-        return self.call("submitblock", hexBlock.hex(), options if options else {})
+        return self.call("submitblock", block.hex(), options if options else {})
 
     def ticketFeeInfo(self, blocks=0, windows=0):
         """
@@ -951,43 +950,43 @@ class GetBlockVerboseResult:
         difficulty,
         chainWork,
         previousHash,
-        nextHash,
-        tx,
-        rawTx,
-        sTx,
-        rawSTx,
+        nextHash=None,
+        txHash=None,
+        rawTx=None,
+        sTxHash=None,
+        rawSTx=None,
     ):
         """
         Args:
-            blockHash (str): The hash of the block (same as provided).
+            blockHash (ByteArray): The hash of the block (same as provided).
             confirmations (int): The number of confirmations.
             size (int): The size of the block.
             height (int): The height of the block in the block chain.
             version (int): The block version.
-            merkleRoot (str): Root hash of the merkle tree.
-            stakeRoot (str): The block's sstx hashes the were included.
+            merkleRoot (ByteArray): Root hash of the merkle tree.
+            stakeRoot (ByteArray): The block's sstx hashes the were included.
             time (int): The block time in seconds since 1 Jan 1970 GMT.
             nonce (int): The block nonce.
             voteBits (int): The block's voting results.
-            finalState (str): The block's finalstate.
+            finalState (ByteArray): The block's finalstate.
             voters (int): The number votes in the block.
             freshStake (int): The number of new tickets in the block.
             revocations (int): The number of revocations in the block.
             poolSize (int): The size of the live ticket pool.
-            bits (str): The bits which represent the block difficulty.
+            bits (ByteArray): The bits which represent the block difficulty.
             sBits (float): The stake difficulty of theblock.
-            extraData (str): Extra data field for the requested block.
-            stakeVersion (int): Stake Version of the block.
+            extraData (ByteArray): Extra data field for the requested block.
+            stakeVersion (ByteArray): Stake Version of the block.
             difficulty (float): The proof-of-work difficulty as a multiple of
                 the minimum difficulty.
-            chainWork (str): The total number of hashes expected to produce
-                the chain up to the block in hex.
-            previousHash (str): The hash of the previous block.
-            nextHash (str): The hash of the next block (only if there is one).
-            tx (list(str)): The transaction hashes (only when verboseTx=false).
+            chainWork (ByteArray): The total number of hashes expected to produce
+                the chain up to the block.
+            previousHash (ByteArray): The hash of the previous block.
+            nextHash (ByteArray): The hash of the next block (only if there is one).
+            txHash (list(ByteArray)): The transaction (only when verboseTx=false).
             rawTx (list(RawTransactionResult)): The transactions as JSON objects
                 (only when verboseTx=true).
-            sTx (list(str)): The block's sstx hashes the were included (only
+            sTxHash (list(ByteArray)): The block's sstx hashes that were included (only
                 when verboseTx=false).
             rawSTx (list(RawTransactionResult)): The block's raw sstx hashes
                 that were included (only when verboseTx=true).
@@ -1015,42 +1014,48 @@ class GetBlockVerboseResult:
         self.chainWork = chainWork
         self.previousHash = previousHash
         self.nextHash = nextHash
-        self.tx = tx
-        self.rawTx = rawTx
-        self.sTx = sTx
-        self.rawSTx = rawSTx
+        self.txHash = txHash if txHash else []
+        self.rawTx = rawTx if rawTx else []
+        self.sTxHash = sTxHash if sTxHash else []
+        self.rawSTx = rawSTx if rawSTx else []
 
     @staticmethod
     def parse(obj):
         return GetBlockVerboseResult(
-            blockHash=obj["hash"],
+            blockHash=reversed(ByteArray(obj["hash"])),
             confirmations=obj["confirmations"],
             size=obj["size"],
             height=obj["height"],
             version=obj["version"],
-            merkleRoot=obj["merkleroot"],
-            stakeRoot=obj["stakeroot"],
+            merkleRoot=ByteArray(obj["merkleroot"]),
+            stakeRoot=ByteArray(obj["stakeroot"]),
             time=obj["time"],
             nonce=obj["nonce"],
             voteBits=obj["votebits"],
-            finalState=obj["finalstate"],
+            finalState=ByteArray(obj["finalstate"]),
             voters=obj["voters"],
             freshStake=obj["freshstake"],
             revocations=obj["revocations"],
             poolSize=obj["poolsize"],
-            bits=obj["bits"],
+            bits=ByteArray(obj["bits"]),
             sBits=obj["sbits"],
-            extraData=obj["extradata"],
+            extraData=ByteArray(obj["extradata"]),
             stakeVersion=obj["stakeversion"],
             difficulty=obj["difficulty"],
-            chainWork=obj["chainwork"],
-            previousHash=obj["previousblockhash"],
-            nextHash=get("nextblockhash", obj),
-            tx=get("tx", obj),
+            chainWork=ByteArray(obj["chainwork"]),
+            previousHash=reversed(ByteArray(obj["previousblockhash"])),
+            nextHash=reversed(ByteArray(obj["nextblockhash"]))
+            if "nextblockhash" in obj
+            else None,
+            txHash=[reversed(ByteArray(rawTx)) for rawTx in obj["tx"]]
+            if "tx" in obj
+            else [],
             rawTx=[RawTransactionResult.parse(tx) for tx in obj["rawtx"]]
             if "rawtx" in obj
             else [],
-            sTx=get("stx", obj),
+            sTxHash=[reversed(ByteArray(rawTx)) for rawTx in obj["stx"]]
+            if "stx" in obj
+            else [],
             rawSTx=[RawTransactionResult.parse(stx) for stx in obj["rawstx"]]
             if "rawstx" in obj
             else [],
@@ -1118,7 +1123,7 @@ class GetChainTipsResult:
         """
         Args:
             height (int): The height of the chain tip.
-            blockHash (str): The block hash of the chain tip.
+            blockHash (ByteArray): The block hash of the chain tip.
             branchLen (int): The length of the branch that connects the tip to
                 the main chain (0 for the main chain tip).
             status (str): The status of the chain (active, invalid, headers-only,
@@ -1142,7 +1147,7 @@ class GetChainTipsResult:
         """
         return GetChainTipsResult(
             height=obj["height"],
-            blockHash=obj["hash"],
+            blockHash=reversed(ByteArray(obj["hash"])),
             branchLen=obj["branchlen"],
             status=obj["status"],
         )
@@ -1191,8 +1196,8 @@ class GetCFilterV2Result:
     ):
         """
         Args:
-            blockHash (str): The block hash for which the filter includes data.
-            data (str): Hex-encoded bytes of the serialized filter.
+            blockHash (ByteArray): The block hash for which the filter includes data.
+            data (ByteArray): Bytes of the serialized filter.
             proofIndex (int): The index of the leaf that represents the filter
                 hash in the header commitment.
             proofHashes (list(str)): The hashes needed to prove the filter is
@@ -1215,8 +1220,8 @@ class GetCFilterV2Result:
             GetCFilterV2Result: The GetCFilterV2Result.
         """
         return GetCFilterV2Result(
-            blockHash=obj["blockhash"],
-            data=obj["data"],
+            blockHash=reversed(ByteArray(obj["blockhash"])),
+            data=ByteArray(obj["data"]),
             proofIndex=obj["proofindex"],
             proofHashes=obj["proofhashes"],
         )
@@ -1253,31 +1258,31 @@ class GetBlockHeaderVerboseResult:
     ):
         """
         Args:
-            blockHash (str): The hash of the block (same as provided).
+            blockHash (ByteArray): The hash of the block.
             confirmations (int): The number of confirmations.
             version (int): The block version.
-            merkleRoot (str): The merkle root of the regular transaction tree.
-            stakeRoot (str): The merkle root of the stake transaction tree.
+            merkleRoot (ByteArray): The merkle root of the regular transaction tree.
+            stakeRoot (ByteArray): The merkle root of the stake transaction tree.
             voteBits (int): The vote bits.
-            finalState (str): The final state value of the ticket pool.
+            finalState (ByteArray): The final state value of the ticket pool.
             voters (int): The number of votes in the block.
             freshStake (int): The number of new tickets in the block.
             revocations (int): The number of revocations in the block.
             poolSize (int): The size of the live ticket pool.
-            bits (str): The bits which represent the block difficulty.
+            bits (ByteArray): The bits which represent the block difficulty.
             sBits (float): The stake difficulty in coins.
             height (int): The height of the block in the block chain.
             size (int): The size of the block in bytes.
             time (int): The block time in seconds since 1 Jan 1970 GMT.
             nonce (int): The block nonce.
-            extraData (str): Extra data field for the requested block.
+            extraData (ByteArray): Extra data field for the requested block.
             stakeVersion (int): The stake version of the block.
             difficulty (float): The proof-of-work difficulty as a multiple of
                 the minimum difficulty.
-            chainWork (str): The total number of hashes expected to produce
-                the chain up to the block in hex.
-            previousHash (str): The hash of the previous block or None.
-            nextHash (str): The hash of the next block or None.
+            chainWork (ByteArray): The total number of hashes expected to produce
+                the chain up to the block.
+            previousHash (ByteArray): The hash of the previous block or None.
+            nextHash (ByteArray): The hash of the next block or None.
         """
         self.blockHash = blockHash
         self.confirmations = confirmations
@@ -1315,29 +1320,33 @@ class GetBlockHeaderVerboseResult:
             GetBlockHeaderVerboseResult: The GetBlockHeaderVerboseResult.
         """
         return GetBlockHeaderVerboseResult(
-            blockHash=obj["hash"],
+            blockHash=reversed(ByteArray(obj["hash"])),
             confirmations=obj["confirmations"],
             version=obj["version"],
-            merkleRoot=obj["merkleroot"],
-            stakeRoot=obj["stakeroot"],
+            merkleRoot=ByteArray(obj["merkleroot"]),
+            stakeRoot=ByteArray(obj["stakeroot"]),
             voteBits=obj["votebits"],
-            finalState=obj["finalstate"],
+            finalState=ByteArray(obj["finalstate"]),
             voters=obj["voters"],
             freshStake=obj["freshstake"],
             revocations=obj["revocations"],
             poolSize=obj["poolsize"],
-            bits=obj["bits"],
+            bits=ByteArray(obj["bits"]),
             sBits=obj["sbits"],
             height=obj["height"],
             size=obj["size"],
             time=obj["time"],
             nonce=obj["nonce"],
-            extraData=obj["extradata"],
+            extraData=ByteArray(obj["extradata"]),
             stakeVersion=obj["stakeversion"],
             difficulty=obj["difficulty"],
-            chainWork=obj["chainwork"],
-            previousHash=get("previoushash", obj),
-            nextHash=get("nexthash", obj),
+            chainWork=ByteArray(obj["chainwork"]),
+            previousHash=reversed(ByteArray(obj["previoushash"]))
+            if "previoushash" in obj
+            else None,
+            nextHash=reversed(ByteArray(obj["nexthash"]))
+            if "nexthash" in obj
+            else None,
         )
 
 
@@ -1356,7 +1365,7 @@ class GetRawMempoolVerboseResult:
             height (int): Block height when transaction entered the pool.
             startingPriority (float): Priority when transaction entered the pool.
             currentPriority (float): Current priority.
-            depends (list(str)): Unconfirmed transactions used as inputs for
+            depends (list(ByteArray)): Unconfirmed transactions used as inputs for
                 this transaction.
         """
         self.size = size
@@ -1385,7 +1394,7 @@ class GetRawMempoolVerboseResult:
             height=obj["height"],
             startingPriority=obj["startingpriority"],
             currentPriority=obj["currentpriority"],
-            depends=obj["depends"],
+            depends=[reversed(ByteArray(txid)) for txid in obj["depends"]],
         )
 
 
@@ -1419,7 +1428,7 @@ class GetPeerInfoResult:
         Args:
             nodeID (int): A unique node ID.
             addr (str): The ip address and port of the peer.
-            services (str): Services bitmask which represents the services
+            services (ByteArray): Services bitmask which represents the services
                 supported by the peer.
             relayTxes (bool): Peer has requested transactions be relayed to it.
             lastSend (int): Time the last message was received in seconds since
@@ -1479,7 +1488,7 @@ class GetPeerInfoResult:
         return GetPeerInfoResult(
             nodeID=obj["id"],
             addr=obj["addr"],
-            services=obj["services"],
+            services=ByteArray(obj["services"]),
             relayTxes=obj["relaytxes"],
             lastSend=obj["lastsend"],
             lastRecv=obj["lastrecv"],
@@ -1854,8 +1863,8 @@ class GetWorkResult:
     ):
         """
         Args:
-            data (str): Hex-encoded block data.
-            target (str): Hex-encoded little-endian hash target.
+            data (ByteArray): Block data.
+            target (ByteArray): Little-endian hash target.
         """
         self.data = data
         self.target = target
@@ -1871,7 +1880,9 @@ class GetWorkResult:
         Returns:
             GetWorkResult: The GetWorkResult.
         """
-        return GetWorkResult(data=obj["data"], target=obj["target"])
+        return GetWorkResult(
+            data=ByteArray(obj["data"]), target=ByteArray(obj["target"])
+        )
 
 
 class GetTxOutResult:
@@ -1882,7 +1893,7 @@ class GetTxOutResult:
     ):
         """
         Args:
-            bestBlock (str): The block hash that contains the transaction
+            bestBlock (ByteArray): The block hash that contains the transaction
                 output
             confirmations (int): The number of confirmations
             value (float): The transaction amount in DCR
@@ -1910,7 +1921,7 @@ class GetTxOutResult:
             GetTxOutResult: The GetTxOutResult.
         """
         return GetTxOutResult(
-            bestBlock=obj["bestblock"],
+            bestBlock=reversed(ByteArray(obj["bestblock"])),
             confirmations=obj["confirmations"],
             value=obj["value"],
             scriptPubKey=ScriptPubKeyResult.parse(obj["scriptPubKey"]),
@@ -2044,7 +2055,7 @@ class GetVoteInfoResult:
         currentHeight (int): Top of the chain height.
         startHeight (int): The start height of this voting window.
         endHeight (int): The end height of this voting window.
-        hash (str): The hash of the current height block.
+        blockHash (ByteArray): The hash of the current height block.
         voteVersion (int): Selected vote version.
         quorum (int): Minimum amount of votes required.
         totalVotes (int): Total votes.
@@ -2074,7 +2085,7 @@ class GetVoteInfoResult:
             currentHeight=obj["currentheight"],
             startHeight=obj["startheight"],
             endHeight=obj["endheight"],
-            blockHash=obj["hash"],
+            blockHash=reversed(ByteArray(obj["hash"])),
             voteVersion=obj["voteversion"],
             quorum=obj["quorum"],
             totalVotes=obj["totalvotes"],
@@ -2122,7 +2133,7 @@ class GetStakeVersionsResult:
     ):
         """
         Args:
-            blockHash (str): Hash of the block.
+            blockHash (ByteArray): Hash of the block.
             height (int): Height of the block.
             blockVersion (int): The block version.
             stakeVersion (int): The stake version of the block.
@@ -2147,7 +2158,7 @@ class GetStakeVersionsResult:
             StakeVersionsResult: The StakeVersionsResult.
         """
         return GetStakeVersionsResult(
-            blockHash=obj["hash"],
+            blockHash=reversed(ByteArray(obj["hash"])),
             height=obj["height"],
             blockVersion=obj["blockversion"],
             stakeVersion=obj["stakeversion"],
@@ -2232,7 +2243,7 @@ class GetStakeVersionInfoResult:
         """
         Args:
             currentHeight (int): Top of the chain height.
-            hash (str): Top of the chain hash.
+            blockHash (ByteArray): Top of the chain hash.
             intervals list(VersionInterval): Array of total stake and vote counts.
         """
         self.currentHeight = currentHeight
@@ -2252,7 +2263,7 @@ class GetStakeVersionInfoResult:
         """
         return GetStakeVersionInfoResult(
             currentHeight=obj["currentheight"],
-            blockHash=obj["hash"],
+            blockHash=reversed(ByteArray(obj["hash"])),
             intervals=[VersionInterval.parse(ver) for ver in obj["intervals"]],
         )
 
@@ -2483,13 +2494,13 @@ class GetBlockChainInfoResult(object):
             headers (int): The number of validated block headers that
                 comprise the target best chain.
             syncHeight (int): The latest known block height being synced to.
-            bestBlockHash (str): The block hash of the current best chain
+            bestBlockHash (ByteArray): The block hash of the current best chain
                 tip.
             difficultyRatio (float): The current proof-of-work difficulty as
                 a multiple of the minimum difficulty.
             verificationProgress (float): The chain verification progress
                 estimate.
-            chainWork (str): Hex encoded total work done for the chain.
+            chainWork (ByteArray): Total work done for the chain.
             initialBlockDownload (bool): Best guess of whether this node is
                 in the initial block download mode used to catch up the chain
                 when it is far behind
@@ -2524,10 +2535,10 @@ class GetBlockChainInfoResult(object):
             blocks=obj["blocks"],
             headers=obj["headers"],
             syncHeight=obj["syncheight"],
-            bestBlockHash=obj["bestblockhash"],
+            bestBlockHash=reversed(ByteArray(obj["bestblockhash"])),
             difficultyRatio=obj["difficultyratio"],
             verificationProgress=obj["verificationprogress"],
-            chainWork=obj["chainwork"],
+            chainWork=ByteArray(obj["chainwork"]),
             initialBlockDownload=obj["initialblockdownload"],
             maxBlockSize=obj["maxblocksize"],
             deployments={k: AgendaInfo.parse(v) for k, v in obj["deployments"].items()},
@@ -2579,13 +2590,13 @@ class RawTransactionResult:
 
     def __init__(
         self,
-        txid,
+        txHash,
         version,
         lockTime,
         expiry,
         vin,
         vout,
-        txHex=None,
+        tx=None,
         blockHash=None,
         blockHeight=None,
         blockIndex=None,
@@ -2595,14 +2606,14 @@ class RawTransactionResult:
     ):
         """
         Args:
-            txid (str):  The hash of the transaction.
+            txHash (ByteArray):  The hash of the transaction.
             version (int): The transaction version.
             locktime (int): The transaction lock time.
             expiry (int): The transacion expiry.
             vin (list(object)): The transaction inputs.
             vout (list(object)): The transaction outputs.
-            txHex (str): Hex-encoded transaction or None.
-            blockHash (str): The hash of the block the contains the transaction or None.
+            tx (msgtx.MsgTx): msgtx.MsgTx transaction or None.
+            blockHash (ByteArray): The hash of the block the contains the transaction or None.
             blockHeight (int): The height of the block that contains the transaction or None.
             blockIndex (int): The index within the array of transactions
                 contained by the block or None.
@@ -2610,13 +2621,13 @@ class RawTransactionResult:
             time (int): Transaction time in seconds since 1 Jan 1970 GMT or None.
             blockTime (int): Block time in seconds since the 1 Jan 1970 GMT or None.
         """
-        self.txid = txid
+        self.txHash = txHash
         self.version = version
         self.lockTime = lockTime
         self.expiry = expiry
         self.vin = vin
         self.vout = vout
-        self.txHex = txHex
+        self.tx = tx
         self.blockHash = blockHash
         self.blockHeight = blockHeight
         self.blockIndex = blockIndex
@@ -2636,14 +2647,16 @@ class RawTransactionResult:
             RawTransactionResult: The RawTransactionResult.
         """
         return RawTransactionResult(
-            txid=obj["txid"],
+            txHash=reversed(ByteArray(obj["txid"])),
             version=obj["version"],
             lockTime=obj["locktime"],
             expiry=obj["expiry"],
             vin=[Vin.parse(vin) for vin in obj["vin"]],
             vout=[Vout.parse(vout) for vout in obj["vout"]],
-            txHex=get("hex", obj),
-            blockHash=get("blockhash", obj),
+            tx=MsgTx.deserialize((obj["hex"])) if "hex" in obj else None,
+            blockHash=reversed(ByteArray(obj["blockhash"]))
+            if "blockhash" in obj
+            else None,
             blockHeight=get("blockheight", obj),
             blockIndex=get("blockindex", obj),
             confirmations=get("confirmations", obj),
@@ -2697,7 +2710,7 @@ class Vin:
         amountIn,
         coinbase=None,
         stakebase=None,
-        txid=None,
+        txHash=None,
         vout=None,
         tree=None,
         sequence=None,
@@ -2709,10 +2722,10 @@ class Vin:
         """
         Args:
             amountIn (int): The amount in for this transaction input, in coins.
-            coinbase (str): The hex-encoded bytes of the signature script
+            coinbase (ByteArray): The bytes of the signature script
                 (coinbase txns only) or None.
-            stakebase (str): The hash of the stake transaction or None.
-            txid (str): The hash of the origin transaction (non-coinbase txns
+            stakebase (ByteArray): The hash of the stake transaction or None.
+            txHash (ByteArray): The hash of the origin transaction (non-coinbase txns
                 only) or None.
             vout (int): The index of the output being redeemed from the origin
                 transaction (non-coinbase txns only) or None.
@@ -2731,7 +2744,7 @@ class Vin:
         self.amountIn = amountIn
         self.coinbase = coinbase
         self.stakebase = stakebase
-        self.txid = txid
+        self.txHash = txHash
         self.vout = vout
         self.tree = tree
         self.sequence = sequence
@@ -2754,9 +2767,11 @@ class Vin:
         """
         Vin(
             amountIn=obj["amountin"],
-            coinbase=get("coinbase", obj),
-            stakebase=get("stakebase", obj),
-            txid=get("txid", obj),
+            coinbase=ByteArray(obj["coinbase"]) if "coinbase" in obj else None,
+            stakebase=reversed(ByteArray(obj["stakebase"]))
+            if "stakebase" in obj
+            else None,
+            txHash=reversed(ByteArray(obj["txid"])) if "txid" in obj else None,
             vout=get("vout", obj),
             tree=get("tree", obj),
             blockHeight=get("blockheight", obj),
@@ -2775,15 +2790,15 @@ class ScriptSig:
     """
 
     def __init__(
-        self, asm, scriptHex,
+        self, asm, script,
     ):
         """
         Args:
             asm (str): Disassembly of the script.
-            scriptHex (str): Hex-encoded bytes of the script.
+            script (ByteArray): Bytes of the script.
         """
         self.asm = asm
-        self.scriptHex = scriptHex
+        self.script = script
 
     @staticmethod
     def parse(obj):
@@ -2797,7 +2812,7 @@ class ScriptSig:
             ScriptSig: The Parsed ScriptSig.
         """
         ScriptSig(
-            asm=obj["asm"], scriptHex=obj["hex"],
+            asm=obj["asm"], script=ByteArray(obj["hex"]),
         )
 
 
@@ -2848,13 +2863,13 @@ class ScriptPubKeyResult:
     """
 
     def __init__(
-        self, asm, Type, scriptHex=None, reqSigs=None, addresses=None, commitAmt=None,
+        self, asm, Type, script=None, reqSigs=None, addresses=None, commitAmt=None,
     ):
         """
         Args:
             asm (str): Disassembly of the script.
             Type (str): The type of the script (e.g. 'pubkeyhash').
-            scriptHex (str): Hex-encoded bytes of the script or None.
+            script (ByteArray): Bytes of the script or None.
             reqSigs (int): The number of required signatures or None.
             addresses (list(str)): The Decred addresses associated with this
                 script or None.
@@ -2863,7 +2878,7 @@ class ScriptPubKeyResult:
         """
         self.asm = asm
         self.type = Type
-        self.scriptHex = scriptHex
+        self.script = script
         self.reqSigs = reqSigs
         self.addresses = addresses
         self.commitAmt = commitAmt
@@ -2882,7 +2897,7 @@ class ScriptPubKeyResult:
         return ScriptPubKeyResult(
             asm=obj["asm"],
             Type=obj["type"],
-            scriptHex=get("hex", obj),
+            script=ByteArray(get("hex", obj)),
             reqSigs=get("reqSigs", obj),
             addresses=get("addresses", obj),
             commitAmt=get("commitAmt", obj),
