@@ -27,6 +27,8 @@ sure that the changes meet some minimum requirements. The action definition
 [file](./.github/workflows/python.yml) is a useful summary of the commands
 you'll run while developing.
 
+For test coverage see the `./decred/coverage-html.sh` script.
+
 ## More information
 
 Please find more information in the dcrd
