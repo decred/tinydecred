@@ -12,6 +12,29 @@ from .wire.msgblock import BlockHeader
 from .wire.msgtx import MsgTx
 
 
+def conv(thing):
+    """
+    Helper method to convert reversed bytes or lists of reversed bytes to hex
+    strings. If it is already a string, it is untouched.
+
+    Args:
+        thing (list(str) or list(ByteArray) or str or ByteArray): The thing to
+            convert to str or a list of str.
+
+    Returs:
+        list(str) or str: The thing converted to a hex encoded str.
+    """
+
+    def c(thing):
+        if isinstance(thing, ByteArray):
+            return reversed(thing).hex()
+        return thing
+
+    if isinstance(thing, list):
+        return [c(t) for t in thing]
+    return c(thing)
+
+
 class Client(object):
     """
     The Client communicates with the blockchain RPC API.
@@ -84,15 +107,13 @@ class Client(object):
         Test for the existence of the provided tickets in the expired ticket map.
 
         Args:
-            txHashes (list(ByteArray):) Array of hashes to check.
+            txHashes (list(ByteArray) or list(str)): Array of hashes to check.
 
         Returns:
             list(bool): Bool list showing if ticket exists in the expired ticket
                 database or not.
         """
-        mask = int(
-            self.call("existsexpiredtickets", [reversed(h).hex() for h in txHashes]), 16
-        )
+        mask = int(self.call("existsexpiredtickets", conv(txHashes)), 16)
         return [bool(mask & 1 << n) for n in range(len(txHashes))]
 
     def existsLiveTicket(self, txHash):
@@ -100,27 +121,25 @@ class Client(object):
         Test for the existence of the provided ticket
 
         Args:
-            txHash (ByteArray): The ticket hash to check.
+            txHash (ByteArray or str): The ticket hash to check.
 
         Returns:
             bool: True if address exists in the live ticket database.
         """
-        return self.call("existsliveticket", reversed(txHash).hex())
+        return self.call("existsliveticket", conv(txHash))
 
     def existsLiveTickets(self, txHashes):
         """
         Test for the existence of the provided tickets in the live ticket map.
 
         Args:
-            txHashes (list(ByteArray)): Array of hashes to check.
+            txHashes (list(ByteArray) or list(str)): Array of hashes to check.
 
         Returns:
             list(bool): Bool list showing if ticket exists in the live ticket
                 database or not.
         """
-        mask = int(
-            self.call("existslivetickets", [reversed(h).hex() for h in txHashes]), 16
-        )
+        mask = int(self.call("existslivetickets", conv(txHashes)), 16)
         return [bool(mask & 1 << n) for n in range(len(txHashes))]
 
     def existsMempoolTxs(self, txHashes):
@@ -128,14 +147,12 @@ class Client(object):
         Test for the existence of the provided txs in the mempool.
 
         Args:
-            txHashes (list(ByteArray)): Array of hashes to check.
+            txHashes (list(ByteArray) or list(str)): Array of hashes to check.
 
         Returns:
             list(bool): Bool list showing if txs exist in the mempool or not.
         """
-        mask = int(
-            self.call("existsmempooltxs", [reversed(h).hex() for h in txHashes]), 16
-        )
+        mask = int(self.call("existsmempooltxs", conv(txHashes)), 16)
         return [bool(mask & 1 << n) for n in range(len(txHashes))]
 
     def existsMissedTickets(self, txHashes):
@@ -143,15 +160,13 @@ class Client(object):
         Test for the existence of the provided tickets in the missed ticket map.
 
         Args:
-            txHashes (list(ByteArray)):Array of hashes to check.
+            txHashes (list(ByteArray) or list(str)):Array of hashes to check.
 
         Returns:
             list(bool): Bool list showing if the ticket exists in the missed
                 ticket database or not.
         """
-        mask = int(
-            self.call("existsmissedtickets", [reversed(h).hex() for h in txHashes]), 16
-        )
+        mask = int(self.call("existsmissedtickets", conv(txHashes)), 16)
         return [bool(mask & 1 << n) for n in range(len(txHashes))]
 
     def generate(self, numBlocks):
@@ -209,7 +224,7 @@ class Client(object):
         Returns information about a block given its hash.
 
         Args:
-            blockHash (ByteArray): The hash of the block.
+            blockHash (ByteArray or str): The hash of the block.
             verbose (bool): Optional. Default=True. Specifies the block is
                 returned as a GetBlockVerboseResult instead of serialized bytes.
             verboseTx (bool): Optional. Default=False. Specifies that each
@@ -220,7 +235,7 @@ class Client(object):
             ByteArray or GetBlockVerboseResult: GetBlockVerboseResult if verbose
                 else the bytes of the serialized block.
         """
-        res = self.call("getblock", reversed(blockHash).hex(), verbose, verboseTx)
+        res = self.call("getblock", conv(blockHash), verbose, verboseTx)
         return GetBlockVerboseResult.parse(res) if verbose else ByteArray(res)
 
     def getBlockchainInfo(self):
@@ -259,7 +274,7 @@ class Client(object):
         Returns information about a block header given its hash.
 
         Args:
-            blockHash (ByteArray): The hash of the block.
+            blockHash (ByteArray or str): The hash of the block.
             verbose (bool): Optional. Default=True. Specifies the block
                 header is returned as a GetBlockHeaderVerboseResult instead of
                 a msgblock.BlockHeader.
@@ -269,7 +284,7 @@ class Client(object):
                 GetBlockHeaderVerboseResult if vebose or the msgblock.BlockHeader
                 otherwise.
         """
-        res = self.call("getblockheader", reversed(blockHash).hex(), verbose)
+        res = self.call("getblockheader", conv(blockHash), verbose)
         return (
             GetBlockHeaderVerboseResult.parse(res)
             if verbose
@@ -294,13 +309,13 @@ class Client(object):
         Returns the committed filter for a block
 
         Args:
-            blockHash (ByteArray): The block hash of the filter being queried.
+            blockHash (ByteArray or str): The block hash of the filter being queried.
             filterType (str): The type of committed filter to return.
 
         Returns:
             ByteArray: The committed filter serialized with the N value.
         """
-        res = self.call("getcfilter", reversed(blockHash).hex(), filterType)
+        res = self.call("getcfilter", conv(blockHash), filterType)
         return ByteArray(res)
 
     def getCFilterHeader(self, blockHash, filterType):
@@ -309,14 +324,14 @@ class Client(object):
         through a block.
 
         Args:
-            blockHash (ByteArray): The block hash of the filter header being queried.
+            blockHash (ByteArray or str): The block hash of the filter header being queried.
             filterType (str): The type of committed filter to return the
                 header commitment for.
 
         Returns:
             ByteArray: The filter header commitment hash.
         """
-        res = self.call("getcfilterheader", reversed(blockHash).hex(), filterType)
+        res = self.call("getcfilterheader", conv(blockHash), filterType)
         return ByteArray(res)
 
     def getCFilterV2(self, blockHash):
@@ -326,14 +341,12 @@ class Client(object):
             block header.
 
         Args:
-            blockHash (ByteArray): The block hash of the filter to retrieve.
+            blockHash (ByteArray or str): The block hash of the filter to retrieve.
 
         Returns:
             GetCFilterV2Result: The version 2 block filter.
         """
-        return GetCFilterV2Result.parse(
-            self.call("getcfilterv2", reversed(blockHash).hex())
-        )
+        return GetCFilterV2Result.parse(self.call("getcfilterv2", conv(blockHash)))
 
     def getChainTips(self):
         """
@@ -429,8 +442,7 @@ class Client(object):
                 2000, which matches the wire protocol headers message, but this
                 is not guaranteed).
         """
-        locators = [reversed(loc).hex() for loc in blockLocators]
-        res = self.call("getheaders", locators, reversed(hashStop).hex())["headers"]
+        res = self.call("getheaders", conv(blockLocators), conv(hashStop))["headers"]
         return [BlockHeader.btcDecode(ByteArray(header), 0) for header in res]
 
     def getInfo(self):
@@ -531,7 +543,7 @@ class Client(object):
         Returns information about a transaction given its hash.
 
         Args:
-            txHash (ByteArray): The hash of the transaction.
+            txHash (ByteArray or str): The hash of the transaction.
             verbose (bool): Optional. Default=False. Specifies the transaction is
                 returned as a RawTransactionResult instead of a msgtx.MsgTx.
 
@@ -540,7 +552,7 @@ class Client(object):
                 verbose, msgtx.MsgTx for the transaction if default.
         """
         verb = 1 if verbose else 0
-        res = self.call("getrawtransaction", reversed(txHash).hex(), verb)
+        res = self.call("getrawtransaction", conv(txHash), verb)
         return (
             RawTransactionResult.parse(res)
             if verbose
@@ -573,7 +585,7 @@ class Client(object):
         Returns the stake versions statistics.
 
         Args:
-            blockHash (ByteArray) The start block hash.
+            blockHash (ByteArray or str) The start block hash.
             count (int) The number of blocks that will be returned.
 
         Returns:
@@ -581,7 +593,7 @@ class Client(object):
         """
         return [
             GetStakeVersionsResult.parse(ver)
-            for ver in self.call("getstakeversions", reversed(blockHash).hex(), count)[
+            for ver in self.call("getstakeversions", conv(blockHash), count)[
                 "stakeversions"
             ]
         ]
@@ -600,7 +612,7 @@ class Client(object):
         Returns information about an unspent transaction output.
 
         Args:
-            txHash (ByteArray): The hash of the transaction.
+            txHash (ByteArray or str): The hash of the transaction.
             vout (int): The index of the output.
             includeMempool (bool): Optional. Default=True. Include the mempool
                 when true.
@@ -609,7 +621,7 @@ class Client(object):
             GetTxOutResult: The utxo information.
         """
         return GetTxOutResult.parse(
-            self.call("gettxout", reversed(txHash).hex(), vout, includeMempool)
+            self.call("gettxout", conv(txHash), vout, includeMempool)
         )
 
     def getVoteInfo(self, version):
