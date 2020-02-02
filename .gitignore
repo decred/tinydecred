@@ -1,4 +1,4 @@
-examples/testnet
+decred/examples/testnet
 decred/dist
 tinywallet/dist
 decred/poetry.lock

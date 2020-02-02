@@ -79,6 +79,8 @@ class KeyValueDatabase:
         Returns:
             Bucket: The root bucket.
         """
+        if "$" in name:
+            raise Exception("illegal character. '$' not allowed in table name")
         return Bucket(self.conn, name, **k)
 
     def close(self):
