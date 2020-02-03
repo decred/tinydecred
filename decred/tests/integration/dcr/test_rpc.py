@@ -68,11 +68,39 @@ def test_rpc(config):
         config["rpccert"],
     )
 
-    conv = rpc.conv
-    assert conv(ByteArray("face")) == "cefa"
-    assert conv([ByteArray("face"), ByteArray("baadf00d")]) == ["cefa", "0df0adba"]
-    assert conv("face") == "face"
-    assert conv(["face", "baadf00d"]) == ["face", "baadf00d"]
+    stringify = rpc.stringify
+    assert stringify(ByteArray("face")) == "cefa"
+    assert stringify([ByteArray("face"), ByteArray("baadf00d")]) == ["cefa", "0df0adba"]
+    assert stringify("face") == "face"
+    assert stringify(["face", "baadf00d"]) == ["face", "baadf00d"]
+    alist = [ByteArray("face"), "baadf00d", ByteArray("deadbeef")]
+    alistReversed = ["cefa", "baadf00d", "efbeadde"]
+    assert set(stringify((b for b in alist))) == set((s for s in alistReversed))
+    assert stringify(
+        [
+            ByteArray("face"),
+            (ByteArray("badd"), "d00d", ByteArray("babe")),
+            [alist, [alist], [alist, alist, [alist]]],
+            [ByteArray("feed"), ByteArray("1100")],
+            set({"hey": ByteArray("1234"), "there": ByteArray("4321")}.keys()),
+            ByteArray("baadf00d"),
+        ]
+    ) == [
+        "cefa",
+        ("ddba", "d00d", "beba"),
+        [
+            ["cefa", "baadf00d", "efbeadde"],
+            [["cefa", "baadf00d", "efbeadde"]],
+            [
+                ["cefa", "baadf00d", "efbeadde"],
+                ["cefa", "baadf00d", "efbeadde"],
+                [["cefa", "baadf00d", "efbeadde"]],
+            ],
+        ],
+        ["edfe", "0011"],
+        {"there", "hey"},
+        "0df0adba",
+    ]
 
     existsAddress = rpcClient.existsAddress(mainnetAddress)
     assert existsAddress

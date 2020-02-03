@@ -6,33 +6,39 @@ See LICENSE for details
 import base64
 import ssl
 
+import types
 from decred.util import tinyhttp
 from decred.util.encode import ByteArray
 from .wire.msgblock import BlockHeader
 from .wire.msgtx import MsgTx
 
 
-def conv(thing):
+def stringify(thing):
     """
-    Helper method to convert reversed bytes or lists of reversed bytes to hex
-    strings. If it is already a string, it is untouched.
+    Helper method to convert reversed bytes or iterable objects of reversed
+    bytes to hex strings. If it is already a string, it is untouched.
 
     Args:
-        thing (list(str) or list(ByteArray) or str or ByteArray): The thing to
-            convert to str or a list of str.
+        thing (iterable of str or ByteArray): The thing to convert to strings.
 
-    Returs:
+    Returns:
         list(str) or str: The thing converted to a hex encoded str.
     """
 
-    def c(thing):
+    def parse(thing):
+        if isinstance(thing, types.GeneratorType):
+            return (parse(t) for t in thing)
+        if isinstance(thing, tuple):
+            return tuple(parse(t) for t in thing)
+        if isinstance(thing, set):
+            return set(parse(t) for t in thing)
+        if isinstance(thing, list):
+            return list(parse(t) for t in thing)
         if isinstance(thing, ByteArray):
             return reversed(thing).hex()
         return thing
 
-    if isinstance(thing, list):
-        return [c(t) for t in thing]
-    return c(thing)
+    return parse(thing)
 
 
 class Client(object):
@@ -113,7 +119,7 @@ class Client(object):
             list(bool): Bool list showing if ticket exists in the expired ticket
                 database or not.
         """
-        mask = int(self.call("existsexpiredtickets", conv(txHashes)), 16)
+        mask = int(self.call("existsexpiredtickets", stringify(txHashes)), 16)
         return [bool(mask & 1 << n) for n in range(len(txHashes))]
 
     def existsLiveTicket(self, txHash):
@@ -126,7 +132,7 @@ class Client(object):
         Returns:
             bool: True if address exists in the live ticket database.
         """
-        return self.call("existsliveticket", conv(txHash))
+        return self.call("existsliveticket", stringify(txHash))
 
     def existsLiveTickets(self, txHashes):
         """
@@ -139,7 +145,7 @@ class Client(object):
             list(bool): Bool list showing if ticket exists in the live ticket
                 database or not.
         """
-        mask = int(self.call("existslivetickets", conv(txHashes)), 16)
+        mask = int(self.call("existslivetickets", stringify(txHashes)), 16)
         return [bool(mask & 1 << n) for n in range(len(txHashes))]
 
     def existsMempoolTxs(self, txHashes):
@@ -152,7 +158,7 @@ class Client(object):
         Returns:
             list(bool): Bool list showing if txs exist in the mempool or not.
         """
-        mask = int(self.call("existsmempooltxs", conv(txHashes)), 16)
+        mask = int(self.call("existsmempooltxs", stringify(txHashes)), 16)
         return [bool(mask & 1 << n) for n in range(len(txHashes))]
 
     def existsMissedTickets(self, txHashes):
@@ -166,7 +172,7 @@ class Client(object):
             list(bool): Bool list showing if the ticket exists in the missed
                 ticket database or not.
         """
-        mask = int(self.call("existsmissedtickets", conv(txHashes)), 16)
+        mask = int(self.call("existsmissedtickets", stringify(txHashes)), 16)
         return [bool(mask & 1 << n) for n in range(len(txHashes))]
 
     def generate(self, numBlocks):
@@ -235,7 +241,7 @@ class Client(object):
             ByteArray or GetBlockVerboseResult: GetBlockVerboseResult if verbose
                 else the bytes of the serialized block.
         """
-        res = self.call("getblock", conv(blockHash), verbose, verboseTx)
+        res = self.call("getblock", stringify(blockHash), verbose, verboseTx)
         return GetBlockVerboseResult.parse(res) if verbose else ByteArray(res)
 
     def getBlockchainInfo(self):
@@ -284,7 +290,7 @@ class Client(object):
                 GetBlockHeaderVerboseResult if vebose or the msgblock.BlockHeader
                 otherwise.
         """
-        res = self.call("getblockheader", conv(blockHash), verbose)
+        res = self.call("getblockheader", stringify(blockHash), verbose)
         return (
             GetBlockHeaderVerboseResult.parse(res)
             if verbose
@@ -315,7 +321,7 @@ class Client(object):
         Returns:
             ByteArray: The committed filter serialized with the N value.
         """
-        res = self.call("getcfilter", conv(blockHash), filterType)
+        res = self.call("getcfilter", stringify(blockHash), filterType)
         return ByteArray(res)
 
     def getCFilterHeader(self, blockHash, filterType):
@@ -331,7 +337,7 @@ class Client(object):
         Returns:
             ByteArray: The filter header commitment hash.
         """
-        res = self.call("getcfilterheader", conv(blockHash), filterType)
+        res = self.call("getcfilterheader", stringify(blockHash), filterType)
         return ByteArray(res)
 
     def getCFilterV2(self, blockHash):
@@ -346,7 +352,7 @@ class Client(object):
         Returns:
             GetCFilterV2Result: The version 2 block filter.
         """
-        return GetCFilterV2Result.parse(self.call("getcfilterv2", conv(blockHash)))
+        return GetCFilterV2Result.parse(self.call("getcfilterv2", stringify(blockHash)))
 
     def getChainTips(self):
         """
@@ -442,7 +448,9 @@ class Client(object):
                 2000, which matches the wire protocol headers message, but this
                 is not guaranteed).
         """
-        res = self.call("getheaders", conv(blockLocators), conv(hashStop))["headers"]
+        res = self.call("getheaders", stringify(blockLocators), stringify(hashStop))[
+            "headers"
+        ]
         return [BlockHeader.btcDecode(ByteArray(header), 0) for header in res]
 
     def getInfo(self):
@@ -552,7 +560,7 @@ class Client(object):
                 verbose, msgtx.MsgTx for the transaction if default.
         """
         verb = 1 if verbose else 0
-        res = self.call("getrawtransaction", conv(txHash), verb)
+        res = self.call("getrawtransaction", stringify(txHash), verb)
         return (
             RawTransactionResult.parse(res)
             if verbose
@@ -593,7 +601,7 @@ class Client(object):
         """
         return [
             GetStakeVersionsResult.parse(ver)
-            for ver in self.call("getstakeversions", conv(blockHash), count)[
+            for ver in self.call("getstakeversions", stringify(blockHash), count)[
                 "stakeversions"
             ]
         ]
@@ -621,7 +629,7 @@ class Client(object):
             GetTxOutResult: The utxo information.
         """
         return GetTxOutResult.parse(
-            self.call("gettxout", conv(txHash), vout, includeMempool)
+            self.call("gettxout", stringify(txHash), vout, includeMempool)
         )
 
     def getVoteInfo(self, version):
