@@ -10,7 +10,7 @@ from decred.util.encode import ByteArray
 
 
 class TestBlockHeader(unittest.TestCase):
-    def test_decode(self):
+    def make_block_header(self):
         bh = msgblock.BlockHeader()
         bh.version = 6
         bh.prevBlock = reversed(
@@ -44,7 +44,6 @@ class TestBlockHeader(unittest.TestCase):
             "255221163779dfe8000000000000000000000000000000000000000000000000"
         )
         bh.stakeVersion = 0
-
         encoded = ByteArray(
             "060000000bd25508e99bf6f8399efce65762b55873d69dd05a7871631ac8fa7a36f1d05c"
             "977ea75040b905415cbc8f7dd519831a031ef5cd9c6a187a9eab8136c8b44fda00000000"
@@ -52,6 +51,10 @@ class TestBlockHeader(unittest.TestCase):
             "0000000000000000ffff7f20204e0000000000001b00000066010000aadd025d00000000"
             "255221163779dfe800000000000000000000000000000000000000000000000000000000"
         )
+        return bh, encoded
+
+    def test_decode(self):
+        bh, encoded = self.make_block_header()
         b = bh.serialize()
         self.assertEqual(b, encoded)
         reBH = msgblock.BlockHeader.unblob(b)
@@ -74,3 +77,9 @@ class TestBlockHeader(unittest.TestCase):
         self.assertEqual(bh.extraData, reBH.extraData)
         self.assertEqual(bh.stakeVersion, reBH.stakeVersion)
         self.assertEqual(bh.id(), reBH.id())
+
+    def test_cached_hash(self):
+        bh, _ = self.make_block_header()
+        self.assertIsNone(bh.cachedH)
+        hash_ = bh.cachedHash()
+        self.assertEqual(hash_, bh.cachedHash())
