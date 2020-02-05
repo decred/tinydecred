@@ -694,9 +694,7 @@ class MsgTx:
             # Read in the witnesses, and copy them into the already generated
             # by decodePrefix TxIns.
             if self.txIn is None or len(self.txIn) == 0:
-                self.txIn = [
-                    TxIn(None, 0) for i in range(count)
-                ]
+                self.txIn = [TxIn(None, 0) for i in range(count)]
             for txIn in self.txIn:
                 b = readTxInWitness(b, pver, self.version, txIn)
                 totalScriptSize += len(txIn.signatureScript)

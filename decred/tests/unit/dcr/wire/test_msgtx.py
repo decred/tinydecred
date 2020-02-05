@@ -429,7 +429,7 @@ class TestMsgTx(unittest.TestCase):
         #           i, err, test.writeErr)
         #       continue
         #   }
-        #
+
         #   # Deserialize the transaction.
         #   var tx MsgTx
         #   r := newFixedReader(test.max, test.buf)

@@ -205,7 +205,4 @@ class TestCrypto(unittest.TestCase):
         # Cannot serialize an empty private key.
         kpriv2 = crypto.ExtendedKey.new(testSeed)
         kpriv2.key.zero()
-        self.assertRaises(
-            ValueError,
-            kpriv2.serialize
-        )
+        self.assertRaises(ValueError, kpriv2.serialize)
