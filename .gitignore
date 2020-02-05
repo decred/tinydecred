@@ -2,6 +2,7 @@ decred/examples/testnet
 decred/dist
 tinywallet/dist
 decred/poetry.lock
+htmlcov
 __pycache__/
 .pytest_cache
 .coverage
