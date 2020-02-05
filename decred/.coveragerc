@@ -2,7 +2,8 @@
 # https://coverage.readthedocs.io/en/latest/config.html
 
 [run]
-omit = tinydecred/tests/*
+omit = tests/*
+dynamic_context = test_function
 
 [report]
 # Regexes for lines to exclude from consideration
@@ -24,3 +25,6 @@ exclude_lines =
 ignore_errors = True
 # skip_covered = True
 skip_empty = True
+
+[html]
+show_contexts = True

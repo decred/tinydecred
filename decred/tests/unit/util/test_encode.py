@@ -77,7 +77,13 @@ class TestEncode(unittest.TestCase):
         z[2] = 255
         self.assertEqual(makeA(), z)
 
+        # encode.Blobber API
+        self.assertIsInstance(ByteArray.unblob(zero), ByteArray)
+        self.assertEqual(ByteArray.blob(zero), zero.b)
+
     def test_BuildyBytes(self):
+        self.assertEqual(BuildyBytes().hex(), "")
+
         d0 = ByteArray([0x01, 0x02])
         d1 = ByteArray([0x03, 0x04, 0x05])
         d2 = ByteArray(b"")

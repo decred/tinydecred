@@ -80,7 +80,7 @@ class KeyValueDatabase:
             Bucket: The root bucket.
         """
         if "$" in name:
-            raise Exception("illegal character. '$' not allowed in table name")
+            raise ValueError("illegal character. '$' not allowed in table name")
         return Bucket(self.conn, name, **k)
 
     def close(self):
@@ -176,7 +176,7 @@ class Bucket:
                 constructor.
         """
         if "$" in name:
-            raise Exception("illegal character. '$' not allowed in table name")
+            raise ValueError("illegal character. '$' not allowed in table name")
         compoundName = "{parent}${child}".format(parent=self.name, child=name)
         return Bucket(self.conn, compoundName, **k)
 
@@ -212,7 +212,7 @@ class Bucket:
         cursor = self.conn.cursor()
         cursor.execute(self.existsQuery, (k,))
         row = cursor.fetchone()
-        if row is None:
+        if row is None:  # nocover
             return False
         return row[0] == 1
 
@@ -221,7 +221,7 @@ class Bucket:
         cursor = self.conn.cursor()
         cursor.execute(self.countQuery)
         row = cursor.fetchone()
-        if row is None:
+        if row is None:  # nocover
             return 0
         return row[0]
 

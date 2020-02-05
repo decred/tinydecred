@@ -4,12 +4,13 @@ See LICENSE for details
 """
 
 import os.path
-import unittest
 import random
 from tempfile import TemporaryDirectory
+import unittest
 
 from decred.util import database, helpers
 from decred.util.encode import ByteArray
+
 
 random.seed(0)
 randInt = random.randint
@@ -49,10 +50,13 @@ class TestDB(unittest.TestCase):
             master = database.KeyValueDatabase(os.path.join(tempDir, "tmp.sqlite"))
 
             # '$' in bucket name is illegal.
-            self.assertRaises(Exception, lambda: master.child("a$b"))
+            self.assertRaises(ValueError, lambda: master.child("a$b"))
 
             try:
                 db = master.child("test")
+
+                # '$' in bucket name is illegal.
+                self.assertRaises(ValueError, lambda: db.child("c$d"))
 
                 # Create some test data.
                 testPairs = [(randBytes(low=1), randBytes()) for _ in range(20)]
