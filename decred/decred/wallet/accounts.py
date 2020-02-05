@@ -6,7 +6,6 @@ See LICENSE for details
 accounts module
     Mostly account handling, interaction with this package's functions will
     mostly be through the AccountManager.
-    The tinycrypto package relies heavily on the lower-level crypto modules.
 """
 
 from decred.crypto import crypto

@@ -84,7 +84,7 @@ class BlockHeader:
         self.cachedH = None
 
     @staticmethod
-    def btcDecode(b, pver):  # io.Reader, pver uint32) error {
+    def btcDecode(b, pver):
         """
         BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
         This is part of the Message interface implementation.
@@ -149,14 +149,6 @@ class BlockHeader:
         return BlockHeader.deserialize(b)
 
     def btcEncode(self, pver):
-
-        #     sec := uint32(bh.Timestamp.Unix())
-        # return writeElements(w, bh.Version, &bh.PrevBlock, &bh.MerkleRoot,
-        #     &bh.StakeRoot, bh.VoteBits, bh.FinalState, bh.Voters,
-        #     bh.FreshStake, bh.Revocations, bh.PoolSize, bh.Bits, bh.SBits,
-        #     bh.Height, bh.Size, sec, bh.Nonce, bh.ExtraData,
-        #     bh.StakeVersion)
-
         # byte sizes
         int64 = 8
         int32 = uint32 = 4
@@ -202,19 +194,12 @@ class BlockHeader:
         b[i] = ByteArray(self.extraData, length=extraDataSize)
         i += extraDataSize
         b[i] = ByteArray(self.stakeVersion, length=uint32).littleEndian()
-        i += uint32
-        if i != MaxHeaderSize:
-            raise ValueError(f"unexpected BlockHeader encoded size {i}")
         return b
 
     def hash(self):
         """
         hash computes the block identifier hash for the given block header.
         """
-        # Encode the header and hash256 everything prior to the number of
-        # transactions.  Ignore the error returns since there is no way the
-        # encode could fail except being out of memory which would cause a
-        # run-time panic.
         return hashH(self.serialize().bytes())
 
     def cachedHash(self):

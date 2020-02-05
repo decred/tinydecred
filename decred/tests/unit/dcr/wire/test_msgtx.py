@@ -369,7 +369,7 @@ class TestMsgTx(unittest.TestCase):
             with self.assertRaises(Exception, msg="test %i" % i):
                 msgtx.MsgTx.btcDecode(buf, pver)
 
-    def test_tx_serialize_errors(self):  # TestTxSerializeErrors(t *testing.T) {
+    def test_tx_serialize_errors(self):
         """
         TestTxSerializeErrors performs negative tests against wire encode and decode
         of MsgTx to confirm error paths work correctly.
@@ -441,12 +441,27 @@ class TestMsgTx(unittest.TestCase):
 
     def test_tx(self):
         """
-        TestTx tests the MsgTx API.
-        This test is substantially truncated compare to it's counterpart in go
+        Substantially truncated compared to its counterpart in Go.
         """
+        msg = msgtx.MsgTx.new()
+
+        # Check the tx id.
+        self.assertEqual(
+            msg.id(), "bfc0e650ad0cc0dd5fa88b6bc84beb5ea4a675b4353671532796171ed319341b"
+        )
+
+        # Check the blob.
+        # fmt: off
+        self.assertEqual(
+            msgtx.MsgTx.blob(msg),
+            ByteArray(
+                [0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]
+            ),
+        )
+        # fmt: on
+
         # Ensure the command is expected value.
         wantCmd = "tx"
-        msg = msgtx.MsgTx.new()
         self.assertEqual(msg.command(), wantCmd)
 
         # Ensure max payload is expected value for latest protocol version.
@@ -467,7 +482,7 @@ class TestMsgTx(unittest.TestCase):
             version=123,
             txIn=[
                 msgtx.TxIn(
-                    previousOutPoint=msgtx.OutPoint(txHash=newHash(), idx=5, tree=1,),
+                    previousOutPoint=msgtx.OutPoint(txHash=newHash(), idx=5, tree=1),
                     sequence=msgtx.MaxTxInSequenceNum,
                     valueIn=500,
                     blockHeight=111,
@@ -476,9 +491,9 @@ class TestMsgTx(unittest.TestCase):
                 ),
             ],
             txOut=[
-                msgtx.TxOut(value=321, pkScript=newHash(), version=0,),
-                msgtx.TxOut(value=654, pkScript=newHash(), version=0,),
-                msgtx.TxOut(value=987, pkScript=newHash(), version=0,),
+                msgtx.TxOut(value=321, pkScript=newHash(), version=0),
+                msgtx.TxOut(value=654, pkScript=newHash(), version=0),
+                msgtx.TxOut(value=987, pkScript=newHash(), version=0),
             ],
             lockTime=int(time.time()),
             expiry=int(time.time()) + 86400,
@@ -508,3 +523,31 @@ class TestMsgTx(unittest.TestCase):
             self.assertEqual(txOut.value, reTxOut.value)
             self.assertEqual(txOut.version, reTxOut.version)
             self.assertEqual(txOut.pkScript, reTxOut.pkScript)
+
+    def test_read_tx_in_prefix(self):
+        self.assertRaises(
+            ValueError,
+            msgtx.readTxInPrefix,
+            None,
+            None,
+            wire.TxSerializeOnlyWitness,
+            None,
+            None,
+        )
+
+    def test_read_script(self):
+        self.assertRaises(
+            ValueError,
+            msgtx.readScript,
+            ByteArray([0xFC]),
+            wire.ProtocolVersion,
+            0,
+            "Field",
+        )
+
+    def test_outpoint_txid(self):
+        outp = msgtx.OutPoint(txHash=None, idx=0, tree=0)
+        self.assertEqual(
+            outp.txid(),
+            "0000000000000000000000000000000000000000000000000000000000000000",
+        )

@@ -30,31 +30,37 @@ class TestCrypto(unittest.TestCase):
         self.assertTrue(a, aUnenc)
 
     def test_addr_secp_pubkey(self):
-        pairs = [
+        data = [
             (
                 "033b26959b2e1b0d88a050b111eeebcf776a38447f7ae5806b53c9b46e07c267ad",
                 "DkRKjw7LmGCSzBwaUtjQLfb75Zcx9hH8yGNs3qPSwVzZuUKs7iu2e",
+                "e201ee2f37bcc0ba0e93f82322e48333a92b9355",
             ),
             (
                 "0389ced3eaee84d5f0d0e166f6cd15f1bf6f429d1d13709393b418a6fb22d8be53",
                 "DkRLLaJWkmH75iZGtQYE6FEf16zxeHr6TCAF59tGxhds4MFc2HqUS",
+                "5643d59202de158b509544d40b32e85bfaf6243e",
             ),
             (
                 "02a14a0023d7d8cbc5d39fa60f7e4dc4d5bf18a7031f52875fbca6bf837f68713f",
                 "DkM3hdWuKSSTm7Vq8WZx5f294vcZbPkAQYBDswkjmF1CFuWCRYxTr",
+                "c5fa0d15266e055eaf8ec7c4d7a679885266ef0d",
             ),
             (
                 "03c3e3d7cde1c453a6283f5802a73d1cb3827cb4b007f58e3a52a36ce189934b6a",
                 "DkRLn9vzsjK4ZYgDKy7JVYHKGvpZU5CYGK9H8zF2VCWbpTyVsEf4P",
+                "73612f7b7b1ed32ff44dded7a2cf87c206fabf8a",
             ),
             (
                 "0254e17b230e782e591a9910794fdbf9943d500a47f2bf8446e1238f84e809bffc",
                 "DkM37ymaat9j6oTFii1MZVpXrc4aRLEMHhTZrvrz8QY6BZ2HX843L",
+                "a616bc09179e31e6d9e3abfcb16ac2d2baf45141",
             ),
         ]
-        for hexKey, addrStr in pairs:
+        for hexKey, addrStr, hash160 in data:
             addr = crypto.AddressSecpPubKey(ByteArray(hexKey), mainnet)
             self.assertEqual(addr.string(), addrStr)
+            self.assertEqual(addr.hash160().hex(), hash160)
 
     def test_addr_pubkey_hash(self):
         pairs = [
@@ -147,6 +153,12 @@ class TestCrypto(unittest.TestCase):
             kpub.key.hex(),
             "0317a47499fb2ef0ff8dc6133f577cd44a5f3e53d2835ae15359dbe80c41f70c9b",
         )
+        # Neutering again should make no difference.
+        kpub2 = kpub.neuter()
+        self.assertEqual(
+            kpub2.key.hex(),
+            "0317a47499fb2ef0ff8dc6133f577cd44a5f3e53d2835ae15359dbe80c41f70c9b",
+        )
         kpub_branch0 = kpub.child(0)
         self.assertEqual(
             kpub_branch0.key.hex(),
@@ -169,3 +181,28 @@ class TestCrypto(unittest.TestCase):
         )
         kpriv01_neutered = kpriv_branch0_child1.neuter()
         self.assertEqual(kpriv01_neutered.key.hex(), kpub_branch0_child1.key.hex())
+
+        # fmt: off
+        # Incorrect length of network version bytes.
+        self.assertRaises(
+            ValueError,
+            crypto.ExtendedKey,
+            # privVer too short.
+            ByteArray([0, 0, 0]),
+            ByteArray([0, 0, 0, 0]),
+            None, None, None, None, None, None, None
+        )
+        self.assertRaises(
+            ValueError,
+            crypto.ExtendedKey,
+            ByteArray([0, 0, 0, 0]),
+            # pubVer too long.
+            ByteArray([0, 0, 0, 0, 0]),
+            None, None, None, None, None, None, None
+        )
+        # fmt: on
+
+        # Cannot serialize an empty private key.
+        kpriv2 = crypto.ExtendedKey.new(testSeed)
+        kpriv2.key.zero()
+        self.assertRaises(ValueError, kpriv2.serialize)

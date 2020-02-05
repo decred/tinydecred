@@ -168,8 +168,8 @@ class AddressPubKeyHash:
 class AddressSecpPubKey:
     """
     AddressSecpPubKey represents an address, which is a pubkey hash and its
-    base-58 encoding. Argument pubkey should be a ByteArray corresponding to the
-    serializedCompressed public key (33 bytes).
+    base-58 encoding. Argument serializedPubkey should be a ByteArray
+    corresponding to the serialized compressed public key (33 bytes).
     """
 
     def __init__(self, serializedPubkey, net):

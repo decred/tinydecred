@@ -14,10 +14,8 @@ class TestWire(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         helpers.prepareLogger("TestWire")
-
-    def test_write_read_var_int(self):
         # fmt: off
-        data = (
+        cls.data = (
             (0xFC,               [0xFC]),
             (0xFD,               [0xFD, 0xFD, 0x0]),
             (wire.MaxUint16,     [0xFD, 0xFF, 0xFF]),
@@ -27,7 +25,9 @@ class TestWire(unittest.TestCase):
             (wire.MaxUint64,     [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]),
         )
         # fmt: on
-        for val, bytes_ in data:
+
+    def test_write_var_int(self):
+        for val, bytes_ in self.data:
             from_val = wire.writeVarInt(wire.ProtocolVersion, val)
             from_bytes = ByteArray(bytes_)
             self.assertEqual(from_val, from_bytes)
@@ -36,4 +36,18 @@ class TestWire(unittest.TestCase):
         self.assertRaises(
             ValueError, wire.writeVarInt, wire.ProtocolVersion, wire.MaxUint64 + 1
         )
+
+    def test_read_var_int(self):
         self.assertEqual(wire.readVarInt(ByteArray([0xFC]), wire.ProtocolVersion), 0xFC)
+        self.assertRaises(
+            ValueError,
+            wire.readVarInt,
+            ByteArray([0xFE, 0xFF, 0xFF, 0x0, 0x0]),
+            wire.ProtocolVersion,
+        )
+        self.assertRaises(
+            ValueError,
+            wire.readVarInt,
+            ByteArray([0xFD, 0xFC, 0x0]),
+            wire.ProtocolVersion,
+        )

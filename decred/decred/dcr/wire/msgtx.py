@@ -668,58 +668,42 @@ class MsgTx:
         return b, totalScriptSize
 
     def decodeWitness(self, b, pver, isFull):
-        # r io.Reader, pver uint32, isFull bool) (uint64, error) {
-        # Witness only; generate the TxIn list and fill out only the
-        # sigScripts.
+        """
+        Witness only; generate the TxIn list and fill out only the sigScripts.
+        """
         totalScriptSize = 0
-        if not isFull:
-            count = wire.readVarInt(b, pver)
+        count = wire.readVarInt(b, pver)
 
-            # Prevent more input transactions than could possibly fit into a
-            # message.  It would be possible to cause memory exhaustion and panics
-            # without a sane upper bound on this count.
-            if count > maxTxInPerMessage:
-                raise ValueError(
-                    "MsgTx.decodeWitness: too many input transactions to fit into"
-                    f" max message size [count {count}, max {maxTxInPerMessage}]"
-                )
-
-            self.txIn = [TxIn(None, 0) for i in range(count)]
-            for txIn in self.txIn:
-                b = readTxInWitness(b, pver, self.version, txIn)
-                totalScriptSize += len(txIn.signatureScript)
-            self.txOut = []
-        else:
-            # We're decoding witnesses from a full transaction, so read in
-            # the number of signature scripts, check to make sure it's the
-            # same as the number of TxIns we currently have, then fill in
-            # the signature scripts.
-            count = wire.readVarInt(b, pver)
-
+        # Prevent more input transactions than could possibly fit into a
+        # message, or memory exhaustion and panics could happen.
+        if count > maxTxInPerMessage:
+            raise ValueError(
+                "MsgTx.decodeWitness: too many input transactions to fit into"
+                f" max message size [count {count}, max {maxTxInPerMessage}]"
+            )
+        if isFull:
+            # We're decoding witnesses from a full transaction, so make sure
+            # the number of signature scripts is the same as the number of
+            # TxIns we currently have, then fill in the signature scripts.
             if count != len(self.txIn):
                 raise ValueError(
                     "MsgTx.decodeWitness: non equal witness and prefix txin"
                     f" quantities (witness {count}, prefix {len(self.txIn)})"
                 )
 
-            # Prevent more input transactions than could possibly fit into a
-            # message.  It would be possible to cause memory exhaustion and panics
-            # without a sane upper bound on this count.
-            if count > maxTxInPerMessage:
-                raise ValueError(
-                    "MsgTx.decodeWitness: too many input transactions to fit into"
-                    f" max message size [count {count}, max {maxTxInPerMessage}]"
-                )
-
             # Read in the witnesses, and copy them into the already generated
             # by decodePrefix TxIns.
             if self.txIn is None or len(self.txIn) == 0:
-                self.txIn = [
-                    TxIn(None, 0) for i in range(count)
-                ]  # := make([]TxIn, count)
+                self.txIn = [TxIn(None, 0) for i in range(count)]
             for txIn in self.txIn:
                 b = readTxInWitness(b, pver, self.version, txIn)
                 totalScriptSize += len(txIn.signatureScript)
+        else:
+            self.txIn = [TxIn(None, 0) for i in range(count)]
+            for txIn in self.txIn:
+                b = readTxInWitness(b, pver, self.version, txIn)
+                totalScriptSize += len(txIn.signatureScript)
+            self.txOut = []
 
         return b, totalScriptSize
 
