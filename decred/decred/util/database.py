@@ -25,9 +25,9 @@ NO_VALUE_EXCEPTION = NoValue("no value")
 
 KVTable = "CREATE TABLE IF NOT EXISTS {tablename} (k {keytype}, v {valuetype});"
 
-KVUniqueIndex = "CREATE UNIQUE INDEX IF NOT EXISTS idx ON {tablename}(k);"
+KVUniqueIndex = "CREATE UNIQUE INDEX IF NOT EXISTS idx_{tablename} ON {tablename}(k);"
 
-KVIndex = "CREATE INDEX IF NOT EXISTS idx ON {tablename}(k);"
+KVIndex = "CREATE INDEX IF NOT EXISTS idx_{tablename} ON {tablename}(k);"
 
 KVGet = "SELECT v FROM {tablename} WHERE k = ?;"
 
@@ -79,6 +79,8 @@ class KeyValueDatabase:
         Returns:
             Bucket: The root bucket.
         """
+        if "$" in name:
+            raise Exception("illegal character. '$' not allowed in table name")
         return Bucket(self.conn, name, **k)
 
     def close(self):
