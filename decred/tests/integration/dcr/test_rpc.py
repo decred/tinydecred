@@ -7,7 +7,8 @@ import os
 
 import pytest
 
-from decred.dcr import rpc
+from decred.dcr import rpc, mainnet, txscript
+from decred.crypto import crypto, opcode
 from decred.dcr.wire.msgblock import BlockHeader
 from decred.dcr.wire.msgtx import MsgTx
 from decred.util import helpers
@@ -34,7 +35,6 @@ mainnetAddress = "Dcur2mcGjmENx4DhNqDctW5wJCVyT3Qeqkx"
 cookedAddress1 = "DcurAwesomeAddressmqDctW5wJCW1Cn2MF"
 cookedAddress2 = "DcurAwesomeAddress2mqDcW5wJCW5qZcwR"
 testnetAddress = "Tsf5Qvq2m7X5KzTZDdSGfa6WrMtikYVRkaL"
-someTicket = "6d119de5cddef3bc3927f622fe39980b19bebb494d679deae4e1ecd4874344ed"
 genesisHash = "298e5cc3d985bfe7f81dc135f360abe089edd4396b86d2de66b0cef42b21d980"
 genesisBlockHeader = "0100000000000000000000000000000000000000000000000000000000000000000000000dc101dfc3c6a2eb10ca0c5374e10d28feb53f7eabcc850511ceadb99174aa66000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffff011b00c2eb0b000000000000000000000000a0d7b85600000000000000000000000000000000000000000000000000000000000000000000000000000000"
 blkHash414000 = "000000000000000018744e708a39ad6e0cc22a85d5b902aa2067c9cd0002df85"
@@ -43,9 +43,6 @@ blkHash414005 = "0000000000000000053ca8eb8b5d82bc3e2dc82bded27de2150cb48da02e889
 cFilter414000 = "0000000e590860091d85960f114d2e457d101825e82c901465e94aa768191dcae08475a842086ad954d6"
 cFilterHeader414000 = "412f12ed5bd92df6a8b17cf396697cd44d84ada67f5ca3b1c3f23f3b7619984b"
 blkHeader414002 = "07000000b8b8539315eb883c775cc3ef9ba0dface4dfb89def7b381a0000000000000000ef88a529674708a1496018fcfa68d5f3be9036c361d84577e26d70d81d0af00bcaf745f2a8a2ea5f1553fb5d279da82ef24d16266827607550928aec70337b890100494e62d0e3c705000c00f89f0000e1fe261872887a770300000032510600f3200000d2b41a5e1861aaa200d15401faab664fe1200080000000000000000000000000000000000000000007000000"
-# These two are a pair.
-addressWithTickets = "DcaephHCqjdfb3gPz778DJZWvwmUUs3ssGk"
-aTicket = "d54d90bcec4146e9ae8c2ec860364f7023f33cad02b3c2bb4bdbb36689e68614"
 ownedAddress = "DsUxwT6Kbiur6Nps9q3uGEpJCvrhcxX2nii"
 signedMessage = "H166ndZLNEpIXrcEm4V9lf+AizRp/ejCAhs21J/ht87/RK0QFnOscCbJixKok3oHjpOS0jAkJ4jFktqMXD59LU8="
 message = "this decred is tiny"
@@ -81,7 +78,12 @@ def test_rpc(config):
     )
     assert existsAddresses == [False, False, True, False, False, False, True]
 
-    existsExpiredTickets = rpcClient.existsExpiredTickets([someTicket, someTicket])
+    liveTickets = rpcClient.liveTickets()
+    assert isinstance(liveTickets, list)
+
+    aTicket = liveTickets[0]
+
+    existsExpiredTickets = rpcClient.existsExpiredTickets([aTicket, aTicket])
     assert existsExpiredTickets == [False, False]
 
     bestBlock = rpcClient.getBestBlock()
@@ -178,7 +180,7 @@ def test_rpc(config):
     assert isinstance(getRawMempool, list)
     mempoolTxs = getRawMempool[0]
 
-    existsMempoolTxs = rpcClient.existsMempoolTxs(getRawMempool[:3] + [someTicket])
+    existsMempoolTxs = rpcClient.existsMempoolTxs(getRawMempool[:3] + [aTicket])
     assert existsMempoolTxs == [True, True, True, False]
 
     getRawMempool = rpcClient.getRawMempool(True)
@@ -188,11 +190,18 @@ def test_rpc(config):
     assert blkHeader414002 in getHeaders
 
     # This test will fail if --addrindex is not enabled in dcrd.
-    getRawTransaction = rpcClient.getRawTransaction(someTicket)
+    getRawTransaction = rpcClient.getRawTransaction(aTicket)
     assert isinstance(getRawTransaction, MsgTx)
 
-    getRawTransaction = rpcClient.getRawTransaction(someTicket, 1)
-    assert isinstance(getRawTransaction, rpc.RawTransactionsResult)
+    rawaddr = txscript.extractStakeScriptHash(
+        getRawTransaction.txOut[0].pkScript, opcode.OP_SSTX
+    ).bytes()
+    addressWithTickets = crypto.AddressScriptHash(
+        mainnet.ScriptHashAddrID, rawaddr
+    ).string()
+
+    getRawTransaction = rpcClient.getRawTransaction(aTicket, 1)
+    assert isinstance(getRawTransaction, rpc.RawTransactionResult)
 
     getStakeDifficulty = rpcClient.getStakeDifficulty()
     assert isinstance(getStakeDifficulty, rpc.GetStakeDifficultyResult)
@@ -219,9 +228,6 @@ def test_rpc(config):
     dcrdHelp = rpcClient.help("getinfo")
     assert isinstance(dcrdHelp, str)
 
-    liveTickets = rpcClient.liveTickets()
-    assert isinstance(liveTickets, list)
-
     missedTickets = rpcClient.missedTickets()
     assert isinstance(missedTickets, list)
 
@@ -245,7 +251,7 @@ def test_rpc(config):
     rpcClient.ping()
 
     searchRawTransactions = rpcClient.searchRawTransactions(mainnetAddress)
-    assert isinstance(searchRawTransactions[0], rpc.RawTransactionsResult)
+    assert isinstance(searchRawTransactions[0], rpc.RawTransactionResult)
 
     searchRawTransactions = rpcClient.searchRawTransactions(mainnetAddress, 0)
     assert isinstance(searchRawTransactions[0], str)

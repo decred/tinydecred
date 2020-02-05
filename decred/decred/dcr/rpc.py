@@ -519,16 +519,16 @@ class Client(object):
         Args:
             txid (str): The hash of the transaction.
             verbose (bool): Optional. Default=False. Specifies the transaction is
-                returned as a RawTransactionsResult instead of a msgtx.MsgTx.
+                returned as a RawTransactionResult instead of a msgtx.MsgTx.
 
         Returns:
-            msgtx.MsgTx or RawTransactionsResult: RawTransactionsResult if
+            msgtx.MsgTx or RawTransactionResult: RawTransactionResult if
                 verbose, msgtx.MsgTx for the transaction if default.
         """
         verb = 1 if verbose else 0
         res = self.call("getrawtransaction", txid, verb)
         return (
-            RawTransactionsResult.parse(res)
+            RawTransactionResult.parse(res)
             if verbose
             else MsgTx.deserialize(ByteArray(res))
         )
@@ -700,7 +700,7 @@ class Client(object):
         Args:
             address (str): The Decred address to search for
             verbose (bool): Optional. default=True. Specifies the transaction
-                is returned as a list of RawTransactionsResult instead of
+                is returned as a list of RawTransactionResult instead of
                 hex-encoded strings.
             skip (int): Optional. Default=0. The number of leading transactions
                 to leave out of the final response.
@@ -727,7 +727,7 @@ class Client(object):
             reverse,
             filterAddrs if filterAddrs else [],
         )
-        return [RawTransactionsResult.parse(rawTx) for rawTx in res] if verbose else res
+        return [RawTransactionResult.parse(rawTx) for rawTx in res] if verbose else res
 
     def sendRawTransaction(self, msgTx, allowHighFees=False):
         """
@@ -960,11 +960,11 @@ class GetBlockVerboseResult:
             previousHash (str): The hash of the previous block.
             nextHash (str): The hash of the next block (only if there is one).
             tx (list(str)): The transaction hashes (only when verboseTx=false).
-            rawTx (list(RawTransactionsResult)): The transactions as JSON objects
+            rawTx (list(RawTransactionResult)): The transactions as JSON objects
                 (only when verboseTx=true).
             sTx (list(str)): The block's sstx hashes the were included (only
                 when verboseTx=false).
-            rawSTx (list(RawTransactionsResult)): The block's raw sstx hashes
+            rawSTx (list(RawTransactionResult)): The block's raw sstx hashes
                 that were included (only when verboseTx=true).
         """
         self.blockHash = blockHash
@@ -1022,11 +1022,11 @@ class GetBlockVerboseResult:
             previousHash=obj["previousblockhash"],
             nextHash=get("nextblockhash", obj),
             tx=get("tx", obj),
-            rawTx=[RawTransactionsResult.parse(tx) for tx in obj["rawtx"]]
+            rawTx=[RawTransactionResult.parse(tx) for tx in obj["rawtx"]]
             if "rawtx" in obj
             else [],
             sTx=get("stx", obj),
-            rawSTx=[RawTransactionsResult.parse(stx) for stx in obj["rawstx"]]
+            rawSTx=[RawTransactionResult.parse(stx) for stx in obj["rawstx"]]
             if "rawstx" in obj
             else [],
         )
@@ -2549,7 +2549,7 @@ class AgendaInfo(object):
         )
 
 
-class RawTransactionsResult:
+class RawTransactionResult:
     """searchrawtransactions"""
 
     def __init__(
@@ -2602,15 +2602,15 @@ class RawTransactionsResult:
     @staticmethod
     def parse(obj):
         """
-        Parse the RawTransactionsResult from the decoded RPC response.
+        Parse the RawTransactionResult from the decoded RPC response.
 
         Args:
             obj (object): The decoded dcrd RPC response.
 
         Returns:
-            RawTransactionsResult: The RawTransactionsResult.
+            RawTransactionResult: The RawTransactionResult.
         """
-        return RawTransactionsResult(
+        return RawTransactionResult(
             txid=obj["txid"],
             version=obj["version"],
             lockTime=obj["locktime"],
