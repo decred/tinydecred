@@ -194,17 +194,11 @@ class BlockHeader:
         b[i] = ByteArray(self.extraData, length=extraDataSize)
         i += extraDataSize
         b[i] = ByteArray(self.stakeVersion, length=uint32).littleEndian()
-        i += uint32
         return b
 
     def hash(self):
         """
         hash computes the block identifier hash for the given block header.
-
-        Encode the header and hash256 everything prior to the number of
-        transactions.  Ignore the error returns since there is no way the
-        encode could fail except being out of memory which would cause a
-        run-time panic.
         """
         return hashH(self.serialize().bytes())
 
