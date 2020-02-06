@@ -5,8 +5,8 @@ See LICENSE for details
 
 import unittest
 
-from decred.dcr import mainnet
 from decred.dcr.calc import SubsidyCache
+from decred.dcr.nets import mainnet
 from decred.util import chains
 
 

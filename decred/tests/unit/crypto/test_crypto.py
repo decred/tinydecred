@@ -6,7 +6,7 @@ See LICENSE for details
 import unittest
 
 from decred.crypto import crypto, rando
-from decred.dcr import mainnet
+from decred.dcr.nets import mainnet
 from decred.util.encode import ByteArray
 
 

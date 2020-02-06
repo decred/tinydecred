@@ -13,8 +13,9 @@ import unittest
 
 from decred.crypto import crypto, opcode, rando
 from decred.crypto.secp256k1 import curve as Curve
-from decred.dcr import account, mainnet, testnet, txscript, vsp
+from decred.dcr import account, txscript, vsp
 from decred.dcr.calc import SubsidyCache
+from decred.dcr.nets import mainnet, testnet
 from decred.dcr.wire import msgtx, wire
 from decred.util import database
 from decred.util.encode import ByteArray
