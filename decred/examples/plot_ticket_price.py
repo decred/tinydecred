@@ -15,22 +15,30 @@ except ImportError:
     print("matplotlib import error. Did you 'pip3 install matplotlib'?")
     exit()
 
-# Create a dcrdata client and grab the ticket price data.
-dcrdata = DcrdataClient("https://dcrdata.decred.org")
-ticketPrice = dcrdata.chart("ticket-price")
-# ticketPrice["t"] is UNIX timestamp (was "x")
-# ticketPrice["price"] is ticket price, in atoms (was "y")
-# These keys changed, see https://github.com/decred/dcrdata/pull/1507
 
-# Make the axes pretty.
-ax = plt.gca()  # gca = get current axes
-years = range(2016, 2026)
-ax.set_xticks([mktime(year) for year in years])
-ax.set_xticklabels([str(year) for year in years])
-ax.set_xlabel("date")
-ax.set_ylabel("ticket price (DCR)")
+def run():
+    # Create a dcrdata client and grab the ticket price data.
+    dcrdata = DcrdataClient("https://dcrdata.decred.org")
+    ticketPrice = dcrdata.chart("ticket-price")
+    # ticketPrice["t"] is UNIX timestamp (was "x")
+    # ticketPrice["price"] is ticket price, in atoms (was "y")
+    # These keys changed, see https://github.com/decred/dcrdata/pull/1507
 
-ax.plot(
-    ticketPrice["t"], [atoms * 1e-8 for atoms in ticketPrice["price"]], color="#222222",
-)
-plt.show()
+    # Make the axes pretty.
+    ax = plt.gca()  # gca = get current axes
+    years = range(2016, 2026)
+    ax.set_xticks([mktime(year) for year in years])
+    ax.set_xticklabels([str(year) for year in years])
+    ax.set_xlabel("date")
+    ax.set_ylabel("ticket price (DCR)")
+
+    ax.plot(
+        ticketPrice["t"],
+        [atoms * 1e-8 for atoms in ticketPrice["price"]],
+        color="#222222",
+    )
+    plt.show()
+
+
+if __name__ == "__main__":
+    run()

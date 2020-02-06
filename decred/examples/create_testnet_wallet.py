@@ -16,15 +16,20 @@ from decred.util.helpers import mkdir
 from decred.wallet.wallet import Wallet
 
 
-# Create an encrypted, password-protected wallet file.
-password = getpass()
-mkdir("testnet")
-walletPath = os.path.join("testnet", "testnet_wallet.db")
-mnemonicSeed, wallet = Wallet.create(walletPath, password)
-# Open the zeroth Decred account to get an address.
-wallet.open("dcr", 0, password, None)
+def run():
+    # Create an encrypted, password-protected wallet file.
+    password = getpass()
+    mkdir("testnet")
+    walletPath = os.path.join("testnet", "testnet_wallet.db")
+    mnemonicSeed, wallet = Wallet.create(walletPath, password)
+    # Open the zeroth Decred account to get an address.
+    wallet.open("dcr", 0, password, None)
 
-# Print the seed words and an address.
-print("Mnemonic seed\n-------------")
-print(" ".join(mnemonicSeed))
-print("Receive DCR at %s" % wallet.currentAddress())
+    # Print the seed words and an address.
+    print("Mnemonic seed\n-------------")
+    print(" ".join(mnemonicSeed))
+    print("Receive DCR at %s" % wallet.currentAddress())
+
+
+if __name__ == "__main__":
+    run()
