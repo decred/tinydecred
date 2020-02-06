@@ -10,7 +10,8 @@ import unittest
 
 from decred.crypto import crypto, rando
 from decred.crypto.secp256k1 import curve as Curve
-from decred.dcr import account, dcrdata, mainnet, testnet, txscript
+from decred.dcr import account, dcrdata, txscript
+from decred.dcr.nets import mainnet, testnet
 from decred.dcr.wire import msgtx
 from decred.util import encode
 

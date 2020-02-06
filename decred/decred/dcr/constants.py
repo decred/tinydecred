@@ -5,12 +5,12 @@ See LICENSE for details
 Just some constants.
 """
 
-import os
+from pathlib import Path
 
 
-PYDECRED_PACKAGEDIR = os.path.dirname(os.path.realpath(__file__))
-FAVICON = os.path.join(PYDECRED_PACKAGEDIR, "favicon-32x32.png")
-LOGO = os.path.join(PYDECRED_PACKAGEDIR, "logo.svg")
+ASSETS_DIR = Path(__file__).resolve().parent / "assets"
+FAVICON = ASSETS_DIR / "favicon-32x32.png"
+LOGO = ASSETS_DIR / "logo.svg"
 INF = float("inf")
 MINUTE = 60
 DAY = 86400

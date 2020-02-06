@@ -9,7 +9,8 @@ import bisect
 import math
 
 from decred.util import helpers
-from . import constants as C, mainnet
+from . import constants as C
+from .nets import mainnet
 
 
 NETWORK = mainnet

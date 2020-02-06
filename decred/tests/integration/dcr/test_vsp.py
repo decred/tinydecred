@@ -5,7 +5,8 @@ See LICENSE for details
 
 import unittest
 
-from decred.dcr import testnet, vsp
+from decred.dcr import vsp
+from decred.dcr.nets import testnet
 
 
 class TestVSPLive(unittest.TestCase):
