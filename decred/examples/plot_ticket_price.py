@@ -16,7 +16,7 @@ except ImportError:
     exit()
 
 
-def run():
+def main():
     # Create a dcrdata client and grab the ticket price data.
     dcrdata = DcrdataClient("https://dcrdata.decred.org")
     ticketPrice = dcrdata.chart("ticket-price")
@@ -41,4 +41,4 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    main()

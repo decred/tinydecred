@@ -16,7 +16,7 @@ from decred.util.helpers import mkdir
 from decred.wallet.wallet import Wallet
 
 
-def run():
+def main():
     # Create an encrypted, password-protected wallet file.
     password = getpass()
     mkdir("testnet")
@@ -32,4 +32,4 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    main()

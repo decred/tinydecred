@@ -26,7 +26,7 @@ class Signals(object):
         print(bal)
 
 
-def run():
+def main():
     # DcrdataBlockchain implements a Blockchain API (see api.py) for Decred.
     dbPath = os.path.join("testnet", "dcr_testnet.db")
     dcrdata = "https://testnet.dcrdata.org"
@@ -59,4 +59,4 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    main()
