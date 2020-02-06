@@ -12,11 +12,11 @@ from getpass import getpass
 
 from decred import config
 
-# Set the configuration for testnet before loading TD modules.
+# Set the configuration for testnet before loading decred modules.
 config.load("testnet")
 
-from decred.dcr import testnet
 from decred.dcr.dcrdata import DcrdataBlockchain
+from decred.dcr.nets import testnet
 from decred.wallet.wallet import Wallet
 
 
