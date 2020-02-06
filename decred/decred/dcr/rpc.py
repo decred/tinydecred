@@ -25,20 +25,17 @@ def stringify(thing):
         list(str) or str: The thing converted to a hex encoded str.
     """
 
-    def parse(thing):
-        if isinstance(thing, types.GeneratorType):
-            return (parse(t) for t in thing)
-        if isinstance(thing, tuple):
-            return tuple(parse(t) for t in thing)
-        if isinstance(thing, set):
-            return set(parse(t) for t in thing)
-        if isinstance(thing, list):
-            return list(parse(t) for t in thing)
-        if isinstance(thing, ByteArray):
-            return reversed(thing).hex()
-        return thing
-
-    return parse(thing)
+    if isinstance(thing, types.GeneratorType):
+        return (stringify(t) for t in thing)
+    if isinstance(thing, tuple):
+        return tuple(stringify(t) for t in thing)
+    if isinstance(thing, set):
+        return set(stringify(t) for t in thing)
+    if isinstance(thing, list):
+        return list(stringify(t) for t in thing)
+    if isinstance(thing, ByteArray):
+        return reversed(thing).hex()
+    return thing
 
 
 class Client(object):
@@ -845,7 +842,7 @@ class Client(object):
             addr (str): Address to look for.
 
         Returns:
-            list(ByteArray): Tickets owned by the specified address.
+            list(ByteArray): Hashed tickets owned by the specified address.
         """
         res = self.call("ticketsforaddress", addr)["tickets"]
         return [reversed(ByteArray(h)) for h in res]

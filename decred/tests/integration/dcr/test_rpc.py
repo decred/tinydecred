@@ -36,7 +36,6 @@ mainnetAddress = "Dcur2mcGjmENx4DhNqDctW5wJCVyT3Qeqkx"
 cookedAddress1 = "DcurAwesomeAddressmqDctW5wJCW1Cn2MF"
 cookedAddress2 = "DcurAwesomeAddress2mqDcW5wJCW5qZcwR"
 testnetAddress = "Tsf5Qvq2m7X5KzTZDdSGfa6WrMtikYVRkaL"
-someTicket = "6d119de5cddef3bc3927f622fe39980b19bebb494d679deae4e1ecd4874344ed"
 genesisHash = "298e5cc3d985bfe7f81dc135f360abe089edd4396b86d2de66b0cef42b21d980"
 blkHash414000 = "000000000000000018744e708a39ad6e0cc22a85d5b902aa2067c9cd0002df85"
 blkHex414000 = ByteArray(
@@ -308,7 +307,7 @@ def test_rpc(config):
     assert isinstance(ticketFeeInfo, rpc.TicketFeeInfoResult)
 
     ticketsForAddress = rpcClient.ticketsForAddress(addressWithTickets)
-    assert reversed(ByteArray(aTicket)) in ticketsForAddress
+    assert aTicket in ticketsForAddress
 
     ticketVWAP = rpcClient.ticketVWAP()
     assert isinstance(ticketVWAP, float)
