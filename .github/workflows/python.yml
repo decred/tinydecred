@@ -45,7 +45,7 @@ jobs:
       working-directory: ${{ format('./{0}/', matrix.package) }}
       run: |
         poetry run pytest ./tests/unit/
-    - name: Build the ${{ matrix.package }} package
-      working-directory: ${{ format('./{0}/', matrix.package) }}
-      run: |
-        poetry build
+    # - name: Build the ${{ matrix.package }} package
+    #   working-directory: ${{ format('./{0}/', matrix.package) }}
+    #   run: |
+    #     poetry build
