@@ -9,15 +9,14 @@ A PyQt light wallet.
 import os
 import sys
 
-from PyQt5 import QtGui, QtCore, QtWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets
 
 from decred import config
 from decred.dcr import constants as DCR
 from decred.dcr.dcrdata import DcrdataBlockchain
-from decred.util import helpers, database
+from decred.util import database, helpers
 from decred.wallet.wallet import Wallet
-
-from tinywallet import screens, ui, qutilities as Q
+from tinywallet import qutilities as Q, screens, ui
 
 
 # the directory of the tinywallet package

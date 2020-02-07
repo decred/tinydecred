@@ -3,10 +3,11 @@ Copyright (c) 2019, the Decred developers
 See LICENSE for details
 """
 
-import pytest
 import os.path
 from tempfile import TemporaryDirectory
 import time
+
+import pytest
 
 from decred.util import database
 

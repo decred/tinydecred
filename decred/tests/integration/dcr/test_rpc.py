@@ -7,9 +7,9 @@ import os
 
 import pytest
 
+from decred.crypto import crypto, opcode
 from decred.dcr import rpc, txscript
 from decred.dcr.nets import mainnet
-from decred.crypto import crypto, opcode
 from decred.dcr.wire.msgblock import BlockHeader
 from decred.dcr.wire.msgtx import MsgTx
 from decred.util import helpers

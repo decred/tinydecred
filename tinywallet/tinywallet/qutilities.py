@@ -8,7 +8,7 @@ PyQt5 utilities.
 
 import re
 
-from PyQt5 import QtCore, QtWidgets, QtGui
+from PyQt5 import QtCore, QtGui, QtWidgets
 
 from decred.util import helpers
 

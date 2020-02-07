@@ -8,8 +8,9 @@ module curve
     dcrd golang version.
 """
 
-from decred.util.encode import ByteArray
 from decred.crypto.rando import generateSeed
+from decred.util.encode import ByteArray
+
 from .field import BytePoints, FieldVal
 
 

@@ -10,6 +10,7 @@ from decred import config
 from decred.crypto import crypto, mnemonic, rando
 from decred.util import chains, encode, helpers
 from decred.util.database import KeyValueDatabase
+
 from . import accounts
 
 

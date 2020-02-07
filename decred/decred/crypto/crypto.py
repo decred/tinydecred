@@ -9,14 +9,15 @@ Cryptographic functions.
 import hashlib
 import hmac
 
-from base58 import b58encode, b58decode
+from base58 import b58decode, b58encode
 from blake256.blake256 import blake_hash
 import nacl.secret
 
 from decred.util import encode
 from decred.util.encode import ByteArray
+
 from . import rando
-from .secp256k1.curve import curve as Curve, PublicKey, PrivateKey
+from .secp256k1.curve import PrivateKey, PublicKey, curve as Curve
 
 
 KEY_SIZE = 32

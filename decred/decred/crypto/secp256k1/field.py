@@ -8,6 +8,7 @@ from base64 import b64decode
 from zlib import decompress as zdecompress
 
 from decred.util.encode import ByteArray
+
 from .bytepoints import secp256k1BytePoints
 
 

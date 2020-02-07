@@ -3,7 +3,7 @@ Copyright (c) 2019, The Decred developers
 See LICENSE for details
 """
 
-from . import mainnet, testnet, simnet
+from . import mainnet, simnet, testnet
 
 
 the_nets = {n.Name: n for n in (mainnet, testnet, simnet)}
