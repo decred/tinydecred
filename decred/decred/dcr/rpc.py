@@ -5,8 +5,8 @@ See LICENSE for details
 
 import base64
 import ssl
-
 import types
+
 from decred.util import tinyhttp
 from decred.util.encode import ByteArray
 from .wire.msgblock import BlockHeader
