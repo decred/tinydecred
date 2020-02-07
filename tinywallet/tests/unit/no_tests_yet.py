@@ -1,3 +1,0 @@
-"""
-Placeholder to make CI happy. One day there'll be actual tests here...
-"""
