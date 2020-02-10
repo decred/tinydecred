@@ -7,14 +7,13 @@ See LICENSE for details
 import os
 import time
 
+from decred.dcr import constants as C
+from decred.util import helpers
 import matplotlib
 from matplotlib import font_manager as FontManager
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 (flake8 ignore)
-
-from decred.dcr import constants as C
-from decred.util import helpers
 
 from . import ui as UI
 

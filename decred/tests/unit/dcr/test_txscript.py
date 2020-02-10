@@ -3,13 +3,13 @@ Copyright (c) 2019, the Decred developers
 See LICENSE for details
 """
 
-from base58 import b58decode
 import json
 import os
 from tempfile import TemporaryDirectory
 import time
 import unittest
 
+from base58 import b58decode
 
 from decred.crypto import crypto, opcode, rando
 from decred.crypto.secp256k1 import curve as Curve

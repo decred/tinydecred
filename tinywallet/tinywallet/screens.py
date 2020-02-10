@@ -9,12 +9,12 @@ import random
 import time
 from urllib.parse import urlparse
 
-from PyQt5 import QtGui, QtCore, QtWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets
 
 from decred import config
 from decred.dcr import constants as DCR
 from decred.dcr.vsp import VotingServiceProvider
-from decred.util import helpers, chains
+from decred.util import chains, helpers
 from decred.wallet.wallet import Wallet
 
 from . import qutilities as Q, ui

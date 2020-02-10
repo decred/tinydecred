@@ -8,6 +8,7 @@ import ssl
 
 from decred.util import tinyhttp
 from decred.util.encode import ByteArray
+
 from .wire.msgblock import BlockHeader
 from .wire.msgtx import MsgTx
 

@@ -11,6 +11,7 @@ import time
 from decred.crypto import crypto
 from decred.util import encode, tinyhttp
 from decred.util.encode import ByteArray
+
 from . import constants, nets, txscript
 
 

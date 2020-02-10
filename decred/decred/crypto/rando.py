@@ -6,6 +6,7 @@ See LICENSE for details
 
 import os
 
+
 MinSeedBytes = 16  # 128 bits
 MaxSeedBytes = 64  # 512 bits
 

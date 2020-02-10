@@ -8,6 +8,7 @@ Based on dcrd MsgTx.
 
 from decred.crypto.crypto import hashH
 from decred.util.encode import ByteArray
+
 from . import wire
 
 

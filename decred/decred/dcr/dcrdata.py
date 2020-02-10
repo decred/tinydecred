@@ -14,13 +14,15 @@ import ssl
 import sys
 import threading
 import time
-from urllib.parse import urlparse, urlencode
+from urllib.parse import urlencode, urlparse
+
 import websocket
 
 from decred.crypto import crypto
 from decred.util import chains, database, encode, helpers, tinyhttp
 from decred.util.database import KeyValueDatabase
 from decred.wallet import api
+
 from . import account, calc, txscript
 from .wire import msgblock, msgtx, wire
 

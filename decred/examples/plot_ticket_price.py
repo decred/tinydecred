@@ -9,6 +9,7 @@ be installed separately with `pip3 install matplotlib`.
 from decred.dcr.dcrdata import DcrdataClient
 from decred.util.helpers import mktime
 
+
 try:
     from matplotlib import pyplot as plt
 except ImportError:
