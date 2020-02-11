@@ -12,6 +12,7 @@ from logging.handlers import RotatingFileHandler
 import os
 from os.path import expanduser
 import platform
+import random
 import shutil
 import sys
 from tempfile import TemporaryDirectory
@@ -19,6 +20,13 @@ import time
 import traceback
 
 from appdirs import AppDirs
+
+
+random.seed(0)
+
+
+def randBytes(low=0, high=50):
+    return bytes(random.randint(0, 255) for _ in range(random.randint(low, high)))
 
 
 def formatTraceback(e):

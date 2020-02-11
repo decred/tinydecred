@@ -4,21 +4,11 @@ See LICENSE for details
 """
 
 import os.path
-import random
 from tempfile import TemporaryDirectory
 import unittest
 
 from decred.util import database, helpers
 from decred.util.encode import ByteArray
-
-
-random.seed(0)
-randInt = random.randint
-randByte = lambda: randInt(0, 255)
-
-
-def randBytes(low=0, high=50):
-    return bytes(randByte() for _ in range(randInt(low, high)))
 
 
 class TBlobber:
@@ -59,7 +49,9 @@ class TestDB(unittest.TestCase):
                 self.assertRaises(ValueError, lambda: db.child("c$d"))
 
                 # Create some test data.
-                testPairs = [(randBytes(low=1), randBytes()) for _ in range(20)]
+                testPairs = [
+                    (helpers.randBytes(low=1), helpers.randBytes()) for _ in range(20)
+                ]
                 self.runPairs(db, testPairs)
 
                 # check integer keys and child naming scheme
@@ -74,9 +66,11 @@ class TestDB(unittest.TestCase):
                 self.assertEqual(len([key for key in db if key == k]), 1)
 
                 # test a serializable object
-                randBlobber = lambda: TBlobber(ByteArray(randBytes()))
+                randBlobber = lambda: TBlobber(ByteArray(helpers.randBytes()))
                 objDB = master.child("blobber", blobber=TBlobber, unique=False)
-                testPairs = [(randBytes(low=1), randBlobber()) for _ in range(20)]
+                testPairs = [
+                    (helpers.randBytes(low=1), randBlobber()) for _ in range(20)
+                ]
                 self.runPairs(objDB, testPairs)
 
                 # non-uniqueness of keys
@@ -86,7 +80,9 @@ class TestDB(unittest.TestCase):
 
                 # test a second-level child
                 kidDB = db.child("kid")
-                testPairs = [(randBytes(low=1), randBytes()) for _ in range(20)]
+                testPairs = [
+                    (helpers.randBytes(low=1), helpers.randBytes()) for _ in range(20)
+                ]
                 self.runPairs(kidDB, testPairs)
 
                 # uniqueness of table keys
