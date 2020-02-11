@@ -4,6 +4,8 @@ See LICENSE for details
 """
 
 from decred.crypto.secp256k1 import curve
+from decred.util import helpers
+from decred.util.encode import ByteArray
 
 
 def test_add_jacobian():
@@ -389,3 +391,42 @@ def test_add_affine():
         # Ensure result matches expected.
         assert rx == x3
         assert ry == y3
+
+
+def check_naf(want):
+    """
+    want: ByteArray
+    """
+    nafPos, nafNeg = curve.NAF(want)
+    got = 0
+    # Check that the NAF representation comes up with the right number.
+    for j in range(len(nafPos)):
+        bytePos = nafPos[j]
+        byteNeg = nafNeg[j]
+        for _ in range(8):
+            got *= 2
+            if bytePos & 0x80 == 0x80:
+                got += 1
+            elif byteNeg & 0x80 == 0x80:
+                got -= 1
+            bytePos <<= 1
+            byteNeg <<= 1
+    assert got == want.int()
+
+
+def test_naf():
+    tests = (
+        "6df2b5d30854069ccdec40ae022f5c948936324a4e9ebed8eb82cfd5a6b6d766",
+        "b776e53fb55f6b006a270d42d64ec2b1",
+        "d6cc32c857f1174b604eefc544f0c7f7",
+        "45c53aa1bb56fcd68c011e2dad6758e4",
+        "a2e79d200f27f2360fba57619936159b",
+    )
+    for i, test in enumerate(tests):
+        check_naf(ByteArray(test))
+
+
+def test_naf_rand():
+    for _ in range(1024):
+        data = ByteArray(helpers.randBytes(0, 32))
+        check_naf(data)
