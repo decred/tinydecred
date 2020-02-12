@@ -22,6 +22,18 @@ import traceback
 from appdirs import AppDirs
 
 
+def sign(x):
+    """
+    x: number
+    """
+    if x < 0:
+        return -1
+    elif x > 0:
+        return 1
+    else:
+        return 0
+
+
 random.seed(0)
 
 

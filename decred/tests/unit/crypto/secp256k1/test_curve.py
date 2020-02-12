@@ -3,6 +3,7 @@ Copyright (c) 2019, the Decred developers
 See LICENSE for details
 """
 
+
 import random
 
 from decred.crypto.secp256k1 import curve
@@ -504,9 +505,5 @@ def test_splitk(sign):
 def test_splitk_rand(randBytes):
     random.seed(0)
     for _ in range(1024):
-        k = ByteArray(randBytes(0, 32)).int()
-        k1, k2 = curve.curve.splitK(k)
-        gotk = k2 * curve.curve.lambda_
-        gotk += k1
-        gotk %= curve.curve.N
-        assert gotk == k
+        data = ByteArray(randBytes(0, 32))
+        _check_naf(data)
