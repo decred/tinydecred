@@ -130,7 +130,7 @@ class PrivateKey:
         self.pub = PublicKey(curve, x, y)
 
 
-def randFieldElement():  # c elliptic.Curve, rand io.Reader) (k *big.Int, err error) {
+def randFieldElement():
     """
     randFieldElement returns a random element of the field underlying the given
     curve using the procedure given in [NSA] A.2.1.
@@ -155,7 +155,7 @@ def generateKey():
 
 class KoblitzCurve:
     def __init__(
-        self, P, N, B, Gx, Gy, BitSize, H, q, byteSize, lamda, beta, a1, b1, a2, b2
+        self, P, N, B, Gx, Gy, BitSize, H, q, byteSize, lambda_, beta, a1, b1, a2, b2
     ):
         self.P = P
         self.N = N
@@ -166,7 +166,7 @@ class KoblitzCurve:
         self.H = H
         self.q = q
         self.byteSize = byteSize
-        self.lamda = lamda
+        self.lambda_ = lambda_
         self.beta = beta
         self.a1 = a1
         self.b1 = b1
@@ -210,10 +210,10 @@ class KoblitzCurve:
         # being a bottleneck.
         # c1 = round(b2 * k / n) from step 4.
         # Rounding isn't really necessary and costs too much, hence skipped
-        c1 = (self.b2 + k) // self.N
+        c1 = (self.b2 * k) // self.N
         # c2 = round(b1 * k / n) from step 4 (sign reversed to optimize one step)
         # Rounding isn't really necessary and costs too much, hence skipped
-        c2 = (self.b1 + k) // self.N
+        c2 = (self.b1 * k) // self.N
         # k1 = k - c1 * a1 - c2 * a2 from step 5 (note c2's sign is reversed)
         tmp1 = c1 * self.a1
         tmp2 = c2 * self.a2
@@ -935,9 +935,7 @@ class Curve(KoblitzCurve):
             BitSize=bitSize,
             H=1,
             q=(p + 1) // 4,
-            # new(big.Int).Div(new(big.Int).Add(secp256k1.P, big.NewInt(1)), big.NewInt(4)),
             # Provided for convenience since this gets computed repeatedly.
-            # lambda is a reserved keyword in Python, so misspelling on purpose.
             byteSize=bitSize / 8,
             # Next 6 constants are from Hal Finney's bitcointalk.org post:
             # https://bitcointalk.org/index.php?topic=3238.msg45565#msg45565
@@ -945,7 +943,7 @@ class Curve(KoblitzCurve):
             #
             # They have also been independently derived from the code in the
             # EndomorphismVectors function in gensecp256k1.go.
-            lamda=fromHex(
+            lambda_=fromHex(
                 "5363AD4CC05C30E0A5261C028812645A122E22EA20816678DF02967C1B23BD72"
             ),
             beta=FieldVal.fromHex(
