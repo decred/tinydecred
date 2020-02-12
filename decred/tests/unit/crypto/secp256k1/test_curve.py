@@ -6,8 +6,8 @@ See LICENSE for details
 from dataclasses import dataclass
 
 from decred.crypto.secp256k1 import curve
-from decred.util.helpers import randBytes, sign
 from decred.util.encode import ByteArray
+from decred.util.helpers import randBytes, sign
 
 
 def test_add_jacobian():
@@ -435,7 +435,6 @@ def test_naf_rand():
 
 
 def test_splitk():
-
     @dataclass
     class TestData:
         k: str
