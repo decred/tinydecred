@@ -435,58 +435,50 @@ def test_naf_rand():
 
 
 def test_splitk():
-    @dataclass
-    class TestData:
-        k: str
-        k1: str
-        k2: str
-        s1: int
-        s2: int
-
     tests = [
-        TestData(
+        dict(
             k="6df2b5d30854069ccdec40ae022f5c948936324a4e9ebed8eb82cfd5a6b6d766",
             k1="00000000000000000000000000000000b776e53fb55f6b006a270d42d64ec2b1",
             k2="00000000000000000000000000000000d6cc32c857f1174b604eefc544f0c7f7",
             s1=-1,
             s2=-1,
         ),
-        TestData(
+        dict(
             k="6ca00a8f10632170accc1b3baf2a118fa5725f41473f8959f34b8f860c47d88d",
             k1="0000000000000000000000000000000007b21976c1795723c1bfbfa511e95b84",
             k2="00000000000000000000000000000000d8d2d5f9d20fc64fd2cf9bda09a5bf90",
             s1=1,
             s2=-1,
         ),
-        TestData(
+        dict(
             k="b2eda8ab31b259032d39cbc2a234af17fcee89c863a8917b2740b67568166289",
             k1="00000000000000000000000000000000507d930fecda7414fc4a523b95ef3c8c",
             k2="00000000000000000000000000000000f65ffb179df189675338c6185cb839be",
             s1=-1,
             s2=-1,
         ),
-        TestData(
+        dict(
             k="f6f00e44f179936f2befc7442721b0633f6bafdf7161c167ffc6f7751980e3a0",
             k1="0000000000000000000000000000000008d0264f10bcdcd97da3faa38f85308d",
             k2="0000000000000000000000000000000065fed1506eb6605a899a54e155665f79",
             s1=-1,
             s2=-1,
         ),
-        TestData(
+        dict(
             k="8679085ab081dc92cdd23091ce3ee998f6b320e419c3475fae6b5b7d3081996e",
             k1="0000000000000000000000000000000089fbf24fbaa5c3c137b4f1cedc51d975",
             k2="00000000000000000000000000000000d38aa615bd6754d6f4d51ccdaf529fea",
             s1=-1,
             s2=-1,
         ),
-        TestData(
+        dict(
             k="6b1247bb7931dfcae5b5603c8b5ae22ce94d670138c51872225beae6bba8cdb3",
             k1="000000000000000000000000000000008acc2a521b21b17cfb002c83be62f55d",
             k2="0000000000000000000000000000000035f0eff4d7430950ecb2d94193dedc79",
             s1=-1,
             s2=-1,
         ),
-        TestData(
+        dict(
             k="a2e8ba2e8ba2e8ba2e8ba2e8ba2e8ba219b51835b55cc30ebfe2f6599bc56f58",
             k1="0000000000000000000000000000000045c53aa1bb56fcd68c011e2dad6758e4",
             k2="00000000000000000000000000000000a2e79d200f27f2360fba57619936159b",
@@ -495,14 +487,14 @@ def test_splitk():
         ),
     ]
     for i, test in enumerate(tests):
-        k = ByteArray(test.k).int()
+        k = ByteArray(test["k"]).int()
         k1int, k2int = curve.curve.splitK(k)
         k1sign, k1 = sign(k1int), abs(k1int)
         k2sign, k2 = sign(k2int), abs(k2int)
-        assert f"{k1:064x}" == test.k1
-        assert f"{k2:064x}" == test.k2
-        assert k1sign == test.s1
-        assert k2sign == test.s2
+        assert f"{k1:064x}" == test["k1"]
+        assert f"{k2:064x}" == test["k2"]
+        assert k1sign == test["s1"]
+        assert k2sign == test["s2"]
         gotk = k2int * curve.curve.lambda_
         gotk += k1int
         gotk %= curve.curve.N
