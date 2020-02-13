@@ -3,7 +3,6 @@ Copyright (c) 2019, the Decred developers
 See LICENSE for details
 """
 
-
 import random
 
 from decred.crypto.secp256k1 import curve
