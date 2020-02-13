@@ -6,6 +6,7 @@ See LICENSE for details
 import random
 
 from decred.crypto.secp256k1 import curve
+from decred.crypto.secp256k1.curve import curve as curve_obj
 from decred.util.encode import ByteArray
 
 
@@ -219,7 +220,7 @@ def test_add_jacobian():
         # Add the two points.
         fv = curve.FieldVal
         rx, ry, rz = fv(), fv(), fv()
-        curve.curve.addJacobian(x1, y1, z1, x2, y2, z2, rx, ry, rz)
+        curve_obj.addJacobian(x1, y1, z1, x2, y2, z2, rx, ry, rz)
         assert rx.equals(x3)
         assert ry.equals(y3)
         assert rz.equals(z3)
@@ -279,7 +280,7 @@ def test_double_jacobian():
         # Double the point.
         fv = curve.FieldVal
         rx, ry, rz = fv(), fv(), fv()
-        curve.curve.doubleJacobian(x1, y1, z1, rx, ry, rz)
+        curve_obj.doubleJacobian(x1, y1, z1, rx, ry, rz)
         assert rx.equals(x3)
         assert ry.equals(y3)
         assert rz.equals(z3)
@@ -315,7 +316,7 @@ def test_base_mult():
     ]
 
     for i, (k, x, y) in enumerate(tests):
-        px, py = curve.curve.scalarBaseMult(curve.fromHex(k))
+        px, py = curve_obj.scalarBaseMult(curve.fromHex(k))
         assert px == curve.fromHex(x)
         assert py == curve.fromHex(y)
 
@@ -382,12 +383,12 @@ def test_add_affine():
 
         # Ensure the test data is using points that are actually on
         # the curve (or the point at infinity).
-        assert (x1 == 0 and y1 == 0) or curve.curve.isAffineOnCurve(x1, y1)
-        assert (x2 == 0 and y2 == 0) or curve.curve.isAffineOnCurve(x2, y2)
-        assert (x3 == 0 and y3 == 0) or curve.curve.isAffineOnCurve(x3, y3)
+        assert (x1 == 0 and y1 == 0) or curve_obj.isAffineOnCurve(x1, y1)
+        assert (x2 == 0 and y2 == 0) or curve_obj.isAffineOnCurve(x2, y2)
+        assert (x3 == 0 and y3 == 0) or curve_obj.isAffineOnCurve(x3, y3)
 
         # Add the two points.
-        rx, ry = curve.curve.add(x1, y1, x2, y2)
+        rx, ry = curve_obj.add(x1, y1, x2, y2)
 
         # Ensure result matches expected.
         assert rx == x3
@@ -486,18 +487,18 @@ def test_splitk(sign):
             s2=-1,
         ),
     ]
-    for i, test in enumerate(tests):
+    for test in tests:
         k = ByteArray(test["k"]).int()
-        k1int, k2int = curve.curve.splitK(k)
+        k1int, k2int = curve_obj.splitK(k)
         k1sign, k1 = sign(k1int), abs(k1int)
         k2sign, k2 = sign(k2int), abs(k2int)
         assert f"{k1:064x}" == test["k1"]
         assert f"{k2:064x}" == test["k2"]
         assert k1sign == test["s1"]
         assert k2sign == test["s2"]
-        gotk = k2int * curve.curve.lambda_
+        gotk = k2int * curve_obj.lambda_
         gotk += k1int
-        gotk %= curve.curve.N
+        gotk %= curve_obj.N
         assert gotk == k
 
 
@@ -505,8 +506,58 @@ def test_splitk_rand(randBytes):
     random.seed(0)
     for _ in range(1024):
         k = ByteArray(randBytes(0, 32)).int()
-        k1, k2 = curve.curve.splitK(k)
-        gotk = k2 * curve.curve.lambda_
+        k1, k2 = curve_obj.splitK(k)
+        gotk = k2 * curve_obj.lambda_
         gotk += k1
-        gotk %= curve.curve.N
+        gotk %= curve_obj.N
         assert gotk == k
+
+
+def test_scalar_mult():
+    tests = [
+        # base mult, essentially.
+        dict(
+            x="79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            y="483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+            k="18e14a7b6a307f426a94f8114701e7c8e774e7f9a47e2c2035db29a206321725",
+            rx="50863ad64a87ae8a2fe83c1af1a8403cb53f53e486d8511dad8a04887e5b2352",
+            ry="2cd470243453a299fa9e77237716103abc11a1df38855ed6f2ee187e9c582ba6",
+        ),
+        # From btcd issue #709.
+        dict(
+            x="000000000000000000000000000000000000000000000000000000000000002c",
+            y="420e7a99bba18a9d3952597510fd2b6728cfeafc21a4e73951091d4d8ddbe94e",
+            k="a2e8ba2e8ba2e8ba2e8ba2e8ba2e8ba219b51835b55cc30ebfe2f6599bc56f58",
+            rx="a2112dcdfbcd10ae1133a358de7b82db68e0a3eb4b492cc8268d1e7118c98788",
+            ry="27fc7463b7bb3c5f98ecf2c84a6272bb1681ed553d92c69f2dfe25a9f9fd3836",
+        ),
+    ]
+
+    for test in tests:
+        x = ByteArray(test["x"]).int()
+        y = ByteArray(test["y"]).int()
+        k = ByteArray(test["k"]).int()
+        x_want = ByteArray(test["rx"]).int()
+        y_want = ByteArray(test["ry"]).int()
+        x_got, y_got = curve_obj.scalarMult(x, y, k)
+        assert x_got == x_want
+        assert y_got == y_want
+
+
+def test_scalar_mult_rand():
+    # Strategy for this test:
+    # Get a random exponent from the generator point at first.
+    # This creates a new point which is used in the next iteration.
+    # Use another random exponent on the new point.
+    # We use BaseMult to verify by multiplying the previous exponent
+    # and the new random exponent together (mod N).
+    x, y = curve_obj.Gx, curve_obj.Gy
+    exponent = 1
+    # 16 instead of 1024 because CPU-intensive.
+    for _ in range(16):
+        data = ByteArray(randBytes(0, 32)).int()
+        x, y = curve_obj.scalarMult(x, y, data)
+        exponent *= data
+        x_want, y_want = curve_obj.scalarBaseMult(exponent)
+        assert x == x_want
+        assert y == y_want

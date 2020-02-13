@@ -197,6 +197,8 @@ class KoblitzCurve:
 
     def splitK(self, k):
         """
+        k: integer
+
         splitK returns a balanced length-two representation of k and their signs.
         This is algorithm 3.74 from [GECC].
 
@@ -260,8 +262,10 @@ class KoblitzCurve:
         # elliptic curves states that P(x, y) = -P(x, -y), it's faster and
         # simplifies the code to just make the point negative.
         if k1 < 0:
+            k1 = -k1
             p1y, p1yNeg = p1yNeg, p1y
-        if k2 < 1:
+        if k2 < 0:
+            k2 = -k2
             p2y, p2yNeg = p2yNeg, p2y
 
         # NAF versions of k1 and k2 should have a lot more zeros.
@@ -906,7 +910,7 @@ class KoblitzCurve:
         x.normalize()
         y.normalize()
 
-        # Convert the field values for the now affine point to big.Ints.
+        # Convert the field values for the now affine point to big integers.
         return ByteArray(x.bytes()).int(), ByteArray(y.bytes()).int()
 
 
@@ -957,8 +961,8 @@ class Curve(KoblitzCurve):
 
     def bigAffineToField(self, x, y):
         """
-        bigAffineToField takes an affine point (x, y) as big integers and converts
-        it to an affine point as field values.
+        bigAffineToField takes an affine point (x, y) as big integers
+        andconverts it to an affine point as field values.
         """
         x3, y3 = FieldVal(), FieldVal()
         x3.setBytes(ByteArray(x).bytes())
