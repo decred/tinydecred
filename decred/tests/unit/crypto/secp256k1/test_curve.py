@@ -3,9 +3,10 @@ Copyright (c) 2019, the Decred developers
 See LICENSE for details
 """
 
+import random
+
 from decred.crypto.secp256k1 import curve
 from decred.util.encode import ByteArray
-from decred.util.helpers import randBytes, sign
 
 
 def test_add_jacobian():
@@ -426,13 +427,14 @@ def test_naf():
         _check_naf(ByteArray(test))
 
 
-def test_naf_rand():
+def test_naf_rand(randBytes):
+    random.seed(0)
     for _ in range(1024):
         data = ByteArray(randBytes(0, 32))
         _check_naf(data)
 
 
-def test_splitk():
+def test_splitk(sign):
     tests = [
         dict(
             k="6df2b5d30854069ccdec40ae022f5c948936324a4e9ebed8eb82cfd5a6b6d766",
@@ -499,7 +501,8 @@ def test_splitk():
         assert gotk == k
 
 
-def test_splitk_rand():
+def test_splitk_rand(randBytes):
+    random.seed(0)
     for _ in range(1024):
         k = ByteArray(randBytes(0, 32)).int()
         k1, k2 = curve.curve.splitK(k)
