@@ -3,8 +3,6 @@ Copyright (c) 2019, the Decred developers
 See LICENSE for details
 """
 
-from dataclasses import dataclass
-
 from decred.crypto.secp256k1 import curve
 from decred.util.encode import ByteArray
 from decred.util.helpers import randBytes, sign
