@@ -12,9 +12,6 @@ def test_add_jacobian():
     """
     TestAddJacobian tests addition of points projected in Jacobian coordinates.
     """
-    # x1, y1, z1 string // Coordinates (in hex) of first point to add
-    # x2, y2, z2 string // Coordinates (in hex) of second point to add
-    # x3, y3, z3 string // Coordinates (in hex) of expected point
     tests = [
         # Addition with a point at infinity (left hand side).
         # ∞ + P = P
@@ -197,6 +194,9 @@ def test_add_jacobian():
         ),
     ]
 
+    # x1, y1, z1 string // Coordinates (in hex) of first point to add
+    # x2, y2, z2 string // Coordinates (in hex) of second point to add
+    # x3, y3, z3 string // Coordinates (in hex) of expected point
     for i, (x1, y1, z1, x2, y2, z2, x3, y3, z3) in enumerate(tests):
         # Convert hex to field values.
         x1 = curve.FieldVal.fromHex(x1)
@@ -228,8 +228,6 @@ def test_double_jacobian():
     """
     TestDoubleJacobian tests doubling of points projected in Jacobian coordinates.
     """
-    # x1, y1, z1 string // Coordinates (in hex) of point to double
-    #     x3, y3, z3 string // Coordinates (in hex) of expected point
     tests = [
         # Doubling a point at infinity is still infinity.
         ("0", "0", "0", "0", "0", "0",),
@@ -262,6 +260,8 @@ def test_double_jacobian():
         ),
     ]
 
+    # x1, y1, z1 string // Coordinates (in hex) of point to double
+    # x3, y3, z3 string // Coordinates (in hex) of expected point
     for i, (x1, y1, z1, x3, y3, z3) in enumerate(tests):
         # Convert hex to field values.
         x1 = curve.FieldVal.fromHex(x1)
