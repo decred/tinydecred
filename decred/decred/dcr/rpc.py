@@ -177,7 +177,11 @@ class Client(object):
         ]
         cs = [cout.toJSON() for cout in couts]
         res = self.call("createrawsstx", vOuts, amount, cs)
-        return MsgTx.deserialize(ByteArray(res))
+        ticketPurchase = MsgTx.deserialize(ByteArray(res))
+        # TxIn.valueIn are not set until dcrd version 1.6.
+        for i, vOut in enumerate(vOuts):
+            ticketPurchase.txIn[i].valueIn = vOut["amt"]
+        return ticketPurchase
 
     def createRawTransaction(self, inputs, amounts, locktime=None, expiry=None):
         """
