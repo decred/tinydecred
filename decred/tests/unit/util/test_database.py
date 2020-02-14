@@ -4,6 +4,7 @@ See LICENSE for details
 """
 
 import os.path
+import random
 from tempfile import TemporaryDirectory
 
 import pytest
@@ -50,6 +51,7 @@ def test_database(prepareLogger, randBytes):
                 db.child("c$d")
 
             # Create some test data.
+            random.seed(0)
             testPairs = [(randBytes(low=1), randBytes()) for _ in range(20)]
             runPairs(db, testPairs)
 
