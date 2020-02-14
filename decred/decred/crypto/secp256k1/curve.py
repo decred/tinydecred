@@ -971,7 +971,7 @@ class Curve(KoblitzCurve):
     def bigAffineToField(self, x, y):
         """
         bigAffineToField takes an affine point (x, y) as big integers
-        andconverts it to an affine point as field values.
+        and converts it to an affine point as field values.
         """
         x3, y3 = FieldVal(), FieldVal()
         x3.setBytes(ByteArray(x).bytes())
