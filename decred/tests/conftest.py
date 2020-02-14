@@ -7,6 +7,8 @@ import random
 
 import pytest
 
+from decred.util import helpers
+
 
 @pytest.fixture
 def sign():
@@ -34,3 +36,9 @@ def randBytes():
         return bytes(random.randint(0, 255) for _ in range(random.randint(low, high)))
 
     return _randBytes
+
+
+@pytest.fixture(scope="module")
+def prepareLogger(request):
+    logger_id = getattr(request.module, "LOGGER_ID")
+    helpers.prepareLogger(logger_id)
