@@ -443,7 +443,7 @@ class MsgTx:
         Convert this tx to human readable form.
 
         Returns:
-            str: The transacion, decoded.
+            str: The transaction, decoded.
         """
         result = [""]
 

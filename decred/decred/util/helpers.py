@@ -21,6 +21,19 @@ import traceback
 from appdirs import AppDirs
 
 
+def satsToCoins(sats):
+    """
+    Convert the smallest unit of a coin into its coin value.
+
+    Args:
+        sats (int): 1e8 division of a coin.
+
+    Returns:
+        float: The coin value.
+    """
+    return round(sats / 1e8, 8)
+
+
 def formatTraceback(e):
     """
     Format a traceback for an exception.
