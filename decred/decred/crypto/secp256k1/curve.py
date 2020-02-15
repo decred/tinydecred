@@ -123,6 +123,14 @@ class PublicKey:
         b += ByteArray(self.y, length=32)
         return b
 
+    def __eq__(self, other):
+        """
+        __eq__ compares this PublicKey instance to the one passed, returning
+        true if both PublicKeys are equivalent. A PublicKey is equivalent to
+        another if they both have the same X and Y coordinate.
+        """
+        return (self.x == other.x) and (self.y == other.y)
+
 
 class PrivateKey:
     def __init__(self, curve, k, x, y):
@@ -197,6 +205,8 @@ class KoblitzCurve:
 
     def splitK(self, k):
         """
+        k: integer
+
         splitK returns a balanced length-two representation of k and their signs.
         This is algorithm 3.74 from [GECC].
 
@@ -260,8 +270,10 @@ class KoblitzCurve:
         # elliptic curves states that P(x, y) = -P(x, -y), it's faster and
         # simplifies the code to just make the point negative.
         if k1 < 0:
+            k1 = -k1
             p1y, p1yNeg = p1yNeg, p1y
-        if k2 < 1:
+        if k2 < 0:
+            k2 = -k2
             p2y, p2yNeg = p2yNeg, p2y
 
         # NAF versions of k1 and k2 should have a lot more zeros.
@@ -326,12 +338,13 @@ class KoblitzCurve:
 
     def parsePubKey(self, pubKeyStr):
         """
-        parsePubKey parses a public key for a koblitz curve from a bytestring into a
-        ecdsa.Publickey, verifying that it is valid. It supports compressed and
-        uncompressed signature formats, but not the hybrid format.
+        parsePubKey parses a public key for a koblitz curve from a bytestring
+        into a ecdsa.Publickey, verifying that it is valid. It supports
+        compressed and uncompressed signature formats, but not the hybrid
+        format.
         """
         if len(pubKeyStr) == 0:
-            raise Exception("empty pubkey string")
+            raise ValueError("empty pubkey string")
 
         fmt = pubKeyStr[0]
         ybit = (fmt & 0x1) == 0x1
@@ -342,7 +355,7 @@ class KoblitzCurve:
         pkLen = len(pubKeyStr)
         if pkLen == PUBKEY_LEN:
             if PUBKEY_UNCOMPRESSED != fmt:
-                raise Exception("invalid magic in pubkey str: %d" % pubKeyStr[0])
+                raise ValueError("invalid magic in pubkey str: %d" % pubKeyStr[0])
             x = ifunc(pubKeyStr[1:33])
             y = ifunc(pubKeyStr[33:])
 
@@ -351,20 +364,20 @@ class KoblitzCurve:
             # solution determines which solution of the curve we use.
             # / y^2 = x^3 + Curve.B
             if PUBKEY_COMPRESSED != fmt:
-                raise Exception(
+                raise ValueError(
                     "invalid magic in compressed pubkey string: %d" % pubKeyStr[0]
                 )
             x = ifunc(pubKeyStr[1:33])
             y = self.decompressPoint(x, ybit)
         else:  # wrong!
-            raise Exception("invalid pub key length %d" % len(pubKeyStr))
+            raise ValueError("invalid pub key length %d" % len(pubKeyStr))
 
         if x > self.P:
-            raise Exception("pubkey X parameter is >= to P")
+            raise ValueError("pubkey X parameter is >= to P")
         if y > self.P:
-            raise Exception("pubkey Y parameter is >= to P")
+            raise ValueError("pubkey Y parameter is >= to P")
         if not self.isAffineOnCurve(x, y):
-            raise Exception("pubkey [%d, %d] isn't on secp256k1 curve" % (x, y))
+            raise ValueError("pubkey [%d, %d] isn't on secp256k1 curve" % (x, y))
         return PublicKey(self, x, y)
 
     def decompressPoint(self, x, ybit):
@@ -906,7 +919,7 @@ class KoblitzCurve:
         x.normalize()
         y.normalize()
 
-        # Convert the field values for the now affine point to big.Ints.
+        # Convert the field values for the now affine point to big integers.
         return ByteArray(x.bytes()).int(), ByteArray(y.bytes()).int()
 
 
@@ -957,8 +970,8 @@ class Curve(KoblitzCurve):
 
     def bigAffineToField(self, x, y):
         """
-        bigAffineToField takes an affine point (x, y) as big integers and converts
-        it to an affine point as field values.
+        bigAffineToField takes an affine point (x, y) as big integers
+        and converts it to an affine point as field values.
         """
         x3, y3 = FieldVal(), FieldVal()
         x3.setBytes(ByteArray(x).bytes())
