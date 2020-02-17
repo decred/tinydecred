@@ -438,6 +438,46 @@ class MsgTx:
             and self.expiry == tx.expiry
         )
 
+    def __repr__(self):
+        """
+        Convert this tx to human readable form.
+
+        Returns:
+            str: The transaction, decoded.
+        """
+        result = [""]
+
+        def s(thing, description, nIndent=0):
+            indent = "".join("    " for _ in range(nIndent))
+            result.append("{}{}: {}".format(indent, thing, description))
+
+        s("txid", self.txid())
+        s("serType", self.serType)
+        s("version", self.version)
+        for i, txIn in enumerate(self.txIn):
+            s("txIn {}".format(i), "")
+            s("previousOutPoint".format(i), "", 1)
+            s("txid", txIn.previousOutPoint.txid(), 2)
+            s("idx", txIn.previousOutPoint.index, 2)
+            s("tree", txIn.previousOutPoint.tree, 2)
+            s("sequence", txIn.sequence, 1)
+            s("valueIn", txIn.valueIn, 1)
+            s("blockHeight", txIn.blockHeight, 1)
+            s("blockIndex", txIn.blockIndex, 1)
+            s(
+                "signatureScript",
+                txIn.signatureScript.hex() if txIn.signatureScript else "None",
+                1,
+            )
+        for i, txOut in enumerate(self.txOut):
+            s("txOut {}".format(i), "")
+            s("value", txOut.value, 1)
+            s("version", txOut.version, 1)
+            s("pkScript", txOut.pkScript.hex(), 1)
+        s("lockTime", self.lockTime)
+        s("expiry", self.expiry)
+        return "\n".join(result)
+
     def addTxIn(self, txin):
         self.txIn.append(txin)
 

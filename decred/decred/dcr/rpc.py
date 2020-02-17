@@ -9,9 +9,11 @@ import types
 
 from decred.util import tinyhttp
 from decred.util.encode import ByteArray
+from decred.util.helpers import coinify
 
+from . import txscript
 from .wire.msgblock import BlockHeader
-from .wire.msgtx import MsgTx
+from .wire.msgtx import MsgTx, TxOut, TxTreeStake
 
 
 def stringify(thing):
@@ -79,6 +81,233 @@ class Client(object):
         if "error" in res and res["error"]:
             raise Exception("%s error: %r" % (method, res["error"]))
         return res["result"]
+
+    def addNode(self, addr, subCmd):
+        """
+        Attempts to add or remove a persistent peer.
+
+        Args:
+            addr (str): IP address and port of the peer to operate on
+            subCmd (str): 'add' to add a persistent peer, 'remove' to remove a
+                persistent peer, or 'onetry' to try a single connection to a peer
+        """
+        self.call("addnode", addr, subCmd)
+
+    def createRawSSRTx(self, ticket, relayFee=None):
+        """
+        Returns a new unsigned transaction revoking the ticket.
+
+        Args:
+            ticket (msgTx.MsgTx): The ticket to revoke.
+            fee (int): Optional. Default=None. The fee to apply to the
+                revocation in atoms/kb.
+
+        Returns:
+            MstTx.msgtx: The revocation.
+        """
+        fee = None
+        if relayFee:
+            outs = []
+            # Parse the ticket purchase transaction to determine the required output
+            # destinations for vote rewards or revocations.
+            (
+                ticketPayKinds,
+                ticketHash160s,
+                ticketValues,
+                _,
+                _,
+                _,
+            ) = txscript.sstxStakeOutputInfo(ticket.txOut)
+
+            # Calculate the output values for the revocation.  Revocations do not
+            # contain any subsidy.
+            values = txscript.calculateRewards(ticketValues, ticket.txOut[0].value, 0)
+
+            # All remaining outputs pay to the output destinations and amounts tagged
+            # by the ticket purchase.
+            for i in range(len(ticketHash160s)):
+                scriptFn = txscript.payToSSRtxPKHDirect
+                # P2SH
+                if ticketPayKinds[i]:
+                    scriptFn = txscript.payToSSRtxSHDirect
+                script = scriptFn(ticketHash160s[i])
+                outs.append(TxOut(values[i], script))
+
+            # Calculate the estimated signed serialize size.
+            scriptSizes = [txscript.RedeemP2SHSigScriptSize]
+            sizeEstimate = txscript.estimateSerializeSize(scriptSizes, outs, 0)
+            fee = txscript.calcMinRequiredTxRelayFee(relayFee, sizeEstimate)
+            # dcrd takes amounts in coins
+            fee = coinify(fee)
+
+        vOuts = [
+            {
+                "txid": ticket.txid(),
+                # dcrd takes amounts in coins
+                "amount": coinify(ticket.txOut[0].value),
+                "vout": 0,
+                "tree": TxTreeStake,
+            }
+        ]
+        res = self.call("createrawssrtx", vOuts, *([fee] if fee else []))
+        return MsgTx.deserialize(ByteArray(res))
+
+    def createRawSSTx(self, inputs, amount, cOuts):
+        """
+        Returns a new transaction spending the provided inputs and sending to
+        the provided addresses. The transaction inputs are not signed in the
+        created transaction. The signrawtransaction RPC command provided by
+        wallet must be used to sign the resulting transaction.
+
+        Args:
+            inputs (list(UTXO)): The inputs to the transaction.
+            amount (dict[str]float): Dictionary with the destination addresses
+                as keys and amounts in atoms as values.
+            cOuts (list(COut)): Array of sstx commit outs to use.
+
+        Result:
+            msgtx.MsgTx: The serialized transaction
+        """
+        vOuts = [
+            {
+                "txid": reversed(utxo.txHash).hex(),
+                "vout": utxo.vout,
+                "tree": txscript.scriptTree(utxo.scriptClass),
+                "amt": utxo.satoshis,
+            }
+            for utxo in inputs
+        ]
+        cs = [cOut.toJSON() for cOut in cOuts]
+        res = self.call("createrawsstx", vOuts, amount, cs)
+        ticketPurchase = MsgTx.deserialize(ByteArray(res))
+        # TxIn.valueIn are not set until dcrd version 1.6.
+        for i, vOut in enumerate(vOuts):
+            ticketPurchase.txIn[i].valueIn = vOut["amt"]
+        return ticketPurchase
+
+    def createRawTransaction(self, inputs, amounts, locktime=None, expiry=None):
+        """
+        Returns a new transaction spending the provided inputs and sending to
+        the provided addresses. The transaction inputs are not signed in the
+        created transaction. The signrawtransaction RPC command provided by
+        wallet must be used to sign the resulting transaction.
+
+        Args:
+            inputs (list(UTXO)): The inputs to the transaction.
+            amounts (dict[str]int) JSON object with the destination addresses
+                as keys and amounts as values in atoms.
+            locktime (int): Optional. Default=None. Locktime value; a non-zero
+                value will also locktime-activate the inputs.
+            expiry (int) Optional. Default=None. Expiry value. a non-zero value
+                when the transaction expires.
+
+        Result:
+            msgtx.MsgTx: The serialized transaction
+        """
+        vOuts = [
+            {
+                "txid": reversed(utxo.txHash).hex(),
+                "vout": utxo.vout,
+                "tree": txscript.scriptTree(utxo.scriptClass),
+                # dcrd takes amounts in coins
+                "amount": coinify(utxo.satoshis),
+            }
+            for utxo in inputs
+        ]
+        # dcrd takes amounts in coins
+        for k, v in amounts.items():
+            amounts[k] = coinify(v)
+        res = self.call(
+            "createrawtransaction",
+            vOuts,
+            amounts,
+            *([locktime] if locktime else []),
+            *([expiry] if expiry and locktime else [])
+        )
+        return MsgTx.deserialize(ByteArray(res))
+
+    def debugLevel(self, levelSpec):
+        """
+        Dynamically changes the debug logging level. The levelspec can either a
+        debug level or of the form:
+        <subsystem>=<level>,<subsystem2>=<level2>,...
+        The valid debug levels are trace, debug, info, warn, error, and critical.
+        The valid subsystems are AMGR, ADXR, BCDB, BMGR, DCRD, CHAN, DISC, PEER,
+        RPCS, SCRP, SRVR, and TXMP. Finally, the keyword 'show' will return a
+        list of the available subsystems.
+
+        Args:
+            levelSpec (str): The debug level(s) to use or the
+                keyword 'show'
+
+        Returns:
+            str: The string 'Done.' if levelspec != 'show', else the list of
+                subsystems.
+        """
+        return self.call("debuglevel", levelSpec)
+
+    def decodeRawTransaction(self, tx):
+        """
+        Returns the transaction decoded as a RawTransactionResult.
+
+        Args:
+            tx (msgtx.MsgTx): The transaction.
+
+        Returns:
+            RawTransactionResult: The decoded transaction.
+        """
+        return RawTransactionResult.parse(self.call("decoderawtransaction", tx.txHex()))
+
+    def decodeScript(self, script, version=0):
+        """
+        Information about the provided hex-encoded script.
+
+        Args:
+            script (ByteArray): The script.
+            version (int): Optional. Default=0 The script version.
+
+        Returns:
+            DecodeScriptResult: The script, decoded.
+        """
+        return DecodeScriptResult.parse(
+            self.call("decodescript", script.hex(), version)
+        )
+
+    def estimateFee(self):
+        """
+        Returns the estimated fee in atoms/kb.
+
+        Returns:
+            int: Estimated fee in atoms/kb.
+        """
+        return int(self.call("estimatefee", 0) * 1e8)
+
+    def estimateSmartFee(self, confirmations):
+        """
+        Returns the estimated fee using the historical fee data in atoms/kb.
+
+        Args:
+            confirmations (int): Max 32. Estimate the fee rate a transaction requires so
+                that it is mined in up to this number of blocks.
+
+        Returns:
+            int: Estimated fee rate in atoms/kb.
+        """
+        return int(self.call("estimatesmartfee", confirmations, "conservative") * 1e8)
+
+    def estimateStakeDiff(self, tickets):
+        """
+        Estimate the next minimum, maximum, expected, and user-specified stake
+        difficulty.
+
+        Args:
+            tickets (int): Use this number of new tickets in blocks
+                to estimate the next difficulty.
+
+        Returns:
+            EstimateStakeDiffResult: The estimated difficulty.
+        """
+        return EstimateStakeDiffResult.parse(self.call("estimatestakediff", tickets))
 
     def existsAddress(self, address):
         """
@@ -232,7 +461,7 @@ class Client(object):
             verbose (bool): Optional. Default=True. Specifies the block is
                 returned as a GetBlockVerboseResult instead of serialized bytes.
             verboseTx (bool): Optional. Default=False. Specifies that each
-                transaction is returned as a RawTransactionsResult and only
+                transaction is returned as a RawTransactionResult and only
                 applies if the verbose flag is true (dcrd extension).
 
         Returns:
@@ -943,7 +1172,132 @@ def get(k, obj):
     return obj[k] if k in obj else None
 
 
+class COut:
+    """
+    Models data used when sending a createRawSSTx. Contains an sstxcommitment output.
+    """
+
+    def __init__(
+        self, addr, commitAmt, changeAddr, changeAmt,
+    ):
+        """
+        Args:
+            addr (str): Address to send sstx commit.
+            commitAmt (int): Amount to commit.
+            changeAddr (str): Address for change.
+            changeAmt (int): Amount for change.
+        """
+        self.addr = addr
+        self.commitAmt = commitAmt
+        self.changeAddr = changeAddr
+        self.changeAmt = changeAmt
+
+    def toJSON(self):
+        """
+        Encode the COuts to JSON.
+
+        Returns:
+            JSON: The encoded couts.
+        """
+        return {
+            "addr": self.addr,
+            "commitamt": self.commitAmt,
+            "changeaddr": self.changeAddr,
+            "changeamt": self.changeAmt,
+        }
+
+
+class DecodeScriptResult:
+    """
+    Models data returned by the decodeScript command.
+    """
+
+    def __init__(
+        self, asm, scriptType, reqSigs=None, addresses=None, p2sh=None,
+    ):
+        """
+
+        Args:
+            asm (str): Disassembly of the script.
+            type (str): The type of the script (e.g. 'pubkeyhash').
+            reqSigs (int): The number of required signatures or None.
+            addresses (list(str)): The Decred addresses associated with this
+                script or None.
+            p2sh (str): The script hash for use in pay-to-script-hash transactions
+                or None (only present if the provided redeem script is not already
+                a pay-to-script-hash script).
+        """
+        self.asm = asm
+        self.type = scriptType
+        self.reqSigs = reqSigs
+        self.addresses = addresses if addresses else []
+        self.p2sh = p2sh
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the DecodeScriptResult from the decoded RPC response.
+
+        Args:
+            obj (dict): The decoded dcrd RPC response.
+
+        Returns:
+            DecodeScriptResult: The DecodeScriptResult.
+        """
+        return DecodeScriptResult(
+            asm=obj["asm"],
+            scriptType=obj["type"],
+            reqSigs=get("reqSigs", obj),
+            addresses=[addr for addr in obj["addresses"]] if "addresses" in obj else [],
+            p2sh=get("p2sh", obj),
+        )
+
+
+class EstimateStakeDiffResult:
+    """
+    Models the data returned by the estimateStakeDiff command.
+    """
+
+    def __init__(
+        self, diffMin, diffMax, expected, user=None,
+    ):
+        """
+        Args:
+            diffMin (float): Minimum estimate for stake difficulty.
+            diffMax (float): Maximum estimate for stake difficulty.
+            expected (float): Expected estimate for stake difficulty.
+            user (float): Estimate for stake difficulty with the passed user
+                amount of tickets.
+        """
+        self.diffMin = diffMin
+        self.diffMax = diffMax
+        self.expected = expected
+        self.user = user
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the EstimateStakeDiffResult from the decoded RPC response.
+
+        Args:
+            obj (dict): The decoded dcrd RPC response.
+
+        Returns:
+            EstimateStakeDiffResult: The EstimateStakeDiffResult.
+        """
+        return EstimateStakeDiffResult(
+            diffMin=obj["min"],
+            diffMax=obj["max"],
+            expected=obj["expected"],
+            user=get("user", obj),
+        )
+
+
 class GetBlockVerboseResult:
+    """
+    Models data returned by the getBlock command.
+    """
+
     def __init__(
         self,
         blockHash,
@@ -1039,6 +1393,15 @@ class GetBlockVerboseResult:
 
     @staticmethod
     def parse(obj):
+        """
+        Parse the GetBlockVerboseResult from the decoded RPC response.
+
+        Args:
+            obj (dict): The decoded dcrd RPC response.
+
+        Returns:
+            GetBlockVerboseResult: The GetBlockVerboseResult.
+        """
         return GetBlockVerboseResult(
             blockHash=reversed(ByteArray(obj["hash"])),
             confirmations=obj["confirmations"],
@@ -1082,29 +1445,40 @@ class GetBlockVerboseResult:
 
 class GetAddedNodeInfoResultAddr:
     """
-    GetAddedNodeInfoResultAddr models the data of the addresses portion of the
-    getaddednodeinfo command.
+    Models the addresses data of a GetAddedNodeInfoResult.
     """
 
     def __init__(
         self, address, connected,
     ):
         """
-        address (str): The ip address for this DNS entry.
-        connected (str): The connection 'direction' (inbound/outbound/false).
+        Args:
+            address (str): The ip address for this DNS entry.
+            connected (str): The connection 'direction' (inbound/outbound/false).
         """
         self.address = address
         self.connected = connected
 
     @staticmethod
     def parse(obj):
+        """
+        Parse the GetAddedNodeInfoResultAddr from the decoded RPC response.
+
+        Args:
+            obj (dict): The decoded dcrd RPC response.
+
+        Returns:
+            GetAddedNodeInfoResultAddr: The GetAddedNodeInfoResultAddr.
+        """
         return GetAddedNodeInfoResultAddr(
             address=obj["address"], connected=obj["connected"],
         )
 
 
 class GetAddedNodeInfoResult:
-    """getaddednodeinforesult"""
+    """
+    Models data returned by the getAddedNodeInfo command.
+    """
 
     def __init__(
         self, addedNode, connected=None, addresses=None,
@@ -1123,6 +1497,15 @@ class GetAddedNodeInfoResult:
 
     @staticmethod
     def parse(obj):
+        """
+        Parse the GetAddedNodeInfoResult from the decoded RPC response.
+
+        Args:
+            obj (dict): The decoded dcrd RPC response.
+
+        Returns:
+            GetAddedNodeInfoResult: The GetAddedNodeInfoResult.
+        """
         return GetAddedNodeInfoResult(
             addedNode=obj["addednode"],
             connected=get("connected", obj),
@@ -1135,6 +1518,10 @@ class GetAddedNodeInfoResult:
 
 
 class GetChainTipsResult:
+    """
+    Models data returned by the getChainTips command.
+    """
+
     def __init__(
         self, height, blockHash, branchLen, status,
     ):
@@ -1158,7 +1545,7 @@ class GetChainTipsResult:
         Parse the GetChainTipsResult from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             GetChainTipsResult: The GetChainTipsResult.
@@ -1172,7 +1559,9 @@ class GetChainTipsResult:
 
 
 class GetBlockSubsidyResult:
-    """getblocksubsidyresult"""
+    """
+    Models data returned by the getBockSubsidy command.
+    """
 
     def __init__(
         self, developer, pos, sPoW, total,
@@ -1195,7 +1584,7 @@ class GetBlockSubsidyResult:
         Parse the GetBlockSubsidyResult from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             GetBlockSubsidyResult: The GetBlockSubsidyResult.
@@ -1209,6 +1598,10 @@ class GetBlockSubsidyResult:
 
 
 class GetCFilterV2Result:
+    """
+    Models data returned by the getCFilterV2 command.
+    """
+
     def __init__(
         self, blockHash, data, proofIndex, proofHashes,
     ):
@@ -1232,7 +1625,7 @@ class GetCFilterV2Result:
         Parse the GetCFilterV2Result from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             GetCFilterV2Result: The GetCFilterV2Result.
@@ -1246,7 +1639,9 @@ class GetCFilterV2Result:
 
 
 class GetBlockHeaderVerboseResult:
-    """getblockheaderverboseresult"""
+    """
+    Models data returned by the verbose getBlockHeader command.
+    """
 
     def __init__(
         self,
@@ -1332,7 +1727,7 @@ class GetBlockHeaderVerboseResult:
         Parse the GetBlockHeaderVerboseResult from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             GetBlockHeaderVerboseResult: The GetBlockHeaderVerboseResult.
@@ -1369,7 +1764,9 @@ class GetBlockHeaderVerboseResult:
 
 
 class GetRawMempoolVerboseResult:
-    """getrawmempoolverboseresult"""
+    """
+    Models data returned by the verbose getRawMempool command.
+    """
 
     def __init__(
         self, size, fee, time, height, startingPriority, currentPriority, depends,
@@ -1400,7 +1797,7 @@ class GetRawMempoolVerboseResult:
         Parse the GetRawMempoolVerboseResult from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             GetRawMempoolVerboseResult: The GetRawMempoolVerboseResult.
@@ -1417,7 +1814,9 @@ class GetRawMempoolVerboseResult:
 
 
 class GetPeerInfoResult:
-    """getpeerinforesult"""
+    """
+    Models data returned by the getPeerInfo command.
+    """
 
     def __init__(
         self,
@@ -1498,7 +1897,7 @@ class GetPeerInfoResult:
         Parse the GetPeerInfoResult from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             GetPeerInfoResult: The GetPeerInfoResult.
@@ -1529,8 +1928,7 @@ class GetPeerInfoResult:
 
 class LocalAddressesResult:
     """
-    LocalAddressesResult models the localaddresses data from the getnetworkinfo
-    command.
+    Models the localAddresses data for a GetNetworkInfoResult.
     """
 
     def __init__(
@@ -1551,7 +1949,7 @@ class LocalAddressesResult:
         Parse the LocalAddressesResult from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             LocalAddressesResult: The LocalAddressesResult.
@@ -1563,7 +1961,7 @@ class LocalAddressesResult:
 
 class NetworksResult:
     """
-    NetworksResult models the networks data from the getnetworkinfo command.
+    Models the networks data for a GetNetworkInfoResult.
     """
 
     def __init__(
@@ -1591,7 +1989,7 @@ class NetworksResult:
         Parse the NetworkResults from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             NetworkResults: The NetworkResults.
@@ -1606,7 +2004,9 @@ class NetworksResult:
 
 
 class GetNetworkInfoResult:
-    """getnetworkinforesult"""
+    """
+    Models data returned by the getNetworkInfo command.
+    """
 
     def __init__(
         self,
@@ -1651,7 +2051,7 @@ class GetNetworkInfoResult:
         Parse the GetNetworkInfoResult from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             GetNetworkInfoResult: The GetNetworkInfoResult.
@@ -1672,7 +2072,9 @@ class GetNetworkInfoResult:
 
 
 class GetNetTotalsResult:
-    """getnettotalsresult"""
+    """
+    Models data returned by the getNetTotals command.
+    """
 
     def __init__(
         self, totalBytesRecv, totalBytesSent, timeMillis,
@@ -1692,7 +2094,7 @@ class GetNetTotalsResult:
         Parse the GetNetTotalResult from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             GetNetTotalsResult: The GetNetTotalsResult.
@@ -1705,7 +2107,9 @@ class GetNetTotalsResult:
 
 
 class GetMiningInfoResult:
-    """getmininginforesult"""
+    """
+    Models data returned by the getMiningInfo command.
+    """
 
     def __init__(
         self,
@@ -1759,7 +2163,7 @@ class GetMiningInfoResult:
         Parse the GetMiningInfoResult from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             GetMiningInfoResult: The GetMiningInfoResult.
@@ -1781,7 +2185,9 @@ class GetMiningInfoResult:
 
 
 class GetMempoolInfoResult:
-    """getmempoolinforesult"""
+    """
+    Models data returned by the getMempoolInfo command.
+    """
 
     def __init__(
         self, size, Bytes,
@@ -1800,7 +2206,7 @@ class GetMempoolInfoResult:
         Parse the GetMempoolInfoResult from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             GetMempoolInfoResult: The GetMempoolInfoResult.
@@ -1809,7 +2215,9 @@ class GetMempoolInfoResult:
 
 
 class InfoChainResult:
-    """infochainresult"""
+    """
+    Models data returned by the getInfo command.
+    """
 
     def __init__(
         self,
@@ -1854,7 +2262,7 @@ class InfoChainResult:
         Parse the InfoChainResult from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             InfoChainResult: The InfoChainResult.
@@ -1874,7 +2282,9 @@ class InfoChainResult:
 
 
 class GetWorkResult:
-    """getworkresult"""
+    """
+    Models data returned by the getWork command.
+    """
 
     def __init__(
         self, data, target,
@@ -1893,7 +2303,7 @@ class GetWorkResult:
         Parse the GetWorkResult from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             GetWorkResult: The GetWorkResult.
@@ -1904,7 +2314,9 @@ class GetWorkResult:
 
 
 class GetTxOutResult:
-    """gettxoutresult"""
+    """
+    Models data returned by the getTxOut command.
+    """
 
     def __init__(
         self, bestBlock, confirmations, value, scriptPubKey, version, coinbase,
@@ -1933,7 +2345,7 @@ class GetTxOutResult:
         Parse the GetTxOutResult from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             GetTxOutResult: The GetTxOutResult.
@@ -1950,7 +2362,7 @@ class GetTxOutResult:
 
 class Choice:
     """
-    Choice models an individual choice inside an Agenda.
+    Models an individual choice inside an Agenda for a GetVoteInfoResult.
     """
 
     def __init__(
@@ -1980,7 +2392,7 @@ class Choice:
         Parse the Choice from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             Choice: The parsed Choice.
@@ -1998,7 +2410,7 @@ class Choice:
 
 class Agenda:
     """
-    Agenda models an individual agenda including its choices.
+    Models an individual agenda including its choices for a GetVoteInfoResult.
     """
 
     def __init__(
@@ -2038,7 +2450,7 @@ class Agenda:
         Parse the Agenda from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             Agenda: The parsed Agenda info.
@@ -2056,7 +2468,9 @@ class Agenda:
 
 
 class GetVoteInfoResult:
-    """getvoteinfo"""
+    """
+    Models data returned by the getVoteInfo command.
+    """
 
     def __init__(
         self,
@@ -2094,7 +2508,7 @@ class GetVoteInfoResult:
         Parse the GetVoteInfoResult from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             GetVoteInfoResult: The GetVoteInfoResult.
@@ -2115,7 +2529,7 @@ class GetVoteInfoResult:
 
 class VersionBits:
     """
-    VersionBits models a generic version:bits tuple.
+    Models a generic version:bits tuple for a GetStakeVersionsResult.
     """
 
     def __init__(
@@ -2135,7 +2549,7 @@ class VersionBits:
         Parse the VersionBits from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             VersionBits: The parsed VersionBits.
@@ -2144,7 +2558,9 @@ class VersionBits:
 
 
 class GetStakeVersionsResult:
-    """getstakeversionsresult"""
+    """
+    Models data returned by the getStakeVersions command.
+    """
 
     def __init__(
         self, blockHash, height, blockVersion, stakeVersion, votes,
@@ -2170,7 +2586,7 @@ class GetStakeVersionsResult:
         Parse the StakeVersionsResult from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             StakeVersionsResult: The StakeVersionsResult.
@@ -2186,7 +2602,8 @@ class GetStakeVersionsResult:
 
 class VersionCount:
     """
-    VersionCount models a generic version:count tuple.
+    Models a generic version:count tuple for a VersionInterval for a
+    GetStakeVersionInfoResult.
     """
 
     def __init__(
@@ -2205,7 +2622,7 @@ class VersionCount:
         Parse the VersionCount from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             VersionCount: The parsed VersionCount.
@@ -2215,7 +2632,7 @@ class VersionCount:
 
 class VersionInterval:
     """
-    VersionInterval models a version count for an interval.
+    Models intervals data for a GetStakeVersionInfoResult.
     """
 
     def __init__(
@@ -2239,7 +2656,7 @@ class VersionInterval:
         Parse the VersionInterval from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             VersionInterval: The parsed VersionInterval.
@@ -2253,7 +2670,9 @@ class VersionInterval:
 
 
 class GetStakeVersionInfoResult:
-    """getstakeversioninforesult"""
+    """
+    Models data returned by the getStakeVersionInfo command.
+    """
 
     def __init__(
         self, currentHeight, blockHash, intervals,
@@ -2274,7 +2693,7 @@ class GetStakeVersionInfoResult:
         Parse the GetStakeVersionInfoResult from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             GetStakeVersionInfoResult: The GetStakeVersionInfoResult.
@@ -2287,7 +2706,9 @@ class GetStakeVersionInfoResult:
 
 
 class GetStakeDifficultyResult:
-    """getstakedifficultyresult"""
+    """
+    Models data returned by the getStakeDifficulty command.
+    """
 
     def __init__(
         self, currentStakeDifficulty, nextStakeDifficulty,
@@ -2306,7 +2727,7 @@ class GetStakeDifficultyResult:
         Parse the GetStakeDifficultyResult from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             GetStakeDifficultyResult: The GetStakeDifficultyResult.
@@ -2318,7 +2739,7 @@ class GetStakeDifficultyResult:
 
 class FeeInfoResult:
     """
-    Models the data returned from ticketFeeInfo and txFeeInfo.
+    Models data returned by the ticketFeeInfo and txFeeInfo commands.
     """
 
     def __init__(
@@ -2361,7 +2782,7 @@ class FeeInfoResult:
         Parse the FeeInfoResult from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             FeeInfoResult: The FeeInfoResult.
@@ -2380,7 +2801,9 @@ class FeeInfoResult:
 
 
 class TicketFeeInfoResult:
-    """ticketfeeinforesult"""
+    """
+    Models data returned by the ticketFeeInfo command.
+    """
 
     def __init__(
         self, feeInfoMempool, feeInfoBlocks=None, feeInfoWindows=None,
@@ -2404,7 +2827,7 @@ class TicketFeeInfoResult:
         Parse the TicketFeeInfoResult from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             TicketFeeInfoResult: The TicketFeeInfoResult.
@@ -2421,7 +2844,9 @@ class TicketFeeInfoResult:
 
 
 class TxFeeInfoResult:
-    """txfeeinforesult"""
+    """
+    Models data returned by the txFeeInfo command.
+    """
 
     def __init__(
         self, feeInfoMempool, feeInfoBlocks=None, feeInfoRange=None,
@@ -2445,7 +2870,7 @@ class TxFeeInfoResult:
         Parse the TxFeeInfoResult from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             TxFeeInfoResult: The TxFeeInfoResult.
@@ -2462,7 +2887,9 @@ class TxFeeInfoResult:
 
 
 class GetBestBlockResult(object):
-    """getbestblockhash"""
+    """
+    Models data returned by the getBestBlock command.
+    """
 
     def __init__(self, blockHash, height):
         """
@@ -2479,7 +2906,7 @@ class GetBestBlockResult(object):
         Parse the GetBestBlockResult from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             GetBestBlockResult: The GetBestBlockResult.
@@ -2489,7 +2916,9 @@ class GetBestBlockResult(object):
 
 
 class GetBlockChainInfoResult(object):
-    """getblockchaininfo"""
+    """
+    Models data returned by the getBlockChainInfo command.
+    """
 
     def __init__(
         self,
@@ -2543,7 +2972,7 @@ class GetBlockChainInfoResult(object):
         Parse the GetBlockChainInfoResult from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             GetBlockChainInfoResult: The GetBlockChainInfoResult.
@@ -2565,7 +2994,7 @@ class GetBlockChainInfoResult(object):
 
 class AgendaInfo(object):
     """
-    AgendaInfo provides an overview of an agenda in a consensus deployment.
+    Models data for deployments of a GetBlockChainInfoResult.
     """
 
     def __init__(
@@ -2590,7 +3019,7 @@ class AgendaInfo(object):
         Parse the AgendaInfo from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             AgendaInfo: The AgendaInfo.
@@ -2604,7 +3033,10 @@ class AgendaInfo(object):
 
 
 class RawTransactionResult:
-    """searchrawtransactions"""
+    """
+    Models data returned by the searchRawTransactions, decodeRawTransaction,
+    getblock, and getRawTransaction commands.
+    """
 
     def __init__(
         self,
@@ -2627,7 +3059,7 @@ class RawTransactionResult:
             txHash (ByteArray):  The hash of the transaction.
             version (int): The transaction version.
             locktime (int): The transaction lock time.
-            expiry (int): The transacion expiry.
+            expiry (int): The transaction expiry.
             vin (list(object)): The transaction inputs.
             vout (list(object)): The transaction outputs.
             tx (msgtx.MsgTx): msgtx.MsgTx transaction or None.
@@ -2659,7 +3091,7 @@ class RawTransactionResult:
         Parse the RawTransactionResult from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             RawTransactionResult: The RawTransactionResult.
@@ -2685,7 +3117,7 @@ class RawTransactionResult:
 
 class PrevOut:
     """
-    PrevOut represents previous output for an input Vin.
+    Models previous output data for a Vin for a RawTransactionResult.
     """
 
     def __init__(
@@ -2705,7 +3137,7 @@ class PrevOut:
         Parse the PrevOut from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             PrevOut: The Parsed PrevOut.
@@ -2718,9 +3150,7 @@ class PrevOut:
 
 class Vin:
     """
-    Vin models parts of the tx data.  It is defined separately since
-    getrawtransaction, decoderawtransaction, and searchrawtransaction use the
-    same structure.
+    Models a Vin for a RawTransactionResult.
     """
 
     def __init__(
@@ -2778,7 +3208,7 @@ class Vin:
         Parse the Vin from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             Vin: The Parsed Vin.
@@ -2802,9 +3232,7 @@ class Vin:
 
 class ScriptSig:
     """
-    ScriptSig models a signature script.  It is defined separately since it only
-    applies to non-coinbase.  Therefore the field in the Vin structure needs
-    to be a pointer.
+    Models signature data for a Vin for a RawTransactionResult.
     """
 
     def __init__(
@@ -2824,7 +3252,7 @@ class ScriptSig:
         Parse the ScriptSig from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             ScriptSig: The Parsed ScriptSig.
@@ -2836,8 +3264,7 @@ class ScriptSig:
 
 class Vout:
     """
-    Vout models parts of the tx data.  It is defined separately since both
-    getrawtransaction and decoderawtransaction use the same structure.
+    Models a Vout for a RawTransactionResult.
     """
 
     def __init__(
@@ -2861,7 +3288,7 @@ class Vout:
         Parse the Vout from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             Vout: The Parsed Vout.
@@ -2876,8 +3303,7 @@ class Vout:
 
 class ScriptPubKeyResult:
     """
-    ScriptPubKeyResult models the scriptPubKey data of a tx script.  It is
-    defined separately since it is used by multiple commands.
+    Models script data for a Vin for a RawTransactionResult.
     """
 
     def __init__(
@@ -2907,7 +3333,7 @@ class ScriptPubKeyResult:
         Parse the ScriptPubKeyResult from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             ScriptPubKeyResult: The ScriptPubKeyResult.
@@ -2923,7 +3349,9 @@ class ScriptPubKeyResult:
 
 
 class ValidateAddressChainResult:
-    """validateaddress"""
+    """
+    Models data returned by the validateAddress command.
+    """
 
     def __init__(
         self, isValid, address=None,
@@ -2942,7 +3370,7 @@ class ValidateAddressChainResult:
         Parse the ValidateAddressChainResult from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             ValidateAddressChainResult: The ValidateAddressChainResult.
@@ -2954,7 +3382,7 @@ class ValidateAddressChainResult:
 
 class VersionResult:
     """
-    VersionResult provides a data structure to store version information.
+    Models data returned by the values of a version command.
     """
 
     def __init__(
@@ -2982,7 +3410,7 @@ class VersionResult:
         Parse the VersionResult from the decoded RPC response.
 
         Args:
-            obj (object): The decoded dcrd RPC response.
+            obj (dict): The decoded dcrd RPC response.
 
         Returns:
             VersionResult: A VersionResult object.
