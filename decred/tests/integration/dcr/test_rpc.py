@@ -110,10 +110,10 @@ def test_rpc(config):
     assert debugLevel == "Done."
 
     estimateFee = rpcClient.estimateFee()
-    assert isinstance(estimateFee, float)
+    assert isinstance(estimateFee, int)
 
     estimateSmartFee = rpcClient.estimateSmartFee(32)
-    assert isinstance(estimateSmartFee, float)
+    assert isinstance(estimateSmartFee, int)
 
     estimateStakeDiff = rpcClient.estimateStakeDiff(0)
     assert isinstance(estimateStakeDiff, rpc.EstimateStakeDiffResult)

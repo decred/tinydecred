@@ -9,7 +9,7 @@ import types
 
 from decred.util import tinyhttp
 from decred.util.encode import ByteArray
-from decred.util.helpers import satsToCoins as coinify
+from decred.util.helpers import coinify
 
 from . import txscript
 from .wire.msgblock import BlockHeader
@@ -275,25 +275,25 @@ class Client(object):
 
     def estimateFee(self):
         """
-        Returns the estimated fee in dcr/kb.
+        Returns the estimated fee in atoms/kb.
 
         Returns:
-            float: Estimated fee.
+            int: Estimated fee in atoms/kb.
         """
-        return self.call("estimatefee", 0)
+        return int(self.call("estimatefee", 0) * 1e8)
 
     def estimateSmartFee(self, confirmations):
         """
-        Returns the estimated fee using the historical fee data in dcr/kb.
+        Returns the estimated fee using the historical fee data in atoms/kb.
 
         Args:
             confirmations (int): Max 32. Estimate the fee rate a transaction requires so
                 that it is mined in up to this number of blocks.
 
         Returns:
-            float: Estimated fee rate (in DCR/KB).
+            int: Estimated fee rate in atoms/kb.
         """
-        return self.call("estimatesmartfee", confirmations, "conservative")
+        return int(self.call("estimatesmartfee", confirmations, "conservative") * 1e8)
 
     def estimateStakeDiff(self, tickets):
         """
@@ -1174,7 +1174,7 @@ def get(k, obj):
 
 class COut:
     """
-    Models data used when sending a createRawSSTx. Contains sstx commit outs.
+    Models data used when sending a createRawSSTx. Contains an sstxcommitment output.
     """
 
     def __init__(
