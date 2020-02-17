@@ -65,6 +65,18 @@ PKFUncompressed = 0
 PKFCompressed = 1
 
 
+class AddressEdwardsPubKey:
+    """unimplemented"""
+
+    pass
+
+
+class AddressSecSchnorrPubKey:
+    """unimplemented"""
+
+    pass
+
+
 class CrazyKeyError(Exception):
     """
     Both derived public or private keys rely on treating the left 32-byte

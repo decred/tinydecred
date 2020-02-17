@@ -189,7 +189,7 @@ class TinyBlock(object):
         Returns:
             TinyBlock: The parsed TinyBlock.
         """
-        return TinyBlock(ByteArray(obj["hash"]), obj["height"])
+        return TinyBlock(reversed(ByteArray(obj["hash"])), obj["height"])
 
     def __eq__(self, blk):
         """
@@ -857,10 +857,6 @@ class Account(object):
         self.utxos = {u.key(): u for u in blockchainUTXOs}
         self.utxoDB.clear()
         self.utxoDB.batchInsert(self.utxos.items())
-        self.updateStakeStats()
-        pool = self.stakePool()
-        if pool:
-            pool.authorize(self.votingAddress())
 
     def utxoscan(self):
         """
@@ -926,8 +922,7 @@ class Account(object):
         Add a Transaction-implementing object to the mempool.
 
         Args:
-            tx (Transaction): An object that implements the Transaction API
-                from tinydecred.api.
+            tx (MsgTx): A transaction.
         """
         self.mempool[tx.txid()] = tx
 
@@ -1476,14 +1471,16 @@ class Account(object):
         txs, spentUTXOs, newUTXOs = self.blockchain.purchaseTickets(
             keysource, self.getUTXOs, req
         )
-        if txs:
-            # Add the split transactions
-            self.addMempoolTx(txs[0])
-            # Add all tickets
-            for tx in txs[1]:
-                self.addMempoolTx(tx)
+        # Add the split transactions
+        self.addMempoolTx(txs[0])
+        # Add all tickets
+        for tx in txs[1]:
+            self.addMempoolTx(tx)
         # Store the txids.
         self.tickets.extend([tx.txid() for tx in txs[1]])
+        self.spendUTXOs(spentUTXOs)
+        for utxo in newUTXOs:
+            self.addUTXO(utxo)
         self.signals.balance(self.calcBalance())
         return txs[1]
 
@@ -1566,6 +1563,11 @@ class Account(object):
             addresses = self.generateGapAddresses()
             if not addresses:
                 break
+
+        self.updateStakeStats()
+        pool = self.stakePool()
+        if pool:
+            pool.authorize(self.votingAddress())
 
         # Subscribe to block and address updates.
         blockchain.addressReceiver = self.addressSignal

@@ -732,9 +732,6 @@ def getScriptClass(scriptVersion, script):
     """
     if scriptVersion != DefaultScriptVersion:
         return NonStandardTy
-    elif isPubKeyHashScript(script):
-        return PubKeyHashTy
-
     elif isPubKeyScript(script):
         return PubKeyTy
     # elif isPubKeyAltScript(script):

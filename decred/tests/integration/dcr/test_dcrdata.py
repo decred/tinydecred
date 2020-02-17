@@ -142,19 +142,20 @@ class TestDcrdata(unittest.TestCase):
                 )
                 ticketPrice = blockchain.stakeDiff()
 
-                class request:
-                    minConf = 0
-                    expiry = 0
-                    spendLimit = ticketPrice * 2 * 1.1
-                    poolAddress = poolAddr.string()
-                    votingAddress = scriptAddr.string()
-                    ticketFee = 0
-                    poolFees = 7.5
-                    count = 2
-                    txFee = 0
+                request = account.TicketRequest(
+                    minConf=0,
+                    expiry=0,
+                    spendLimit=ticketPrice * 2 * 1.1,
+                    poolAddress=poolAddr.string(),
+                    votingAddress=scriptAddr.string(),
+                    ticketFee=0,
+                    poolFees=7.5,
+                    count=2,
+                    txFee=0,
+                )
 
                 ticket, spent, newUTXOs = blockchain.purchaseTickets(
-                    KeySource(), utxosource, request()
+                    KeySource(), utxosource, request
                 )
             finally:
                 blockchain.close()
