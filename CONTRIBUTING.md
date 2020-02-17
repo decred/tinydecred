@@ -27,6 +27,10 @@ sure that the changes meet some minimum requirements. The action definition
 [file](./.github/workflows/python.yml) is a useful summary of the commands
 you'll run while developing.
 
+New tests should be written in the [pytest](https://docs.pytest.org/) format.
+Existing tests in the stdlib `unittest` format may be rewritten to use pytest
+as needed.
+
 For displaying line-by-line test coverage in a web browser see the
 `./decred/coverage-html.sh` script.
 
