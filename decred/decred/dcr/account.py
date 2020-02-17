@@ -845,16 +845,15 @@ class Account(object):
                 self.tickets.append(utxo.txid)
         self.stakeStats = TicketStats(ticketCount, ticketVal)
 
-    def resolveUTXOs(self, blockchainUTXOs):
+    def resolveUTXOs(self, utxos):
         """
-        resolveUTXOs is run once at the end of a sync. Using this opportunity
-        to hook into the sync to authorize the stake pool.
+        Set the current UTXO set to the supplied list.
 
         Args:
             blockchainUTXOs (list(object)): A list of Python objects decoded from
                 dcrdata's JSON response from ...addr/utxo endpoint.
         """
-        self.utxos = {u.key(): u for u in blockchainUTXOs}
+        self.utxos = {u.key(): u for u in utxos}
         self.utxoDB.clear()
         self.utxoDB.batchInsert(self.utxos.items())
 
@@ -1564,6 +1563,7 @@ class Account(object):
             if not addresses:
                 break
 
+        # update the staking info and authorize the stake pool.
         self.updateStakeStats()
         pool = self.stakePool()
         if pool:
