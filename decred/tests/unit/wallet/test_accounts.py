@@ -5,13 +5,15 @@ See LICENSE for details
 
 import os
 from tempfile import TemporaryDirectory
-import unittest
 
 from decred.crypto import crypto, rando
 from decred.dcr import nets
-from decred.util import chains, database, helpers
+from decred.util import database
 from decred.util.encode import ByteArray
 from decred.wallet import accounts
+
+
+LOGGER_ID = "test_accounts"
 
 
 testSeed = ByteArray(
@@ -21,66 +23,54 @@ testSeed = ByteArray(
 tRoot = crypto.ExtendedKey.new(testSeed)
 
 
-class TestAccounts(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        """
-        Set up for tests. Arguments are ignored.
-        """
-        helpers.prepareLogger("TACCT")
-        chains.registerChain("dcr", None)
-        # log.setLevel(0)
+def test_child_neuter(prepareLogger):
+    """
+    Test the ExtendedKey.neuter method.
+    """
+    extKey = crypto.ExtendedKey.new(testSeed)
+    extKey.setNetwork(nets.mainnet)
+    extKey.child(0)
+    pub = extKey.neuter()
+    expStr = (
+        "dpubZ9169KDAEUnyo8vdTJcpFWeaUEKH3G6detaXv46HxtQcENwxGBbRqbfTCJ9BUnWP"
+        + "CkE8WApKPJ4h7EAapnXCZq1a9AqWWzs1n31VdfwbrQk"
+    )
+    assert pub.string() == expStr
 
-    def test_child_neuter(self):
-        """
-        Test the ExtendedKey.neuter method.
-        """
-        extKey = crypto.ExtendedKey.new(testSeed)
-        extKey.setNetwork(nets.mainnet)
-        extKey.child(0)
-        pub = extKey.neuter()
-        self.assertEqual(
-            pub.string(),
-            "dpubZ9169KDAEUnyo8vdTJcpFWeaUEKH3G6detaXv46HxtQcENwxGBbR"
-            "qbfTCJ9BUnWPCkE8WApKPJ4h7EAapnXCZq1a9AqWWzs1n31VdfwbrQk",
-        )
 
-    def test_change_addresses(self):
-        """
-        Test internal branch address derivation.
-        """
-        cryptoKey = crypto.ByteArray(rando.generateSeed(32))
-        with TemporaryDirectory() as tempDir:
-            db = database.KeyValueDatabase(os.path.join(tempDir, "tmp.db")).child("tmp")
-            # ticker for coin type is ok. Case insensitive.
-            am = accounts.createNewAccountManager(
-                tRoot, cryptoKey, "DcR", nets.mainnet, db
-            )
-            acct = am.openAccount(0, cryptoKey)
-            for i in range(10):
-                acct.nextInternalAddress()
+def test_change_addresses(prepareLogger):
+    """
+    Test internal branch address derivation.
+    """
+    cryptoKey = crypto.ByteArray(rando.generateSeed(32))
+    with TemporaryDirectory() as tempDir:
+        db = database.KeyValueDatabase(os.path.join(tempDir, "tmp.db")).child("tmp")
+        # ticker for coin type is ok. Case insensitive.
+        am = accounts.createNewAccountManager(tRoot, cryptoKey, "DcR", nets.mainnet, db)
+        acct = am.openAccount(0, cryptoKey)
+        for i in range(10):
+            acct.nextInternalAddress()
 
-    def test_account_manager(self):
-        cryptoKey = crypto.ByteArray(rando.generateSeed(32))
-        with TemporaryDirectory() as tempDir:
-            db = database.KeyValueDatabase(os.path.join(tempDir, "tmp.db")).child("tmp")
-            # 42 = Decred
-            am = accounts.createNewAccountManager(
-                tRoot, cryptoKey, 42, nets.mainnet, db
-            )
 
-            acct = am.openAccount(0, cryptoKey)
-            zeroth = acct.currentAddress()
+def test_account_manager(prepareLogger):
+    cryptoKey = crypto.ByteArray(rando.generateSeed(32))
+    with TemporaryDirectory() as tempDir:
+        db = database.KeyValueDatabase(os.path.join(tempDir, "tmp.db")).child("tmp")
+        # 42 = Decred
+        am = accounts.createNewAccountManager(tRoot, cryptoKey, 42, nets.mainnet, db)
 
-            b = am.serialize()
-            reAM = accounts.AccountManager.unblob(b.b)
+        acct = am.openAccount(0, cryptoKey)
+        zeroth = acct.currentAddress()
 
-            self.assertEqual(am.coinType, reAM.coinType)
-            self.assertEqual(am.coinKeyEnc, reAM.coinKeyEnc)
-            self.assertEqual(am.netName, reAM.netName)
+        b = am.serialize()
+        reAM = accounts.AccountManager.unblob(b.b)
 
-            reAM.load(db, None)
-            reAcct = reAM.openAccount(0, cryptoKey)
-            reZeroth = reAcct.currentAddress()
+        assert am.coinType == reAM.coinType
+        assert am.netName == reAM.netName
+        assert am.netName == reAM.netName
 
-            self.assertEqual(zeroth, reZeroth)
+        reAM.load(db, None)
+        reAcct = reAM.openAccount(0, cryptoKey)
+        reZeroth = reAcct.currentAddress()
+
+        assert zeroth == reZeroth
