@@ -5,6 +5,7 @@ See LICENSE for details
 
 import unittest
 
+from decred import DecredError
 from decred.dcr.wire import wire
 from decred.util import helpers
 from decred.util.encode import ByteArray
@@ -34,19 +35,19 @@ class TestWire(unittest.TestCase):
             val_from_bytes = wire.readVarInt(from_bytes, wire.ProtocolVersion)
             self.assertEqual(val_from_bytes, val)
         self.assertRaises(
-            ValueError, wire.writeVarInt, wire.ProtocolVersion, wire.MaxUint64 + 1
+            DecredError, wire.writeVarInt, wire.ProtocolVersion, wire.MaxUint64 + 1
         )
 
     def test_read_var_int(self):
         self.assertEqual(wire.readVarInt(ByteArray([0xFC]), wire.ProtocolVersion), 0xFC)
         self.assertRaises(
-            ValueError,
+            DecredError,
             wire.readVarInt,
             ByteArray([0xFE, 0xFF, 0xFF, 0x0, 0x0]),
             wire.ProtocolVersion,
         )
         self.assertRaises(
-            ValueError,
+            DecredError,
             wire.readVarInt,
             ByteArray([0xFD, 0xFC, 0x0]),
             wire.ProtocolVersion,

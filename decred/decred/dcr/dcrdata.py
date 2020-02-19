@@ -18,20 +18,18 @@ from urllib.parse import urlencode, urlparse
 
 import websocket
 
+from decred import DecredError
 from decred.crypto import crypto
-from decred.util import chains, database, encode, helpers, tinyhttp
+from decred.util import chains, database, helpers, tinyhttp
 from decred.util.database import KeyValueDatabase
+from decred.util.encode import ByteArray
 from decred.wallet import api
 
 from . import account, calc, txscript
 from .wire import msgblock, msgtx, wire
 
 
-ByteArray = encode.ByteArray
-BuildyBytes = encode.BuildyBytes
-UTXO = account.UTXO
-
-log = helpers.getLogger("DCRDATA")  # , logLvl=0)
+log = helpers.getLogger("DCRDATA")
 
 VERSION = "0.0.1"
 GET_HEADERS = {"User-Agent": "PyDcrData/%s" % VERSION}
@@ -41,6 +39,10 @@ POST_HEADERS = {
 }
 
 formatTraceback = helpers.formatTraceback
+
+
+class DcrDataError(DecredError):
+    pass
 
 
 class DcrdataPath(object):
@@ -84,8 +86,7 @@ class DcrdataPath(object):
                 return uri
             if all([x in kwargs for x in argList]):
                 return template % tuple(kwargs[x] for x in argList)
-        raise DcrDataException(
-            "ArgumentError",
+        raise DcrDataError(
             "Supplied arguments, %r, do not match any of the know call signatures, %r."
             % (args if args else kwargs, [argList for argList, _ in self.callSigns]),
         )
@@ -93,9 +94,7 @@ class DcrdataPath(object):
     def __getattr__(self, key):
         if key in self.subpaths:
             return self.subpaths[key]
-        raise DcrDataException(
-            "SubpathError", "No subpath %s found in datapath" % (key,)
-        )
+        raise DcrDataError("No subpath %s found in datapath" % (key,))
 
     def __call__(self, *args, **kwargs):
         return tinyhttp.get(self.getCallsignPath(*args, **kwargs), headers=GET_HEADERS)
@@ -165,7 +164,7 @@ class DcrdataClient(object):
             params = []
             pathSequence = []
             templateParts = []
-            # split the path into an array for nodes and an array for pararmeters
+            # split the path into an array for nodes and an array for parameters
             for i, part in enumerate(path.strip("/").split("/")):
                 param = getParam(part)
                 if param:
@@ -387,12 +386,6 @@ class WebsocketClient(object):
             self.socket.close()
 
 
-class DcrDataException(Exception):
-    def __init__(self, name, message):
-        self.name = name
-        self.message = message
-
-
 class AgendaChoices:
     """
     Agenda choices such as abstain, yes, no.
@@ -517,10 +510,10 @@ def makeOutputs(pairs, chain):
     outputs = []
     for addrStr, amt in pairs:
         if amt < 0:
-            raise Exception("amt < 0")
+            raise DecredError("amt < 0")
         # Make sure its atoms
         if not isinstance(amt, int):
-            raise Exception("amt is not integral")
+            raise DecredError("amt is not integral")
         pkScript = txscript.makePayToAddrScript(addrStr, chain)
         outputs.append(msgtx.TxOut(value=amt, pkScript=pkScript))
     return outputs
@@ -541,14 +534,14 @@ def checkOutput(output, fee):
         is raised.
     """
     if output.value < 0:
-        raise Exception("transaction output amount is negative")
+        raise DecredError("transaction output amount is negative")
     if output.value > txscript.MaxAmount:
-        raise Exception("transaction output amount exceeds maximum value")
+        raise DecredError("transaction output amount exceeds maximum value")
     if output.value == 0:
-        raise Exception("zero-value output")
+        raise DecredError("zero-value output")
     # need to implement these
     if txscript.isDustOutput(output, fee):
-        raise Exception("policy violation: transaction output is dust")
+        raise DecredError("policy violation: transaction output is dust")
 
 
 def hashFromHex(s):
@@ -660,7 +653,7 @@ class DcrdataBlockchain(object):
         if receiver:
             self.addressReceiver = receiver
         elif self.addressReceiver is None:
-            raise Exception("must set receiver to subscribe to addresses")
+            raise DecredError("must set receiver to subscribe to addresses")
         self.dcrdata.subscribeAddresses(addrs)
 
     def processNewUTXO(self, utxo):
@@ -674,7 +667,7 @@ class DcrdataBlockchain(object):
         Returns:
             bool: True if no errors are encountered.
         """
-        utxo = UTXO.parse(utxo)
+        utxo = account.UTXO.parse(utxo)
         tx = self.tx(utxo.txid)
         if tx.looksLikeCoinbase():
             # This is a coinbase or stakebase transaction. Set the maturity.
@@ -729,7 +722,7 @@ class DcrdataBlockchain(object):
         """
         tx = self.tx(txid)
         txout = tx.txOut[vout]
-        utxo = UTXO(
+        utxo = account.UTXO(
             address=None,
             txHash=reversed(ByteArray(txid)),
             vout=vout,
@@ -752,12 +745,12 @@ class DcrdataBlockchain(object):
         hashKey = hashFromHex(txid).bytes()
         try:
             return self.txDB[hashKey]
-        except database.NoValue:
+        except database.NoValueError:
             try:
                 # Grab the hex encoded transaction
                 txHex = self.dcrdata.tx.hex(txid)
                 if not txHex:
-                    raise Exception("failed to retrieve tx hex from dcrdata")
+                    raise DecredError("failed to retrieve tx hex from dcrdata")
                 msgTx = msgtx.MsgTx.deserialize(ByteArray(txHex))
                 self.txDB[hashKey] = msgTx
                 return msgTx
@@ -766,7 +759,7 @@ class DcrdataBlockchain(object):
                     "unable to retrieve tx data from dcrdata at %s: %s"
                     % (self.dcrdata.baseURI, e)
                 )
-        raise Exception("failed to retreive transaction")
+        raise DecredError("failed to retreive transaction")
 
     def blockForTx(self, txid):
         """
@@ -780,7 +773,7 @@ class DcrdataBlockchain(object):
             # Try to get the blockhash from the database.
             bHash = self.txBlockMap[txHash]
             return self.blockHeader(hexFromHash(bHash))
-        except database.NoValue:
+        except database.NoValueError:
             # If the blockhash is not in the database, get it from dcrdata
             decodedTx = self.dcrdata.tx(txid)
             if (
@@ -819,7 +812,7 @@ class DcrdataBlockchain(object):
         try:
             serialized = self.headerDB[hashFromHex(hexHash).bytes()]
             return msgblock.BlockHeader.deserialize(serialized)
-        except database.NoValue:
+        except database.NoValueError:
             try:
                 block = self.dcrdata.block.hash.header.raw(hexHash)
                 blockHeader = msgblock.BlockHeader.deserialize(ByteArray(block["hex"]))
@@ -827,7 +820,7 @@ class DcrdataBlockchain(object):
                 return blockHeader
             except Exception as e:
                 log.warning("unable to retrieve block header: %s" % formatTraceback(e))
-        raise Exception("failed to get block header for block %s" % hexHash)
+        raise DecredError("failed to get block header for block %s" % hexHash)
 
     def blockHeaderByHeight(self, height):
         """
@@ -843,7 +836,7 @@ class DcrdataBlockchain(object):
         try:
             hashKey = self.heightMap[height]
             return self.headerDB[hashKey]
-        except database.NoValue:
+        except database.NoValueError:
             try:
                 hexBlock = self.blockchain.block.header.raw(idx=height)
                 blockHeader = msgblock.BlockHeader.deserialize(ByteArray(hexBlock))
@@ -851,7 +844,7 @@ class DcrdataBlockchain(object):
                 return blockHeader
             except Exception:
                 log.warning("unable to retrieve block header")
-        raise Exception("failed to get block header at height %i" % height)
+        raise DecredError("failed to get block header at height %i" % height)
 
     def bestBlock(self):
         """
@@ -878,7 +871,7 @@ class DcrdataBlockchain(object):
             return
         except Exception as e:
             log.error("failed to retrieve tip from blockchain: %s" % formatTraceback(e))
-        raise Exception("no tip data retrieved")
+        raise DecredError("no tip data retrieved")
 
     def relayFee(self):
         """
@@ -964,7 +957,7 @@ class DcrdataBlockchain(object):
                 # auto-reconnect using this signal.
                 pass
             else:
-                raise Exception("unknown signal %s" % repr(sigType))
+                raise DecredError("unknown signal %s" % repr(sigType))
         except Exception as e:
             log.error("failed to process pubsub message: %s" % formatTraceback(e))
 
@@ -1094,7 +1087,7 @@ class DcrdataBlockchain(object):
                 changeAmount, changeScriptSize, relayFeePerKb
             ):
                 if len(changeScript) > txscript.MaxScriptElementSize:
-                    raise Exception(
+                    raise DecredError(
                         "script size exceed maximum bytes pushable to the stack"
                     )
                 change = msgtx.TxOut(
@@ -1109,7 +1102,7 @@ class DcrdataBlockchain(object):
 
             # dcrwallet conditionally randomizes the change position here
             if len(newTx.txIn) != len(scripts):
-                raise Exception(
+                raise DecredError(
                     "tx.TxIn and prevPkScripts slices must have equal length"
                 )
 
@@ -1134,7 +1127,7 @@ class DcrdataBlockchain(object):
             self.broadcast(newTx.txHex())
             if change:
                 newUTXOs.append(
-                    UTXO(
+                    account.UTXO(
                         address=changeAddress,
                         txHash=newTx.cachedHash(),
                         vout=changeVout,
@@ -1174,17 +1167,17 @@ class DcrdataBlockchain(object):
         # account minConf is zero for regular outputs for now. Need to make that
         # adjustable.
         # if req.minConf < 0:
-        #     raise Exception("negative minconf")
+        #     raise DecredError("negative minconf")
 
         # Need a positive or zero expiry that is higher than the next block to
         # generate.
         if req.expiry < 0:
-            raise Exception("negative expiry")
+            raise DecredError("negative expiry")
 
         # Perform a sanity check on expiry.
         tipHeight = self.tip["height"]
         if req.expiry <= tipHeight + 1 and req.expiry > 0:
-            raise Exception("expiry height must be above next block height")
+            raise DecredError("expiry height must be above next block height")
 
         # Fetch a new address for creating a split transaction. Then,
         # make a split transaction that contains exact outputs for use
@@ -1202,26 +1195,26 @@ class DcrdataBlockchain(object):
 
         # Ensure the ticket price does not exceed the spend limit if set.
         if req.spendLimit > 0 and ticketPrice > req.spendLimit:
-            raise Exception(
+            raise DecredError(
                 "ticket price %f above spend limit %f" % (ticketPrice, req.spendLimit)
             )
 
         # Check that pool fees is zero, which will result in invalid zero-valued
         # outputs.
         if req.poolFees == 0:
-            raise Exception("no pool fee specified")
+            raise DecredError("no pool fee specified")
 
         stakeSubmissionPkScriptSize = 0
 
         # Check the pool address from the request.
         if not req.poolAddress:
-            raise Exception("no pool address specified. solo voting not supported")
+            raise DecredError("no pool address specified. solo voting not supported")
 
         poolAddress = txscript.decodeAddress(req.poolAddress, self.params)
 
         # Check the passed address from the request.
         if not req.votingAddress:
-            raise Exception("voting address not set in purchaseTickets request")
+            raise DecredError("voting address not set in purchaseTickets request")
 
         # decode the string addresses. This is the P2SH multi-sig script
         # address, not the wallets voting address, which is only one of the two
@@ -1237,7 +1230,7 @@ class DcrdataBlockchain(object):
         ):
             stakeSubmissionPkScriptSize = txscript.P2PKHPkScriptSize + 1
         else:
-            raise Exception(
+            raise DecredError(
                 "unsupported voting address type %s" % votingAddress.__class__.__name__
             )
 
@@ -1389,7 +1382,7 @@ class DcrdataBlockchain(object):
             # For now, don't allow any high fees (> 1000x default). Could later
             # be a property of the account.
             if txscript.paysHighFees(eop.amt, ticket):
-                raise Exception("high fees detected")
+                raise DecredError("high fees detected")
 
             self.broadcast(ticket.txHex())
             tickets.append(ticket)
@@ -1398,7 +1391,7 @@ class DcrdataBlockchain(object):
             # Add a UTXO to the internal outputs list.
             txOut = ticket.txOut[0]
             internalOutputs.append(
-                UTXO(
+                account.UTXO(
                     address=votingAddress.string(),
                     txHash=ticket.cachedHash(),
                     vout=0,  # sstx is output 0

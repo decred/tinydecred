@@ -7,6 +7,7 @@ import random
 
 import pytest
 
+from decred import DecredError
 from decred.crypto.secp256k1 import curve
 from decred.crypto.secp256k1.curve import curve as curve_obj
 from decred.util.encode import ByteArray
@@ -781,7 +782,7 @@ def test_public_keys():
         if test["isValid"]:
             pk = curve_obj.parsePubKey(test["key"])
         else:
-            with pytest.raises(ValueError):
+            with pytest.raises(DecredError):
                 curve_obj.parsePubKey(test["key"])
             # Invalid key has no serialization format.
             continue

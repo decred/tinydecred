@@ -16,12 +16,14 @@ Blobber API:
 import sqlite3
 import threading
 
+from decred import DecredError
 
-class NoValue(Exception):
+
+class NoValueError(DecredError):
     pass
 
 
-NO_VALUE_EXCEPTION = NoValue("no value")
+NO_VALUE_EXCEPTION = NoValueError("no value")
 
 KVTable = "CREATE TABLE IF NOT EXISTS {tablename} (k {keytype}, v {valuetype});"
 
@@ -80,7 +82,7 @@ class KeyValueDatabase:
             Bucket: The root bucket.
         """
         if "$" in name:
-            raise ValueError("illegal character. '$' not allowed in table name")
+            raise DecredError("illegal character. '$' not allowed in table name")
         return Bucket(self.conn, name, **k)
 
     def close(self):
@@ -176,7 +178,7 @@ class Bucket:
                 constructor.
         """
         if "$" in name:
-            raise ValueError("illegal character. '$' not allowed in table name")
+            raise DecredError("illegal character. '$' not allowed in table name")
         compoundName = "{parent}${child}".format(parent=self.name, child=name)
         return Bucket(self.conn, compoundName, **k)
 

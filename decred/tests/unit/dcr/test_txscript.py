@@ -9,6 +9,7 @@ import unittest
 
 from base58 import b58decode
 
+from decred import DecredError
 from decred.crypto import crypto, opcode, rando
 from decred.crypto.secp256k1 import curve as Curve
 from decred.dcr import txscript, vsp
@@ -32,7 +33,7 @@ def parseShortForm(asm):
             if hasattr(opcode, longToken):
                 b += ByteArray(getattr(opcode, longToken))
             else:
-                raise Exception("unknown token %s" % token)
+                raise DecredError("unknown token %s" % token)
     return b
 
 
@@ -389,7 +390,13 @@ class TestTxScript(unittest.TestCase):
 
             # Create test that provides one less byte than the data push requires.
             tests.append(
-                ("short OP_DATA_%d" % op, ByteArray(op) + data[1:], None, 0, Exception,)
+                (
+                    "short OP_DATA_%d" % op,
+                    ByteArray(op) + data[1:],
+                    None,
+                    0,
+                    DecredError,
+                )
             )
 
         # Add both positive and negative tests for OP_PUSHDATA{1,2,4}.
@@ -410,7 +417,7 @@ class TestTxScript(unittest.TestCase):
                     ByteArray(opcode.OP_PUSHDATA1),
                     None,
                     0,
-                    Exception,
+                    DecredError,
                 ),
                 (
                     "OP_PUSHDATA1 short data by 1 byte",
@@ -419,7 +426,7 @@ class TestTxScript(unittest.TestCase):
                     + ByteArray([0x01] * 75),
                     None,
                     0,
-                    Exception,
+                    DecredError,
                 ),
                 (
                     "OP_PUSHDATA2",
@@ -435,7 +442,7 @@ class TestTxScript(unittest.TestCase):
                     ByteArray(opcode.OP_PUSHDATA2),
                     None,
                     0,
-                    Exception,
+                    DecredError,
                 ),
                 (
                     "OP_PUSHDATA2 short data by 1 byte",
@@ -444,7 +451,7 @@ class TestTxScript(unittest.TestCase):
                     + ByteArray([0x01] * 75),
                     None,
                     0,
-                    Exception,
+                    DecredError,
                 ),
                 (
                     "OP_PUSHDATA4",
@@ -460,7 +467,7 @@ class TestTxScript(unittest.TestCase):
                     ByteArray(opcode.OP_PUSHDATA4),
                     None,
                     0,
-                    Exception,
+                    DecredError,
                 ),
                 (
                     "OP_PUSHDATA4 short data by 1 byte",
@@ -469,7 +476,7 @@ class TestTxScript(unittest.TestCase):
                     + ByteArray([0x01] * 75),
                     None,
                     0,
-                    Exception,
+                    DecredError,
                 ),
             ]
         )
@@ -513,7 +520,7 @@ class TestTxScript(unittest.TestCase):
                     + ByteArray(opcode.OP_CHECKSIG),
                     ((opcode.OP_DUP, nilBytes, 1), (opcode.OP_HASH160, nilBytes, 2),),
                     2,
-                    Exception,
+                    DecredError,
                 ),
                 (
                     "almost pay-to-pubkey-hash (overlapped data)",
@@ -558,7 +565,7 @@ class TestTxScript(unittest.TestCase):
                     + ByteArray(opcode.OP_EQUAL),
                     ((opcode.OP_HASH160, nilBytes, 1),),
                     1,
-                    Exception,
+                    DecredError,
                 ),
                 (
                     "almost pay-to-script-hash (overlapped data)",
@@ -941,7 +948,7 @@ class TestTxScript(unittest.TestCase):
         for test in tests:
             try:
                 txscript.Signature.parse(ByteArray(test.sig), test.der)
-            except Exception:
+            except DecredError:
                 self.assertFalse(test.isValid)
 
     def test_sign_tx(self):
@@ -1080,7 +1087,7 @@ class TestTxScript(unittest.TestCase):
                         privKey = crypto.privKeyFromBytes(k)
                         pkBytes = privKey.pub.serializeCompressed()
                     else:
-                        raise Exception(
+                        raise DecredError(
                             "test for signature suite %d not implemented" % suite
                         )
 
@@ -1146,7 +1153,7 @@ class TestTxScript(unittest.TestCase):
                         privKey = crypto.privKeyFromBytes(k)
                         pkBytes = privKey.pub.serializeCompressed()
                     else:
-                        raise Exception(
+                        raise DecredError(
                             "test for signature suite %d not implemented" % suite
                         )
 
@@ -1210,7 +1217,7 @@ class TestTxScript(unittest.TestCase):
                         privKey = crypto.privKeyFromBytes(k)
                         pkBytes = privKey.pub.serializeCompressed()
                     else:
-                        raise Exception(
+                        raise DecredError(
                             "test for signature suite %d not implemented" % suite
                         )
 
@@ -1284,7 +1291,7 @@ class TestTxScript(unittest.TestCase):
                         pkBytes = privKey.pub.serializeCompressed()
                         pkBytes2 = privKey2.pub.serializeCompressed()
                     else:
-                        raise Exception(
+                        raise DecredError(
                             "test for signature suite %d not implemented" % suite
                         )
 
@@ -1711,7 +1718,7 @@ class TestTxScript(unittest.TestCase):
             err = None
             try:
                 decoded = txscript.decodeAddress(test.addr, test.net)
-            except Exception as e:
+            except DecredError as e:
                 err = e
             self.assertEqual(err is None, test.valid, "%s error: %s" % (test.name, err))
 
@@ -1737,7 +1744,7 @@ class TestTxScript(unittest.TestCase):
                     # address is checked below.
                     try:
                         saddr = ByteArray(decoded.string())
-                    except Exception:
+                    except ValueError:
                         saddr = test.saddr
 
                 elif isinstance(decoded, crypto.AddressEdwardsPubKey):
@@ -1772,14 +1779,14 @@ class TestTxScript(unittest.TestCase):
                             "%s: address is invalid but creating new address succeeded"
                             % test.name
                         )
-                    except Exception:
+                    except DecredError:
                         pass
                 continue
 
             # Valid test, compare address created with f against expected result.
             try:
                 addr = test.f()
-            except Exception as e:
+            except DecredError as e:
                 self.fail(
                     "%s: address is valid but creating new address failed with error %s",
                     test.name,
@@ -2105,7 +2112,7 @@ class TestTxScript(unittest.TestCase):
                 scriptClass, addrs, reqSigs = txscript.extractPkScriptAddrs(
                     scriptVersion, t.script, mainnet
                 )
-            except Exception as e:
+            except (DecredError, NotImplementedError) as e:
                 if t.exception and t.exception in str(e):
                     continue
                 self.fail("extractPkScriptAddrs #%d (%s): %s" % (i, t.name, e))
@@ -2227,7 +2234,7 @@ class TestTxScript(unittest.TestCase):
         for t in tests:
             try:
                 pkScript = txscript.payToAddrScript(t.inAddr)
-            except Exception as e:
+            except NotImplementedError as e:
                 if not t.err:
                     self.fail("unexpected exception: %s" % e)
                 continue
@@ -2269,7 +2276,7 @@ class TestTxScript(unittest.TestCase):
             elif len(test) == 7:
                 txHex, scriptHex, vin, hashType, sigHashHex, err, comment = test
             else:
-                raise Exception("Test #%d: wrong length %d" % (i, len(test)))
+                raise DecredError("Test #%d: wrong length %d" % (i, len(test)))
 
             # Extract and parse the transaction from the test fields.
             tx = msgtx.MsgTx.deserialize(ByteArray(txHex))
@@ -2286,7 +2293,7 @@ class TestTxScript(unittest.TestCase):
             # Calculate the signature hash and verify expected result.
             try:
                 sigHash = txscript.calcSignatureHash(subScript, hashType, tx, vin, None)
-            except Exception as e:
+            except DecredError as e:
                 if err == "OK":
                     self.fail("unexpected calcSignatureHash exception: %s" % e)
                 continue

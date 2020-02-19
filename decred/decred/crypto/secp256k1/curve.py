@@ -8,6 +8,7 @@ module curve
     dcrd golang version.
 """
 
+from decred import DecredError
 from decred.crypto.rando import generateSeed
 from decred.util.encode import ByteArray
 
@@ -344,7 +345,7 @@ class KoblitzCurve:
         format.
         """
         if len(pubKeyStr) == 0:
-            raise ValueError("empty pubkey string")
+            raise DecredError("empty pubkey string")
 
         fmt = pubKeyStr[0]
         ybit = (fmt & 0x1) == 0x1
@@ -355,7 +356,7 @@ class KoblitzCurve:
         pkLen = len(pubKeyStr)
         if pkLen == PUBKEY_LEN:
             if PUBKEY_UNCOMPRESSED != fmt:
-                raise ValueError("invalid magic in pubkey str: %d" % pubKeyStr[0])
+                raise DecredError("invalid magic in pubkey str: %d" % pubKeyStr[0])
             x = ifunc(pubKeyStr[1:33])
             y = ifunc(pubKeyStr[33:])
 
@@ -364,20 +365,20 @@ class KoblitzCurve:
             # solution determines which solution of the curve we use.
             # / y^2 = x^3 + Curve.B
             if PUBKEY_COMPRESSED != fmt:
-                raise ValueError(
+                raise DecredError(
                     "invalid magic in compressed pubkey string: %d" % pubKeyStr[0]
                 )
             x = ifunc(pubKeyStr[1:33])
             y = self.decompressPoint(x, ybit)
         else:  # wrong!
-            raise ValueError("invalid pub key length %d" % len(pubKeyStr))
+            raise DecredError("invalid pub key length %d" % len(pubKeyStr))
 
         if x > self.P:
-            raise ValueError("pubkey X parameter is >= to P")
+            raise DecredError("pubkey X parameter is >= to P")
         if y > self.P:
-            raise ValueError("pubkey Y parameter is >= to P")
+            raise DecredError("pubkey Y parameter is >= to P")
         if not self.isAffineOnCurve(x, y):
-            raise ValueError("pubkey [%d, %d] isn't on secp256k1 curve" % (x, y))
+            raise DecredError("pubkey [%d, %d] isn't on secp256k1 curve" % (x, y))
         return PublicKey(self, x, y)
 
     def decompressPoint(self, x, ybit):
@@ -399,7 +400,7 @@ class KoblitzCurve:
         if ybit == isEven(y):
             y = self.P - y
         if ybit == isEven(y):
-            raise Exception("ybit doesn't match oddnes")
+            raise DecredError("ybit doesn't match oddnes")
         return y
 
     def addJacobian(self, x1, y1, z1, x2, y2, z2, x3, y3, z3):  # *fieldVal) {

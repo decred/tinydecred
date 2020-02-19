@@ -6,6 +6,7 @@ See LICENSE for details
 Based on dcrd MsgTx.
 """
 
+from decred import DecredError
 from decred.crypto.crypto import hashH
 from decred.util.encode import ByteArray
 
@@ -73,7 +74,7 @@ def readOutPoint(b, pver, ver):
 
 def readTxInPrefix(b, pver, serType, ver, ti):
     if serType == wire.TxSerializeOnlyWitness:
-        raise ValueError(
+        raise DecredError(
             "readTxInPrefix: tried to read a prefix input for a witness only tx"
         )
 
@@ -130,7 +131,7 @@ def readScript(b, pver, maxAllowed, fieldName):
     # upper bound on this count.
     if count > maxAllowed:
         msg = "readScript: {} is larger than the max allowed size [count {}, max {}]"
-        raise ValueError(msg.format(fieldName, count, maxAllowed))
+        raise DecredError(msg.format(fieldName, count, maxAllowed))
 
     a = b.pop(count)
 
@@ -672,7 +673,7 @@ class MsgTx:
         # message.  It would be possible to cause memory exhaustion and panics
         # without a sane upper bound on this count.
         if count > maxTxInPerMessage:
-            raise Exception(
+            raise DecredError(
                 "MsgTx.decodePrefix: too many input transactions to fit into"
                 " max message size [count %d, max %d]" % (count, maxTxInPerMessage)
             )
@@ -688,7 +689,7 @@ class MsgTx:
         # message.  It would be possible to cause memory exhaustion and panics
         # without a sane upper bound on this count.
         if count > maxTxOutPerMessage:
-            raise Exception(
+            raise DecredError(
                 "MsgTx.decodePrefix: too many output transactions to fit into"
                 " max message size [count %d, max %d]" % (count, maxTxOutPerMessage)
             )
@@ -718,7 +719,7 @@ class MsgTx:
         # Prevent more input transactions than could possibly fit into a
         # message, or memory exhaustion and panics could happen.
         if count > maxTxInPerMessage:
-            raise ValueError(
+            raise DecredError(
                 "MsgTx.decodeWitness: too many input transactions to fit into"
                 f" max message size [count {count}, max {maxTxInPerMessage}]"
             )
@@ -727,7 +728,7 @@ class MsgTx:
             # the number of signature scripts is the same as the number of
             # TxIns we currently have, then fill in the signature scripts.
             if count != len(self.txIn):
-                raise ValueError(
+                raise DecredError(
                     "MsgTx.decodeWitness: non equal witness and prefix txin"
                     f" quantities (witness {count}, prefix {len(self.txIn)})"
                 )

@@ -8,6 +8,7 @@ Some network math.
 import bisect
 import math
 
+from decred import DecredError
 from decred.util import helpers
 
 from . import constants as C
@@ -334,7 +335,7 @@ def attackCost(
     :param float rentalRate: The rental rate, in fiat/hash.
     """
     if any([x is None for x in (ticketFraction, xcRate, blockHeight)]):
-        raise Exception(
+        raise DecredError(
             "ticketFraction, xcRate, and blockHeight are required args/kwargs"
             " for AttackCost"
         )
@@ -343,7 +344,7 @@ def attackCost(
     poolSize = poolSize if poolSize else NETWORK.TicketExpiry
     treasurySplit = treasurySplit if treasurySplit else NETWORK.TREASURY_SPLIT
     if treasurySplit is None:
-        raise Exception("AttackCost: treasurySplit cannot be None")
+        raise DecredError("AttackCost: treasurySplit cannot be None")
 
     if stakeSplit:
         if not powSplit:
@@ -358,20 +359,20 @@ def attackCost(
     device = device if device else MODEL_DEVICE
     if nethash is None:
         if roi is None:  # mining ROI could be zero
-            raise Exception("minimizeY: Either a nethash or an roi must be provided")
+            raise DecredError("minimizeY: Either a nethash or an roi must be provided")
         nethash = ReverseEquations.networkHashrate(
             device, xcRate, roi, blockHeight, blockTime, powSplit
         )
     if rentability or rentalRatio:
         if not rentalRate:
-            raise Exception(
+            raise DecredError(
                 "minimizeY: If rentability is non-zero, rentalRate must be provided"
             )
     else:
         rentalRate = 0
     if ticketPrice is None:
         if not apy:
-            raise Exception(
+            raise DecredError(
                 "minimizeY: Either a ticketPrice or an apy must be provided"
             )
         ticketPrice = ReverseEquations.ticketPrice(
@@ -417,7 +418,7 @@ def purePowAttackCost(
     **kwargs
 ):
     if any([x is None for x in (xcRate, blockHeight)]):
-        raise Exception(
+        raise DecredError(
             "xcRate and blockHeight are required args/kwargs for PurePowAttackCost"
         )
     blockTime = blockTime if blockTime else NETWORK.TargetTimePerBlock
@@ -425,13 +426,13 @@ def purePowAttackCost(
     treasurySplit = treasurySplit if treasurySplit else NETWORK.TREASURY_SPLIT
     if nethash is None:
         if roi is None:  # mining ROI could be zero
-            raise Exception("minimizeY: Either a nethash or an roi must be provided")
+            raise DecredError("minimizeY: Either a nethash or an roi must be provided")
         nethash = ReverseEquations.networkHashrate(
             device, xcRate, roi, blockHeight, blockTime, 1 - treasurySplit
         )
     if rentability or rentalRatio:
         if not rentalRate:
-            raise Exception(
+            raise DecredError(
                 "minimizeY: If rentability is non-zero, rentalRate must be provided"
             )
     else:

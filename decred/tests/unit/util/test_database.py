@@ -9,6 +9,7 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
+from decred import DecredError
 from decred.util import database
 from decred.util.encode import ByteArray
 
@@ -40,14 +41,14 @@ def test_database(prepareLogger, randBytes):
         master = database.KeyValueDatabase(os.path.join(tempDir, "tmp.sqlite"))
 
         # '$' in bucket name is illegal.
-        with pytest.raises(ValueError):
+        with pytest.raises(DecredError):
             master.child("a$b")
 
         try:
             db = master.child("test")
 
             # Again, '$' in bucket name is illegal.
-            with pytest.raises(ValueError):
+            with pytest.raises(DecredError):
                 db.child("c$d")
 
             # Create some test data.
@@ -128,7 +129,7 @@ def runPairs(db, testPairs):
     assert len(db) == len(testPairs) - 1
 
     # Make sure the right row was deleted.
-    with pytest.raises(database.NoValue):
+    with pytest.raises(database.NoValueError):
         v = db[k]
 
     # Remmove the corresponding test pair from the dict.

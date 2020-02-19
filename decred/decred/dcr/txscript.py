@@ -8,6 +8,7 @@ Based on dcrd txscript.
 
 import math
 
+from decred import DecredError
 from decred.crypto import crypto, opcode
 from decred.crypto.secp256k1.curve import curve as Curve
 from decred.util import helpers
@@ -239,7 +240,7 @@ def scriptTree(scriptClass):
         int: The script's tree.
     """
     if scriptClass < 0 or scriptClass > 11:
-        raise Exception("unknown script class: {}".format(scriptClass))
+        raise DecredError("unknown script class: {}".format(scriptClass))
 
     return (
         wire.TxTreeStake
@@ -257,9 +258,9 @@ def canonicalPadding(b):
     leading zero padding.
     """
     if b[0] & 0x80 == 0x80:
-        raise Exception("negative number")
+        raise DecredError("negative number")
     if len(b) > 1 and b[0] == 0x00 and b[1] & 0x80 != 0x80:
-        raise Exception("excessive padding")
+        raise DecredError("excessive padding")
 
 
 class Signature:
@@ -325,24 +326,24 @@ class Signature:
         # minimal message is when both numbers are 1 bytes. adding up to:
         # 0x30 + len + 0x02 + 0x01 + <byte> + 0x2 + 0x01 + <byte>
         if len(sigBytes) < 8:
-            raise Exception("malformed signature: too short")
+            raise DecredError("malformed signature: too short")
 
         # 0x30
         index = 0
         if sigBytes[index] != 0x30:
-            raise Exception("malformed signature: no header magic")
+            raise DecredError("malformed signature: no header magic")
         index += 1
         # length of remaining message
         siglen = sigBytes[index]
         index += 1
         if siglen + 2 > len(sigBytes):
-            raise Exception("malformed signature: bad length")
+            raise DecredError("malformed signature: bad length")
         # trim the slice we're working on so we only look at what matters.
         sigBytes = sigBytes[: siglen + 2]
 
         # 0x02
         if sigBytes[index] != 0x02:
-            raise Exception("malformed signature: no 1st int marker")
+            raise DecredError("malformed signature: no 1st int marker")
         index += 1
 
         # Length of signature r.
@@ -351,22 +352,22 @@ class Signature:
         # hence the -3. We assume that the length must be at least one byte.
         index += 1
         if rLen <= 0 or rLen > len(sigBytes) - index - 3:
-            raise Exception("malformed signature: bogus r length")
+            raise DecredError("malformed signature: bogus r length")
 
         # Then r itself.
         rBytes = sigBytes[index : index + rLen]
         if der:
             try:
                 canonicalPadding(rBytes)
-            except Exception as e:
-                raise Exception(
+            except DecredError as e:
+                raise DecredError(
                     "malformed signature: bogus r padding or sign: {}".format(e)
                 )
 
         index += rLen
         # 0x02. length already checked in previous if.
         if sigBytes[index] != 0x02:
-            raise Exception("malformed signature: no 2nd int marker")
+            raise DecredError("malformed signature: no 2nd int marker")
         index += 1
 
         # Length of signature s.
@@ -374,36 +375,36 @@ class Signature:
         index += 1
         # s should be the rest of the bytes.
         if sLen <= 0 or sLen > len(sigBytes) - index:
-            raise Exception("malformed signature: bogus S length")
+            raise DecredError("malformed signature: bogus S length")
 
         # Then s itself.
         sBytes = sigBytes[index : index + sLen]
         if der:
             try:
                 canonicalPadding(rBytes)
-            except Exception as e:
-                raise Exception(
+            except DecredError as e:
+                raise DecredError(
                     "malformed signature: bogus s padding or sign: {}".format(e)
                 )
 
         index += sLen
         # sanity check length parsing
         if index != len(sigBytes):
-            raise Exception(
-                "malformed signature: bad final length %s != %s" % index, len(sigBytes)
+            raise DecredError(
+                f"malformed signature: bad final length {index} != {len(sigBytes)}"
             )
 
         signature = Signature(rBytes, sBytes)
 
         # FWIW the ecdsa spec states that r and s must be | 1, N - 1 |
         if signature.r.int() < 1:
-            raise Exception("signature r is less than one")
+            raise DecredError("signature r is less than one")
         if signature.s.int() < 1:
-            raise Exception("signature s is less than one")
+            raise DecredError("signature s is less than one")
         if signature.r.int() >= Curve.N:
-            raise Exception("signature r is >= curve.N")
+            raise DecredError("signature r is >= curve.N")
         if signature.s.int() >= Curve.N:
-            raise Exception("signature s is >= curve.N")
+            raise DecredError("signature s is >= curve.N")
 
         return signature
 
@@ -464,7 +465,7 @@ class ScriptTokenizer:
             # Data pushes of specific lengths -- OP_DATA_[1-75].
             script = self.script[self.offset :]
             if len(script) < op.length:
-                self.err = Exception(
+                self.err = DecredError(
                     "opcode %s requires %d bytes, but script only has %d remaining"
                     % (op.name, op.length, len(script))
                 )
@@ -479,7 +480,7 @@ class ScriptTokenizer:
             # Data pushes with parsed lengths -- OP_PUSHDATA{1,2,4}.
             script = self.script[self.offset + 1 :]
             if len(script) < -op.length:
-                self.err = Exception(
+                self.err = DecredError(
                     "opcode %s requires %d bytes, but script only has %d remaining"
                     % (op.name, -op.length, len(script))
                 )
@@ -493,7 +494,7 @@ class ScriptTokenizer:
             elif op.length == -4:
                 dataLen = script[:4].unLittle().int()
             else:
-                self.err = Exception("invalid opcode length %d" % op.length)
+                self.err = DecredError("invalid opcode length %d" % op.length)
                 return False
 
             # Move to the beginning of the data.
@@ -501,7 +502,7 @@ class ScriptTokenizer:
 
             # Disallow entries that do not fit script or were sign extended.
             if dataLen > len(script) or dataLen < 0:
-                self.err = Exception(
+                self.err = DecredError(
                     "opcode %s pushes %d bytes, but script only has %d remaining"
                     % (op.name, dataLen, len(script))
                 )
@@ -1016,7 +1017,7 @@ def getStakeOutSubclass(pkScript):
 
     scriptClass = getScriptClass(scriptVersion, pkScript)
     if scriptTree(scriptClass) != wire.TxTreeStake:
-        raise Exception("not a stake output")
+        raise DecredError("not a stake output")
 
     return getScriptClass(scriptVersion, pkScript[1:])
 
@@ -1180,31 +1181,31 @@ def checkSStx(tx):
     # CheckTransactionSanity already makes sure that number of inputs is
     # greater than 0, so no need to check that.
     if len(tx.txIn) > MaxInputsPerSStx:
-        raise Exception("SStx has too many inputs")
+        raise DecredError("SStx has too many inputs")
 
     # Check to make sure there aren't too many outputs.
     if len(tx.txOut) > MaxOutputsPerSStx:
-        raise Exception("SStx has too many outputs")
+        raise DecredError("SStx has too many outputs")
 
     # Check to make sure there are some outputs.
     if len(tx.txOut) == 0:
-        raise Exception("SStx has no outputs")
+        raise DecredError("SStx has no outputs")
 
     # Check to make sure that all output scripts are the consensus version.
     for idx, txOut in enumerate(tx.txOut):
         if txOut.version != consensusVersion:
-            raise Exception("invalid script version found in txOut idx %d" % idx)
+            raise DecredError("invalid script version found in txOut idx %d" % idx)
 
     # Ensure that the first output is tagged OP_SSTX.
     if getScriptClass(tx.txOut[0].version, tx.txOut[0].pkScript) != StakeSubmissionTy:
-        raise Exception(
+        raise DecredError(
             "First SStx output should have been OP_SSTX tagged, but it was not"
         )
 
     # Ensure that the number of outputs is equal to the number of inputs
     # + 1.
     if (len(tx.txIn) * 2 + 1) != len(tx.txOut):
-        raise Exception(
+        raise DecredError(
             "The number of inputs in the SStx tx was not the number of outputs/2 - 1"
         )
 
@@ -1218,7 +1219,7 @@ def checkSStx(tx):
         # Check change outputs.
         if outTxIndex % 2 == 0:
             if getScriptClass(scrVersion, rawScript) != StakeSubChangeTy:
-                raise Exception(
+                raise DecredError(
                     "SStx output at output index %d was not an sstx change output",
                     outTxIndex,
                 )
@@ -1227,14 +1228,14 @@ def checkSStx(tx):
         # Else (odd) check commitment outputs.  The script should be a
         # NullDataTy output.
         if getScriptClass(scrVersion, rawScript) != NullDataTy:
-            raise Exception(
+            raise DecredError(
                 "SStx output at output index %d was not a NullData (OP_RETURN) push",
                 outTxIndex,
             )
 
         # The length of the output script should be between 32 and 77 bytes long.
         if len(rawScript) < SStxPKHMinOutSize or len(rawScript) > SStxPKHMaxOutSize:
-            raise Exception(
+            raise DecredError(
                 "SStx output at output index %d was a NullData (OP_RETURN) push"
                 " of the wrong size",
                 outTxIndex,
@@ -1254,7 +1255,7 @@ def checkSStx(tx):
             not (outputScriptPrefix[0] == validSStxAddressOutMinPrefix[0])
             or not pushLengthValid
         ):
-            raise Exception(
+            raise DecredError(
                 "sstx commitment at output idx %v had an invalid prefix", outTxIndex
             )
 
@@ -1334,7 +1335,7 @@ def payToPubKeyHashScript(pkHash):
     specified address.
     """
     if len(pkHash) != 20:
-        raise Exception(
+        raise DecredError(
             "cannot create script with pubkey hash length %d. expected length 20"
             % len(pkHash)
         )
@@ -1390,7 +1391,7 @@ def payToStakeSHScript(addr, stakeCode):
 
 def multiSigScript(addrs, nRequired):
     if len(addrs) < nRequired:
-        raise Exception(
+        raise DecredError(
             "unable to generate multisig script with {} required signatures when there are only {} public keys available".format(
                 nRequired, len(addrs)
             )
@@ -1704,7 +1705,7 @@ def signRFC6979(privateKey, inHash):
     r = Curve.scalarBaseMult(k)[0] % N
 
     if r == 0:
-        raise ValueError("calculated R is zero")
+        raise DecredError("calculated R is zero")
 
     e = hashToInt(inHash)
     s = privateKey.int() * r
@@ -1715,7 +1716,7 @@ def signRFC6979(privateKey, inHash):
     if (N >> 1) > 1:
         s = N - s
     if s == 0:
-        raise ValueError("calculated S is zero")
+        raise DecredError("calculated S is zero")
 
     return Signature(r, s)
 
@@ -1864,7 +1865,7 @@ def calcSignatureHash(script, hashType, tx, idx, cachedPrefix):
     # is improper to use SigHashSingle on input indices that don't have a
     # corresponding output.
     if hashType & sigHashMask == SigHashSingle and idx >= len(tx.txOut):
-        raise Exception(
+        raise DecredError(
             "attempt to sign single input at index %d >= %d outputs"
             % (idx, len(tx.txOut))
         )
@@ -2007,7 +2008,7 @@ def calcSignatureHash(script, hashType, tx, idx, cachedPrefix):
         prefixBuf += ByteArray(tx.lockTime, length=4).littleEndian()
         prefixBuf += ByteArray(tx.expiry, length=4).littleEndian()
         if len(prefixBuf) != expectedSize:
-            raise Exception(
+            raise DecredError(
                 "incorrect prefix serialization size %i != %i"
                 % (len(prefixBuf), expectedSize)
             )
@@ -2051,7 +2052,7 @@ def calcSignatureHash(script, hashType, tx, idx, cachedPrefix):
         witnessBuf += putVarInt(len(commitScript))
         witnessBuf += commitScript
     if len(witnessBuf) != expectedSize:
-        raise Exception(
+        raise DecredError(
             "incorrect witness serialization size %i != %i"
             % (len(witnessBuf), expectedSize)
         )
@@ -2080,7 +2081,7 @@ def signP2PKHMsgTx(msgtx, prevOutputs, keysource, params):
     prevOutLen, txInLen = len(prevOutputs), len(msgtx.txIn)
     if prevOutLen != txInLen:
         msg = "Number of prevOutputs ({}) does not match number of tx inputs ({})"
-        raise ValueError(msg.format(prevOutLen, txInLen))
+        raise DecredError(msg.format(prevOutLen, txInLen))
 
     for i, output in enumerate(prevOutputs):
         # Errors don't matter here, as we only consider the
@@ -2090,7 +2091,7 @@ def signP2PKHMsgTx(msgtx, prevOutputs, keysource, params):
             continue
         apkh = addrs[0]
         if not isinstance(apkh, crypto.AddressPubKeyHash):
-            raise ValueError("previous output address is not P2PKH")
+            raise DecredError("previous output address is not P2PKH")
 
         privKey = keysource.priv(apkh.string())
         sigscript = signatureScript(
@@ -2214,7 +2215,7 @@ def extractPkScriptAddrs(version, pkScript, chainParams):
     with an invalid script version error.
     """
     if version != 0:
-        raise ValueError("invalid script version")
+        raise DecredError("invalid script version")
 
     # Check for pay-to-pubkey-hash script.
     pkHash = extractPubKeyHash(pkScript)
@@ -2588,7 +2589,7 @@ def mergeMultiSig(tx, idx, addresses, nRequired, pkScript, sigScript, prevScript
             if len(data) != 0:
                 possibleSigs.append(data)
         if tokenizer.err is not None:
-            raise Exception("mergeMultisig: extractSigs: {}".format(tokenizer.err))
+            raise DecredError("mergeMultisig: extractSigs: {}".format(tokenizer.err))
 
     # Attempt to extract signatures from the two scripts.  Return the other
     # script that is intended to be merged in the case signature extraction
@@ -2761,7 +2762,7 @@ def spendScriptSize(pkScript):
         # types only but ignore P2SH script type since it can pay
         # to any script which the wallet may not recognize.
         if scriptClass != PubKeyHashTy:
-            raise Exception(
+            raise DecredError(
                 "unexpected nested script class for credit: %d" % scriptClass
             )
         return RedeemP2PKHSigScriptSize
@@ -3105,10 +3106,10 @@ def sstxNullOutputAmounts(amounts, changeAmounts, amountTicket):
     lengthAmounts = len(amounts)
 
     if lengthAmounts != len(changeAmounts):
-        raise Exception("amounts was not equal in length to change amounts!")
+        raise DecredError("amounts was not equal in length to change amounts!")
 
     if amountTicket <= 0:
-        raise Exception("committed amount was too small!")
+        raise DecredError("committed amount was too small!")
 
     contribAmounts = []
     total = 0
@@ -3121,7 +3122,7 @@ def sstxNullOutputAmounts(amounts, changeAmounts, amountTicket):
     for i in range(lengthAmounts):
         contrib = amounts[i] - changeAmounts[i]
         if contrib < 0:
-            raise Exception(
+            raise DecredError(
                 "change at idx %d spent more coins than allowed (have: %r, spent: %r)"
                 % (i, amounts[i], changeAmounts[i])
             )
@@ -3168,7 +3169,7 @@ def makeTicket(
         raise NotImplementedError("solo tickets not supported")
 
     if not addrVote:
-        raise ValueError("no voting address provided")
+        raise DecredError("no voting address provided")
 
     txIn = msgtx.TxIn(previousOutPoint=inputPool.op, valueIn=inputPool.amt)
     mtx.addTxIn(txIn)
@@ -3420,4 +3421,4 @@ def makeRevocation(ticketPurchase, feePerKB):
             if not isDustAmount(amount, len(output.pkScript), feePerKB):
                 output.value = amount
                 return revocation
-    raise ValueError("missing suitable revocation output to pay relay fee")
+    raise DecredError("missing suitable revocation output to pay relay fee")

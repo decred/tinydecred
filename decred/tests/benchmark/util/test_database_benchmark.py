@@ -45,5 +45,5 @@ def test_benchmark():
         assert len(db) == num
         lap("batch insert")
 
-        with pytest.raises(database.NoValue):
+        with pytest.raises(database.NoValueError):
             db["nonsense"]

@@ -11,6 +11,7 @@ import os
 
 from appdirs import AppDirs
 
+from decred import DecredError
 from decred.dcr import nets
 from decred.util import helpers
 
@@ -57,7 +58,7 @@ def tinyNetConfig(netName):
         return TestnetConfig
     if netName == SIMNET:
         return SimnetConfig
-    raise Exception("unknown network")
+    raise DecredError("unknown network")
 
 
 class TinyConfig:

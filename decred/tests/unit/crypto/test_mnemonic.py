@@ -5,6 +5,7 @@ See LICENSE for details
 
 import unittest
 
+from decred import DecredError
 from decred.crypto import mnemonic
 from decred.util.encode import ByteArray
 
@@ -47,4 +48,4 @@ class TestMnemonic(unittest.TestCase):
     def test_bad_paths(self):
         wordlists = (["", "meme"], ["acme", "kiwi"])
         for wordlist in wordlists:
-            self.assertRaises(Exception, mnemonic.decode, wordlist)
+            self.assertRaises(DecredError, mnemonic.decode, wordlist)

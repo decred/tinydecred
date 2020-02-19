@@ -5,6 +5,7 @@ See LICENSE for details
 
 import unittest
 
+from decred import DecredError
 from decred.crypto import crypto, rando
 from decred.dcr.nets import mainnet
 from decred.util.encode import ByteArray
@@ -185,7 +186,7 @@ class TestCrypto(unittest.TestCase):
         # fmt: off
         # Incorrect length of network version bytes.
         self.assertRaises(
-            ValueError,
+            DecredError,
             crypto.ExtendedKey,
             # privVer too short.
             ByteArray([0, 0, 0]),
@@ -193,7 +194,7 @@ class TestCrypto(unittest.TestCase):
             None, None, None, None, None, None, None
         )
         self.assertRaises(
-            ValueError,
+            DecredError,
             crypto.ExtendedKey,
             ByteArray([0, 0, 0, 0]),
             # pubVer too long.
@@ -205,4 +206,4 @@ class TestCrypto(unittest.TestCase):
         # Cannot serialize an empty private key.
         kpriv2 = crypto.ExtendedKey.new(testSeed)
         kpriv2.key.zero()
-        self.assertRaises(ValueError, kpriv2.serialize)
+        self.assertRaises(DecredError, kpriv2.serialize)
