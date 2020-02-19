@@ -10,13 +10,13 @@ import time
 
 from decred.crypto import crypto
 from decred.util import encode, tinyhttp
-from decred.util.encode import ByteArray
 
 from . import constants, nets, txscript
 
 
 # The duration purchase info is good for.
 PURCHASE_INFO_LIFE = constants.HOUR
+ByteArray = encode.ByteArray
 
 
 def resultIsSuccess(res):
@@ -30,12 +30,7 @@ def resultIsSuccess(res):
     Returns:
         bool: True if result fields indicate success.
     """
-    return (
-        res
-        and isinstance(res, object)
-        and "status" in res
-        and res["status"] == "success"
-    )
+    return isinstance(res, object) and "status" in res and res["status"] == "success"
 
 
 class PurchaseInfo(object):
@@ -71,15 +66,18 @@ class PurchaseInfo(object):
         Args:
             pi (object): The response from the 'getpurchaseinfo' request.
         """
-        get = lambda k, default=None: pi[k] if k in pi else default
+
+        def get(k, obj, default=None):
+            return pi[k] if k in obj else default
+
         return PurchaseInfo(
-            addr=get("PoolAddress"),
-            fees=get("PoolFees"),
-            script=ByteArray(get("Script")),
-            ticketAddr=get("TicketAddress"),
-            vBits=get("VoteBits"),
-            vBitsVer=get("VoteBitsVersion"),
-            stamp=get("unixTimestamp", default=int(time.time())),
+            addr=get("PoolAddress", pi),
+            fees=get("PoolFees", pi),
+            script=ByteArray(get("Script", pi)),
+            ticketAddr=get("TicketAddress", pi),
+            vBits=get("VoteBits", pi),
+            vBitsVer=get("VoteBitsVersion", pi),
+            stamp=get("unixTimestamp", pi, default=int(time.time())),
         )
 
     @staticmethod
@@ -129,31 +127,34 @@ class PoolStats(object):
     def __init__(self, stats):
         """
         Args:
-            stats (object): The response from the 'stats' request.
+            stats (obj): The response from the 'stats' request.
         """
-        get = lambda k, default=None: stats[k] if k in stats else default
-        self.allMempoolTix = get("AllMempoolTix")
-        self.apiVersionsSupported = get("APIVersionsSupported")
-        self.blockHeight = get("BlockHeight")
-        self.difficulty = get("Difficulty")
-        self.expired = get("Expired")
-        self.immature = get("Immature")
-        self.live = get("Live")
-        self.missed = get("Missed")
-        self.ownMempoolTix = get("OwnMempoolTix")
-        self.poolSize = get("PoolSize")
-        self.proportionLive = get("ProportionLive")
-        self.proportionMissed = get("ProportionMissed")
-        self.revoked = get("Revoked")
-        self.totalSubsidy = get("TotalSubsidy")
-        self.voted = get("Voted")
-        self.network = get("Network")
-        self.poolEmail = get("PoolEmail")
-        self.poolFees = get("PoolFees")
-        self.poolStatus = get("PoolStatus")
-        self.userCount = get("UserCount")
-        self.userCountActive = get("UserCountActive")
-        self.version = get("Version")
+
+        def get(k, obj):
+            return obj[k] if k in stats else None
+
+        self.allMempoolTix = get("AllMempoolTix", stats)
+        self.apiVersionsSupported = get("APIVersionsSupported", stats)
+        self.blockHeight = get("BlockHeight", stats)
+        self.difficulty = get("Difficulty", stats)
+        self.expired = get("Expired", stats)
+        self.immature = get("Immature", stats)
+        self.live = get("Live", stats)
+        self.missed = get("Missed", stats)
+        self.ownMempoolTix = get("OwnMempoolTix", stats)
+        self.poolSize = get("PoolSize", stats)
+        self.proportionLive = get("ProportionLive", stats)
+        self.proportionMissed = get("ProportionMissed", stats)
+        self.revoked = get("Revoked", stats)
+        self.totalSubsidy = get("TotalSubsidy", stats)
+        self.voted = get("Voted", stats)
+        self.network = get("Network", stats)
+        self.poolEmail = get("PoolEmail", stats)
+        self.poolFees = get("PoolFees", stats)
+        self.poolStatus = get("PoolStatus", stats)
+        self.userCount = get("UserCount", stats)
+        self.userCountActive = get("UserCountActive", stats)
+        self.version = get("Version", stats)
 
 
 class VotingServiceProvider(object):
@@ -305,22 +306,23 @@ class VotingServiceProvider(object):
             address (string): The base58-encoded pubkey address that the wallet
                 uses to vote.
         """
-        # An error is returned if the address is already set
-        # {'status': 'error', 'code': 6,
-        #     'message': 'address error - address already submitted'}
-        # First try to get the purchase info directly.
+        # An error is returned if the address isn't yet set
+        # {'status': 'error', 'code': 9,
+        #  'message': 'no address submitted',
+        # 'data': None}
         try:
             self.getPurchaseInfo()
             self.validate(address)
         except Exception as e:
             # code 9 is address not set
-            alreadyRegistered = (
+            addressNotSet = (
                 isinstance(self.err, dict)
                 and "code" in self.err
                 and self.err["code"] == 9
             )
-            if not alreadyRegistered:
+            if not addressNotSet:
                 raise e
+
             # address is not set
             data = {"UserPubKeyAddr": address}
             res = tinyhttp.post(
@@ -341,7 +343,7 @@ class VotingServiceProvider(object):
         """
         # An error is returned if the address isn't yet set
         # {'status': 'error', 'code': 9,
-        #  'message': 'purchaseinfo error - no address submitted',
+        #  'message': 'no address submitted',
         # 'data': None}
         self.err = None
         res = tinyhttp.get(self.apiPath("getpurchaseinfo"), headers=self.headers())
