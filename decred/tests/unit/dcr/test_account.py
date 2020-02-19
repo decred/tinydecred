@@ -7,7 +7,6 @@ import json
 import os
 from tempfile import TemporaryDirectory
 
-# from decred.util import database
 from decred.crypto import crypto, opcode, rando
 from decred.dcr import account, nets, txscript
 from decred.dcr.vsp import PurchaseInfo, VotingServiceProvider
@@ -286,12 +285,9 @@ def test_account(prepareLogger):
         assert acct.gapLimit == reAcct.gapLimit
 
         # Create a faux blockchain for the account.
-        bctxsForAddr = []
-        bcUTXOs = []
-
         class Blockchain:
-            txsForAddr = lambda addr: bctxsForAddr
-            UTXOs = lambda addrs: bcUTXOs
+            txsForAddr = lambda addr: []
+            UTXOs = lambda addrs: []
             tip = {"height": 5}
 
         acct.blockchain = Blockchain
@@ -412,7 +408,7 @@ def test_account(prepareLogger):
         utxo = account.UTXO(addr, ByteArray(b"txid"), 0, satoshis=newVal)
 
         def t4a(*a):
-            acct.blockchain.txsForAddr = lambda *a: bctxsForAddr
+            acct.blockchain.txsForAddr = lambda *a: []
             return [newTx.id()]
 
         acct.blockchain.txsForAddr = t4a
