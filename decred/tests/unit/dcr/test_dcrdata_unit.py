@@ -8,7 +8,7 @@ import pytest
 from decred.dcr import dcrdata
 
 
-def test_dcrdatapath(http_post):
+def test_dcrdatapath(http_get_post):
     ddp = dcrdata.DcrdataPath()
 
     # __getattr__
@@ -29,12 +29,7 @@ def test_dcrdatapath(http_post):
     csp = ddp.getCallsignPath("address", address="1234")
     assert csp == "/address?address=1234"
 
-    # Post.
-    ret = ddp.post("")
+    # Post. Queue the response we want first.
+    http_get_post(("", "'data'"), {})
+    ret = ddp.post("data")
     assert ret == {}
-
-
-# Keys are "(uri, repr(data))", see conftest.py .
-test_dcrdatapath.HTTP_POST_RESP = {
-    ("", "''"): {},
-}
