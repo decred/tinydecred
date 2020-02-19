@@ -5,9 +5,10 @@ See LICENSE for details
 
 import os
 
-from base58 import b58decode, b58encode
+from base58 import b58decode
 import pytest
 
+from decred import DecredError
 from decred.crypto import crypto, opcode
 from decred.dcr import account, rpc, txscript
 from decred.dcr.nets import mainnet
@@ -153,7 +154,7 @@ def test_rpc(config):
             break
 
     else:
-        raise Exception("did not find a suitable script to decode")
+        raise DecredError("did not find a suitable script to decode")
 
     existsExpiredTickets = rpcClient.existsExpiredTickets([aTicket, aTicket])
     assert existsExpiredTickets == [False, False]

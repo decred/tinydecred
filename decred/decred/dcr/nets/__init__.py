@@ -3,6 +3,8 @@ Copyright (c) 2019, The Decred developers
 See LICENSE for details
 """
 
+from decred import DecredError
+
 from . import mainnet, simnet, testnet
 
 
@@ -18,4 +20,4 @@ def parse(name):
     try:
         return the_nets[name]
     except KeyError:
-        raise ValueError(f"unrecognized network name {name}")
+        raise DecredError(f"unrecognized network name {name}")

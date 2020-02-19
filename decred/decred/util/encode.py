@@ -8,6 +8,8 @@ A class that wraps ByteArray and provides some convenient operators.
 
 import struct
 
+from decred import DecredError
+
 
 NONE = "None".encode()
 
@@ -204,7 +206,7 @@ class ByteArray(object):
         a = decodeBA(a)
         aLen, bLen = len(a), len(self.b)
         if aLen > bLen:
-            raise ValueError("decode: invalid length %i > %i" % (aLen, bLen))
+            raise DecredError("decode: invalid length %i > %i" % (aLen, bLen))
         return a, aLen, self.b, bLen
 
     def __lt__(self, a):
@@ -405,11 +407,11 @@ def extractPushes(b):
         b = b[1:]
         if bLen == 255:
             if len(b) < 2:
-                raise Exception("2 bytes not available for uint16 data length")
+                raise DecredError("2 bytes not available for uint16 data length")
             bLen = intFromBytes(b[:2])
             b = b[2:]
         if len(b) < bLen:
-            raise Exception("data too short for pop of %d bytes" % bLen)
+            raise DecredError("data too short for pop of %d bytes" % bLen)
         pushes.append(b[:bLen])
         b = b[bLen:]
     return pushes
@@ -428,7 +430,7 @@ def decodeBlob(b):
         list(bytes-like): The data pushes.
     """
     if len(b) == 0:
-        raise Exception("zero length blob not allowed")
+        raise DecredError("zero length blob not allowed")
     return b[0], extractPushes(b[1:])
 
 

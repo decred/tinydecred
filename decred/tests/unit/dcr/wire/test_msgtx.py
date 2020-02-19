@@ -6,6 +6,7 @@ See LICENSE for details
 import time
 import unittest
 
+from decred import DecredError
 from decred.crypto import rando
 from decred.dcr.wire import msgtx, wire
 from decred.util import helpers
@@ -366,7 +367,7 @@ class TestMsgTx(unittest.TestCase):
 
         for i, (buf, pver, version) in enumerate(tests):
             # Decode from wire format.
-            with self.assertRaises(Exception, msg="test %i" % i):
+            with self.assertRaises(DecredError, msg="test %i" % i):
                 msgtx.MsgTx.btcDecode(buf, pver)
 
     def test_tx_serialize_errors(self):
@@ -526,7 +527,7 @@ class TestMsgTx(unittest.TestCase):
 
     def test_read_tx_in_prefix(self):
         self.assertRaises(
-            ValueError,
+            DecredError,
             msgtx.readTxInPrefix,
             None,
             None,
@@ -537,7 +538,7 @@ class TestMsgTx(unittest.TestCase):
 
     def test_read_script(self):
         self.assertRaises(
-            ValueError,
+            DecredError,
             msgtx.readScript,
             ByteArray([0xFC]),
             wire.ProtocolVersion,

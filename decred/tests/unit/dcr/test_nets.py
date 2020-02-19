@@ -5,11 +5,12 @@ See LICENSE for details
 
 import pytest
 
+from decred import DecredError
 from decred.dcr import nets
 
 
 def test_nets():
     assert nets.parse("mainnet") is nets.mainnet
 
-    with pytest.raises(ValueError):
+    with pytest.raises(DecredError):
         nets.parse("nonet")

@@ -3,6 +3,7 @@ Copyright (c) 2019, Brian Stafford
 See LICENSE for details
 """
 
+from decred import DecredError
 from decred.crypto import crypto, opcode
 from decred.util import encode, helpers
 
@@ -783,7 +784,7 @@ class Account(object):
             except crypto.CrazyKeyError:
                 continue
         # It is realistically impossible to reach here.
-        raise Exception("error finding voting key")
+        raise DecredError("error finding voting key")
 
     def close(self):
         """
@@ -1000,7 +1001,7 @@ class Account(object):
             addr = nextAddr()
             if addr != CrazyAddress:
                 return addr
-        raise Exception("failed to generate new address")
+        raise DecredError("failed to generate new address")
 
     def nextExternalAddress(self):
         """
@@ -1188,7 +1189,7 @@ class Account(object):
         """
         branch, idx = self.branchAndIndex(addr)
         if branch is None:
-            raise Exception("unknown address")
+            raise DecredError("unknown address")
 
         branchKey = self.privKey.child(branch)
         privKey = branchKey.child(idx)
@@ -1407,7 +1408,7 @@ class Account(object):
                 _, addresses, _ = txscript.extractPkScriptAddrs(
                     0, txout.pkScript, self.net
                 )
-            except Exception:
+            except DecredError:
                 # log.debug("unsupported script %s" % txout.pkScript.hex())
                 continue
             # convert the Address objects to strings.
@@ -1508,7 +1509,7 @@ class Account(object):
                 None,
             )
             if not redeemScript:
-                raise Exception("did not find redeem script for hash %s" % redeemHash)
+                raise DecredError("did not find redeem script for hash %s" % redeemHash)
 
             keysource = KeySource(
                 # This will need to change when we start using different
@@ -1533,7 +1534,7 @@ class Account(object):
         if stakePool:
             try:
                 stakePool.getPurchaseInfo()
-            except Exception as e:
+            except DecredError as e:
                 log.error("error getting VSP purchase info: %s" % e)
 
         # First, look at addresses that have been generated but not seen. Run in

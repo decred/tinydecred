@@ -6,6 +6,7 @@ See LICENSE for details
 Constants and common routines from the dcrd wire package.
 """
 
+from decred import DecredError
 from decred.util.encode import ByteArray
 
 
@@ -158,7 +159,7 @@ def readVarInt(b, pver):  # r io.Reader, pver uint32) (uint64, error) {
         # encoded using fewer bytes.
         minRv = 0x100000000
         if rv < minRv:
-            raise ValueError(err_msg.format(rv, discriminant, minRv))
+            raise DecredError(err_msg.format(rv, discriminant, minRv))
 
     elif discriminant == 0xFE:
         rv = b.pop(4).unLittle().int()
@@ -167,7 +168,7 @@ def readVarInt(b, pver):  # r io.Reader, pver uint32) (uint64, error) {
         # encoded using fewer bytes.
         minRv = 0x10000
         if rv < minRv:
-            raise ValueError(err_msg.format(rv, discriminant, minRv))
+            raise DecredError(err_msg.format(rv, discriminant, minRv))
 
     elif discriminant == 0xFD:
         rv = b.pop(2).unLittle().int()
@@ -176,7 +177,7 @@ def readVarInt(b, pver):  # r io.Reader, pver uint32) (uint64, error) {
         # encoded using fewer bytes.
         minRv = 0xFD
         if rv < minRv:
-            raise ValueError(err_msg.format(rv, discriminant, minRv))
+            raise DecredError(err_msg.format(rv, discriminant, minRv))
 
     else:
         rv = discriminant

@@ -7,8 +7,10 @@ This module defines an API used by the wallet and implemented by each asset and
 node type.
 """
 
+from decred import DecredError
 
-class InsufficientFundsError(Exception):
+
+class InsufficientFundsError(DecredError):
     """
     Available account balance too low for requested funds.
     """

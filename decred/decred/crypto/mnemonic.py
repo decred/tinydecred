@@ -6,6 +6,7 @@ See LICENSE for details
 PGP-based mnemonic seed generation.
 """
 
+from decred import DecredError
 from decred.util.encode import ByteArray
 
 from .crypto import sha256ChecksumByte
@@ -574,12 +575,11 @@ def decode(words):
         if word == "":
             continue
         if word not in byteMap:
-            raise Exception("unknown words in mnemonic key: %s" % word)
+            raise DecredError("unknown words in mnemonic key: %s" % word)
         b = byteMap[word]
         if int(b % 2) != idx % 2:
-            raise Exception(
-                "word %v is not valid at position %v, check for missing words"
-                % (word, idx)
+            raise DecredError(
+                f"word {word} is not valid at position {idx}, check for missing words"
             )
         decoded[idx] = b // 2
         idx += 1
