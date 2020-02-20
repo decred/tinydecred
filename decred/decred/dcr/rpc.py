@@ -1,5 +1,5 @@
 """
-Copyright (c) 2019, The Decred developers
+Copyright (c) 2019-2020, The Decred developers
 See LICENSE for details
 """
 
@@ -11,7 +11,7 @@ from decred.util import tinyhttp
 from decred.util.encode import ByteArray
 from decred.util.helpers import coinify
 
-from . import txscript
+from . import agenda, txscript
 from .wire.msgblock import BlockHeader
 from .wire.msgtx import MsgTx, TxOut, TxTreeStake
 
@@ -2360,113 +2360,6 @@ class GetTxOutResult:
         )
 
 
-class Choice:
-    """
-    Models an individual choice inside an Agenda for a GetVoteInfoResult.
-    """
-
-    def __init__(
-        self, choiceID, description, bits, isAbstain, isNo, count, progress,
-    ):
-        """
-        Args:
-            choiceID (str): Unique identifier of this choice.
-            description (str): Description of this choice.
-            bits (int): Bits that identify this choice.
-            isAbstain (bool): This choice is to abstain from change.
-            isNo (bool): Hard no choice (1 and only 1 per agenda).
-            count (int): How many votes received.
-            progress (float): Progress of the overall count.
-        """
-        self.choiceID = choiceID
-        self.description = description
-        self.bits = bits
-        self.isAbstain = isAbstain
-        self.isNo = isNo
-        self.count = count
-        self.progress = progress
-
-    @staticmethod
-    def parse(obj):
-        """
-        Parse the Choice from the decoded RPC response.
-
-        Args:
-            obj (dict): The decoded dcrd RPC response.
-
-        Returns:
-            Choice: The parsed Choice.
-        """
-        return Choice(
-            choiceID=obj["id"],
-            description=obj["description"],
-            bits=obj["bits"],
-            isAbstain=obj["isabstain"],
-            isNo=obj["isno"],
-            count=obj["count"],
-            progress=obj["progress"],
-        )
-
-
-class Agenda:
-    """
-    Models an individual agenda including its choices for a GetVoteInfoResult.
-    """
-
-    def __init__(
-        self,
-        agendaID,
-        description,
-        mask,
-        startTime,
-        expireTime,
-        status,
-        quorumProgress,
-        choices,
-    ):
-        """
-        Args:
-            AgendaID (str): Unique identifier of this agenda.
-            description (str): Description of this agenda.
-            mask (int): Agenda mask.
-            startTime (int): Time agenda becomes valid.
-            expireTime (int): Time agenda becomes invalid.
-            status (str): Agenda status.
-            quorumProgress (float): Progress of quorum reached.
-            choices list(Choice): All choices in this agenda.
-        """
-        self.agendaID = agendaID
-        self.description = description
-        self.mask = mask
-        self.startTime = startTime
-        self.expireTime = expireTime
-        self.status = status
-        self.quorumProgress = quorumProgress
-        self.choices = choices
-
-    @staticmethod
-    def parse(obj):
-        """
-        Parse the Agenda from the decoded RPC response.
-
-        Args:
-            obj (dict): The decoded dcrd RPC response.
-
-        Returns:
-            Agenda: The parsed Agenda info.
-        """
-        return Agenda(
-            agendaID=obj["id"],
-            description=obj["description"],
-            mask=obj["mask"],
-            startTime=obj["starttime"],
-            expireTime=obj["expiretime"],
-            status=obj["status"],
-            quorumProgress=obj["quorumprogress"],
-            choices=[Choice.parse(choice) for choice in obj["choices"]],
-        )
-
-
 class GetVoteInfoResult:
     """
     Models data returned by the getVoteInfo command.
@@ -2521,7 +2414,7 @@ class GetVoteInfoResult:
             voteVersion=obj["voteversion"],
             quorum=obj["quorum"],
             totalVotes=obj["totalvotes"],
-            agendas=[Agenda.parse(agenda) for agenda in obj["agendas"]]
+            agendas=[agenda.Agenda.parse(ag) for ag in obj["agendas"]]
             if "agendas" in obj
             else [],
         )
@@ -2988,47 +2881,9 @@ class GetBlockChainInfoResult(object):
             chainWork=ByteArray(obj["chainwork"]),
             initialBlockDownload=obj["initialblockdownload"],
             maxBlockSize=obj["maxblocksize"],
-            deployments={k: AgendaInfo.parse(v) for k, v in obj["deployments"].items()},
-        )
-
-
-class AgendaInfo(object):
-    """
-    Models data for deployments of a GetBlockChainInfoResult.
-    """
-
-    def __init__(
-        self, status, since, startTime, expireTime,
-    ):
-        """
-        Args:
-            status (str): One of "defined", "started", "lockedin", "active",
-                "failed".
-            since (int): Height of last state change.
-            startTime (int): Start time.
-            expireTime (int): End time.
-        """
-        self.status = status
-        self.since = since
-        self.startTime = startTime
-        self.expireTime = expireTime
-
-    @staticmethod
-    def parse(obj):
-        """
-        Parse the AgendaInfo from the decoded RPC response.
-
-        Args:
-            obj (dict): The decoded dcrd RPC response.
-
-        Returns:
-            AgendaInfo: The AgendaInfo.
-        """
-        return AgendaInfo(
-            status=obj["status"],
-            since=obj["since"] if "since" in obj else 0,
-            startTime=obj["starttime"],
-            expireTime=obj["expiretime"],
+            deployments={
+                k: agenda.AgendaInfo.parse(v) for k, v in obj["deployments"].items()
+            },
         )
 
 
