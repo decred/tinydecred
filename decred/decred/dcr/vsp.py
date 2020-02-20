@@ -8,6 +8,7 @@ DcrdataClient.endpointList() for available endpoints.
 
 import time
 
+from decred import DecredError
 from decred.crypto import crypto
 from decred.util import encode, tinyhttp
 
@@ -267,7 +268,7 @@ class VotingServiceProvider(object):
     def validate(self, addr):
         """
         Validate performs some checks that the PurchaseInfo provided by the
-        stake pool API is valid for this given voting address. Exception is
+        stake pool API is valid for this given voting address. DecredError is
         raised on failure to validate.
 
         Args:
@@ -278,7 +279,7 @@ class VotingServiceProvider(object):
         redeemScript = pi.script
         scriptAddr = crypto.newAddressScriptHash(redeemScript, self.net)
         if scriptAddr.string() != pi.ticketAddress:
-            raise Exception(
+            raise DecredError(
                 "ticket address mismatch. %s != %s"
                 % (pi.ticketAddress, scriptAddr.string())
             )
@@ -287,7 +288,7 @@ class VotingServiceProvider(object):
             0, redeemScript, self.net
         )
         if numSigs != 1:
-            raise Exception("expected 2 required signatures, found 2")
+            raise DecredError("expected 2 required signatures, found 2")
         found = False
         signAddr = txscript.decodeAddress(addr, self.net)
         for addr in addrs:
@@ -295,11 +296,11 @@ class VotingServiceProvider(object):
                 found = True
                 break
         if not found:
-            raise Exception("signing pubkey not found in redeem script")
+            raise DecredError("signing pubkey not found in redeem script")
 
     def authorize(self, address):
         """
-        Authorize the stake pool for the provided address and network. Exception
+        Authorize the stake pool for the provided address and network. DecredError
         is raised on failure to authorize.
 
         Args:
@@ -313,7 +314,7 @@ class VotingServiceProvider(object):
         try:
             self.getPurchaseInfo()
             self.validate(address)
-        except Exception as e:
+        except DecredError as e:
             # code 9 is address not set
             addressNotSet = (
                 isinstance(self.err, dict)
@@ -332,7 +333,7 @@ class VotingServiceProvider(object):
                 self.getPurchaseInfo()
                 self.validate(address)
             else:
-                raise Exception("unexpected response from 'address': %s" % repr(res))
+                raise DecredError("unexpected response from 'address': %s" % repr(res))
 
     def getPurchaseInfo(self):
         """
@@ -353,7 +354,7 @@ class VotingServiceProvider(object):
             self.purchaseInfo = pi
             return self.purchaseInfo
         self.err = res
-        raise Exception("unexpected response from 'getpurchaseinfo': %r" % (res,))
+        raise DecredError("unexpected response from 'getpurchaseinfo': %r" % (res,))
 
     def updatePurchaseInfo(self):
         """
@@ -373,14 +374,14 @@ class VotingServiceProvider(object):
         if resultIsSuccess(res):
             self.stats = PoolStats(res["data"])
             return self.stats
-        raise Exception("unexpected response from 'stats': %s" % repr(res))
+        raise DecredError("unexpected response from 'stats': %s" % repr(res))
 
     def setVoteBits(self, voteBits):
         """
         Set the vote preference on the VotingServiceProvider.
 
         Returns:
-            bool: True on success. Exception raised on error.
+            bool: True on success. DecredError raised on error.
         """
         data = {"VoteBits": voteBits}
         res = tinyhttp.post(
@@ -389,4 +390,4 @@ class VotingServiceProvider(object):
         if resultIsSuccess(res):
             self.purchaseInfo.voteBits = voteBits
             return True
-        raise Exception("unexpected response from 'voting': %s" % repr(res))
+        raise DecredError("unexpected response from 'voting': %s" % repr(res))

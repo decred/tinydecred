@@ -7,14 +7,10 @@ import time
 
 import pytest
 
+from decred import DecredError
 from decred.dcr import vsp
 from decred.dcr.nets import mainnet
-from decred.util import encode, tinyhttp
-
-
-class Dummy:
-    def __init__(self, **kwargs):
-        self.__dict__.update(kwargs)
+from decred.util import encode
 
 
 def test_result_is_success():
@@ -84,13 +80,13 @@ def test_purchase_info_blobbing():
     # bad version
     bCopy = encode.ByteArray(b, copy=True)
     bCopy[0] = 255
-    with pytest.raises(Exception):
+    with pytest.raises(AssertionError):
         vsp.PurchaseInfo.unblob(bCopy.bytes())
 
     # too long
     bCopy = encode.ByteArray(b, copy=True)
     bCopy += b"\x00"
-    with pytest.raises(Exception):
+    with pytest.raises(AssertionError):
         vsp.PurchaseInfo.unblob(bCopy.bytes())
 
 
@@ -180,13 +176,13 @@ def test_vsp_blobbing():
     # bad version
     bCopy = encode.ByteArray(b, copy=True)
     bCopy[0] = 255
-    with pytest.raises(Exception):
+    with pytest.raises(AssertionError):
         vsp.VotingServiceProvider.unblob(bCopy.bytes())
 
     # too long
     bCopy = encode.ByteArray(b, copy=True)
     bCopy += b"\x00"
-    with pytest.raises(Exception):
+    with pytest.raises(AssertionError):
         vsp.VotingServiceProvider.unblob(bCopy.bytes())
 
 
@@ -196,13 +192,102 @@ def test_vsp_serialize():
     assert pool.serialize() == encode.ByteArray(b)
 
 
-# fmt: off
-vspProviders = {'Staked': {'APIEnabled': True, 'APIVersionsSupported': [1, 2], 'Network': 'mainnet', 'URL': 'https://decred.staked.us', 'Launched': 1543433400, 'LastUpdated': 1582020568, 'Immature': 0, 'Live': 141, 'Voted': 2730, 'Missed': 10, 'PoolFees': 5, 'ProportionLive': 0.0034847511245118877, 'ProportionMissed': 0.0036496350364963502, 'UserCount': 229, 'UserCountActive': 106, 'Version': '1.4.0-pre+dev'}, 'Golf': {'APIEnabled': True, 'APIVersionsSupported': [1, 2], 'Network': 'mainnet', 'URL': 'https://stakepool.dcrstats.com', 'Launched': 1464167340, 'LastUpdated': 1582020568, 'Immature': 21, 'Live': 768, 'Voted': 148202, 'Missed': 154, 'PoolFees': 5, 'ProportionLive': 0.01898077208244773, 'ProportionMissed': 0, 'UserCount': 6005, 'UserCountActive': 2751, 'Version': '1.5.0-pre'}, 'Hotel': {'APIEnabled': True, 'APIVersionsSupported': [1, 2], 'Network': 'mainnet', 'URL': 'https://stake.decredbrasil.com', 'Launched': 1464463860, 'LastUpdated': 1582020568, 'Immature': 41, 'Live': 607, 'Voted': 48135, 'Missed': 49, 'PoolFees': 5, 'ProportionLive': 0.015002842383647644, 'ProportionMissed': 0.0010169350821849577, 'UserCount': 1607, 'UserCountActive': 968, 'Version': '1.5.0'}, 'November': {'APIEnabled': True, 'APIVersionsSupported': [1, 2], 'Network': 'mainnet', 'URL': 'https://decred.raqamiya.net', 'Launched': 1513878600, 'LastUpdated': 1582020568, 'Immature': 5, 'Live': 334, 'Voted': 15720, 'Missed': 50, 'PoolFees': 1, 'ProportionLive': 0.008255270767937913, 'ProportionMissed': 0.0031705770450221942, 'UserCount': 261, 'UserCountActive': 114, 'Version': '1.5.0-pre'}, 'Ray': {'APIEnabled': True, 'APIVersionsSupported': [1, 2], 'Network': 'mainnet', 'URL': 'https://dcrpos.idcray.com', 'Launched': 1518446640, 'LastUpdated': 1582020569, 'Immature': 50, 'Live': 1108, 'Voted': 36974, 'Missed': 298, 'PoolFees': 2, 'ProportionLive': 0.027385748535554512, 'ProportionMissed': 0.007995277956643057, 'UserCount': 137, 'UserCountActive': 70, 'Version': '1.4.0-pre+dev'}}
-# fmt: on
+vspProviders = {
+    "Staked": {
+        "APIEnabled": True,
+        "APIVersionsSupported": [1, 2],
+        "Network": "mainnet",
+        "URL": "https://decred.staked.us",
+        "Launched": 1543433400,
+        "LastUpdated": 1582020568,
+        "Immature": 0,
+        "Live": 141,
+        "Voted": 2730,
+        "Missed": 10,
+        "PoolFees": 5,
+        "ProportionLive": 0.0034847511245118877,
+        "ProportionMissed": 0.0036496350364963502,
+        "UserCount": 229,
+        "UserCountActive": 106,
+        "Version": "1.4.0-pre+dev",
+    },
+    "Golf": {
+        "APIEnabled": True,
+        "APIVersionsSupported": [1, 2],
+        "Network": "mainnet",
+        "URL": "https://stakepool.dcrstats.com",
+        "Launched": 1464167340,
+        "LastUpdated": 1582020568,
+        "Immature": 21,
+        "Live": 768,
+        "Voted": 148202,
+        "Missed": 154,
+        "PoolFees": 5,
+        "ProportionLive": 0.01898077208244773,
+        "ProportionMissed": 0,
+        "UserCount": 6005,
+        "UserCountActive": 2751,
+        "Version": "1.5.0-pre",
+    },
+    "Hotel": {
+        "APIEnabled": True,
+        "APIVersionsSupported": [1, 2],
+        "Network": "mainnet",
+        "URL": "https://stake.decredbrasil.com",
+        "Launched": 1464463860,
+        "LastUpdated": 1582020568,
+        "Immature": 41,
+        "Live": 607,
+        "Voted": 48135,
+        "Missed": 49,
+        "PoolFees": 5,
+        "ProportionLive": 0.015002842383647644,
+        "ProportionMissed": 0.0010169350821849577,
+        "UserCount": 1607,
+        "UserCountActive": 968,
+        "Version": "1.5.0",
+    },
+    "November": {
+        "APIEnabled": True,
+        "APIVersionsSupported": [1, 2],
+        "Network": "mainnet",
+        "URL": "https://decred.raqamiya.net",
+        "Launched": 1513878600,
+        "LastUpdated": 1582020568,
+        "Immature": 5,
+        "Live": 334,
+        "Voted": 15720,
+        "Missed": 50,
+        "PoolFees": 1,
+        "ProportionLive": 0.008255270767937913,
+        "ProportionMissed": 0.0031705770450221942,
+        "UserCount": 261,
+        "UserCountActive": 114,
+        "Version": "1.5.0-pre",
+    },
+    "Ray": {
+        "APIEnabled": True,
+        "APIVersionsSupported": [1, 2],
+        "Network": "mainnet",
+        "URL": "https://dcrpos.idcray.com",
+        "Launched": 1518446640,
+        "LastUpdated": 1582020569,
+        "Immature": 50,
+        "Live": 1108,
+        "Voted": 36974,
+        "Missed": 298,
+        "PoolFees": 2,
+        "ProportionLive": 0.027385748535554512,
+        "ProportionMissed": 0.007995277956643057,
+        "UserCount": 137,
+        "UserCountActive": 70,
+        "Version": "1.4.0-pre+dev",
+    },
+}
 
 
-def test_vsp_providers():
-    tinyhttp.get = lambda *args: vspProviders
+def test_vsp_providers(http_get_post):
+    http_get_post("https://api.decred.org/?c=gsd", vspProviders)
     providers = vsp.VotingServiceProvider.providers(mainnet)
     assert len(providers) == 5
 
@@ -228,21 +313,21 @@ def test_vsp_validate():
 
     # valid but wrong address
     addr = "TkQ4jEVTpGn1LZBPrAoUJ15fDGGHubzd1DDkMSc4hxtHXpHjW1BJ8"
-    with pytest.raises(Exception):
+    with pytest.raises(DecredError):
         pool.validate(addr)
 
     # invalid address
     addr = "ASDF"
-    with pytest.raises(Exception):
+    with pytest.raises(DecredError):
         pool.validate(addr)
 
     # no address
     addr = ""
-    with pytest.raises(Exception):
+    with pytest.raises(DecredError):
         pool.validate(addr)
 
 
-def test_vsp_authorize():
+def test_vsp_authorize(http_get_post):
     pool = vsp.VotingServiceProvider(**votingServiceProvider)
     success = {"status": "success", "data": purchaseInfo}
     addressNotSet = {
@@ -253,31 +338,31 @@ def test_vsp_authorize():
 
     # ok
     addr = "TkKmVKG7u7PwhQaYr7wgMqBwHneJ2cN4e5YpMVUsWSopx81NFXEzK"
-    tinyhttp.get = lambda *a, **kw: success
+    http_get_post(pool.apiPath("getpurchaseinfo"), success)
     pool.authorize(addr)
 
     # address not submitted
-    results = iter((addressNotSet, success))
     addr = "TkKmVKG7u7PwhQaYr7wgMqBwHneJ2cN4e5YpMVUsWSopx81NFXEzK"
-    tinyhttp.get = lambda *a, **kw: next(results)
-    tinyhttp.post = lambda *a, **kw: success
+    http_get_post(pool.apiPath("getpurchaseinfo"), addressNotSet)
+    http_get_post(pool.apiPath("getpurchaseinfo"), success)
+    http_get_post((pool.apiPath("address"), repr({"UserPubKeyAddr": addr})), success)
     pool.authorize(addr)
 
     # other error
     systemErr = {"status": "error", "code": 14, "message": "system error"}
     addr = "TkKmVKG7u7PwhQaYr7wgMqBwHneJ2cN4e5YpMVUsWSopx81NFXEzK"
-    tinyhttp.get = lambda *a, **kw: systemErr
-    with pytest.raises(Exception):
+    http_get_post(pool.apiPath("getpurchaseinfo"), systemErr)
+    with pytest.raises(DecredError):
         pool.authorize(addr)
 
     # wrong address
     addr = "TkQ4jEVTpGn1LZBPrAoUJ15fDGGHubzd1DDkMSc4hxtHXpHjW1BJ8"
-    tinyhttp.get = lambda *a, **kw: success
-    with pytest.raises(Exception):
+    http_get_post(pool.apiPath("getpurchaseinfo"), systemErr)
+    with pytest.raises(DecredError):
         pool.authorize(addr)
 
 
-def test_vsp_get_purchase_info():
+def test_vsp_get_purchase_info(http_get_post):
     pool = vsp.VotingServiceProvider(**votingServiceProvider)
     success = {"status": "success", "data": purchaseInfo}
 
@@ -288,24 +373,24 @@ def test_vsp_get_purchase_info():
     }
 
     # ok
-    tinyhttp.get = lambda *a, **kw: success
+    http_get_post(pool.apiPath("getpurchaseinfo"), success)
     pool.getPurchaseInfo()
     assert not pool.err
 
     # error
-    tinyhttp.get = lambda *a, **kw: addressNotSet
-    with pytest.raises(Exception):
+    http_get_post(pool.apiPath("getpurchaseinfo"), addressNotSet)
+    with pytest.raises(DecredError):
         pool.getPurchaseInfo()
     assert pool.err
 
 
-def test_vsp_update_purchase_info():
+def test_vsp_update_purchase_info(http_get_post):
     pool = vsp.VotingServiceProvider(**votingServiceProvider)
     success = {"status": "success", "data": purchaseInfo}
 
     # updated
     pool.purchaseInfo.unixTimestamp = 0
-    tinyhttp.get = lambda *a, **kw: success
+    http_get_post(pool.apiPath("getpurchaseinfo"), success)
     pool.updatePurchaseInfo()
     assert pool.purchaseInfo.unixTimestamp != 0
 
@@ -317,22 +402,22 @@ def test_vsp_update_purchase_info():
     assert pool.purchaseInfo.unixTimestamp == before
 
 
-def test_vsp_get_stats():
+def test_vsp_get_stats(http_get_post):
     pool = vsp.VotingServiceProvider(**votingServiceProvider)
     success = {"status": "success", "data": poolStats}
 
     # ok
-    tinyhttp.get = lambda *a, **ka: success
+    http_get_post(pool.apiPath("stats"), success)
     pool.getStats()
 
     # pool error
     systemErr = {"status": "error", "code": 14, "message": "system error"}
-    tinyhttp.get = lambda *a, **ka: systemErr
-    with pytest.raises(Exception):
+    http_get_post(pool.apiPath("stats"), systemErr)
+    with pytest.raises(DecredError):
         pool.getStats()
 
 
-def test_vsp_set_vote_bits():
+def test_vsp_set_vote_bits(http_get_post):
     pool = vsp.VotingServiceProvider(**votingServiceProvider)
     success = {"status": "success", "data": "ok"}
 
@@ -340,15 +425,15 @@ def test_vsp_set_vote_bits():
     assert pool.purchaseInfo.voteBits == 5
 
     # ok
-    tinyhttp.post = lambda *a, **ka: success
+    http_get_post((pool.apiPath("voting"), repr({"VoteBits": 7})), success)
     pool.setVoteBits(7)
     # set to 7
     assert pool.purchaseInfo.voteBits == 7
 
     # pool error
     systemErr = {"status": "error", "code": 14, "message": "system error"}
-    tinyhttp.post = lambda *a, **ka: systemErr
-    with pytest.raises(Exception):
+    http_get_post((pool.apiPath("voting"), repr({"VoteBits": 3})), systemErr)
+    with pytest.raises(DecredError):
         pool.setVoteBits(3)
     # no change
     assert pool.purchaseInfo.voteBits == 7
