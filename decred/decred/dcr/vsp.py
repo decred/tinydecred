@@ -1,6 +1,6 @@
 """
 Copyright (c) 2019, Brian Stafford
-Copyright (c) 2019, the Decred developers
+Copyright (c) 2019-2020, the Decred developers
 See LICENSE for details
 
 DcrdataClient.endpointList() for available endpoints.
@@ -68,17 +68,18 @@ class PurchaseInfo(object):
             pi (object): The response from the 'getpurchaseinfo' request.
         """
 
-        def get(k, obj, default=None):
-            return pi[k] if k in obj else default
+        def get(k, default=None):
+            nonlocal pi
+            return pi[k] if k in pi else default
 
         return PurchaseInfo(
-            addr=get("PoolAddress", pi),
-            fees=get("PoolFees", pi),
-            script=ByteArray(get("Script", pi)),
-            ticketAddr=get("TicketAddress", pi),
-            vBits=get("VoteBits", pi),
-            vBitsVer=get("VoteBitsVersion", pi),
-            stamp=get("unixTimestamp", pi, default=int(time.time())),
+            addr=get("PoolAddress"),
+            fees=get("PoolFees"),
+            script=ByteArray(get("Script")),
+            ticketAddr=get("TicketAddress"),
+            vBits=get("VoteBits"),
+            vBitsVer=get("VoteBitsVersion"),
+            stamp=get("unixTimestamp", default=int(time.time())),
         )
 
     @staticmethod
@@ -131,31 +132,32 @@ class PoolStats(object):
             stats (obj): The response from the 'stats' request.
         """
 
-        def get(k, obj):
-            return obj[k] if k in stats else None
+        def get(k):
+            nonlocal stats
+            return stats[k] if k in stats else None
 
-        self.allMempoolTix = get("AllMempoolTix", stats)
-        self.apiVersionsSupported = get("APIVersionsSupported", stats)
-        self.blockHeight = get("BlockHeight", stats)
-        self.difficulty = get("Difficulty", stats)
-        self.expired = get("Expired", stats)
-        self.immature = get("Immature", stats)
-        self.live = get("Live", stats)
-        self.missed = get("Missed", stats)
-        self.ownMempoolTix = get("OwnMempoolTix", stats)
-        self.poolSize = get("PoolSize", stats)
-        self.proportionLive = get("ProportionLive", stats)
-        self.proportionMissed = get("ProportionMissed", stats)
-        self.revoked = get("Revoked", stats)
-        self.totalSubsidy = get("TotalSubsidy", stats)
-        self.voted = get("Voted", stats)
-        self.network = get("Network", stats)
-        self.poolEmail = get("PoolEmail", stats)
-        self.poolFees = get("PoolFees", stats)
-        self.poolStatus = get("PoolStatus", stats)
-        self.userCount = get("UserCount", stats)
-        self.userCountActive = get("UserCountActive", stats)
-        self.version = get("Version", stats)
+        self.allMempoolTix = get("AllMempoolTix")
+        self.apiVersionsSupported = get("APIVersionsSupported")
+        self.blockHeight = get("BlockHeight")
+        self.difficulty = get("Difficulty")
+        self.expired = get("Expired")
+        self.immature = get("Immature")
+        self.live = get("Live")
+        self.missed = get("Missed")
+        self.ownMempoolTix = get("OwnMempoolTix")
+        self.poolSize = get("PoolSize")
+        self.proportionLive = get("ProportionLive")
+        self.proportionMissed = get("ProportionMissed")
+        self.revoked = get("Revoked")
+        self.totalSubsidy = get("TotalSubsidy")
+        self.voted = get("Voted")
+        self.network = get("Network")
+        self.poolEmail = get("PoolEmail")
+        self.poolFees = get("PoolFees")
+        self.poolStatus = get("PoolStatus")
+        self.userCount = get("UserCount")
+        self.userCountActive = get("UserCountActive")
+        self.version = get("Version")
 
 
 class VotingServiceProvider(object):
