@@ -9,32 +9,25 @@ from decred.util import tinyhttp
 
 
 @pytest.fixture
-def http_get(request, monkeypatch):
+def http_get_post(monkeypatch):
     """
-    Use this fixture in tests while defining the responses to be returned in
-    a "HTTP_GET_RESP" function-level dict with "uri" as keys.
+    Tests will use the returned "queue" function to add responses they want
+    returned from both tinyhttp "get" and "post" functions.
+    The "get" responses will use "uri" as a key, while the "post" responses
+    will use "(uri, repr(data))".
     """
-    get_resp = getattr(request.function, "HTTP_GET_RESP")
+    q = {}
 
     def mock_get(uri, **kwargs):
-        nonlocal get_resp
-        return get_resp[uri]
-
-    # Avoid calling the actual tinyhttp.get .
-    monkeypatch.setattr(tinyhttp, "get", mock_get)
-
-
-@pytest.fixture
-def http_post(request, monkeypatch):
-    """
-    Use this fixture in tests while defining the responses to be returned in
-    a "HTTP_POST_RESP" function-level dict with "(uri, repr(data))" as keys.
-    """
-    post_resp = getattr(request.function, "HTTP_POST_RESP")
+        return q[uri].pop()
 
     def mock_post(uri, data, **kwargs):
-        nonlocal post_resp
-        return post_resp[(uri, repr(data))]
+        return q[(uri, repr(data))].pop()
 
-    # Avoid calling the actual tinyhttp.post .
+    monkeypatch.setattr(tinyhttp, "get", mock_get)
     monkeypatch.setattr(tinyhttp, "post", mock_post)
+
+    def queue(k, v):
+        q.setdefault(k, []).append(v)
+
+    return queue
