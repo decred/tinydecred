@@ -19,18 +19,15 @@ def http_get_post(monkeypatch):
     q = {}
 
     def mock_get(uri, **kwargs):
-        nonlocal q
         return q[uri].pop()
 
     def mock_post(uri, data, **kwargs):
-        nonlocal q
         return q[(uri, repr(data))].pop()
 
     monkeypatch.setattr(tinyhttp, "get", mock_get)
     monkeypatch.setattr(tinyhttp, "post", mock_post)
 
     def queue(k, v):
-        nonlocal q
         q.setdefault(k, []).append(v)
 
     return queue
