@@ -34,7 +34,9 @@ def test_result_is_success():
 purchaseInfo = {
     "PoolAddress": "TsbyH2p611jSWnvUAq3erSsRYnCxBg3nT2S",
     "PoolFees": 0.5,
-    "Script": "512103af3c24d005ca8b755e7167617f3a5b4c60a65f8318a7fcd1b0cacb1abd2a97fc21027b81bc16954e28adb832248140eb58bedb6078ae5f4dabf21fde5a8ab7135cb652ae",
+    "Script": "512103af3c24d005ca8b755e7167617f3a5b4c60a65f8318a7fcd1b0cacb1ab"
+    + "d2a97fc21027b81bc16954e28adb832248140eb58bedb6078ae5f4dabf21fde5a8ab713"
+    + "5cb652ae",
     "TicketAddress": "Tcbvn2hiEAXBDwUPDLDG2SxF9iANMKhdVev",
     "VoteBits": 5,
     "VoteBitsVersion": 0,
@@ -50,7 +52,9 @@ def test_purchase_info_parse():
     assert pi.poolFees == 0.5
     assert (
         pi.script
-        == "512103af3c24d005ca8b755e7167617f3a5b4c60a65f8318a7fcd1b0cacb1abd2a97fc21027b81bc16954e28adb832248140eb58bedb6078ae5f4dabf21fde5a8ab7135cb652ae"
+        == "512103af3c24d005ca8b755e7167617f3a5b4c60a65f8318a7fcd1b0cacb1abd2a"
+        + "97fc21027b81bc16954e28adb832248140eb58bedb6078ae5f4dabf21fde5a8ab71"
+        + "35cb652ae"
     )
     assert pi.ticketAddress == "Tcbvn2hiEAXBDwUPDLDG2SxF9iANMKhdVev"
     assert pi.voteBits == 5
@@ -70,7 +74,9 @@ def test_purchase_info_blobbing():
     assert rePi.poolFees == 0.5
     assert (
         rePi.script
-        == "512103af3c24d005ca8b755e7167617f3a5b4c60a65f8318a7fcd1b0cacb1abd2a97fc21027b81bc16954e28adb832248140eb58bedb6078ae5f4dabf21fde5a8ab7135cb652ae"
+        == "512103af3c24d005ca8b755e7167617f3a5b4c60a65f8318a7fcd1b0cacb1abd2a"
+        + "97fc21027b81bc16954e28adb832248140eb58bedb6078ae5f4dabf21fde5a8ab71"
+        + "35cb652ae"
     )
     assert rePi.ticketAddress == "Tcbvn2hiEAXBDwUPDLDG2SxF9iANMKhdVev"
     assert rePi.voteBits == 5
@@ -146,7 +152,9 @@ def test_pool_stats():
 
 votingServiceProvider = {
     "url": "https://www.dcrstakedinner.com",
-    "apiKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1Nzc0MzM0NDIsImlzcyI6Imh0dHBzOi8vd3d3LmRjcnN0YWtlZGlubmVyLmNvbSIsImxvZ2dlZEluQXMiOjQ2fQ.PEb000_TjQuBYxjRdh-VOaXMdV2GUw3_ZyIyp_tfpFE",
+    "apiKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1Nzc0MzM0NDIsIm"
+    + "lzcyI6Imh0dHBzOi8vd3d3LmRjcnN0YWtlZGlubmVyLmNvbSIsImxvZ2dlZEluQXMiOjQ2f"
+    + "Q.PEb000_TjQuBYxjRdh-VOaXMdV2GUw3_ZyIyp_tfpFE",
     "netName": "testnet3",
     "purchaseInfo": vsp.PurchaseInfo.parse(purchaseInfo),
 }
