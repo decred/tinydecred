@@ -1,4 +1,5 @@
 """
+Copyright (c) 2019-2020, Brian Stafford
 Copyright (c) 2020, the Decred developers
 See LICENSE for details
 """
@@ -47,10 +48,10 @@ class AgendaChoices:
     Agenda individual choices such as abstain, yes, no.
     """
 
-    def __init__(self, ID, description, bits, isAbstain, isNo, count, progress):
+    def __init__(self, id_, description, bits, isAbstain, isNo, count, progress):
         """
         Args:
-            ID (str): unique identifier of this choice.
+            id_ (str): unique identifier of this choice.
             description (str): description of this choice.
             bits (int): bits that identify this choice.
             isAbstain (bool): this choice is to abstain from change.
@@ -58,7 +59,7 @@ class AgendaChoices:
             count (int): how many votes received.
             progress (float): progress of the overall count.
         """
-        self.ID = ID
+        self.id = id_
         self.description = description
         self.bits = bits
         self.isAbstain = isAbstain
@@ -68,7 +69,7 @@ class AgendaChoices:
 
     def __eq__(self, other):
         try:
-            return self.ID == other.ID
+            return self.id == other.id
         except AttributeError:
             return False
 
@@ -84,7 +85,7 @@ class AgendaChoices:
             AgendaChoices: the parsed AgendaChoices.
         """
         return AgendaChoices(
-            ID=obj["id"],
+            id_=obj["id"],
             description=obj["description"],
             bits=obj["bits"],
             isAbstain=obj["isabstain"],
@@ -101,7 +102,7 @@ class Agenda:
 
     def __init__(
         self,
-        ID,
+        id_,
         description,
         mask,
         startTime,
@@ -112,7 +113,7 @@ class Agenda:
     ):
         """
         Args:
-            ID (str): unique identifier of this agenda.
+            id_ (str): unique identifier of this agenda.
             description (str): description of this agenda.
             mask (int): agenda mask.
             startTime (int): time agenda becomes valid.
@@ -121,7 +122,7 @@ class Agenda:
             quorumProgress (float): progress of quorum reached.
             choices list(AgendaChoices): all choices in this agenda.
         """
-        self.ID = ID
+        self.id = id_
         self.description = description
         self.mask = mask
         self.startTime = startTime
@@ -132,7 +133,7 @@ class Agenda:
 
     def __eq__(self, other):
         try:
-            return self.ID == other.ID
+            return self.id == other.id
         except AttributeError:
             return False
 
@@ -148,7 +149,7 @@ class Agenda:
             Agenda: the parsed Agenda info.
         """
         return Agenda(
-            ID=obj["id"],
+            id_=obj["id"],
             description=obj["description"],
             mask=obj["mask"],
             startTime=obj["starttime"],
