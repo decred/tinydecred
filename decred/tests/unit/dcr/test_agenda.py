@@ -25,7 +25,7 @@ def test_agenda_info():
 
 
 AGENDA_CHOICES_RAW = dict(
-    id_="choices_id",
+    id="choices_id",
     description="description",
     bits=0,
     isabstain=False,
@@ -56,7 +56,7 @@ def test_agenda_choices():
 
 
 AGENDA_RAW = dict(
-    id_="agenda_id",
+    id="agenda_id",
     description="description",
     mask=0,
     starttime=0,
