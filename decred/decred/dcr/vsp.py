@@ -11,13 +11,13 @@ import time
 from decred import DecredError
 from decred.crypto import crypto
 from decred.util import encode, tinyhttp
+from decred.util.encode import ByteArray
 
 from . import constants, nets, txscript
 
 
 # The duration purchase info is good for.
 PURCHASE_INFO_LIFE = constants.HOUR
-ByteArray = encode.ByteArray
 
 
 def resultIsSuccess(res):
