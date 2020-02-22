@@ -22,10 +22,10 @@ def test_result_is_success():
             self.isSuccess = isSuccess
 
     tests = [
-        test({"status": "success"}, True,),
-        test({"status": "fail"}, False,),
-        test({}, False,),
-        test("abcd", False,),
+        test({"status": "success"}, True),
+        test({"status": "fail"}, False),
+        test({}, False),
+        test("abcd", False),
     ]
     for test in tests:
         assert vsp.resultIsSuccess(test.res) is test.isSuccess
@@ -43,45 +43,34 @@ purchaseInfo = {
 }
 
 
+def assertPiIsEqual(pi):
+    assert pi.poolAddress == purchaseInfo["PoolAddress"]
+    assert pi.poolFees == purchaseInfo["PoolFees"]
+    assert pi.script == purchaseInfo["Script"]
+    assert pi.ticketAddress == purchaseInfo["TicketAddress"]
+    assert pi.voteBits == purchaseInfo["VoteBits"]
+    assert pi.voteBitsVersion == purchaseInfo["VoteBitsVersion"]
+
+
 def test_purchase_info_parse():
 
     now = int(time.time())
     pi = vsp.PurchaseInfo.parse(purchaseInfo)
 
-    assert pi.poolAddress == "TsbyH2p611jSWnvUAq3erSsRYnCxBg3nT2S"
-    assert pi.poolFees == 0.5
-    assert (
-        pi.script
-        == "512103af3c24d005ca8b755e7167617f3a5b4c60a65f8318a7fcd1b0cacb1abd2a"
-        "97fc21027b81bc16954e28adb832248140eb58bedb6078ae5f4dabf21fde5a8ab7135"
-        "cb652ae"
-    )
-    assert pi.ticketAddress == "Tcbvn2hiEAXBDwUPDLDG2SxF9iANMKhdVev"
-    assert pi.voteBits == 5
-    assert pi.voteBitsVersion == 0
+    assertPiIsEqual(pi)
     assert isinstance(pi.unixTimestamp, int) and pi.unixTimestamp >= now
 
 
 def test_purchase_info_blobbing():
 
     pi = vsp.PurchaseInfo.parse(purchaseInfo)
-    stamp = pi.unixTimestamp
     b = vsp.PurchaseInfo.blob(pi)
     assert isinstance(b, bytearray)
 
     rePi = vsp.PurchaseInfo.unblob(b)
-    assert rePi.poolAddress == "TsbyH2p611jSWnvUAq3erSsRYnCxBg3nT2S"
-    assert rePi.poolFees == 0.5
-    assert (
-        rePi.script
-        == "512103af3c24d005ca8b755e7167617f3a5b4c60a65f8318a7fcd1b0cacb1abd2a"
-        "97fc21027b81bc16954e28adb832248140eb58bedb6078ae5f4dabf21fde5a8ab7135"
-        "cb652ae"
-    )
-    assert rePi.ticketAddress == "Tcbvn2hiEAXBDwUPDLDG2SxF9iANMKhdVev"
-    assert rePi.voteBits == 5
-    assert rePi.voteBitsVersion == 0
-    assert rePi.unixTimestamp == stamp
+    assertPiIsEqual(rePi)
+    ts = rePi.unixTimestamp
+    assert isinstance(ts, int) and ts == pi.unixTimestamp
 
     # bad version
     bCopy = encode.ByteArray(b, copy=True)
@@ -126,30 +115,31 @@ def test_pool_stats():
 
     ps = vsp.PoolStats(poolStats)
 
-    assert ps.allMempoolTix == 12
-    assert ps.apiVersionsSupported == [1, 2]
-    assert ps.blockHeight == 368781
-    assert ps.difficulty == 88.50820708
-    assert ps.expired == 3
-    assert ps.immature == 0
-    assert ps.live == 28
-    assert ps.missed == 349
-    assert ps.ownMempoolTix == 0
-    assert ps.poolSize == 5759
-    assert ps.proportionLive == 0.004861955200555652
-    assert ps.proportionMissed == 0.3216589861751152
-    assert ps.revoked == 349
-    assert ps.totalSubsidy == 293.10719669
-    assert ps.voted == 736
-    assert ps.network == "testnet3"
-    assert ps.poolEmail == "joe@dcrstakedinner.com"
-    assert ps.poolFees == 0.5
-    assert ps.poolStatus == "Open"
-    assert ps.userCount == 44
-    assert ps.userCountActive == 34
-    assert ps.version == "1.6.0-pre"
+    assert ps.allMempoolTix == poolStats["AllMempoolTix"]
+    assert ps.apiVersionsSupported == poolStats["APIVersionsSupported"]
+    assert ps.blockHeight == poolStats["BlockHeight"]
+    assert ps.difficulty == poolStats["Difficulty"]
+    assert ps.expired == poolStats["Expired"]
+    assert ps.immature == poolStats["Immature"]
+    assert ps.live == poolStats["Live"]
+    assert ps.missed == poolStats["Missed"]
+    assert ps.ownMempoolTix == poolStats["OwnMempoolTix"]
+    assert ps.poolSize == poolStats["PoolSize"]
+    assert ps.proportionLive == poolStats["ProportionLive"]
+    assert ps.proportionMissed == poolStats["ProportionMissed"]
+    assert ps.revoked == poolStats["Revoked"]
+    assert ps.totalSubsidy == poolStats["TotalSubsidy"]
+    assert ps.voted == poolStats["Voted"]
+    assert ps.network == poolStats["Network"]
+    assert ps.poolEmail == poolStats["PoolEmail"]
+    assert ps.poolFees == poolStats["PoolFees"]
+    assert ps.poolStatus == poolStats["PoolStatus"]
+    assert ps.userCount == poolStats["UserCount"]
+    assert ps.userCountActive == poolStats["UserCountActive"]
+    assert ps.version == poolStats["Version"]
 
 
+now = int(time.time())
 votingServiceProvider = {
     "url": "https://www.dcrstakedinner.com",
     "apiKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1Nzc0MzM0NDIsIm"
@@ -160,13 +150,19 @@ votingServiceProvider = {
 }
 
 
+def assertVspIsEqual(pool):
+    assert pool.url == votingServiceProvider["url"]
+    assert pool.apiKey == votingServiceProvider["apiKey"]
+    assert pool.net.Name == votingServiceProvider["netName"]
+    assertPiIsEqual(pool.purchaseInfo)
+
+
 def test_vsp_init():
 
     pool = vsp.VotingServiceProvider(**votingServiceProvider)
-    assert pool.url == "https://www.dcrstakedinner.com"
-    assert pool.apiKey == votingServiceProvider["apiKey"]
-    assert pool.net.Name == "testnet3"
-    assert pool.purchaseInfo.ticketAddress == "Tcbvn2hiEAXBDwUPDLDG2SxF9iANMKhdVev"
+    assertVspIsEqual(pool)
+    ts = pool.purchaseInfo.unixTimestamp
+    assert isinstance(ts, int) and ts >= now
 
 
 def test_vsp_blobbing():
@@ -176,10 +172,9 @@ def test_vsp_blobbing():
     assert isinstance(b, bytearray)
 
     rePool = vsp.VotingServiceProvider.unblob(b)
-    assert rePool.url == "https://www.dcrstakedinner.com"
-    assert rePool.apiKey == votingServiceProvider["apiKey"]
-    assert rePool.net.Name == "testnet3"
-    assert rePool.purchaseInfo.ticketAddress == "Tcbvn2hiEAXBDwUPDLDG2SxF9iANMKhdVev"
+    assertVspIsEqual(rePool)
+    ts = rePool.purchaseInfo.unixTimestamp
+    assert isinstance(ts, int) and ts == pool.purchaseInfo.unixTimestamp
 
     # bad version
     bCopy = encode.ByteArray(b, copy=True)

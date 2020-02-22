@@ -65,21 +65,17 @@ class PurchaseInfo(object):
     def parse(pi):
         """
         Args:
-            pi (object): The response from the 'getpurchaseinfo' request.
+            pi (dict): The response from the 'getpurchaseinfo' request.
         """
 
-        def get(k, default=None):
-            nonlocal pi
-            return pi[k] if k in pi else default
-
         return PurchaseInfo(
-            addr=get("PoolAddress"),
-            fees=get("PoolFees"),
-            script=ByteArray(get("Script")),
-            ticketAddr=get("TicketAddress"),
-            vBits=get("VoteBits"),
-            vBitsVer=get("VoteBitsVersion"),
-            stamp=get("unixTimestamp", default=int(time.time())),
+            addr=pi.get("PoolAddress"),
+            fees=pi.get("PoolFees"),
+            script=ByteArray(pi["Script"]) if "Script" in pi else None,
+            ticketAddr=pi.get("TicketAddress"),
+            vBits=pi.get("VoteBits"),
+            vBitsVer=pi.get("VoteBitsVersion"),
+            stamp=pi.get("unixTimestamp", int(time.time())),
         )
 
     @staticmethod
@@ -129,35 +125,31 @@ class PoolStats(object):
     def __init__(self, stats):
         """
         Args:
-            stats (obj): The response from the 'stats' request.
+            stats (dict): The response from the 'stats' request.
         """
 
-        def get(k):
-            nonlocal stats
-            return stats[k] if k in stats else None
-
-        self.allMempoolTix = get("AllMempoolTix")
-        self.apiVersionsSupported = get("APIVersionsSupported")
-        self.blockHeight = get("BlockHeight")
-        self.difficulty = get("Difficulty")
-        self.expired = get("Expired")
-        self.immature = get("Immature")
-        self.live = get("Live")
-        self.missed = get("Missed")
-        self.ownMempoolTix = get("OwnMempoolTix")
-        self.poolSize = get("PoolSize")
-        self.proportionLive = get("ProportionLive")
-        self.proportionMissed = get("ProportionMissed")
-        self.revoked = get("Revoked")
-        self.totalSubsidy = get("TotalSubsidy")
-        self.voted = get("Voted")
-        self.network = get("Network")
-        self.poolEmail = get("PoolEmail")
-        self.poolFees = get("PoolFees")
-        self.poolStatus = get("PoolStatus")
-        self.userCount = get("UserCount")
-        self.userCountActive = get("UserCountActive")
-        self.version = get("Version")
+        self.allMempoolTix = stats.get("AllMempoolTix")
+        self.apiVersionsSupported = stats.get("APIVersionsSupported")
+        self.blockHeight = stats.get("BlockHeight")
+        self.difficulty = stats.get("Difficulty")
+        self.expired = stats.get("Expired")
+        self.immature = stats.get("Immature")
+        self.live = stats.get("Live")
+        self.missed = stats.get("Missed")
+        self.ownMempoolTix = stats.get("OwnMempoolTix")
+        self.poolSize = stats.get("PoolSize")
+        self.proportionLive = stats.get("ProportionLive")
+        self.proportionMissed = stats.get("ProportionMissed")
+        self.revoked = stats.get("Revoked")
+        self.totalSubsidy = stats.get("TotalSubsidy")
+        self.voted = stats.get("Voted")
+        self.network = stats.get("Network")
+        self.poolEmail = stats.get("PoolEmail")
+        self.poolFees = stats.get("PoolFees")
+        self.poolStatus = stats.get("PoolStatus")
+        self.userCount = stats.get("UserCount")
+        self.userCountActive = stats.get("UserCountActive")
+        self.version = stats.get("Version")
 
 
 class VotingServiceProvider(object):
@@ -309,10 +301,6 @@ class VotingServiceProvider(object):
             address (string): The base58-encoded pubkey address that the wallet
                 uses to vote.
         """
-        # An error is returned if the address isn't yet set
-        # {'status': 'error', 'code': 9,
-        #  'message': 'no address submitted',
-        # 'data': None}
         try:
             self.getPurchaseInfo()
             self.validate(address)
@@ -344,10 +332,6 @@ class VotingServiceProvider(object):
         Returns:
             PurchaseInfo: The PurchaseInfo object.
         """
-        # An error is returned if the address isn't yet set
-        # {'status': 'error', 'code': 9,
-        #  'message': 'no address submitted',
-        # 'data': None}
         self.err = None
         res = tinyhttp.get(self.apiPath("getpurchaseinfo"), headers=self.headers())
         if resultIsSuccess(res):
