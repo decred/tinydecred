@@ -1408,7 +1408,7 @@ class Account(object):
                 _, addresses, _ = txscript.extractPkScriptAddrs(
                     0, txout.pkScript, self.net
                 )
-            except DecredError:
+            except (DecredError, NotImplementedError):
                 # log.debug("unsupported script %s" % txout.pkScript.hex())
                 continue
             # convert the Address objects to strings.
