@@ -359,7 +359,7 @@ class Signature:
         if der:
             try:
                 canonicalPadding(rBytes)
-            except DecredError as e:
+            except Exception as e:
                 raise DecredError(
                     "malformed signature: bogus r padding or sign: {}".format(e)
                 )
@@ -382,7 +382,7 @@ class Signature:
         if der:
             try:
                 canonicalPadding(rBytes)
-            except DecredError as e:
+            except Exception as e:
                 raise DecredError(
                     "malformed signature: bogus s padding or sign: {}".format(e)
                 )
