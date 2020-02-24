@@ -1534,7 +1534,7 @@ class Account(object):
         if stakePool:
             try:
                 stakePool.getPurchaseInfo()
-            except DecredError as e:
+            except Exception as e:
                 log.error("error getting VSP purchase info: %s" % e)
 
         # First, look at addresses that have been generated but not seen. Run in
