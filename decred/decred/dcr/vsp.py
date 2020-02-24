@@ -1,6 +1,6 @@
 """
 Copyright (c) 2019, Brian Stafford
-Copyright (c) 2019, the Decred developers
+Copyright (c) 2019-2020, the Decred developers
 See LICENSE for details
 
 DcrdataClient.endpointList() for available endpoints.
@@ -8,6 +8,7 @@ DcrdataClient.endpointList() for available endpoints.
 
 import time
 
+from decred import DecredError
 from decred.crypto import crypto
 from decred.util import encode, tinyhttp
 from decred.util.encode import ByteArray
@@ -30,12 +31,7 @@ def resultIsSuccess(res):
     Returns:
         bool: True if result fields indicate success.
     """
-    return (
-        res
-        and isinstance(res, object)
-        and "status" in res
-        and res["status"] == "success"
-    )
+    return isinstance(res, object) and "status" in res and res["status"] == "success"
 
 
 class PurchaseInfo(object):
@@ -69,17 +65,17 @@ class PurchaseInfo(object):
     def parse(pi):
         """
         Args:
-            pi (object): The response from the 'getpurchaseinfo' request.
+            pi (dict): The response from the 'getpurchaseinfo' request.
         """
-        get = lambda k, default=None: pi[k] if k in pi else default
+
         return PurchaseInfo(
-            addr=get("PoolAddress"),
-            fees=get("PoolFees"),
-            script=ByteArray(get("Script")),
-            ticketAddr=get("TicketAddress"),
-            vBits=get("VoteBits"),
-            vBitsVer=get("VoteBitsVersion"),
-            stamp=get("unixTimestamp", default=int(time.time())),
+            addr=pi.get("PoolAddress"),
+            fees=pi.get("PoolFees"),
+            script=ByteArray(pi["Script"]) if "Script" in pi else None,
+            ticketAddr=pi.get("TicketAddress"),
+            vBits=pi.get("VoteBits"),
+            vBitsVer=pi.get("VoteBitsVersion"),
+            stamp=pi.get("unixTimestamp", int(time.time())),
         )
 
     @staticmethod
@@ -129,31 +125,31 @@ class PoolStats(object):
     def __init__(self, stats):
         """
         Args:
-            stats (object): The response from the 'stats' request.
+            stats (dict): The response from the 'stats' request.
         """
-        get = lambda k, default=None: stats[k] if k in stats else default
-        self.allMempoolTix = get("AllMempoolTix")
-        self.apiVersionsSupported = get("APIVersionsSupported")
-        self.blockHeight = get("BlockHeight")
-        self.difficulty = get("Difficulty")
-        self.expired = get("Expired")
-        self.immature = get("Immature")
-        self.live = get("Live")
-        self.missed = get("Missed")
-        self.ownMempoolTix = get("OwnMempoolTix")
-        self.poolSize = get("PoolSize")
-        self.proportionLive = get("ProportionLive")
-        self.proportionMissed = get("ProportionMissed")
-        self.revoked = get("Revoked")
-        self.totalSubsidy = get("TotalSubsidy")
-        self.voted = get("Voted")
-        self.network = get("Network")
-        self.poolEmail = get("PoolEmail")
-        self.poolFees = get("PoolFees")
-        self.poolStatus = get("PoolStatus")
-        self.userCount = get("UserCount")
-        self.userCountActive = get("UserCountActive")
-        self.version = get("Version")
+
+        self.allMempoolTix = stats.get("AllMempoolTix")
+        self.apiVersionsSupported = stats.get("APIVersionsSupported")
+        self.blockHeight = stats.get("BlockHeight")
+        self.difficulty = stats.get("Difficulty")
+        self.expired = stats.get("Expired")
+        self.immature = stats.get("Immature")
+        self.live = stats.get("Live")
+        self.missed = stats.get("Missed")
+        self.ownMempoolTix = stats.get("OwnMempoolTix")
+        self.poolSize = stats.get("PoolSize")
+        self.proportionLive = stats.get("ProportionLive")
+        self.proportionMissed = stats.get("ProportionMissed")
+        self.revoked = stats.get("Revoked")
+        self.totalSubsidy = stats.get("TotalSubsidy")
+        self.voted = stats.get("Voted")
+        self.network = stats.get("Network")
+        self.poolEmail = stats.get("PoolEmail")
+        self.poolFees = stats.get("PoolFees")
+        self.poolStatus = stats.get("PoolStatus")
+        self.userCount = stats.get("UserCount")
+        self.userCountActive = stats.get("UserCountActive")
+        self.version = stats.get("Version")
 
 
 class VotingServiceProvider(object):
@@ -266,7 +262,7 @@ class VotingServiceProvider(object):
     def validate(self, addr):
         """
         Validate performs some checks that the PurchaseInfo provided by the
-        stake pool API is valid for this given voting address. Exception is
+        stake pool API is valid for this given voting address. DecredError is
         raised on failure to validate.
 
         Args:
@@ -277,7 +273,7 @@ class VotingServiceProvider(object):
         redeemScript = pi.script
         scriptAddr = crypto.newAddressScriptHash(redeemScript, self.net)
         if scriptAddr.string() != pi.ticketAddress:
-            raise Exception(
+            raise DecredError(
                 "ticket address mismatch. %s != %s"
                 % (pi.ticketAddress, scriptAddr.string())
             )
@@ -286,7 +282,7 @@ class VotingServiceProvider(object):
             0, redeemScript, self.net
         )
         if numSigs != 1:
-            raise Exception("expected 2 required signatures, found 2")
+            raise DecredError("expected 2 required signatures, found 2")
         found = False
         signAddr = txscript.decodeAddress(addr, self.net)
         for addr in addrs:
@@ -294,33 +290,30 @@ class VotingServiceProvider(object):
                 found = True
                 break
         if not found:
-            raise Exception("signing pubkey not found in redeem script")
+            raise DecredError("signing pubkey not found in redeem script")
 
     def authorize(self, address):
         """
-        Authorize the stake pool for the provided address and network. Exception
+        Authorize the stake pool for the provided address and network. DecredError
         is raised on failure to authorize.
 
         Args:
             address (string): The base58-encoded pubkey address that the wallet
                 uses to vote.
         """
-        # An error is returned if the address is already set
-        # {'status': 'error', 'code': 6,
-        #     'message': 'address error - address already submitted'}
-        # First try to get the purchase info directly.
         try:
             self.getPurchaseInfo()
             self.validate(address)
-        except Exception as e:
+        except DecredError as e:
             # code 9 is address not set
-            alreadyRegistered = (
+            addressNotSet = (
                 isinstance(self.err, dict)
                 and "code" in self.err
                 and self.err["code"] == 9
             )
-            if not alreadyRegistered:
+            if not addressNotSet:
                 raise e
+
             # address is not set
             data = {"UserPubKeyAddr": address}
             res = tinyhttp.post(
@@ -330,7 +323,7 @@ class VotingServiceProvider(object):
                 self.getPurchaseInfo()
                 self.validate(address)
             else:
-                raise Exception("unexpected response from 'address': %s" % repr(res))
+                raise DecredError("unexpected response from 'address': %s" % repr(res))
 
     def getPurchaseInfo(self):
         """
@@ -339,10 +332,6 @@ class VotingServiceProvider(object):
         Returns:
             PurchaseInfo: The PurchaseInfo object.
         """
-        # An error is returned if the address isn't yet set
-        # {'status': 'error', 'code': 9,
-        #  'message': 'purchaseinfo error - no address submitted',
-        # 'data': None}
         self.err = None
         res = tinyhttp.get(self.apiPath("getpurchaseinfo"), headers=self.headers())
         if resultIsSuccess(res):
@@ -351,7 +340,7 @@ class VotingServiceProvider(object):
             self.purchaseInfo = pi
             return self.purchaseInfo
         self.err = res
-        raise Exception("unexpected response from 'getpurchaseinfo': %r" % (res,))
+        raise DecredError("unexpected response from 'getpurchaseinfo': %r" % (res,))
 
     def updatePurchaseInfo(self):
         """
@@ -371,14 +360,14 @@ class VotingServiceProvider(object):
         if resultIsSuccess(res):
             self.stats = PoolStats(res["data"])
             return self.stats
-        raise Exception("unexpected response from 'stats': %s" % repr(res))
+        raise DecredError("unexpected response from 'stats': %s" % repr(res))
 
     def setVoteBits(self, voteBits):
         """
         Set the vote preference on the VotingServiceProvider.
 
         Returns:
-            bool: True on success. Exception raised on error.
+            bool: True on success. DecredError raised on error.
         """
         data = {"VoteBits": voteBits}
         res = tinyhttp.post(
@@ -387,4 +376,4 @@ class VotingServiceProvider(object):
         if resultIsSuccess(res):
             self.purchaseInfo.voteBits = voteBits
             return True
-        raise Exception("unexpected response from 'voting': %s" % repr(res))
+        raise DecredError("unexpected response from 'voting': %s" % repr(res))
