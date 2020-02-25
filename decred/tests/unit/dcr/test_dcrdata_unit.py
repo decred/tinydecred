@@ -3,6 +3,9 @@ Copyright (c) 2019, the Decred developers
 See LICENSE for details
 """
 
+import json
+from pathlib import Path
+
 import pytest
 
 from decred.crypto import opcode
@@ -76,3 +79,50 @@ def test_checkoutput():
     tx = msgtx.TxOut(value=1, pkScript=script)
     with pytest.raises(dcrdata.DecredError):
         dcrdata.checkOutput(tx, 0)
+
+
+class MockWebsocketClient:
+    def __init__(self):
+        self.sent = []
+
+    def send(self, msg):
+        self.sent.append(msg)
+
+    def close(self):
+        pass
+
+
+def test_dcrdataclient(http_get_post):
+    # Load the list of API calls.
+    data_file = Path(__file__).resolve().parent / "test-data" / "dcrdata.json"
+    with open(data_file) as f:
+        api_list = json.loads(f.read())
+
+    # Queue the list of API calls.
+    base_url = "https://example.org/"
+    http_get_post(f"{base_url}api/list", api_list)
+
+    # Create the dcrdata client.
+    ddc = dcrdata.DcrdataClient(base_url)
+
+    assert len(ddc.listEntries) == 84
+    assert len(ddc.subscribedAddresses) == 0
+
+    assert ddc.endpointList()[0] == ddc.listEntries[0][1]
+
+    assert ddc.endpointGuide() is None
+
+    # Set the mock WebsocketClient.
+    ddc.ps = MockWebsocketClient()
+
+    ddc.subscribedAddresses = ["already_there"]
+    ddc.subscribeAddresses(["already_there", "new_one"])
+    assert ddc.ps.sent[0]["message"]["message"] == "address:new_one"
+
+    ddc.ps.sent = []
+    ddc.subscribeBlocks()
+    assert ddc.ps.sent[0]["message"]["message"] == "newblock"
+
+    assert dcrdata.DcrdataClient.timeStringToUnix("1970-01-01 00:00:00") == 0
+
+    assert dcrdata.DcrdataClient.RFC3339toUnix("1970-01-01T00:00:00Z") == 0
