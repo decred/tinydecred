@@ -14,7 +14,7 @@ from decred.crypto import opcode
 from decred.dcr import txscript
 from decred.dcr.dcrdata import (
     DcrdataClient,
-    DcrDataError,
+    DcrdataError,
     DcrdataPath,
     DecredError,
     checkOutput,
@@ -29,18 +29,18 @@ def test_dcrdatapath(http_get_post):
     ddp = DcrdataPath()
 
     # __getattr__
-    with pytest.raises(DcrDataError):
+    with pytest.raises(DcrdataError):
         ddp.no_such_path()
 
     # Empty URI, needed for post.
-    with pytest.raises(DcrDataError):
+    with pytest.raises(DcrdataError):
         ddp.getCallsignPath()
     ddp.addCallsign([], "")
     csp = ddp.getCallsignPath()
     assert csp == ""
 
     # Non-empty URI.
-    with pytest.raises(DcrDataError):
+    with pytest.raises(DcrdataError):
         ddp.getCallsignPath("address")
     ddp.addCallsign(["address"], "/%s")
     csp = ddp.getCallsignPath("address", address="1234")

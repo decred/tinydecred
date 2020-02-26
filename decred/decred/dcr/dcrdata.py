@@ -40,7 +40,7 @@ POST_HEADERS = {
 }
 
 
-class DcrDataError(DecredError):
+class DcrdataError(DecredError):
     pass
 
 
@@ -85,7 +85,7 @@ class DcrdataPath:
                 return uri
             if all([x in kwargs for x in argList]):
                 return template % tuple(kwargs[x] for x in argList)
-        raise DcrDataError(
+        raise DcrdataError(
             "Supplied arguments, %r, do not match any of the know call signatures, %r."
             % (args if args else kwargs, [argList for argList, _ in self.callSigns]),
         )
@@ -93,7 +93,7 @@ class DcrdataPath:
     def __getattr__(self, key):
         if key in self.subpaths:
             return self.subpaths[key]
-        raise DcrDataError("No subpath %s found in datapath" % (key,))
+        raise DcrdataError("No subpath %s found in datapath" % (key,))
 
     def __call__(self, *args, **kwargs):
         return tinyhttp.get(self.getCallsignPath(*args, **kwargs), headers=GET_HEADERS)
