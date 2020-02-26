@@ -1,6 +1,6 @@
 """
 Copyright (c) 2019, Brian Stafford
-Copyright (c) 2019, the Decred developers
+Copyright (c) 2019-2020, the Decred developers
 See LICENSE for details
 
 DcrdataClient.endpointList() for available enpoints.
@@ -25,7 +25,7 @@ from decred.util.database import KeyValueDatabase
 from decred.util.encode import ByteArray
 from decred.wallet import api
 
-from . import account, calc, txscript
+from . import account, agenda, calc, txscript
 from .wire import msgblock, msgtx, wire
 
 
@@ -386,112 +386,6 @@ class WebsocketClient(object):
             self.socket.close()
 
 
-class AgendaChoices:
-    """
-    Agenda choices such as abstain, yes, no.
-    """
-
-    def __init__(self, ID, description, bits, isabstain, isno, count, progress):
-        self.id = ID
-        self.description = description
-        self.bits = bits
-        self.isabstain = isabstain
-        self.isno = isno
-        self.count = count
-        self.progress = progress
-
-    @staticmethod
-    def parse(obj):
-        return AgendaChoices(
-            ID=obj["id"],
-            description=obj["description"],
-            bits=obj["bits"],
-            isabstain=obj["isabstain"],
-            isno=obj["isno"],
-            count=obj["count"],
-            progress=obj["progress"],
-        )
-
-
-class Agenda:
-    """
-    An agenda with name, description, and AgendaChoices.
-    """
-
-    def __init__(
-        self,
-        ID,
-        description,
-        mask,
-        starttime,
-        expiretime,
-        status,
-        quorumprogress,
-        choices,
-    ):
-        self.id = ID
-        self.description = description
-        self.mask = mask
-        self.starttime = starttime
-        self.expiretime = expiretime
-        self.status = status
-        self.quorumprogress = quorumprogress
-        self.choices = choices
-
-    @staticmethod
-    def parse(obj):
-        return Agenda(
-            ID=obj["id"],
-            description=obj["description"],
-            mask=obj["mask"],
-            starttime=obj["starttime"],
-            expiretime=obj["expiretime"],
-            status=obj["status"],
-            quorumprogress=obj["quorumprogress"],
-            choices=[AgendaChoices.parse(choice) for choice in obj["choices"]],
-        )
-
-
-class AgendasInfo:
-    """
-    All current agenda information for the current network. agendas contains
-    a list of Agenda.
-    """
-
-    def __init__(
-        self,
-        currentheight,
-        startheight,
-        endheight,
-        HASH,
-        voteversion,
-        quorum,
-        totalvotes,
-        agendas,
-    ):
-        self.currentheight = currentheight
-        self.startheight = startheight
-        self.endheight = endheight
-        self.hash = HASH
-        self.voteversion = voteversion
-        self.quorum = quorum
-        self.totalvotes = totalvotes
-        self.agendas = agendas
-
-    @staticmethod
-    def parse(obj):
-        return AgendasInfo(
-            currentheight=obj["currentheight"],
-            startheight=obj["startheight"],
-            endheight=obj["endheight"],
-            HASH=obj["hash"],
-            voteversion=obj["voteversion"],
-            quorum=obj["quorum"],
-            totalvotes=obj["totalvotes"],
-            agendas=[Agenda.parse(agenda) for agenda in obj["agendas"]],
-        )
-
-
 def makeOutputs(pairs, chain):
     """
     makeOutputs creates a slice of transaction outputs from a pair of address
@@ -638,7 +532,7 @@ class DcrdataBlockchain(object):
         Returns:
             AgendasInfo: the current agendas.
         """
-        return AgendasInfo.parse(self.dcrdata.stake.vote.info())
+        return agenda.AgendasInfo.parse(self.dcrdata.stake.vote.info())
 
     def subscribeAddresses(self, addrs, receiver=None):
         """
