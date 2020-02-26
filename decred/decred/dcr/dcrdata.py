@@ -20,16 +20,17 @@ import websocket
 
 from decred import DecredError
 from decred.crypto import crypto
-from decred.util import chains, database, helpers, tinyhttp
+from decred.util import chains, database, tinyhttp
 from decred.util.database import KeyValueDatabase
 from decred.util.encode import ByteArray
+from decred.util.helpers import formatTraceback, getLogger
 from decred.wallet import api
 
 from . import account, agenda, calc, txscript
 from .wire import msgblock, msgtx, wire
 
 
-log = helpers.getLogger("DCRDATA")
+log = getLogger("DCRDATA")
 
 VERSION = "0.0.1"
 GET_HEADERS = {"User-Agent": "PyDcrData/%s" % VERSION}
@@ -38,14 +39,12 @@ POST_HEADERS = {
     "Content-Type": "application/json; charset=utf-8",
 }
 
-formatTraceback = helpers.formatTraceback
 
-
-class DcrDataError(DecredError):
+class DcrdataError(DecredError):
     pass
 
 
-class DcrdataPath(object):
+class DcrdataPath:
     """
     DcrdataPath represents some point along a URL. It may just be a node that
     is not an endpoint, or it may be an enpoint, in which case it's `get`
@@ -86,7 +85,7 @@ class DcrdataPath(object):
                 return uri
             if all([x in kwargs for x in argList]):
                 return template % tuple(kwargs[x] for x in argList)
-        raise DcrDataError(
+        raise DcrdataError(
             "Supplied arguments, %r, do not match any of the know call signatures, %r."
             % (args if args else kwargs, [argList for argList, _ in self.callSigns]),
         )
@@ -94,7 +93,7 @@ class DcrdataPath(object):
     def __getattr__(self, key):
         if key in self.subpaths:
             return self.subpaths[key]
-        raise DcrDataError("No subpath %s found in datapath" % (key,))
+        raise DcrdataError("No subpath %s found in datapath" % (key,))
 
     def __call__(self, *args, **kwargs):
         return tinyhttp.get(self.getCallsignPath(*args, **kwargs), headers=GET_HEADERS)
@@ -112,7 +111,7 @@ def getSocketURIs(uri):
     return ws, ps
 
 
-# To Do: Get the full list here.
+# TODO: get the full list here.
 InsightPaths = [
     "/tx/send",
     "/insight/api/addr/{address}/utxo",
@@ -121,7 +120,7 @@ InsightPaths = [
 ]
 
 
-class DcrdataClient(object):
+class DcrdataClient:
     """
     DcrdataClient represents the base node. The only argument to the
     constructor is the path to a DCRData server, e.g. http://explorer.dcrdata.org.
@@ -136,8 +135,7 @@ class DcrdataClient(object):
         """
         self.baseURI = baseURI.rstrip("/").rstrip("/api")
         self.baseApi = self.baseURI + "/api"
-        self.wsURI, self.psURI = getSocketURIs(self.baseURI)
-        self.ws = None
+        _, self.psURI = getSocketURIs(self.baseURI)
         self.ps = None
         self.subscribedAddresses = []
         self.emitter = emitter
@@ -187,8 +185,6 @@ class DcrdataClient(object):
         return getattr(self.root, key)
 
     def close(self):
-        if self.ws:
-            self.ws.close()
         if self.ps:
             self.ps.close()
 
@@ -266,7 +262,7 @@ class Sub:
         }
 
 
-class WebsocketClient(object):
+class WebsocketClient:
     """
     A WebSocket client.
     """
@@ -460,7 +456,7 @@ def hexFromHash(h):
     return reversed(h).hex()
 
 
-class DcrdataBlockchain(object):
+class DcrdataBlockchain:
     """
     DcrdataBlockchain implements the Blockchain API from tinydecred.api.
     """
@@ -501,7 +497,7 @@ class DcrdataBlockchain(object):
         """
         Connect to dcrdata.
         """
-        self.dcrdata = DcrdataClient(self.datapath, emitter=self.pubsubSignal,)
+        self.dcrdata = DcrdataClient(self.datapath, emitter=self.pubsubSignal)
         self.updateTip()
 
     def close(self):
@@ -883,9 +879,7 @@ class DcrdataBlockchain(object):
             pass
         return False
 
-    def sendOutputs(
-        self, outputs, keysource, utxosource, feeRate=None
-    ):  # , minconf=1, randomizeChangeIdx=True):
+    def sendOutputs(self, outputs, keysource, utxosource, feeRate=None):
         """
         Send the `TxOut`s to the address.
 
@@ -1297,12 +1291,15 @@ class DcrdataBlockchain(object):
 
     def revokeTicket(self, tx, keysource, redeemScript):
         """
-        Revoke a ticket by signing the supplied redeem script and broadcasting the raw transaction.
+        Revoke a ticket by signing the supplied redeem script and broadcasting
+        the raw transaction.
 
         Args:
             tx (object): the msgTx of the ticket purchase.
-            keysource (object): a KeySource object that holds a function to get the private key used for signing.
-            redeemScript (byte-like): the 1-of-2 multisig script that delegates voting rights for the ticket.
+            keysource (object): a KeySource object that holds a function to get
+                the private key used for signing.
+            redeemScript (byte-like): the 1-of-2 multisig script that delegates
+                voting rights for the ticket.
 
         Returns:
             MsgTx: the signed revocation.
