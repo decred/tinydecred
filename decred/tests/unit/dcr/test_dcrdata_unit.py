@@ -16,16 +16,14 @@ from decred.dcr import txscript
 # Use after #82 is merged.
 # from decred.dcr import agenda
 from decred.dcr.dcrdata import (
-    # Remove after #82 is merged.
-    AgendasInfo,
     DcrdataBlockchain,
     DcrdataClient,
     DcrdataError,
     DcrdataPath,
-    DecredError,
     checkOutput,
     makeOutputs,
 )
+from decred.dcr.dcrdata import AgendasInfo  # Remove after #82 is merged.
 from decred.dcr.nets import testnet
 from decred.dcr.wire import msgtx
 from decred.util.encode import ByteArray
