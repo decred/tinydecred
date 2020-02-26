@@ -81,19 +81,6 @@ def test_checkoutput():
         dcrdata.checkOutput(tx, 0)
 
 
-def make_dcrdataclient(http_get_post):
-    # Load the list of API calls.
-    data_file = Path(__file__).resolve().parent / "test-data" / "dcrdata.json"
-    with open(data_file) as f:
-        api_list = json.loads(f.read())
-
-    # Queue the list of API calls.
-    base_url = "https://example.org/"
-    http_get_post(f"{base_url}api/list", api_list)
-
-    return dcrdata.DcrdataClient(base_url)
-
-
 class MockWebsocketClient:
     def __init__(self):
         self.sent = []
@@ -105,32 +92,44 @@ class MockWebsocketClient:
         pass
 
 
-def test_dcrdataclient(http_get_post):
-    ddc = make_dcrdataclient(http_get_post)
+def make_dcrdataclient(http_get_post):
+    # Load the list of API calls.
+    data_file = Path(__file__).resolve().parent / "test-data" / "dcrdata.json"
+    with open(data_file) as f:
+        api_list = json.loads(f.read())
 
-    assert len(ddc.listEntries) == 84
-    assert len(ddc.subscribedAddresses) == 0
+    # Queue the list of API calls.
+    base_url = "https://example.org/"
+    http_get_post(f"{base_url}api/list", api_list)
 
-    assert ddc.endpointList()[0] == ddc.listEntries[0][1]
-
-    assert ddc.endpointGuide() is None
-
-
-def test_dcrdataclient_subscriptions(http_get_post):
-    ddc = make_dcrdataclient(http_get_post)
+    ddc = dcrdata.DcrdataClient(base_url)
 
     # Set the mock WebsocketClient.
     ddc.ps = MockWebsocketClient()
 
-    ddc.subscribedAddresses = ["already_there"]
-    ddc.subscribeAddresses(["already_there", "new_one"])
-    assert ddc.ps.sent[0]["message"]["message"] == "address:new_one"
-
-    ddc.ps.sent = []
-    ddc.subscribeBlocks()
-    assert ddc.ps.sent[0]["message"]["message"] == "newblock"
+    return ddc
 
 
-def test_dcrdataclient_static():
-    assert dcrdata.DcrdataClient.timeStringToUnix("1970-01-01 00:00:00") == 0
-    assert dcrdata.DcrdataClient.RFC3339toUnix("1970-01-01T00:00:00Z") == 0
+class TestDcrdataClient:
+    def test_misc(self, http_get_post):
+        ddc = make_dcrdataclient(http_get_post)
+
+        assert len(ddc.listEntries) == 84
+        assert len(ddc.subscribedAddresses) == 0
+        assert ddc.endpointList()[0] == ddc.listEntries[0][1]
+        assert ddc.endpointGuide() is None
+
+    def test_subscriptions(self, http_get_post):
+        ddc = make_dcrdataclient(http_get_post)
+
+        ddc.subscribedAddresses = ["already_there"]
+        ddc.subscribeAddresses(["already_there", "new_one"])
+        assert ddc.ps.sent[0]["message"]["message"] == "address:new_one"
+
+        ddc.ps.sent = []
+        ddc.subscribeBlocks()
+        assert ddc.ps.sent[0]["message"]["message"] == "newblock"
+
+    def test_static(self):
+        assert dcrdata.DcrdataClient.timeStringToUnix("1970-01-01 00:00:00") == 0
+        assert dcrdata.DcrdataClient.RFC3339toUnix("1970-01-01T00:00:00Z") == 0
