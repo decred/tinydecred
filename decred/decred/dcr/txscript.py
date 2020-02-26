@@ -2945,7 +2945,6 @@ def isUnspendable(amount, pkScript):
         or len(pkScript) > 0
         and pkScript[0] == opcode.OP_RETURN
     ):
-
         return True
 
     # The script is unspendable if it is guaranteed to fail at execution.

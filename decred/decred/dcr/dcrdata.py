@@ -402,12 +402,12 @@ def makeOutputs(pairs, chain):
         list(msgtx.TxOut): Transaction outputs.
     """
     outputs = []
-    for addrStr, amt in pairs:
-        if amt < 0:
-            raise DecredError("amt < 0")
-        # Make sure its atoms
+    for idx, (addrStr, amt) in enumerate(pairs):
+        # Make sure amt is atoms.
         if not isinstance(amt, int):
-            raise DecredError("amt is not integral")
+            raise DecredError(f"Decred amount #{idx} is not an integer")
+        if amt < 0:
+            raise DecredError(f"Decred amount #{idx} is negative")
         pkScript = txscript.makePayToAddrScript(addrStr, chain)
         outputs.append(msgtx.TxOut(value=amt, pkScript=pkScript))
     return outputs
@@ -416,15 +416,14 @@ def makeOutputs(pairs, chain):
 def checkOutput(output, fee):
     """
     checkOutput performs simple consensus and policy tests on a transaction
-    output.  Returns with errors.Invalid if output violates consensus rules, and
-    errors.Policy if the output violates a non-consensus policy.
+    output.
 
     Args:
         output (TxOut): The output to check
         fee (float): The transaction fee rate (/kB).
 
     Returns:
-        There is not return value. If an output is deemed invalid, an exception
+        There is no return value. If an output is deemed invalid, DecredError
         is raised.
     """
     if output.value < 0:
