@@ -102,7 +102,8 @@ class MockWebsocketClient:
         pass
 
 
-def make_dcrdataclient(http_get_post):
+def preload_api_list(http_get_post):
+
     # Load the list of API calls.
     data_file = Path(__file__).resolve().parent / "test-data" / "dcrdata.json"
     with open(data_file) as f:
@@ -112,25 +113,29 @@ def make_dcrdataclient(http_get_post):
     base_url = "https://example.org/"
     http_get_post(f"{base_url}api/list", api_list)
 
-    ddc = DcrdataClient(base_url)
-
-    # Set the mock WebsocketClient.
-    ddc.ps = MockWebsocketClient()
-
-    return ddc
+    return base_url
 
 
 class TestDcrdataClient:
-    def test_misc(self, http_get_post):
-        ddc = make_dcrdataclient(http_get_post)
+    def test_misc(self, http_get_post, capsys):
+        base_url = preload_api_list(http_get_post)
+        ddc = DcrdataClient(base_url)
 
         assert len(ddc.listEntries) == 84
         assert len(ddc.subscribedAddresses) == 0
         assert ddc.endpointList()[0] == ddc.listEntries[0][1]
-        assert ddc.endpointGuide() is None
+
+        # This prints to stdout.
+        ddc.endpointGuide()
+        out, err = capsys.readouterr()
+        assert len(out.splitlines()) == 84
 
     def test_subscriptions(self, http_get_post):
-        ddc = make_dcrdataclient(http_get_post)
+        base_url = preload_api_list(http_get_post)
+        ddc = DcrdataClient(base_url)
+
+        # Set the mock WebsocketClient.
+        ddc.ps = MockWebsocketClient()
 
         ddc.subscribedAddresses = ["already_there"]
         ddc.subscribeAddresses(["already_there", "new_one"])
