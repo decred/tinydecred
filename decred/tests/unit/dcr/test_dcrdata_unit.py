@@ -91,6 +91,19 @@ def test_checkoutput():
         checkOutput(tx, 0)
 
 
+def make_dcrdataclient(http_get_post):
+    # Load the list of API calls.
+    data_file = Path(__file__).resolve().parent / "test-data" / "dcrdata.json"
+    with open(data_file) as f:
+        api_list = json.loads(f.read())
+
+    # Queue the list of API calls.
+    base_url = "https://example.org/"
+    http_get_post(f"{base_url}api/list", api_list)
+
+    return dcrdata.DcrdataClient(base_url)
+
+
 class MockWebsocketClient:
     def __init__(self):
         self.sent = []
