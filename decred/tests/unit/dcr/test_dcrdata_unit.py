@@ -10,9 +10,15 @@ from pathlib import Path
 
 import pytest
 
+from decred import DecredError
 from decred.crypto import opcode
 from decred.dcr import txscript
+# Use after #82 is merged.
+# from decred.dcr import agenda
 from decred.dcr.dcrdata import (
+    # Remove after #82 is merged.
+    AgendasInfo,
+    DcrdataBlockchain,
     DcrdataClient,
     DcrdataError,
     DcrdataPath,
@@ -23,6 +29,39 @@ from decred.dcr.dcrdata import (
 from decred.dcr.nets import testnet
 from decred.dcr.wire import msgtx
 from decred.util.encode import ByteArray
+
+
+AGENDA_CHOICES_RAW = dict(
+    id="choices_id",
+    description="description",
+    bits=0,
+    isabstain=False,
+    isno=False,
+    count=0,
+    progress=0.0,
+)
+
+AGENDA_RAW = dict(
+    id="agenda_id",
+    description="description",
+    mask=0,
+    starttime=0,
+    expiretime=0,
+    status="status",
+    quorumprogress=0.0,
+    choices=[AGENDA_CHOICES_RAW],
+)
+
+AGENDAS_INFO_RAW = {
+    "currentheight": 0,
+    "startheight": 0,
+    "endheight": 0,
+    "hash": "hash",
+    "voteversion": 0,
+    "quorum": 0.0,
+    "totalvotes": 0,
+    "agendas": [AGENDA_RAW],
+}
 
 
 def test_dcrdatapath(http_get_post):
@@ -146,3 +185,43 @@ class TestDcrdataClient:
     def test_static(self):
         assert DcrdataClient.timeStringToUnix("1970-01-01 00:00:00") == 0
         assert DcrdataClient.RFC3339toUnix("1970-01-01T00:00:00Z") == 0
+
+
+class TestDcrdataBlockchain:
+    def test_subscriptions(self, http_get_post, tmp_path):
+
+        # Exception in updateTip.
+        base_url = preload_api_list(http_get_post)
+        with pytest.raises(DecredError):
+            DcrdataBlockchain(str(tmp_path / "test.db"), testnet, base_url)
+
+        # Successful creation.
+        base_url = preload_api_list(http_get_post)
+        http_get_post(f"{base_url}api/block/best", 1)
+        ddb = DcrdataBlockchain(str(tmp_path / "test.db"), testnet, base_url)
+        assert ddb.tip == 1
+
+        # Set the mock WebsocketClient.
+        ddb.dcrdata.ps = MockWebsocketClient()
+
+        # Subscribes.
+        def receiver(obj):
+            print("msg: %s" % repr(obj))
+
+        ddb.subscribeBlocks(receiver)
+        assert ddb.dcrdata.ps.sent[0]["message"]["message"] == "newblock"
+
+        # Exception in subscribeAddresses.
+        with pytest.raises(DecredError):
+            ddb.subscribeAddresses([])
+
+        ddb.dcrdata.ps.sent = []
+        ddb.subscribeAddresses(["new_one"], receiver)
+        assert ddb.dcrdata.ps.sent[0]["message"]["message"] == "address:new_one"
+
+        # getAgendasInfo.
+        http_get_post(f"{base_url}api/stake/vote/info", AGENDAS_INFO_RAW)
+        agsinfo = ddb.getAgendasInfo()
+        # Use after #82 is merged.
+        # assert isinstance(agsinfo, agenda.AgendasInfo)
+        assert isinstance(agsinfo, AgendasInfo)

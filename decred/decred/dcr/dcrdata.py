@@ -472,13 +472,13 @@ class DcrdataBlockchain:
     def __init__(self, db, params, datapath, skipConnect=False):
         """
         Args:
-            db (str||database.Bucket): The database bucket or a filepath. If
-                a filepath, a new database will be created.
-            params obj: Network parameters
-            datapath str: A uri for a dcrdata server
-            skipConnect bool: Skip initial connection
+            db (str | database.Bucket): The database bucket or a filepath.
+                If a filepath, a new database will be created.
+            params obj: blockchain network parameters.
+            datapath str: a URI for a dcrdata server.
+            skipConnect bool: skip initial connection to dcrdata.
         """
-        # Allow string arguments for datab
+        # Allow string arguments for database.
         self.ownsDB = False
         if isinstance(db, str):
             self.ownsDB = True
@@ -765,10 +765,9 @@ class DcrdataBlockchain:
         """
         try:
             self.tip = self.bestBlock()
-            return
         except Exception as e:
             log.error("failed to retrieve tip from blockchain: %s" % formatTraceback(e))
-        raise DecredError("no tip data retrieved")
+            raise DecredError("no tip data retrieved")
 
     def relayFee(self):
         """

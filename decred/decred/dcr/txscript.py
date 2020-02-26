@@ -2892,13 +2892,11 @@ def calcMinRequiredTxRelayFee(relayFeePerKb, txSerializeSize):
     return round(fee)
 
 
-def isDustAmount(
-    amount, scriptSize, relayFeePerKb
-):  # amount dcrutil.Amount, scriptSize int, relayFeePerKb dcrutil.Amount) bool {
+def isDustAmount(amount, scriptSize, relayFeePerKb):
     """
-    isDustAmount determines whether a transaction output value and script length would
-    cause the output to be considered dust.  Transactions with dust outputs are
-    not standard and are rejected by mempools with default policies.
+    isDustAmount determines whether a transaction output value and script length
+    would cause the output to be considered dust.  Transactions with dust outputs
+    are not standard and are rejected by mempools with default policies.
 
     Args:
         amount (int): Atoms.
