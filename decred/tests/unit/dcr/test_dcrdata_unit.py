@@ -1,6 +1,8 @@
 """
-Copyright (c) 2019, the Decred developers
+Copyright (c) 2020, the Decred developers
 See LICENSE for details
+
+Tests use the "http_get_post" fixture in conftest.py .
 """
 
 import json
@@ -9,28 +11,36 @@ from pathlib import Path
 import pytest
 
 from decred.crypto import opcode
-from decred.dcr import dcrdata, txscript
+from decred.dcr import txscript
+from decred.dcr.dcrdata import (
+    DcrdataClient,
+    DcrDataError,
+    DcrdataPath,
+    DecredError,
+    checkOutput,
+    makeOutputs,
+)
 from decred.dcr.nets import testnet
 from decred.dcr.wire import msgtx
 from decred.util.encode import ByteArray
 
 
 def test_dcrdatapath(http_get_post):
-    ddp = dcrdata.DcrdataPath()
+    ddp = DcrdataPath()
 
     # __getattr__
-    with pytest.raises(dcrdata.DcrDataError):
+    with pytest.raises(DcrDataError):
         ddp.no_such_path()
 
     # Empty URI, needed for post.
-    with pytest.raises(dcrdata.DcrDataError):
+    with pytest.raises(DcrDataError):
         ddp.getCallsignPath()
     ddp.addCallsign([], "")
     csp = ddp.getCallsignPath()
     assert csp == ""
 
     # Non-empty URI.
-    with pytest.raises(dcrdata.DcrDataError):
+    with pytest.raises(DcrDataError):
         ddp.getCallsignPath("address")
     ddp.addCallsign(["address"], "/%s")
     csp = ddp.getCallsignPath("address", address="1234")
@@ -44,16 +54,16 @@ def test_dcrdatapath(http_get_post):
 
 def test_makeoutputs():
     # Amount is non-integer.
-    with pytest.raises(dcrdata.DecredError):
-        dcrdata.makeOutputs([("", None)], None)
+    with pytest.raises(DecredError):
+        makeOutputs([("", None)], None)
 
     # Amount is negative.
-    with pytest.raises(dcrdata.DecredError):
-        dcrdata.makeOutputs([("", -1)], None)
+    with pytest.raises(DecredError):
+        makeOutputs([("", -1)], None)
 
     address = "TsfDLrRkk9ciUuwfp2b8PawwnukYD7yAjGd"  # testnet return address
     value = int(1 * 1e8)  # 1 DCR, atoms
-    output = dcrdata.makeOutputs([(address, value)], testnet)[0]
+    output = makeOutputs([(address, value)], testnet)[0]
     assert isinstance(output, msgtx.TxOut)
     assert output.value == value
 
@@ -61,24 +71,24 @@ def test_makeoutputs():
 def test_checkoutput():
     # Amount is zero.
     tx = msgtx.TxOut()
-    with pytest.raises(dcrdata.DecredError):
-        dcrdata.checkOutput(tx, 0)
+    with pytest.raises(DecredError):
+        checkOutput(tx, 0)
 
     # Amount is negative.
     tx = msgtx.TxOut(-1)
-    with pytest.raises(dcrdata.DecredError):
-        dcrdata.checkOutput(tx, 0)
+    with pytest.raises(DecredError):
+        checkOutput(tx, 0)
 
     # Amount is too large.
     tx = msgtx.TxOut(txscript.MaxAmount + 1)
-    with pytest.raises(dcrdata.DecredError):
-        dcrdata.checkOutput(tx, 0)
+    with pytest.raises(DecredError):
+        checkOutput(tx, 0)
 
     # Tx is dust output.
     script = ByteArray([opcode.OP_RETURN, opcode.OP_NOP])
     tx = msgtx.TxOut(value=1, pkScript=script)
-    with pytest.raises(dcrdata.DecredError):
-        dcrdata.checkOutput(tx, 0)
+    with pytest.raises(DecredError):
+        checkOutput(tx, 0)
 
 
 class MockWebsocketClient:
@@ -102,7 +112,7 @@ def make_dcrdataclient(http_get_post):
     base_url = "https://example.org/"
     http_get_post(f"{base_url}api/list", api_list)
 
-    ddc = dcrdata.DcrdataClient(base_url)
+    ddc = DcrdataClient(base_url)
 
     # Set the mock WebsocketClient.
     ddc.ps = MockWebsocketClient()
@@ -131,5 +141,5 @@ class TestDcrdataClient:
         assert ddc.ps.sent[0]["message"]["message"] == "newblock"
 
     def test_static(self):
-        assert dcrdata.DcrdataClient.timeStringToUnix("1970-01-01 00:00:00") == 0
-        assert dcrdata.DcrdataClient.RFC3339toUnix("1970-01-01T00:00:00Z") == 0
+        assert DcrdataClient.timeStringToUnix("1970-01-01 00:00:00") == 0
+        assert DcrdataClient.RFC3339toUnix("1970-01-01T00:00:00Z") == 0

@@ -111,7 +111,7 @@ def getSocketURIs(uri):
     return ws, ps
 
 
-# To Do: Get the full list here.
+# TODO: get the full list here.
 InsightPaths = [
     "/tx/send",
     "/insight/api/addr/{address}/utxo",
@@ -879,9 +879,7 @@ class DcrdataBlockchain:
             pass
         return False
 
-    def sendOutputs(
-        self, outputs, keysource, utxosource, feeRate=None
-    ):  # , minconf=1, randomizeChangeIdx=True):
+    def sendOutputs(self, outputs, keysource, utxosource, feeRate=None):
         """
         Send the `TxOut`s to the address.
 
