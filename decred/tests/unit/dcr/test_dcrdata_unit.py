@@ -10,11 +10,11 @@ from pathlib import Path
 
 import pytest
 
+# Use after #82 is merged.
+# from decred.dcr import agenda
 from decred import DecredError
 from decred.crypto import opcode
 from decred.dcr import txscript
-# Use after #82 is merged.
-# from decred.dcr import agenda
 from decred.dcr.dcrdata import (
     DcrdataBlockchain,
     DcrdataClient,

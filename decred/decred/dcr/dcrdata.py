@@ -40,15 +40,7 @@ POST_HEADERS = {
 }
 
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 class DcrdataError(DecredError):
-=======
-class DcrDataError(DecredError):
->>>>>>> Test DcrdataClient in dcrdata.py using a MockWebsocketClient.
-=======
-class DcrdataError(DecredError):
->>>>>>> Fix case: DcrDataError -> DcrdataError
     pass
 
 
