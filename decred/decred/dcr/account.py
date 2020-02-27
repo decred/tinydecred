@@ -55,7 +55,7 @@ def filterCrazyAddress(addrs):
     return [a for a in addrs if a != CrazyAddress]
 
 
-class KeySource(object):
+class KeySource:
     """
     Implements the KeySource API from tinydecred.api. Must provide access to
     internal addresses via the KeySource.internal method, and PrivateKeys for a
@@ -138,7 +138,7 @@ class TicketStats:
         self.value = value
 
 
-class TinyBlock(object):
+class TinyBlock:
     """
     TinyBlock is a block hash and height that satisfies encode.Blobber.
     """
@@ -205,7 +205,7 @@ class TinyBlock(object):
         return self.hash == blk.hash and self.height == blk.height
 
 
-class TicketInfo(object):
+class TicketInfo:
     """
     Ticket-related transaction information.
     """
@@ -327,7 +327,7 @@ class TicketInfo(object):
         return ByteArray(TicketInfo.blob(self))
 
 
-class UTXO(object):
+class UTXO:
     """
     The UTXO is part of the wallet API. BlockChains create and parse UTXO
     objects and fill fields as required by the Wallet.
@@ -570,7 +570,7 @@ class UTXO(object):
         return self.tinfo and self.tinfo.status in ("expired", "missed")
 
 
-class Balance(object):
+class Balance:
     """
     Information about an account's balance.
     The `total` attribute will contain the sum of the value of all UTXOs known
@@ -626,7 +626,7 @@ class Balance(object):
         )
 
 
-class Account(object):
+class Account:
     """
     Account is a Decred account.
     """
