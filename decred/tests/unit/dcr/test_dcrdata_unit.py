@@ -10,11 +10,9 @@ from pathlib import Path
 
 import pytest
 
-# Use after #82 is merged.
-# from decred.dcr import agenda
 from decred import DecredError
 from decred.crypto import opcode
-from decred.dcr import txscript
+from decred.dcr import agenda, txscript
 from decred.dcr.dcrdata import (
     DcrdataBlockchain,
     DcrdataClient,
@@ -23,7 +21,6 @@ from decred.dcr.dcrdata import (
     checkOutput,
     makeOutputs,
 )
-from decred.dcr.dcrdata import AgendasInfo  # Remove after #82 is merged.
 from decred.dcr.nets import testnet
 from decred.dcr.wire import msgtx
 from decred.util.encode import ByteArray
@@ -220,6 +217,4 @@ class TestDcrdataBlockchain:
         # getAgendasInfo.
         http_get_post(f"{base_url}api/stake/vote/info", AGENDAS_INFO_RAW)
         agsinfo = ddb.getAgendasInfo()
-        # Use after #82 is merged.
-        # assert isinstance(agsinfo, agenda.AgendasInfo)
-        assert isinstance(agsinfo, AgendasInfo)
+        assert isinstance(agsinfo, agenda.AgendasInfo)
