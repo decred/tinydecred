@@ -24,14 +24,13 @@ def newHash():
     return ByteArray(rando.generateSeed(32))
 
 
-# fmt: off
 def parseShortForm(asm):
     b = ByteArray(b"")
     for token in asm.split():
         if token.startswith("0x"):
             b += ByteArray(token[2:])
         elif token.startswith("NULL_BYTES_"):
-            b += ByteArray(bytes(int(token[len("NULL_BYTES_"):])))
+            b += ByteArray(bytes(int(token[len("NULL_BYTES_") :])))
         else:
             longToken = "OP_" + token
             if hasattr(opcode, longToken):
@@ -268,6 +267,7 @@ def sstxTxIn():
     """
     sstxTxIn is the first input in the reference valid sstx
     """
+    # fmt: off
     return msgtx.TxIn(
         previousOutPoint=msgtx.OutPoint(
             txHash=ByteArray(
@@ -309,12 +309,14 @@ def sstxTxIn():
         ),
         sequence=0xFFFFFFFF,
     )
+    # fmt: on
 
 
 def sstxTxOut0():
     """
     sstxTxOut0 is the first output in the reference valid sstx
     """
+    # fmt: off
     return msgtx.TxOut(
         value=0x2123E300,  # 556000000
         version=0x0000,
@@ -334,12 +336,14 @@ def sstxTxOut0():
             ]
         ),
     )
+    # fmt: on
 
 
 def sstxTxOut1():
     """
     sstxTxOut1 is the second output in the reference valid sstx
     """
+    # fmt: off
     return msgtx.TxOut(
         value=0x00000000,  # 0
         version=0x0000,
@@ -358,12 +362,14 @@ def sstxTxOut1():
             ]
         ),
     )
+    # fmt: on
 
 
 def sstxTxOut2():
     """
     sstxTxOut2 is the third output in the reference valid sstx
     """
+    # fmt: off
     return msgtx.TxOut(
         value=0x2223E300,
         version=0x0000,
@@ -383,6 +389,7 @@ def sstxTxOut2():
             ]
         ),
     )
+    # fmt: on
 
 
 def sstxTxOut3():
@@ -390,6 +397,7 @@ def sstxTxOut3():
     sstxTxOut3 is another output in an SStx, this time instruction to pay to
     a P2SH output
     """
+    # fmt: off
     return msgtx.TxOut(
         value=0x00000000,  # 0
         version=0x0000,
@@ -408,6 +416,7 @@ def sstxTxOut3():
             ]
         ),
     )
+    # fmt: on
 
 
 def sstxTxOut4():
@@ -415,6 +424,7 @@ def sstxTxOut4():
     sstxTxOut4 is the another output in the reference valid sstx, and pays change
     to a P2SH address
     """
+    # fmt: off
     return msgtx.TxOut(
         value=0x2223E300,
         version=0x0000,
@@ -432,6 +442,7 @@ def sstxTxOut4():
             ]
         ),
     )
+    # fmt: on
 
 
 def sstxTxOut4VerBad():
@@ -439,6 +450,7 @@ def sstxTxOut4VerBad():
     sstxTxOut4VerBad is the third output in the reference valid sstx, with a
     bad version.
     """
+    # fmt: off
     return msgtx.TxOut(
         value=0x2223E300,
         version=0x1234,
@@ -456,6 +468,7 @@ def sstxTxOut4VerBad():
             ]
         ),
     )
+    # fmt: on
 
 
 def sstxBadVersionOut():
@@ -505,6 +518,7 @@ def ssgenTxIn1():
     # ssgenTxIn1 is the 1st position input in a valid SSGen tx used to test out the
     # IsSSGen function
     """
+    # fmt: off
     return msgtx.TxIn(
         previousOutPoint=msgtx.OutPoint(
             txHash=ByteArray(
@@ -546,6 +560,7 @@ def ssgenTxIn1():
         ),
         sequence=0xFFFFFFFF,
     )
+    # fmt: on
 
 
 def ssgenTxOut0():
@@ -553,6 +568,7 @@ def ssgenTxOut0():
     ssgenTxOut0 is the 0th position output in a valid SSGen tx used to test out the
     IsSSGen function
     """
+    # fmt: off
     return msgtx.TxOut(
         value=0x00000000,  # 0
         version=0x0000,
@@ -572,6 +588,7 @@ def ssgenTxOut0():
             ]
         ),
     )
+    # fmt: on
 
 
 def ssgenTxOut1():
@@ -579,6 +596,7 @@ def ssgenTxOut1():
     # ssgenTxOut1 is the 1st position output in a valid SSGen tx used to test out the
     # IsSSGen function
     """
+    # fmt: off
     return msgtx.TxOut(
         value=0x00000000,  # 0
         version=0x0000,
@@ -586,6 +604,7 @@ def ssgenTxOut1():
             [0x6A, 0x02, 0x94, 0x8C,]  # OP_RETURN  # 2 bytes to be pushed  # Vote bits
         ),
     )
+    # fmt: on
 
 
 def ssgenTxOut2():
@@ -593,6 +612,7 @@ def ssgenTxOut2():
     # ssgenTxOut2 is the 2nd position output in a valid SSGen tx used to test out the
     # IsSSGen function
     """
+    # fmt: off
     return msgtx.TxOut(
         value=0x2123E300,  # 556000000
         version=0x0000,
@@ -612,12 +632,14 @@ def ssgenTxOut2():
             ]
         ),
     )
+    # fmt: on
 
 
 def ssgenTxOut3():
     """
     ssgenTxOut3 is a P2SH output
     """
+    # fmt: off
     return msgtx.TxOut(
         value=0x2123E300,  # 556000000
         version=0x0000,
@@ -635,12 +657,14 @@ def ssgenTxOut3():
             ]
         ),
     )
+    # fmt: on
 
 
 def ssgenTxOut3BadVer():
     """
     ssgenTxOut3BadVer is a P2SH output with a bad version.
     """
+    # fmt: off
     return msgtx.TxOut(
         value=0x2123E300,  # 556000000
         version=0x0100,
@@ -658,6 +682,7 @@ def ssgenTxOut3BadVer():
             ]
         ),
     )
+    # fmt: on
 
 
 def ssgenMsgTx():
@@ -695,6 +720,7 @@ def ssgenMsgTxExtraOutputs():
     """
     ssgenMsgTxExtraOutputs is an invalid SSGen MsgTx with too many outputs
     """
+    # fmt: off
     return msgtx.MsgTx(
         serType=wire.TxSerializeFull,
         version=1,
@@ -723,6 +749,7 @@ def ssgenMsgTxExtraOutputs():
         expiry=0,
         cachedHash=None,
     )
+    # fmt: on
 
 
 def ssgenMsgTxStakeBaseWrong():
@@ -1229,6 +1256,7 @@ class TestTxScript(unittest.TestCase):
             if not txscript.isSSGen(ssgen):
                 raise Exception("isSSGen claimed a valid ssgen is invalid")
 
+            # fmt: off
             # Test for an OP_RETURN VoteBits push of the maximum size
             biggestPush = ByteArray(
                 [
@@ -1245,6 +1273,7 @@ class TestTxScript(unittest.TestCase):
                     0x6b, 0x52, 0xde,
                 ]
             )
+            # fmt: on
 
             ssgen = ssgenMsgTx()
             ssgen.tree = wire.TxTreeStake
@@ -1302,6 +1331,7 @@ class TestTxScript(unittest.TestCase):
         ssgen = ssgenMsgTx()
         b = ssgen.serialize().bytes()
         # Replace TxTreeStake with TxTreeRegular
+        # fmt: off
         b = b.replace(
             bytes(
                 [
@@ -1316,6 +1346,7 @@ class TestTxScript(unittest.TestCase):
                 ]
             ),
         )
+        # fmt: on
 
         # Deserialize the manipulated tx
         tx = msgtx.MsgTx.deserialize(b)
@@ -1341,6 +1372,7 @@ class TestTxScript(unittest.TestCase):
         # Test for too short of an OP_RETURN push being given in the 0th tx out
         ssgen = ssgenMsgTx()
         b = ssgen.serialize().bytes()
+        # fmt: off
         b = b.replace(
             bytes(
                 [
@@ -1363,6 +1395,7 @@ class TestTxScript(unittest.TestCase):
                 ]
             ),
         )
+        # fmt: on
 
         # Deserialize the manipulated tx
         tx = msgtx.MsgTx.deserialize(b)
@@ -1374,6 +1407,7 @@ class TestTxScript(unittest.TestCase):
         # Test for an invalid OP_RETURN prefix
         ssgen = ssgenMsgTx()
         b = ssgen.serialize().bytes()
+        # fmt: off
         b = b.replace(
             bytes(
                 [
@@ -1396,6 +1430,7 @@ class TestTxScript(unittest.TestCase):
                 ]
             ),
         )
+        # fmt: on
 
         # Deserialize the manipulated tx
         tx = msgtx.MsgTx.deserialize(b)
@@ -1414,9 +1449,11 @@ class TestTxScript(unittest.TestCase):
         # Test for too short of an OP_RETURN push being given in the 1st tx out
         ssgen = ssgenMsgTx()
         b = ssgen.serialize().bytes()
+        # fmt: off
         b = b.replace(
             bytes([0x04, 0x6A, 0x02, 0x94, 0x8C,]), bytes([0x03, 0x6A, 0x01, 0x94,])
         )
+        # fmt: on
 
         # Deserialize the manipulated tx
         tx = msgtx.MsgTx.deserialize(b)
@@ -1428,11 +1465,13 @@ class TestTxScript(unittest.TestCase):
         # Test for an invalid OP_RETURN prefix
         ssgen = ssgenMsgTx()
         b = ssgen.serialize().bytes()
+        # fmt: off
         b = b.replace(
             bytes([0x04, 0x6A, 0x02, 0x94, 0x8C,]),
             # This uses an OP_PUSHDATA_1 2-byte push to do the push in 5 bytes
             bytes([0x05, 0x6a, 0x4c, 0x02, 0x00, 0x00,]),
         )
+        # fmt: on
 
         # Deserialize the manipulated tx
         tx = msgtx.MsgTx.deserialize(b)
@@ -1444,10 +1483,12 @@ class TestTxScript(unittest.TestCase):
         # Test for an index 2+ output being not OP_SSGEN tagged
         ssgen = ssgenMsgTx()
         b = ssgen.serialize().bytes()
+        # fmt: off
         b = b.replace(
             bytes([0x1A, 0xBB, 0x76, 0xA9, 0x14, 0xC3, 0x98,]),
             bytes([0x19, 0x76, 0xA9, 0x14, 0xC3, 0x98,]),
         )
+        # fmt: on
 
         # Deserialize the manipulated tx
         tx = msgtx.MsgTx.deserialize(b)
@@ -1464,6 +1505,7 @@ class TestTxScript(unittest.TestCase):
                 self.der = der
                 self.isValid = isValid
 
+        # fmt: off
         tests = [
             # signatures from bitcoin blockchain tx
             # 0437cd7f8525ceed2324359c2d0ba26006d92d85
@@ -1735,6 +1777,7 @@ class TestTxScript(unittest.TestCase):
                 False,
             ),
         ]
+        # fmt: on
         for test in tests:
             try:
                 txscript.Signature.parse(ByteArray(test.sig), test.der)
@@ -2845,14 +2888,14 @@ class TestTxScript(unittest.TestCase):
         ]
 
         def checkAddrs(a, b, name):
-            assert len(a) == len(b), (
-                f"extracted address length mismatch. expected {len(a)}, got {len(b)} for test {name}"
-            )
+            assert len(a) == len(
+                b
+            ), f"extracted address length mismatch. expected {len(a)}, got {len(b)} for test {name}"
 
             for av, bv in zip(a, b):
-                assert av.scriptAddress() == bv.scriptAddress(), (
-                    f"scriptAddress mismatch. expected {av.scriptAddress().hex()}, got {bv.scriptAddress().hex()} for test {name}"
-                )
+                assert (
+                    av.scriptAddress() == bv.scriptAddress()
+                ), f"scriptAddress mismatch. expected {av.scriptAddress().hex()}, got {bv.scriptAddress().hex()} for test {name}"
 
         for test in tests:
             if "exception" in test:
@@ -3102,14 +3145,13 @@ class TestTxScript(unittest.TestCase):
 
 
 def test_is_unspendable():
-
-    # fmt: off
     """
     name (str): Short description of the test.
     amount (int): Value of the txOut this script spends.
     pkScript (ByteArray): Spending script.
     want (bool): Whether the tx is unspendable
     """
+    # fmt: off
     tests = [dict(
         name="not spendable: begins with OP_RETURN",
         amount=100,
@@ -3198,64 +3240,109 @@ def test_spend_script_size():
     pkScript (ByteArray): The script.
     want (int): Size of the spending script.
     """
-    # fmt: off
     tests = [
         dict(
             name="P2PKH",
-            pkScript=ByteArray([opcode.OP_DUP, opcode.OP_HASH160,
-                                opcode.OP_DATA_20, *([0x00] * 20),
-                                opcode.OP_EQUALVERIFY, opcode.OP_CHECKSIG]),
+            pkScript=ByteArray(
+                [
+                    opcode.OP_DUP,
+                    opcode.OP_HASH160,
+                    opcode.OP_DATA_20,
+                    *([0x00] * 20),
+                    opcode.OP_EQUALVERIFY,
+                    opcode.OP_CHECKSIG,
+                ]
+            ),
             wantException=None,
             want=txscript.RedeemP2PKHSigScriptSize,
         ),
         dict(
             name="P2PK",
-            pkScript=ByteArray([opcode.OP_DATA_33, 0x02, *([0x00] * 32),
-                                opcode.OP_CHECKSIG]),
+            pkScript=ByteArray(
+                [opcode.OP_DATA_33, 0x02, *([0x00] * 32), opcode.OP_CHECKSIG]
+            ),
             wantException=None,
             want=txscript.RedeemP2PKSigScriptSize,
         ),
         dict(
             name="revocation",
-            pkScript=ByteArray([opcode.OP_SSRTX, opcode.OP_DUP, opcode.OP_HASH160,
-                                opcode.OP_DATA_20, *([0x00] * 20),
-                                opcode.OP_EQUALVERIFY, opcode.OP_CHECKSIG]),
+            pkScript=ByteArray(
+                [
+                    opcode.OP_SSRTX,
+                    opcode.OP_DUP,
+                    opcode.OP_HASH160,
+                    opcode.OP_DATA_20,
+                    *([0x00] * 20),
+                    opcode.OP_EQUALVERIFY,
+                    opcode.OP_CHECKSIG,
+                ]
+            ),
             wantException=None,
             want=txscript.RedeemP2PKHSigScriptSize,
         ),
         dict(
             name="stake change",
-            pkScript=ByteArray([opcode.OP_SSTXCHANGE, opcode.OP_DUP, opcode.OP_HASH160,
-                                opcode.OP_DATA_20, *([0x00] * 20),
-                                opcode.OP_EQUALVERIFY, opcode.OP_CHECKSIG]),
+            pkScript=ByteArray(
+                [
+                    opcode.OP_SSTXCHANGE,
+                    opcode.OP_DUP,
+                    opcode.OP_HASH160,
+                    opcode.OP_DATA_20,
+                    *([0x00] * 20),
+                    opcode.OP_EQUALVERIFY,
+                    opcode.OP_CHECKSIG,
+                ]
+            ),
             wantException=None,
             want=txscript.RedeemP2PKHSigScriptSize,
         ),
         dict(
             name="stake gen",
-            pkScript=ByteArray([opcode.OP_SSGEN, opcode.OP_DUP, opcode.OP_HASH160,
-                                opcode.OP_DATA_20, *([0x00] * 20),
-                                opcode.OP_EQUALVERIFY, opcode.OP_CHECKSIG]),
+            pkScript=ByteArray(
+                [
+                    opcode.OP_SSGEN,
+                    opcode.OP_DUP,
+                    opcode.OP_HASH160,
+                    opcode.OP_DATA_20,
+                    *([0x00] * 20),
+                    opcode.OP_EQUALVERIFY,
+                    opcode.OP_CHECKSIG,
+                ]
+            ),
             wantException=None,
             want=txscript.RedeemP2PKHSigScriptSize,
         ),
         dict(
             name="unsupported stake submission",
-            pkScript=ByteArray([opcode.OP_SSTX, opcode.OP_DUP, opcode.OP_HASH160,
-                                opcode.OP_DATA_20, *([0x00] * 20),
-                                opcode.OP_EQUALVERIFY, opcode.OP_CHECKSIG]),
+            pkScript=ByteArray(
+                [
+                    opcode.OP_SSTX,
+                    opcode.OP_DUP,
+                    opcode.OP_HASH160,
+                    opcode.OP_DATA_20,
+                    *([0x00] * 20),
+                    opcode.OP_EQUALVERIFY,
+                    opcode.OP_CHECKSIG,
+                ]
+            ),
             wantException=NotImplementedError,
             want=None,
         ),
         dict(
             name="unsupported nested script",
-            pkScript=ByteArray([opcode.OP_SSRTX, opcode.OP_HASH160,
-                                opcode.OP_DATA_20, *([0x00] * 20), opcode.OP_EQUAL]),
+            pkScript=ByteArray(
+                [
+                    opcode.OP_SSRTX,
+                    opcode.OP_HASH160,
+                    opcode.OP_DATA_20,
+                    *([0x00] * 20),
+                    opcode.OP_EQUAL,
+                ]
+            ),
             wantException=DecredError,
             want=None,
         ),
     ]
-    # fmt: on
     for test in tests:
         if test["wantException"]:
             with pytest.raises(test["wantException"]):
@@ -3318,3 +3405,78 @@ def test_get_P2PKH_pCode():
         assert (
             res == test["want"]
         ), f'wanted {test["want"]} but got {res} for test {test["name"]}'
+
+
+def test_is_dust_amount():
+    """
+    name (str): Short description of the test.
+    value (int): tx output value.
+    relayFee (int): Network relay fee.
+    want (bool): whether this compinatin of size, value, and
+        relayFee is considered dust.
+    """
+    tests = [
+        dict(
+            # Any value is allowed with a zero relay fee.
+            name="zero value with zero relay fee",
+            value=0,
+            relayFee=0,
+            want=False,
+        ),
+        dict(
+            # Zero value is dust with any relay fee"
+            name="zero value with very small tx fee",
+            value=0,
+            relayFee=1,
+            want=True,
+        ),
+        dict(
+            name="25 byte public key script with value 602, relay fee 1e3",
+            value=602,
+            relayFee=1000,
+            want=True,
+        ),
+        dict(
+            name="25 byte public key script with value 603, relay fee 1e3",
+            value=603,
+            relayFee=1000,
+            want=False,
+        ),
+        dict(
+            name="25 byte public key script with value 60299, relay fee 1e5",
+            value=60299,
+            relayFee=1e5,
+            want=True,
+        ),
+        dict(
+            name="25 byte public key script with value 60300, relay fee 1e5",
+            value=60300,
+            relayFee=1e5,
+            want=False,
+        ),
+        dict(
+            name="25 byte public key script with value 6029, relay fee 1e4",
+            value=6029,
+            relayFee=1e4,
+            want=True,
+        ),
+        dict(
+            name="25 byte public key script with value 6030, relay fee 1e4",
+            value=6030,
+            relayFee=1e4,
+            want=False,
+        ),
+        dict(
+            # Maximum allowed value is never dust.
+            name="max amount is never dust",
+            value=txscript.MaxAmount,
+            relayFee=txscript.MaxAmount,
+            want=False,
+        ),
+    ]
+    size = 25
+    for test in tests:
+        res = txscript.isDustAmount(test["value"], size, test["relayFee"])
+        assert (
+            res == test["want"]
+        ), 'wanted {test["want"]} but got {test["got"]} for test {test["name"]}'
