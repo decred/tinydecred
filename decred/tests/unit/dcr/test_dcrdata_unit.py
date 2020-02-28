@@ -88,6 +88,8 @@ def test_dcrdatapath(http_get_post):
     ret = ddp.post("data")
     assert ret == {}
 
+
+def test_makeoutputs():
     # Amount is non-integer.
     with pytest.raises(DecredError):
         makeOutputs([("", None)], None)

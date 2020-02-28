@@ -464,7 +464,7 @@ class DcrdataBlockchain:
     def __init__(self, db, params, datapath, skipConnect=False):
         """
         Args:
-            db (str | database.Bucket): The database bucket or a filepath.
+            db (str | database.Bucket): the database bucket or a filepath.
                 If a filepath, a new database will be created.
             params obj: blockchain network parameters.
             datapath str: a URI for a dcrdata server.
@@ -1036,18 +1036,18 @@ class DcrdataBlockchain:
         available.
 
         Args:
-            keysource account.KeySource: A source for private keys.
-            utxosource func(int, filterFunc) -> (list(UTXO), bool): A source for
+            keysource account.KeySource: a source for private keys.
+            utxosource func(int, filterFunc) -> (list(UTXO), bool): a source for
                 UTXOs. The filterFunc is an optional function to filter UTXOs,
                 and is of the form func(UTXO) -> bool.
-            req account.TicketRequest: The ticket data.
+            req account.TicketRequest: the ticket data.
 
         Returns:
-            (splitTx, tickets) tuple: First element is the split transaction.
+            (splitTx, tickets) tuple: first element is the split transaction.
                 Second is a list of generated tickets.
-            splitSpent list(msgtx.TxOut): The outputs spent for the split
+            splitSpent list(msgtx.TxOut): the outputs spent for the split
                 transaction.
-            internalOutputs list(msgtx.TxOut): New outputs that fund internal
+            internalOutputs list(msgtx.TxOut): new outputs that fund internal
                 addresses.
 
         """
