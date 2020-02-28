@@ -2445,85 +2445,69 @@ def test_calc_min_required_tx_relay_fee():
 
 
 def test_spend_script_size():
-    class test:
-        def __init__(
-            self, name, pkScript, wantException, want,
-        ):
-            """
-            Args:
-                name (str): Short description of the test.
-                pkScript (ByteArray): The script.
-                want (int): Size of the spending script.
-            """
-            self.name = name
-            self.pkScript = pkScript
-            self.wantException = wantException
-            self.want = want
-
+    """
+    Args:
+        name (str): Short description of the test.
+        pkScript (ByteArray): The script.
+        wantException (Exception): If present this exception should be thrown.
+        want (int): Size of the spending script.
+    """
     # fmt: off
-    tests = [
-        test(
-            name="P2PKH",
-            pkScript=ByteArray([opcode.OP_DUP, opcode.OP_HASH160,
-                                opcode.OP_DATA_20, *([0x00] * 20),
-                                opcode.OP_EQUALVERIFY, opcode.OP_CHECKSIG]),
-            wantException=None,
-            want=txscript.RedeemP2PKHSigScriptSize,
-        ),
-        test(
-            name="P2PK",
-            pkScript=ByteArray([opcode.OP_DATA_33, 0x02, *([0x00] * 32),
-                                opcode.OP_CHECKSIG]),
-            wantException=None,
-            want=txscript.RedeemP2PKSigScriptSize,
-        ),
-        test(
-            name="revocation",
-            pkScript=ByteArray([opcode.OP_SSRTX, opcode.OP_DUP, opcode.OP_HASH160,
-                                opcode.OP_DATA_20, *([0x00] * 20),
-                                opcode.OP_EQUALVERIFY, opcode.OP_CHECKSIG]),
-            wantException=None,
-            want=txscript.RedeemP2PKHSigScriptSize,
-        ),
-        test(
-            name="stake change",
-            pkScript=ByteArray([opcode.OP_SSTXCHANGE, opcode.OP_DUP, opcode.OP_HASH160,
-                                opcode.OP_DATA_20, *([0x00] * 20),
-                                opcode.OP_EQUALVERIFY, opcode.OP_CHECKSIG]),
-            wantException=None,
-            want=txscript.RedeemP2PKHSigScriptSize,
-        ),
-        test(
-            name="stake gen",
-            pkScript=ByteArray([opcode.OP_SSGEN, opcode.OP_DUP, opcode.OP_HASH160,
-                                opcode.OP_DATA_20, *([0x00] * 20),
-                                opcode.OP_EQUALVERIFY, opcode.OP_CHECKSIG]),
-            wantException=None,
-            want=txscript.RedeemP2PKHSigScriptSize,
-        ),
-        test(
-            name="unsupported stake submission",
-            pkScript=ByteArray([opcode.OP_SSTX, opcode.OP_DUP, opcode.OP_HASH160,
-                                opcode.OP_DATA_20, *([0x00] * 20),
-                                opcode.OP_EQUALVERIFY, opcode.OP_CHECKSIG]),
-            wantException=NotImplementedError,
-            want=None,
-        ),
-        test(
-            name="unsupported nested script",
-            pkScript=ByteArray([opcode.OP_SSRTX, opcode.OP_HASH160,
-                                opcode.OP_DATA_20, *([0x00] * 20), opcode.OP_EQUAL]),
-            wantException=DecredError,
-            want=None,
-        ),
-    ]
+    tests = [{
+            "name": "P2PKH",
+            "pkScript": ByteArray([opcode.OP_DUP, opcode.OP_HASH160,
+                                   opcode.OP_DATA_20, *([0x00] * 20),
+                                   opcode.OP_EQUALVERIFY, opcode.OP_CHECKSIG]),
+            "wantException": None,
+            "want": txscript.RedeemP2PKHSigScriptSize,
+        }, {
+            "name": "P2PK",
+            "pkScript": ByteArray([opcode.OP_DATA_33, 0x02, *([0x00] * 32),
+                                   opcode.OP_CHECKSIG]),
+            "wantException": None,
+            "want": txscript.RedeemP2PKSigScriptSize,
+        }, {
+            "name": "revocation",
+            "pkScript": ByteArray([opcode.OP_SSRTX, opcode.OP_DUP, opcode.OP_HASH160,
+                                   opcode.OP_DATA_20, *([0x00] * 20),
+                                   opcode.OP_EQUALVERIFY, opcode.OP_CHECKSIG]),
+            "wantException": None,
+            "want": txscript.RedeemP2PKHSigScriptSize,
+        }, {
+            "name": "stake change",
+            "pkScript": ByteArray([opcode.OP_SSTXCHANGE, opcode.OP_DUP, opcode.OP_HASH160,
+                                   opcode.OP_DATA_20, *([0x00] * 20),
+                                   opcode.OP_EQUALVERIFY, opcode.OP_CHECKSIG]),
+            "wantException": None,
+            "want": txscript.RedeemP2PKHSigScriptSize,
+        }, {
+            "name": "stake gen",
+            "pkScript": ByteArray([opcode.OP_SSGEN, opcode.OP_DUP, opcode.OP_HASH160,
+                                   opcode.OP_DATA_20, *([0x00] * 20),
+                                   opcode.OP_EQUALVERIFY, opcode.OP_CHECKSIG]),
+            "wantException": None,
+            "want": txscript.RedeemP2PKHSigScriptSize,
+        }, {
+            "name": "unsupported stake submission",
+            "pkScript": ByteArray([opcode.OP_SSTX, opcode.OP_DUP, opcode.OP_HASH160,
+                                   opcode.OP_DATA_20, *([0x00] * 20),
+                                   opcode.OP_EQUALVERIFY, opcode.OP_CHECKSIG]),
+            "wantException": NotImplementedError,
+            "want": None,
+        }, {
+            "name": "unsupported nested script",
+            "pkScript": ByteArray([opcode.OP_SSRTX, opcode.OP_HASH160,
+                                   opcode.OP_DATA_20, *([0x00] * 20), opcode.OP_EQUAL]),
+            "wantException": DecredError,
+            "want": None,
+        }]
     # fmt: on
     for test in tests:
-        if test.wantException:
-            with pytest.raises(test.wantException):
-                txscript.spendScriptSize(test.pkScript)
+        if test["wantException"]:
+            with pytest.raises(test["wantException"]):
+                txscript.spendScriptSize(test["pkScript"])
             continue
-        res = txscript.spendScriptSize(test.pkScript)
+        res = txscript.spendScriptSize(test["pkScript"])
         assert (
-            res == test.want
-        ), f"wanted {test.want} for test {test.name} but got {res}"
+            res == test["want"]
+        ), f'wanted {test["want"]} but got {res} for test {test["name"]}'
