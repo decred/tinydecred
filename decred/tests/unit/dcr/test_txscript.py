@@ -12,7 +12,7 @@ from base58 import b58decode
 from decred import DecredError
 from decred.crypto import crypto, opcode, rando
 from decred.crypto.secp256k1 import curve as Curve
-from decred.dcr import txscript, vsp
+from decred.dcr import txscript
 from decred.dcr.calc import SubsidyCache
 from decred.dcr.nets import mainnet, testnet
 from decred.dcr.wire import msgtx, wire
@@ -2353,52 +2353,39 @@ class TestTxScript(unittest.TestCase):
 
 
 def test_is_unspendable():
-    class test:
-        def __init__(
-            self, name, amount, pkScript, want,
-        ):
-            """
-            Args:
-                name (str): Short description of the test.
-                amount (int): Value of the txOut this script spends.
-                pkScript (ByteArray): Spending script.
-                want (bool): Whether the tx is unspendable
-            """
-            self.name = name
-            self.amount = amount
-            self.pkScript = pkScript
-            self.want = want
 
     # fmt: off
-    tests = [
-        test(
-            name="not spendable: begins with OP_RETURN",
-            amount=100,
-            pkScript=ByteArray([0x6A, 0x04, 0x74, 0x65, 0x73, 0x74]),
-            want=True,
-        ),
-        test(
-            name="not spendable: zero amount",
-            amount=0,
-            pkScript=ByteArray([0x76, 0xa9, 0x14, 0x29, 0x95, 0xa0,
+    """
+    name (str): Short description of the test.
+    amount (int): Value of the txOut this script spends.
+    pkScript (ByteArray): Spending script.
+    want (bool): Whether the tx is unspendable
+    """
+    tests = [{
+        "name": "not spendable: begins with OP_RETURN",
+        "amount": 100,
+        "pkScript": ByteArray([0x6A, 0x04, 0x74, 0x65, 0x73, 0x74]),
+        "want": True,
+    }, {
+        "name": "not spendable: zero amount",
+        "amount": 0,
+        "pkScript": ByteArray([0x76, 0xa9, 0x14, 0x29, 0x95, 0xa0,
                                0xfe, 0x68, 0x43, 0xfa, 0x9b, 0x95, 0x45,
                                0x97, 0xf0, 0xdc, 0xa7, 0xa4, 0x4d, 0xf6,
                                0xfa, 0x0b, 0x5c, 0x88, 0xac]),
-            want=True,
-        ),
-        test(
-            name="spendable",
-            amount=100,
-            pkScript=ByteArray([0x76, 0xa9, 0x14, 0x29, 0x95, 0xa0,
+        "want": True,
+    }, {
+        "name": "spendable",
+        "amount": 100,
+        "pkScript": ByteArray([0x76, 0xa9, 0x14, 0x29, 0x95, 0xa0,
                                0xfe, 0x68, 0x43, 0xfa, 0x9b, 0x95, 0x45,
                                0x97, 0xf0, 0xdc, 0xa7, 0xa4, 0x4d, 0xf6,
                                0xfa, 0x0b, 0x5c, 0x88, 0xac]),
-            want=False,
-        ),
-    ]
+        "want": False,
+    }]
     # fmt: on
     for test in tests:
-        res = txscript.isUnspendable(test.amount, test.pkScript)
+        res = txscript.isUnspendable(test["amount"], test["pkScript"])
         assert (
-            res == test.want
-        ), f"wanted {test.want} for test {test.name} but got {res}"
+            res == test["want"]
+        ), f'wanted {test["want"]} but got {res} for test {test["name"]}'
