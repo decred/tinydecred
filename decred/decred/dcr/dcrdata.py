@@ -894,9 +894,10 @@ class DcrdataBlockchain:
             utxosource func(int, func(UTXO) -> bool) -> (list(UTXO), bool):
                 A function that takes an amount in atoms, and an optional
                 filtering function. utxosource returns a list of UTXOs that sum
-                to >= the amount. If the filtering function is provided, UTXOs
-                for which the  function return a falsey value will not be
-                included in the returned UTXO list.
+                to >= the amount, and a bool that states whether the funds are
+                sufficient to complete the transaction. If the filtering
+                function is provided, UTXOs for which the  function return a
+                falsey value will not be included in the returned UTXO list.
 
         Returns:
             newTx MsgTx: The sent transaction.
