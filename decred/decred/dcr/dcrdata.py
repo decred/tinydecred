@@ -551,7 +551,7 @@ class DcrdataBlockchain:
         Check for coinbase or stakebase, and assign a maturity as necessary.
 
         Args:
-            utxo UTXO: A new unspent transaction output from blockchain.
+            utxo account.UTXO: A new unspent transaction output from blockchain.
 
         Returns:
             bool: True if no errors are encountered.
@@ -607,7 +607,8 @@ class DcrdataBlockchain:
         Get a UTXO from the outpoint. The UTXO will not have the address set.
 
         Args:
-            txid (str): Hex-encode txid
+            txid str: hex-encoded txid.
+            vout int: the chosen tx output index.
         """
         tx = self.tx(txid)
         txout = tx.txOut[vout]
@@ -665,28 +666,13 @@ class DcrdataBlockchain:
         except database.NoValueError:
             # If the blockhash is not in the database, get it from dcrdata
             decodedTx = self.dcrdata.tx(txid)
-            if (
-                "block" not in decodedTx
-                or "blockhash" not in decodedTx["block"]
-                or decodedTx["block"]["blockhash"] == ""
-            ):
+            try:
+                hexHash = decodedTx["block"]["blockhash"]
+            except KeyError:
                 return None
-            hexHash = decodedTx["block"]["blockhash"]
             header = self.blockHeader(hexHash)
             self.txBlockMap[txHash] = header.cachedHash().bytes()
             return header
-
-    def decodedTx(self, txid):
-        """
-        decodedTx will produce a transaction as a Python dict.
-
-        Args:
-            txid (str): Hex-encoded transaction ID.
-
-        Returns:
-            dict: A Python dict with transaction information.
-        """
-        return self.dcrdata.tx(txid)
 
     def blockHeader(self, hexHash):
         """
@@ -713,7 +699,7 @@ class DcrdataBlockchain:
 
     def blockHeaderByHeight(self, height):
         """
-        Get the block header by height. The blcck header is retreived from the
+        Get the block header by height. The block header is retrieved from the
         blockchain if necessary, in which case it is stored.
 
         Args:

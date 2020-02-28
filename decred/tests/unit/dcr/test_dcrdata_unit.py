@@ -22,7 +22,7 @@ from decred.dcr.dcrdata import (
     makeOutputs,
 )
 from decred.dcr.nets import testnet
-from decred.dcr.wire import msgtx
+from decred.dcr.wire import msgblock, msgtx
 from decred.util.encode import ByteArray
 
 
@@ -320,5 +320,57 @@ class TestDcrdataBlockchain:
         # Preload both the UTXOs and the txs.
         http_get_post(utxoURL, self.utxos)
         for txid, tx in self.txs.items():
-            http_get_post(f"{BASE_URL}api/tx/hex/{txid}", tx)
+            txURL = f"{BASE_URL}api/tx/hex/{txid}"
+            http_get_post(txURL, tx)
         assert len(ddb.UTXOs(addrs)) == 3
+
+        # txsForAddr
+        txsURL = f"{BASE_URL}insight/api/addr/the_address/txs"
+        # No transactions for an address.
+        http_get_post(txsURL, {})
+        assert ddb.txsForAddr("the_address") == []
+        # Some transactions for an address.
+        http_get_post(txsURL, {"transactions": "txs"})
+        assert ddb.txsForAddr("the_address") == "txs"
+
+        # txVout
+        assert (
+            ddb.txVout(
+                "fe332b35fa0a8a8aa2d247a35f45553935e0b96d33e1a8158a1a863307d5bdf3", 0,
+            ).satoshis
+            == 14773017964
+        )
+
+        # blockForTx
+        # Preload the decoded tx.
+        txid = "fe332b35fa0a8a8aa2d247a35f45553935e0b96d33e1a8158a1a863307d5bdf3"
+        txURL = f"{BASE_URL}api/tx/{txid}"
+        decodedTx = {
+            "block": {
+                "blockhash": (
+                    "00000000000000002b197e4018b990efb85e6bd43ffb15f7ede97a78"
+                    "f806a3f8"
+                )
+            }
+        }
+        http_get_post(txURL, decodedTx)
+        # Preload the block header.
+        blockHash = "00000000000000002b197e4018b990efb85e6bd43ffb15f7ede97a78f806a3f8"
+        headerURL = f"{BASE_URL}api/block/hash/{blockHash}/header/raw"
+        blockHeader = {
+            "hex": (
+                "07000000e00b3a83dc60f961d8f516ece63e6d009eff4c2af50139150000"
+                "000000000000873684038a5d384cf123ee39d39bdf9f65cf4051ec4d420f"
+                "e909c16344329aaa35879931c8695d9be6f9259fa7467c51d0c7e601d95c"
+                "c78fdd458210503865af0100721e0a6d2bf90500040091a40000e62f3418"
+                "c8518a700300000012850600213300003de0575e6e8b9d13e691326a1fd4"
+                "3a0000000000000000000000000000000000000000000000000007000000"
+            ),
+        }
+        http_get_post(headerURL, blockHeader)
+        assert isinstance(
+            ddb.blockForTx(
+                "fe332b35fa0a8a8aa2d247a35f45553935e0b96d33e1a8158a1a863307d5bdf3"
+            ),
+            msgblock.BlockHeader,
+        )

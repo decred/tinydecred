@@ -369,7 +369,7 @@ class KeySource:
 
     def priv(self, addr):
         """
-        Retreive the private key for a base-58 encoded address.
+        Retrieve the private key for a base-58 encoded address.
 
         Args:
             addr (str): An address.

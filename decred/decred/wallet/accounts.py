@@ -221,7 +221,7 @@ class AccountManager(object):
         Returns:
             Account: The open account.
         """
-        # Retreive and open the account.
+        # Retrieve and open the account.
         account = self.accounts[acct] if acct in self.accounts else self.account(acct)
         account.open(cryptoKey, chains.chain(self.coinType), self.signals)
         return account
