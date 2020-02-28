@@ -2389,3 +2389,63 @@ def test_is_unspendable():
         assert (
             res == test["want"]
         ), f'wanted {test["want"]} but got {res} for test {test["name"]}'
+
+
+def test_calc_min_required_tx_relay_fee():
+    class test:
+        def __init__(self, name, size, relayFee, want):
+            """
+            Args:
+                name (str): Short description of the test.
+                size (int): Transaction size in bytes.
+                relayFee (int): Minimum relay transaction fee.
+                want (bool): Expected Fee.
+            """
+            self.name = name
+            self.size = size
+            self.relayFee = relayFee
+            self.want = want
+
+    tests = [
+        test(
+            # Ensure combination of size and fee that are less than 1000 produce a
+            # non-zero fee.
+            name="250 bytes with relay fee of 3",
+            size=250,
+            relayFee=3,
+            want=3,
+        ),
+        test(
+            name="1000 bytes with default minimum relay fee",
+            size=1000,
+            relayFee=txscript.DefaultRelayFeePerKb,
+            want=1e4,
+        ),
+        test(
+            name="max standard tx size with default minimum relay fee",
+            size=txscript.MaxStandardTxSize,
+            relayFee=txscript.DefaultRelayFeePerKb,
+            want=1e6,
+        ),
+        test(
+            name="max standard tx size with max relay fee",
+            size=txscript.MaxStandardTxSize,
+            relayFee=txscript.MaxAmount,
+            want=txscript.MaxAmount,
+        ),
+        test(
+            name="1500 bytes with 5000 relay fee", size=1500, relayFee=5000, want=7500,
+        ),
+        test(
+            name="1500 bytes with 3000 relay fee", size=1500, relayFee=3000, want=4500,
+        ),
+        test(name="782 bytes with 5000 relay fee", size=782, relayFee=5000, want=3910,),
+        test(name="782 bytes with 3000 relay fee", size=782, relayFee=3000, want=2346,),
+        test(name="782 bytes with 2550 relay fee", size=782, relayFee=2550, want=1994,),
+    ]
+
+    for test in tests:
+        res = txscript.calcMinRequiredTxRelayFee(test.relayFee, test.size)
+        assert (
+            res == test.want
+        ), f"wanted {test.want} for test {test.name} but got {res}"

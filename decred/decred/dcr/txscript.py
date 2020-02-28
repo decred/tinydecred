@@ -103,6 +103,10 @@ P2SHPkScriptSize = 1 + 1 + 20 + 1
 # DefaultRelayFeePerKb is the default minimum relay fee policy for a mempool.
 DefaultRelayFeePerKb = 1e4
 
+# MaxStandardTxSize is the maximum size allowed for transactions that are
+# considered standard and will therefore be relayed and considered for mining.
+MaxStandardTxSize = 1e5
+
 # AtomsPerCent is the number of atomic units in one coin cent.
 AtomsPerCent = 1e6
 
@@ -2882,7 +2886,7 @@ def calcMinRequiredTxRelayFee(relayFeePerKb, txSerializeSize):
     # free transaction relay fee).  minTxRelayFee is in Atom/KB, so
     # multiply by serializedSize (which is in bytes) and divide by 1000 to
     # get minimum Atoms.
-    fee = relayFeePerKb * txSerializeSize / 1000
+    fee = relayFeePerKb * txSerializeSize // 1000
 
     if fee == 0 and relayFeePerKb > 0:
         fee = relayFeePerKb
