@@ -464,13 +464,13 @@ class DcrdataBlockchain:
     def __init__(self, db, params, datapath, skipConnect=False):
         """
         Args:
-            db (str||database.Bucket): The database bucket or a filepath. If
-                a filepath, a new database will be created.
-            params obj: Network parameters
-            datapath str: A uri for a dcrdata server
-            skipConnect bool: Skip initial connection
+            db (str | database.Bucket): the database bucket or a filepath.
+                If a filepath, a new database will be created.
+            params obj: blockchain network parameters.
+            datapath str: a URI for a dcrdata server.
+            skipConnect bool: skip initial connection to dcrdata.
         """
-        # Allow string arguments for datab
+        # Allow string arguments for database.
         self.ownsDB = False
         if isinstance(db, str):
             self.ownsDB = True
@@ -648,7 +648,7 @@ class DcrdataBlockchain:
                     "unable to retrieve tx data from dcrdata at %s: %s"
                     % (self.dcrdata.baseURI, e)
                 )
-        raise DecredError("failed to retreive transaction")
+        raise DecredError("failed to retrieve transaction")
 
     def blockForTx(self, txid):
         """
@@ -757,10 +757,9 @@ class DcrdataBlockchain:
         """
         try:
             self.tip = self.bestBlock()
-            return
         except Exception as e:
             log.error("failed to retrieve tip from blockchain: %s" % formatTraceback(e))
-        raise DecredError("no tip data retrieved")
+            raise DecredError("no tip data retrieved")
 
     def relayFee(self):
         """
@@ -889,20 +888,21 @@ class DcrdataBlockchain:
           (dcrwallet/wallet/txauthor).AddAllInputScripts
 
         Args:
-            outputs (list(TxOut)): The transaction outputs to send.
+            outputs list(TxOut): The transaction outputs to send.
             keysource func(str) -> PrivateKey: A function that returns the
                 private key for an address.
-            utxosource func(int, func(UTXO) -> bool) -> list(UTXO): A function
-                that takes an amount in atoms, and an optional filtering
-                function. utxosource returns a list of UTXOs that sum to >= the
-                amount. If the filtering function is provided, UTXOs for which
-                the  function return a falsey value will not be included in the
-                returned UTXO list.
+            utxosource func(int, func(UTXO) -> bool) -> (list(UTXO), bool):
+                A function that takes an amount in atoms, and an optional
+                filtering function. utxosource returns a list of UTXOs that sum
+                to >= the amount, and a bool that states whether the funds are
+                sufficient to complete the transaction. If the filtering
+                function is provided, UTXOs for which the  function return a
+                falsey value will not be included in the returned UTXO list.
 
         Returns:
-            MsgTx: The sent transaction.
-            list(UTXO): The spent UTXOs.
-            list(UTXO): Length 1 array containing the new change UTXO.
+            newTx MsgTx: The sent transaction.
+            utxos list(UTXO): The spent UTXOs.
+            newUTXOs list(UTXO): Length 1 array containing the new change UTXO.
         """
         total = 0
         inputs = []
@@ -1036,17 +1036,18 @@ class DcrdataBlockchain:
         available.
 
         Args:
-            keysource (account.KeySource): A source for private keys.
-            utxosource (func(int, filterFunc) -> list(UTXO)): A source for
+            keysource account.KeySource: a source for private keys.
+            utxosource func(int, filterFunc) -> (list(UTXO), bool): a source for
                 UTXOs. The filterFunc is an optional function to filter UTXOs,
                 and is of the form func(UTXO) -> bool.
-            req (account.TicketRequest): The ticket data.
+            req account.TicketRequest: the ticket data.
 
         Returns:
-            tuple: First element is the split transaction. Second is a list of
-                generated tickets.
-            list (msgtx.TxOut): The outputs spent for the split transaction.
-            internalOutputs (msgtx.TxOut): New outputs that fund internal
+            (splitTx, tickets) tuple: first element is the split transaction.
+                Second is a list of generated tickets.
+            splitSpent list(msgtx.TxOut): the outputs spent for the split
+                transaction.
+            internalOutputs list(msgtx.TxOut): new outputs that fund internal
                 addresses.
 
         """
