@@ -36,7 +36,7 @@ MainnetConfig = {"dcrdata": "https://explorer.dcrdata.org/"}
 
 TestnetConfig = {"dcrdata": "https://testnet.dcrdata.org/"}
 
-SimnetConfig = {"dcrdata": "http://localhost:7777"}  # Run dcrdata locally
+SimnetConfig = {"dcrdata": "http://localhost:17779"}  # Run dcrdata locally
 
 log = helpers.getLogger("CONFIG")  # , logLvl=0)
 

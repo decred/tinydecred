@@ -8,54 +8,34 @@ Before running this script, send the wallet some DCR from the faucet.
 """
 
 from getpass import getpass
-import os
 
-from decred import config
-from decred.dcr.dcrdata import DcrdataBlockchain
-from decred.dcr.nets import testnet
-from decred.wallet.wallet import Wallet
+from decred.wallet.simple import SimpleWallet
 
-
-# Set the configuration for testnet before loading decred modules.
-config.load("testnet")
-
-
-# We need a class that implements the Signals API.
-class Signals(object):
-    def balance(self, bal):
-        print(bal)
+# Testnet return address for faucet.decred.org.
+TESTNET_ADDRESS = "TsfDLrRkk9ciUuwfp2b8PawwnukYD7yAjGd"
 
 
 def main():
-    # DcrdataBlockchain implements a Blockchain API (see api.py) for Decred.
-    dbPath = os.path.join("testnet", "dcr_testnet.db")
-    dcrdata = "https://testnet.dcrdata.org"
-    blockchain = DcrdataBlockchain(dbPath, testnet, dcrdata)
-
-    recipient = "TsfDLrRkk9ciUuwfp2b8PawwnukYD7yAjGd"  # testnet return address
     value = int(1 * 1e8)  # 1 DCR, atoms
-
-    # Load the wallet from file.
     password = getpass()
-    walletPath = os.path.join("testnet", "testnet_wallet.db")
+    walletDir = "wallets"
     try:
-        wallet = Wallet.openFile(walletPath, password, Signals())
+        print("Opening and synchronizing wallet")
+        wallet = SimpleWallet(walletDir, password, "testnet")
     except Exception as e:
         print("Failed to open wallet with provided password: %s" % e)
         exit()
 
     try:
-        # Sync the wallet
-        wallet.sync()
         # Send some DCR.
-        tx = wallet.openAccount.sendToAddress(value, recipient)
+        tx = wallet.sendToAddress(value, TESTNET_ADDRESS)
         # Print the transaction ID and a dcrdata link.
-        print("transaction ID: %s" % tx.id())
-        print("see transaction at https://testnet.dcrdata.org/tx/%s" % tx.id())
+        print("Transaction ID: %s" % tx.id())
+        print("See transaction at https://testnet.dcrdata.org/tx/%s" % tx.id())
     except Exception as e:
         print("Failed to send transaction: %s" % e)
-
-    blockchain.close()
+    finally:
+        wallet.close()
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ accounts module
     Mostly account handling, interaction with this package's functions will
     mostly be through the AccountManager.
 """
-
+from decred import DecredError
 from decred.crypto import crypto
 from decred.util import chains, encode, helpers
 
@@ -142,6 +142,11 @@ class AccountManager(object):
         blobber = chains.AccountConstructors[self.coinType]
         self.acctDB = db.child("accts", datatypes=("INTEGER", "BLOB"), blobber=blobber)
         self.signals = signals
+        blockchain = chains.chain(self.coinType)
+        for idx, acct in self.acctDB.items():
+            self.accounts[idx] = acct
+            db = self.dbForAcctIdx(idx)
+            acct.load(self.dbForAcctIdx(idx), blockchain, self.signals)
 
     def coinKey(self, cryptoKey):
         """
@@ -192,6 +197,7 @@ class AccountManager(object):
             self.signals,
         )
         self.acctDB[idx] = account
+        self.accounts[idx] = account
         return account
 
     def account(self, idx):
@@ -204,27 +210,39 @@ class AccountManager(object):
         Returns:
             Account: The account at idx.
         """
-        account = self.acctDB[idx]
-        account.load(self.dbForAcctIdx(idx))
-        self.accounts[idx] = account
-        return account
+        return self.accounts[idx]
 
-    def openAccount(self, acct, cryptoKey):
+    def listAccounts(self):
+        """
+        Get a list of accounts in order of their account index. The index of the
+        of the account in the returned list is its BIP-44 account index.
+
+        Returns:
+            list(dcr.Account): All known accounts.
+        """
+
+        sortedAccts = sorted(self.accounts.items(), key=lambda pair: pair[0])
+        if len(sortedAccts) != sortedAccts[-1][0] + 1:
+            raise DecredError(
+                f"account index mismatch. expected last index {len(sortedAccts) - 1} got {sortedAccts[-1][0]}"
+            )
+        return [a for _, a in sortedAccts]
+
+    def openAccount(self, idx, cryptoKey):
         """
         Open an account.
 
         Args:
-            acct (int): The acccount index, which is its position in the
+            idx (int): The acccount index, which is its position in the
                 accounts list.
             cryptoKey (ByteArray): The master encoding key.
 
         Returns:
             Account: The open account.
         """
-        # Retrieve and open the account.
-        account = self.accounts[acct] if acct in self.accounts else self.account(acct)
-        account.open(cryptoKey, chains.chain(self.coinType), self.signals)
-        return account
+        acct = self.accounts[idx]
+        acct.unlock(cryptoKey)
+        return acct
 
 
 def createNewAccountManager(root, cryptoKey, coinType, chainParams, db):
@@ -267,11 +285,14 @@ def createAccount(
     pubKeyEncrypted = crypto.encrypt(cryptoKey, acctKeyPub.serialize())
     privKeyEncrypted = crypto.encrypt(cryptoKey, acctKeyPriv.serialize())
     constructor = chains.AccountConstructors[coinType]
-    account = constructor(pubKeyEncrypted, privKeyEncrypted, acctName, netName, db)
+    blockchain = chains.chain(coinType)
+    account = constructor(
+        pubKeyEncrypted, privKeyEncrypted, acctName, netName, db, blockchain, signals
+    )
     # Open the account.
-    account.open(cryptoKey, chains.chain(coinType), signals)
+    account.unlock(cryptoKey)
     # Create the first payment address.
     account.generateGapAddresses()
     # Close the account to zero the key.
-    account.close()
+    account.lock()
     return account

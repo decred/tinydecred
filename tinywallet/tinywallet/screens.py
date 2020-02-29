@@ -36,6 +36,8 @@ FADE_IN_ANIMATION = "fadeinanimation"
 
 formatTraceback = helpers.formatTraceback
 
+app = None
+
 
 def pixmapFromSvg(filename, w, h):
     """
@@ -96,13 +98,14 @@ class TinyDialog(QtWidgets.QFrame):
     successSig = QtCore.pyqtSignal(str)
     errorSig = QtCore.pyqtSignal(str)
 
-    def __init__(self, app):
+    def __init__(self, qApp):
         """
         Args:
             app (TinyDecred): The TinyDecred application instance.
         """
         super().__init__()
-        self.app = app
+        global app
+        app = qApp
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
         self.popSig.connect(self.pop_)
         self.pop = lambda w=None: self.popSig.emit(w)
@@ -143,7 +146,7 @@ class TinyDialog(QtWidgets.QFrame):
         menuBar.setFixedHeight(TinyDialog.topMenuHeight)
 
         # A little spinner that it shown while the wallet is locked.
-        self.working = Spinner(self.app, 20, 3, 0)
+        self.working = Spinner(20, 3, 0)
         self.working.setVisible(False)
         self.working.setFixedSize(20, 20)
         menuLayout.addWidget(Q.pad(self.working, 3, 3, 3, 3), 0, Q.ALIGN_CENTER)
@@ -186,7 +189,7 @@ class TinyDialog(QtWidgets.QFrame):
         )
 
     def showEvent(self, e):
-        # geo = self.app.sysTray.geometry()
+        # geo = app.sysTray.geometry()
         # print("sysTray.x: %r" % repr(geo.x()))
         # print("sysTray.y: %r" % repr(geo.y()))
         # print("sysTray.width: %r" % repr(geo.width()))
@@ -365,13 +368,12 @@ class Screen(QtWidgets.QWidget):
     should inherit Screen.
     """
 
-    def __init__(self, app):
+    def __init__(self):
         """
         Args:
             app (TinyDecred): The TinyDecred application instance.
         """
         super().__init__()
-        self.app = app
         # isPoppable indicates whether this screen can be popped by the user
         # when this screen is displayed.
         self.isPoppable = False
@@ -426,25 +428,27 @@ class Screen(QtWidgets.QWidget):
             self.animations.pop(FADE_IN_ANIMATION, None)
 
 
-class HomeScreen(Screen):
+class AccountScreen(Screen):
     """
     The standard home screen for a TinyDecred account.
     """
 
-    def __init__(self, app):
+    def __init__(self, acct):
         """
         Args:
-            app (TinyDecred): The TinyDecred application instance.
+            acct (Account): A Decred account.
         """
-        super().__init__(app)
-        self.app = app
+        super().__init__()
+        self.wallet = app.wallet
+        self.account = acct
 
         # The TinyDialog won't allow popping of the bottom screen anyway.
-        self.isPoppable = False
-        self.canGoHome = False
+        self.isPoppable = True
+        self.canGoHome = True
         self.ticketStats = None
         self.balance = None
-        self.stakeScreen = StakingScreen(app)
+        self.sendScreen = SendScreen(acct)
+        self.stakeScreen = StakingScreen(acct)
 
         # Update the home screen when the balance signal is received.
         app.registerSignal(ui.BALANCE_SIGNAL, self.balanceUpdated)
@@ -459,7 +463,7 @@ class HomeScreen(Screen):
         logo.setPixmap(pixmapFromSvg(DCR.LOGO, 40, 40))
 
         self.totalBalance = b = ClickyLabel(self.balanceClicked, "0.00")
-        Q.setProperties(b, fontFamily="Roboto-Bold", fontSize=36)
+        Q.setProperties(b, fontFamily="Roboto Bold", fontSize=36)
         self.totalUnit = Q.makeLabel("DCR", 18, color="#777777")
         self.totalUnit.setContentsMargins(0, 7, 0, 0)
 
@@ -510,7 +514,7 @@ class HomeScreen(Screen):
         spend.clicked.connect(self.spendClicked)
         optsLyt.addWidget(spend, 0, 0, Q.ALIGN_LEFT)
 
-        self.spinner = Spinner(self.app, 35)
+        self.spinner = Spinner(35)
         optsLyt.addWidget(self.spinner, 0, 1, Q.ALIGN_RIGHT)
 
         # Open staking window. Button is initally hidden until sync is complete.
@@ -533,12 +537,11 @@ class HomeScreen(Screen):
         """
         Generate and display a new address. User password required.
         """
-        app = self.app
 
-        def addr(wallet):
-            return wallet.getNewAddress()
+        def addr():
+            return self.account.nextExternalAddress()
 
-        app.withUnlockedWallet(addr, self.setNewAddress)
+        withUnlockedAccount(self.account, addr, self.setNewAddress)
 
     def setNewAddress(self, address):
         """
@@ -551,10 +554,7 @@ class HomeScreen(Screen):
         """
         When this screen is shown, set the payment address.
         """
-        app = self.app
-        if app.wallet:
-            address = app.wallet.currentAddress()
-            self.address.setText(address)
+        self.address.setText(self.account.currentAddress())
 
     def balanceClicked(self):
         """
@@ -580,8 +580,7 @@ class HomeScreen(Screen):
         Connected to the ui.SYNC_SIGNAL. Remove loading spinner and set ticket
         stats.
         """
-        acct = self.app.wallet.selectedAccount
-        self.ticketStats = acct.ticketStats()
+        self.ticketStats = self.account.ticketStats()
         self.spinner.setVisible(False)
 
     def spendClicked(self, e=None):
@@ -589,16 +588,26 @@ class HomeScreen(Screen):
         Display a form to send funds to an address. A Qt Slot, but any event
         parameter is ignored.
         """
-        self.app.appWindow.stack(self.app.sendScreen)
+        app.appWindow.stack(self.sendScreen)
 
     def openStaking(self, e=None):
         """
         Display the staking window.
         """
-        self.app.appWindow.stack(self.stakeScreen)
+        app.appWindow.stack(self.stakeScreen)
 
     def settingsClicked(self, e):
         log.debug("settings clicked")
+
+    def sync(self):
+        """
+        Start syncing the account.
+        """
+
+        def done(x):
+            app.emitSignal(ui.SYNC_SIGNAL)
+
+        withUnlockedAccount(self.account, self.account.sync, done)
 
 
 class PasswordDialog(Screen):
@@ -606,25 +615,29 @@ class PasswordDialog(Screen):
     PasswordDialog is a simple form for getting a user-supplied password.
     """
 
-    def __init__(self, app):
+    doneSig = QtCore.pyqtSignal()
+
+    def __init__(self):
         """
         Args:
             app (TinyDecred): The TinyDecred application instance.
         """
-        super().__init__(app)
+        super().__init__()
         content, mainLayout = Q.makeWidget(QtWidgets.QWidget, Q.VERTICAL)
         self.layout.addWidget(Q.pad(content, 20, 20, 20, 20))
         mainLayout.setSpacing(10)
         self.isPoppable = True
         self.canGoHome = False
 
+        self.args = tuple()
+        self.doneSig.connect(self.done_)
+
         mainLayout.addWidget(QtWidgets.QLabel("password"))
         pw = self.pwInput = QtWidgets.QLineEdit()
         mainLayout.addWidget(pw)
         pw.setEchoMode(QtWidgets.QLineEdit.Password)
         pw.setMinimumWidth(250)
-        pw.returnPressed.connect(self.pwSubmit)
-        self.callback = lambda p: None
+        pw.returnPressed.connect(self.doneSig.emit)
 
         # Allow user to toggle plain text display.
         row, lyt = Q.makeWidget(QtWidgets.QWidget, Q.HORIZONTAL)
@@ -658,11 +671,9 @@ class PasswordDialog(Screen):
         else:
             self.pwInput.setEchoMode(QtWidgets.QLineEdit.Password)
 
-    def pwSubmit(self):
-        """
-        Qt Slot which submits the password field value to the current callback.
-        """
-        self.callback(self.pwInput.text())
+    def done_(self):
+        callback, args, kwargs = self.args
+        callback(self.pwInput.text(), *args, **kwargs)
 
     def withCallback(self, callback, *args, **kwargs):
         """
@@ -680,7 +691,7 @@ class PasswordDialog(Screen):
         Returns:
             The screen itself is returned as a convenience.
         """
-        self.callback = lambda p, a=args, k=kwargs: callback(p, *a, **k)
+        self.args = (callback, args, kwargs)
         return self
 
 
@@ -731,15 +742,15 @@ class InitializationScreen(Screen):
     for creating a new wallet or loading an existing wallet.
     """
 
-    def __init__(self, app):
+    def __init__(self):
         """
         Args:
             app (TinyDecred): The TinyDecred application instance.
         """
-        super().__init__(app)
+        super().__init__()
         self.canGoHome = False
         self.layout.setSpacing(20)
-        lbl = Q.makeLabel("Welcome!", 26, fontFamily="Roboto-Medium")
+        lbl = Q.makeLabel("Welcome!", 26, fontFamily="Roboto Medium")
         self.layout.addWidget(lbl)
         self.layout.addWidget(Q.makeLabel("How would you like to begin?", 16))
 
@@ -763,7 +774,7 @@ class InitializationScreen(Screen):
         Qt Slot for the new wallet button. Initializes the creation of a new
         wallet.
         """
-        self.app.getPassword(self.initPasswordCallback)
+        app.getPassword(self.initPasswordCallback)
 
     def initPasswordCallback(self, pw):
         """
@@ -774,33 +785,24 @@ class InitializationScreen(Screen):
             pw (str): A user supplied password string.
         """
         # either way, pop the password window
-        app = self.app
-        if pw is None or pw == "":
-            app.appWindow.showError("you must enter a password to create a wallet")
-        else:
+        def create():
+            try:
+                app.dcrdata.connect()
+                words, wallet = Wallet.create(app.walletFilename(), pw, cfg.net)
+                return words, wallet
+            except Exception as e:
+                log.error("failed to create wallet: %s" % formatTraceback(e))
 
-            def create():
-                try:
-                    app.dcrdata.connect()
-                    app.emitSignal(ui.BLOCKCHAIN_CONNECTED)
-                    words, wallet = Wallet.create(app.walletFilename(), pw)
-                    wallet.open("dcr", 0, pw, app.blockchainSignals)
-                    return words, wallet
-                except Exception as e:
-                    log.error("failed to create wallet: %s" % formatTraceback(e))
-
-            app.waitThread(create, self.finishInit)
+        app.waitThread(create, self.finishInit)
 
     def finishInit(self, ret):
         """
         The callback from new wallet creation.
         """
-        app = self.app
         if ret:
             words, wallet = ret
             app.saveSettings()
             app.setWallet(wallet)
-            app.home()
             app.showMnemonics(words)
         else:
             app.appWindow.showError("failed to create wallet")
@@ -810,7 +812,6 @@ class InitializationScreen(Screen):
         The user has selected the "load from file" option. Prompt for a file
         location and load the wallet.
         """
-        app = self.app
         fd = QtWidgets.QFileDialog(self, "select wallet file")
         fd.setViewMode(QtWidgets.QFileDialog.Detail)
         qdir = QtCore.QDir
@@ -840,8 +841,71 @@ class InitializationScreen(Screen):
         """
         User has selected to generate a wallet from a mnemonic seed.
         """
-        restoreScreen = MnemonicRestorer(self.app)
-        self.app.appWindow.stack(restoreScreen)
+        restoreScreen = MnemonicRestorer()
+        app.appWindow.stack(restoreScreen)
+
+
+class AssetScreen(Screen):
+    """
+    AssetScreen is screen for choosing one account out of many, or changing
+    asset-level settings.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.isPoppable = False
+        self.canGoHome = False
+        self.wgt.setFixedSize(
+            TinyDialog.maxWidth * 0.8,
+            TinyDialog.maxHeight * 0.8 - TinyDialog.topMenuHeight,
+        )
+        self.accountScreens = {}
+
+        logo = QtWidgets.QLabel()
+        logo.setPixmap(pixmapFromSvg(DCR.LOGO, 25, 25))
+        lbl = Q.makeLabel("Decred", 25, fontFamily="Roboto Medium")
+        gear = QtWidgets.QLabel()
+        gear.setPixmap(pixmapFromSvg("gear.svg", 20, 20))
+        # Gear icon will lead to an asset settings screen. Hide for now.
+        gear.setVisible(False)
+        wgt, _ = Q.makeSeries(Q.HORIZONTAL, logo, lbl, Q.STRETCH, gear,)
+        self.layout.addWidget(wgt)
+
+        header = Q.makeLabel("Select an account", 20)
+        header.setContentsMargins(0, 15, 0, 5)
+        header.setAlignment(Q.ALIGN_LEFT)
+        self.layout.addWidget(header)
+
+        wgt, self.accountsList = Q.makeWidget(QtWidgets.QWidget, Q.GRID)
+        self.layout.addWidget(wgt)
+        self.acctMgr = app.wallet.accountManager("dcr", app.blockchainSignals)
+        for i, acct in enumerate(self.acctMgr.listAccounts()):
+            selector = app.getButton(SMALL, acct.name)
+
+            def asel():
+                self.accountSelected(i)
+
+            selector.clicked.connect(asel)
+            row = i // 3
+            col = i % 3
+            self.accountsList.addWidget(selector, row, col, 1, Q.ALIGN_LEFT)
+
+    def accountSelected(self, idx):
+        """
+        Connected to the account button clicked signal. Stacks the account
+        screen, creating it if necessary.
+
+        Args:
+            idx (int): The BIP-0044 account index.
+        """
+        acctScreen = self.accountScreens.get(idx, None)
+        if not acctScreen:
+            acct = self.acctMgr.account(idx)
+            acctScreen = AccountScreen(acct)
+            self.accountScreens[idx] = acctScreen
+
+        app.home(acctScreen)
+        acctScreen.sync()
 
 
 class SendScreen(Screen):
@@ -849,18 +913,19 @@ class SendScreen(Screen):
     A screen that displays a form to send funds to an address.
     """
 
-    def __init__(self, app):
+    def __init__(self, acct):
         """
         Args:
-            app (TinyDecred): The TinyDecred application instance.
+            acct (Account): A Decred account.
         """
-        super().__init__(app)
+        super().__init__()
         self.canGoHome = True
         self.isPoppable = True
+        self.account = acct
         layout = self.layout
         layout.setSpacing(25)
 
-        layout.addWidget(Q.makeLabel("Sending Decred", 25, fontFamily="Roboto-Medium"))
+        layout.addWidget(Q.makeLabel("Sending Decred", 25, fontFamily="Roboto Medium"))
 
         # A field to enter the value to send, in asset units (not atoms).
         col, colLyt = Q.makeWidget(QtWidgets.QWidget, Q.VERTICAL)
@@ -896,16 +961,16 @@ class SendScreen(Screen):
         address = self.addressField.text()
         log.debug("sending %f to %s" % (val, address))
 
-        def send(wallet, val, addr):
+        def send():
             try:
-                return wallet.openAccount.sendToAddress(
-                    int(round(val * 1e8)), addr
+                return self.account.sendToAddress(
+                    int(round(val * 1e8)), address
                 )  # raw transaction
             except Exception as e:
                 log.error("failed to send: %s" % formatTraceback(e))
             return False
 
-        self.app.withUnlockedWallet(send, self.sent, val, address)
+        withUnlockedAccount(self.account, send, self.sent)
 
     def sent(self, res):
         """
@@ -914,7 +979,6 @@ class SendScreen(Screen):
         Args:
             res (bool): Success status of the send operation.
         """
-        app = self.app
         if res:
             app.home()
             app.appWindow.showSuccess("sent")
@@ -927,15 +991,11 @@ class WaitingScreen(Screen):
     Waiting screen displays a Spinner.
     """
 
-    def __init__(self, app):
-        """
-        Args:
-            app (TinyDecred): The TinyDecred application instance.
-        """
-        super().__init__(app)
+    def __init__(self):
+        super().__init__()
         self.isPoppable = False
         self.canGoHome = False
-        self.spinner = Spinner(self.app, 60)
+        self.spinner = Spinner(60)
         self.layout.addWidget(self.spinner)
 
 
@@ -944,12 +1004,12 @@ class MnemonicScreen(Screen):
     Display the mnemonic seed from wallet creation.
     """
 
-    def __init__(self, app, words):
+    def __init__(self, words):
         """
         Args:
-            app (TinyDecred): The TinyDecred application instance.
+            words list(str): The mnemonic seed.
         """
-        super().__init__(app)
+        super().__init__()
         self.isPoppable = True
         self.canGoHome = True
         self.wgt.setMaximumWidth(320)
@@ -992,7 +1052,7 @@ class MnemonicScreen(Screen):
         Pop this screen.
         """
         self.lbl.setText("")
-        self.app.appWindow.pop(self)
+        app.appWindow.pop(self)
 
 
 class MnemonicRestorer(Screen):
@@ -1001,12 +1061,8 @@ class MnemonicRestorer(Screen):
     generate a wallet.
     """
 
-    def __init__(self, app):
-        """
-        Args:
-            app (TinyDecred): The TinyDecred application instance.
-        """
-        super().__init__(app)
+    def __init__(self):
+        super().__init__()
         self.isPoppable = True
         self.canGoHome = False
         self.wgt.setMaximumWidth(320)
@@ -1052,65 +1108,30 @@ class MnemonicRestorer(Screen):
         Qt Slot for the submit button clicked signal. Attempt to create a
         wallet with the provided words.
         """
-        app = self.app
         words = self.edit.toPlainText().strip().split()
-        if not words:
-            app.appWindow.showError("enter words to create a wallet")
-        else:
 
-            def pwcb(pw, words):
-                if pw:
-
-                    def create():
-                        try:
-                            app.dcrdata.connect()
-                            app.emitSignal(ui.BLOCKCHAIN_CONNECTED)
-                            wallet = Wallet.createFromMnemonic(
-                                words, app.walletFilename(), pw
-                            )
-                            wallet.open("dcr", 0, pw, app.blockchainSignals)
-                            return wallet
-                        except Exception as e:
-                            log.error(
-                                "failed to create wallet: %s" % formatTraceback(e)
-                            )
-
-                    app.waitThread(create, self.finishCreation)
-                else:
-                    app.appWindow.showError(
-                        "must enter a password to recreate the wallet"
-                    )
-
-            app.getPassword(pwcb, words)
-
-    def finishCreation(self, ret):
-        """
-        The callback from new wallet creation.
-        """
-        app = self.app
-        if ret:
+        def finish(ret):
+            if ret is None:
+                app.appWindow.showError("failed to create wallet")
+                return
             wallet = ret
-            app.saveSettings()
             app.setWallet(wallet)
-            app.home()
-        else:
-            app.appWindow.showError("failed to create wallet")
+            app.home(app.assetScreen)
 
-    def walletCreationComplete(self, wallet):
-        """
-        Receives the result from wallet creation.
+        def create(pw):
+            try:
+                app.dcrdata.connect()
+                wallet = Wallet.createFromMnemonic(
+                    words, app.walletFilename(), pw, cfg.net,
+                )
+                return wallet
+            except Exception as e:
+                log.error("failed to create wallet: %s" % formatTraceback(e))
 
-        Args:
-            ret (None or Wallet): The wallet if successfully created. None if
-                failed.
-        """
-        app = self.app
-        if wallet:
-            app.saveSettings()
-            app.setWallet(wallet)
-            app.home()
-        else:
-            app.appWindow.showError("failed to create wallet")
+        def withpw(pw):
+            app.waitThread(create, finish, pw)
+
+        app.getPassword(withpw)
 
 
 class StakingScreen(Screen):
@@ -1118,34 +1139,38 @@ class StakingScreen(Screen):
     A screen with a form to purchase tickets.
     """
 
-    def __init__(self, app):
+    def __init__(self, acct):
         """
         Args:
-            app (TinyDecred): The TinyDecred application instance.
+            acct (Account): A Decred account.
         """
-        super().__init__(app)
+        super().__init__()
         self.isPoppable = True
         self.canGoHome = True
+        self.account = acct
         self.layout.setSpacing(20)
         self.poolScreen = PoolScreen(app, self.poolAuthed)
         self.accountScreen = PoolAccountScreen(app, self.poolScreen)
         self.agendasScreen = AgendasScreen(app, self.accountScreen)
         self.statsScreen = StakeStatsScreen(app)
+        self.poolScreen = PoolScreen(acct, self.poolAuthed)
+        self.accountScreen = PoolAccountScreen(acct, self.poolScreen)
+        self.agendasScreen = AgendasScreen(acct)
+        self.statsScreen = StakeStatsScreen()
         self.balance = None
         self.wgt.setContentsMargins(5, 5, 5, 5)
         self.wgt.setMinimumWidth(400)
         self.blockchain = chains.chain("dcr")
         self.revocableTicketsCount = 0
 
-        # Register for a few key signals.
-        self.app.registerSignal(ui.BLOCKCHAIN_CONNECTED, self.blockchainConnected)
-        self.app.registerSignal(ui.BALANCE_SIGNAL, self.balanceSet)
+        # Register for signals.
+        app.registerSignal(ui.BALANCE_SIGNAL, self.balanceSet)
 
         # ticket price is a single row reading `Ticket Price: XX.YY DCR`.
         lbl = Q.makeLabel("Ticket Price: ", 16)
         self.lastPrice = None
         self.lastPriceStamp = 0
-        self.ticketPrice = Q.makeLabel("--.--", 24, fontFamily="Roboto-Bold")
+        self.ticketPrice = Q.makeLabel("--.--", 24, fontFamily="Roboto Bold")
         unit = Q.makeLabel("DCR", 16)
         priceWgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, self.ticketPrice, unit)
         self.layout.addWidget(priceWgt)
@@ -1153,9 +1178,9 @@ class StakingScreen(Screen):
         # Current holdings is a single row that reads `Currently staking X
         # tickets worth YY.ZZ DCR`
         lbl = Q.makeLabel("Currently staking", 14)
-        self.ticketCount = Q.makeLabel("", 18, fontFamily="Roboto-Bold")
+        self.ticketCount = Q.makeLabel("", 18, fontFamily="Roboto Bold")
         lbl2 = Q.makeLabel("tickets worth", 14)
-        self.ticketValue = Q.makeLabel("", 18, fontFamily="Roboto-Bold")
+        self.ticketValue = Q.makeLabel("", 18, fontFamily="Roboto Bold")
         unit = Q.makeLabel("DCR", 14)
         wgt, _ = Q.makeSeries(
             Q.HORIZONTAL, lbl, self.ticketCount, lbl2, self.ticketValue, unit
@@ -1169,7 +1194,7 @@ class StakingScreen(Screen):
 
         # A button to view network and ticket stats.
         btn = app.getButton(TINY, "stats")
-        btn.clicked.connect(lambda: self.app.appWindow.stack(self.statsScreen))
+        btn.clicked.connect(lambda: app.appWindow.stack(self.statsScreen))
 
         statsWgt, _ = Q.makeSeries(Q.HORIZONTAL, agendasWgt, btn)
 
@@ -1182,11 +1207,11 @@ class StakingScreen(Screen):
 
         # Hide revoke button unless we have revokable tickets.
         revokeBtn.hide()
-        self.app.registerSignal(ui.SYNC_SIGNAL, self.checkRevocable)
+        app.registerSignal(ui.SYNC_SIGNAL, self.checkRevocable)
 
         # Affordability. A row that reads `You can afford X tickets`
         lbl = Q.makeLabel("You can afford ", 14)
-        self.affordLbl = Q.makeLabel(" ", 17, fontFamily="Roboto-Bold")
+        self.affordLbl = Q.makeLabel(" ", 17, fontFamily="Roboto Bold")
         lbl2 = Q.makeLabel("tickets", 14)
         affordWgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, self.affordLbl, lbl2)
         affordWgt.setContentsMargins(0, 0, 0, 30)
@@ -1214,7 +1239,7 @@ class StakingScreen(Screen):
         # Navigate to account screen, to choose or add a different VSP account.
         self.currentPool = Q.makeLabel("", 15)
         lbl2 = ClickyLabel(
-            lambda: self.app.appWindow.stack(self.accountScreen), "change"
+            lambda: app.appWindow.stack(self.accountScreen), "change"
         )
         Q.setProperties(lbl2, underline=True, fontSize=15)
         Q.addHoverColor(lbl2, "#f5ffff")
@@ -1222,39 +1247,44 @@ class StakingScreen(Screen):
         lyt.setContentsMargins(0, 10, 0, 0)
         self.layout.addWidget(wgt)
 
+        self.sync()
+
     def stacked(self):
         """
         stacked is called on screens when stacked by the TinyDialog.
         """
-        acct = self.app.wallet.selectedAccount
+        acct = self.account
         if not acct.hasPool():
-            self.app.appWindow.pop(self)
-            self.app.appWindow.stack(self.poolScreen)
+            app.appWindow.pop(self)
+            app.appWindow.stack(self.poolScreen)
 
     def stackAgendas(self):
-        acct = self.app.wallet.selectedAccount
+        """
+        Stack the agendas screen.
+        """
+        acct = self.account
         if not acct:
             log.error("no account selected")
-            self.app.appWindow.showError("cannot vote: no account")
+            app.appWindow.showError("cannot vote: no account")
             return
         pools = acct.stakePools
         if len(pools) == 0:
-            self.app.appWindow.showError("cannot vote: no pools")
+            app.appWindow.showError("cannot vote: no pools")
             return
         if len(self.agendasScreen.agendas) == 0:
-            self.app.appWindow.showError("cannot vote: could not fetch agendas")
+            app.appWindow.showError("cannot vote: could not fetch agendas")
             return
         if not self.agendasScreen.voteSet:
-            self.app.appWindow.showError("cannot vote: pool not synced")
+            app.appWindow.showError("cannot vote: pool not synced")
             return
-        self.app.appWindow.stack(self.agendasScreen)
+        app.appWindow.stack(self.agendasScreen)
 
     def checkRevocable(self):
         """
         On SYNC_SIGNAL signal hide or show revoke button based on wether or not
         we have revocable tickets.
         """
-        acct = self.app.wallet.selectedAccount
+        acct = self.account
         n = self.revocableTicketsCount
         for utxo in acct.utxos.values():
             if utxo.isRevocableTicket():
@@ -1272,15 +1302,15 @@ class StakingScreen(Screen):
 
         def revoke(wallet):
             try:
-                self.app.emitSignal(ui.WORKING_SIGNAL)
-                wallet.openAccount.revokeTickets()
+                app.emitSignal(ui.WORKING_SIGNAL)
+                self.account.revokeTickets()
                 return True
             except Exception as e:
                 log.error("revoke tickets error: %s" % formatTraceback(e))
                 return False
-            self.app.emitSignal(ui.DONE_SIGNAL)
+            app.emitSignal(ui.DONE_SIGNAL)
 
-        self.app.withUnlockedWallet(revoke, self.revoked)
+        withUnlockedAccount(self.account, revoke, self.revoked)
 
     def revoked(self, success):
         """
@@ -1292,17 +1322,17 @@ class StakingScreen(Screen):
             if n > 0:
                 if n > 1:
                     plural = "s"
-                self.app.appWindow.showSuccess("revoked {} ticket{}".format(n, plural))
+                app.appWindow.showSuccess("revoked {} ticket{}".format(n, plural))
                 self.revocableTicketsCount = 0
             self.revokeBtn.hide()
         else:
-            self.app.appWindow.showError("revoke tickets finished with error")
+            app.appWindow.showError("revoke tickets finished with error")
 
     def setStats(self):
         """
         Get the current ticket stats and update the display.
         """
-        acct = self.app.wallet.selectedAccount
+        acct = self.account
         stats = acct.ticketStats()
         self.ticketCount.setText(str(stats.count))
         self.ticketValue.setText("%.2f" % (stats.value / 1e8))
@@ -1310,12 +1340,20 @@ class StakingScreen(Screen):
         if stakePool:
             self.currentPool.setText(stakePool.url)
 
-    def blockchainConnected(self):
+    def sync(self):
         """
         Connected to the BLOCKCHAIN_CONNECTED signal. Updates the current
         ticket price.
         """
-        self.app.makeThread(getTicketPrice, self.ticketPriceCB, self.blockchain)
+
+        def getTicketPrice(blockchain):
+            try:
+                return blockchain.stakeDiff() / 1e8
+            except Exception as e:
+                log.error("error fetching ticket price: %s" % e)
+                return False
+
+        app.makeThread(getTicketPrice, self.ticketPriceCB, self.blockchain)
 
     def ticketPriceCB(self, ticketPrice):
         """
@@ -1360,23 +1398,31 @@ class StakingScreen(Screen):
         """
         qtyStr = self.ticketQty.text()
         if not qtyStr or qtyStr == "":
-            self.app.appWindow.showError("can't purchase zero tickets")
+            app.appWindow.showError("can't purchase zero tickets")
             return
         qty = int(qtyStr)
         if qty > self.balance.available / 1e8 / self.lastPrice:
-            self.app.appWindow.showError("can't afford %d tickets" % qty)
+            app.appWindow.showError("can't afford %d tickets" % qty)
+
+        def done(txs):
+            if txs is None:
+                return
+            app.home()
+
+        def do():
+            return self.buyTickets(qty)
 
         def step():
-            self.app.withUnlockedWallet(self.buyTickets, self.ticketsBought, qty)
+            withUnlockedAccount(self.account, do, done)
 
-        self.app.confirm(
+        app.confirm(
             "Are you sure you want to purchase %d ticket(s) for %.2f DCR? "
             "Once purchased, these funds will be locked"
             " until your tickets vote or expire." % (qty, qty * self.lastPrice),
             step,
         )
 
-    def buyTickets(self, wallet, qty):
+    def buyTickets(self, qty):
         """
         The second step in the sequence for a ticket purchase. Defer the hard
         work to the open Account.
@@ -1388,21 +1434,11 @@ class StakingScreen(Screen):
         Returns:
             list(msgtx.MsgTx): The purchased tickets.
         """
-        acct = wallet.openAccount
-        txs = acct.purchaseTickets(qty, self.lastPrice)
+        txs = self.account.purchaseTickets(qty, self.lastPrice)
         if txs:
-            self.app.home()
-        self.app.appWindow.showSuccess("bought %s tickets" % qty)
+            app.home()
+        app.appWindow.showSuccess("bought %s tickets" % qty)
         return txs
-
-    def ticketsBought(self, res):
-        """
-        The final callback from a ticket purchase. If res evaluates True, it
-        should be a list of purchased tickets.
-        """
-        if not res:
-            self.app.appWindow.showError("error purchasing tickets")
-            self.app.home()
 
     def poolAuthed(self, res):
         """
@@ -1411,8 +1447,8 @@ class StakingScreen(Screen):
         """
         if not res:
             # The pool screen handles error notifications.
-            self.app.home()
-        window = self.app.appWindow
+            app.home()
+        window = app.appWindow
         window.pop(self.poolScreen)
         window.stack(self)
 
@@ -1482,12 +1518,12 @@ class StakeStatsScreen(Screen):
     A screen that shows network and ticket stats.
     """
 
-    def __init__(self, app):
+    def __init__(self):
         """
         Args:
             app (TinyDecred): The TinyDecred application instance.
         """
-        super().__init__(app)
+        super().__init__()
         self.isPoppable = True
         self.canGoHome = True
 
@@ -1503,8 +1539,8 @@ class StakeStatsScreen(Screen):
         self.LIFE = DCR.HOUR
 
         # Update stats on initial sync or if spent tickets have been updated.
-        self.app.registerSignal(ui.SYNC_SIGNAL, self.setStats)
-        self.app.registerSignal(ui.SPENT_TICKETS_SIGNAL, self.setStats)
+        app.registerSignal(ui.SYNC_SIGNAL, self.setStats)
+        app.registerSignal(ui.SPENT_TICKETS_SIGNAL, self.setStats)
 
         self.wgt.setMinimumWidth(400)
         self.wgt.setMinimumHeight(225)
@@ -1512,7 +1548,7 @@ class StakeStatsScreen(Screen):
         # header and a button to show live tickets
         lbl = Q.makeLabel("Staking", 18)
         self.liveTicketsListBtn = btn = app.getButton(TINY, "live tickets")
-        btn.clicked.connect(lambda: self.app.appWindow.stack(self.liveTicketsScreen))
+        btn.clicked.connect(lambda: app.appWindow.stack(self.liveTicketsScreen))
         wgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, Q.STRETCH, btn)
         self.layout.addWidget(wgt)
         btn.hide()
@@ -1616,21 +1652,21 @@ class StakeStatsScreen(Screen):
         self.liveTicketsListBtn.hide()
 
         def set():
-            self.app.emitSignal(ui.WORKING_SIGNAL)
+            app.emitSignal(ui.WORKING_SIGNAL)
             self.setStatsNetwork()
             self.setStatsLifetime()
             self.setStatsCurrent()
-            self.app.emitSignal(ui.DONE_SIGNAL)
+            app.emitSignal(ui.DONE_SIGNAL)
             self.lastUpdated = time.time()
             self.updatingLock.release()
 
-        self.app.makeThread(set)
+        app.makeThread(set)
 
     def setStatsNetwork(self):
         """
         Set network statistics.
         """
-        blockchain = self.app.dcrdata
+        blockchain = app.dcrdata
 
         r = sprintDcr
         t = sprintAmount("ticket")
@@ -1655,7 +1691,7 @@ class StakeStatsScreen(Screen):
         """
         Set lifetime statistics.
         """
-        acct = self.app.wallet.selectedAccount
+        acct = app.wallet.selectedAccount
 
         r = sprintDcr
 
@@ -1670,7 +1706,7 @@ class StakeStatsScreen(Screen):
         """
         Set current, unspent tickets. Populate live ticket list.
         """
-        acct = self.app.wallet.selectedAccount
+        acct = app.wallet.selectedAccount
 
         r = sprintDcr
         t = sprintAmount("ticket")
@@ -1703,20 +1739,24 @@ class StakeStatsScreen(Screen):
 
 
 class PoolScreen(Screen):
-    def __init__(self, app, callback):
+    """
+    A screen for adding new VSPs.
+    """
+
+    def __init__(self, acct, callback):
         """
         Args:
-            app (TinyDecred): The TinyDecred application instance.
+            acct (Account): A Decred account.
             callback (function): A function to call when a pool is succesfully
                 validated.
         """
-        super().__init__(app)
+        super().__init__()
         self.isPoppable = True
         self.canGoHome = True
+        self.account = acct
         self.callback = callback
         self.pools = []
         self.poolIdx = -1
-        self.app.registerSignal(ui.BLOCKCHAIN_CONNECTED, self.getPools)
         self.wgt.setMinimumWidth(400)
         self.wgt.setContentsMargins(15, 0, 15, 0)
 
@@ -1747,7 +1787,7 @@ class PoolScreen(Screen):
 
         # Display info for a randomly chosen pool (with some filtering), and a
         # couple of links to aid in selecting a VSP..
-        self.poolUrl = Q.makeLabel("", 16, a=l, fontFamily="Roboto-Medium")
+        self.poolUrl = Q.makeLabel("", 16, a=l, fontFamily="Roboto Medium")
         self.poolUrl.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         Q.addClickHandler(self.poolUrl, self.poolClicked)
         self.poolLink = Q.makeLabel("visit", 14, a=l)
@@ -1790,11 +1830,13 @@ class PoolScreen(Screen):
         wgt, _ = Q.makeSeries(Q.HORIZONTAL, btn1, Q.STRETCH, btn2)
         self.layout.addWidget(wgt)
 
-    def getPools(self):
+        self.sync()
+
+    def sync(self):
         """
         Get the current master list of VSPs from decred.org.
         """
-        net = self.app.dcrdata.params
+        net = app.dcrdata.params
 
         def get():
             try:
@@ -1803,7 +1845,7 @@ class PoolScreen(Screen):
                 log.error("error retrieving stake pools: %s" % e)
                 return False
 
-        self.app.makeThread(get, self.setPools)
+        app.makeThread(get, self.setPools)
 
     def setPools(self, pools):
         """
@@ -1865,7 +1907,6 @@ class PoolScreen(Screen):
         user-specified pool and API key.
         """
         url = self.poolIp.text()
-        app = self.app
         err = app.appWindow.showError
         if not url:
             err("empty address")
@@ -1881,21 +1922,21 @@ class PoolScreen(Screen):
         baseUrl = parsedURL.scheme + "://" + parsedURL.netloc
         pool = VotingServiceProvider(baseUrl, apiKey, cfg.net.Name)
 
-        def registerPool(wallet):
+        def registerPool():
             try:
-                addr = wallet.openAccount.votingAddress().string()
+                addr = self.account.votingAddress().string()
                 pool.authorize(addr)
                 app.appWindow.showSuccess("pool authorized")
-                wallet.openAccount.setNewPool(pool)
+                self.account.setNewPool(pool)
                 # Notify that vote data should be updated.
-                self.app.emitSignal(ui.PURCHASEINFO_SIGNAL)
+                app.emitSignal(ui.PURCHASEINFO_SIGNAL)
                 return True
             except Exception as e:
                 err("pool authorization failed")
                 log.error("pool registration error: %s" % formatTraceback(e))
                 return False
 
-        app.withUnlockedWallet(registerPool, self.callback)
+        withUnlockedAccount(self.account, registerPool, self.callback)
 
     def showAll(self, e=None):
         """
@@ -1924,14 +1965,15 @@ class AgendasScreen(Screen):
     A screen that lists current agendas and allows for vote configuration.
     """
 
-    def __init__(self, app, accountScreen):
+    def __init__(self, acct):
         """
         Args:
-            app (TinyDecred): The TinyDecred application instance.
+            acct (Account): A Decred account.
         """
-        super().__init__(app)
+        super().__init__()
         self.isPoppable = True
         self.canGoHome = True
+        self.account = acct
 
         # Currently shown agenda dropdowns are saved here.
         self.dropdowns = []
@@ -1941,10 +1983,8 @@ class AgendasScreen(Screen):
         self.voteSet = False
         self.blockchain = chains.chain("dcr")
 
-        self.app.registerSignal(ui.PURCHASEINFO_SIGNAL, self.setVote)
-        self.app.registerSignal(ui.BLOCKCHAIN_CONNECTED, self.setBlockchain)
+        app.registerSignal(ui.PURCHASEINFO_SIGNAL, self.setVote)
 
-        self.accountScreen = accountScreen
         self.wgt.setMinimumWidth(400)
         self.wgt.setMinimumHeight(225)
 
@@ -1968,6 +2008,8 @@ class AgendasScreen(Screen):
             Q.HORIZONTAL, prevPg, Q.STRETCH, pgNum, Q.STRETCH, nextPg
         )
         self.layout.addWidget(self.pagination)
+
+        self.sync()
 
     def pageBack(self):
         """
@@ -1997,25 +2039,30 @@ class AgendasScreen(Screen):
         """
         self.pgNum.setText("%d/%d" % (self.page + 1, len(self.pages)))
 
-    def setBlockchain(self):
+    def sync(self):
         """
         Set the dcrdata blockchain on connected signal. Then set agendas.
         """
-        self.setAgendas()
 
-    def setAgendas(self):
+        def get():
+            # dcrdata will send 422 Unprocessible Entity if on simnet.
+            try:
+                return self.blockchain.getAgendasInfo().agendas
+            except Exception:
+                log.warning("error fetching agendas. OK on simnet")
+
+        app.makeThread(get, self.setAgendas)
+
+    def setAgendas(self, agendas):
         """
         Set agendas from dcrdata.
         """
-        # dcrdata will send 422 Unprocessible Entity if on simnet.
-        try:
-            self.agendas = self.blockchain.getAgendasInfo().agendas
-        except Exception:
-            log.warning("error fetching agendas. OK on simnet")
+        if not agendas:
             return
 
+        self.agendas = agendas
         self.pages = [
-            self.agendas[i * 2 : i * 2 + 2] for i in range((len(self.agendas) + 1) // 2)
+            agendas[i * 2 : i * 2 + 2] for i in range((len(agendas) + 1) // 2)
         ]
         self.page = 0
         self.setAgendaWidgets(self.pages[0])
@@ -2027,16 +2074,16 @@ class AgendasScreen(Screen):
         """
         self.voteSet = False
         if len(self.agendas) == 0:
-            self.app.appWindow.showError("unable to set vote: no agendas")
+            app.appWindow.showError("unable to set vote: no agendas")
             return
-        acct = self.app.wallet.selectedAccount
+        acct = self.account
         if not acct:
             log.error("no account selected")
-            self.app.appWindow.showError("unable to update votes: no account")
+            app.appWindow.showError("unable to update votes: no account")
             return
         pools = acct.stakePools
         if len(pools) == 0:
-            self.app.appWindow.showError("unable to set vote: no pools")
+            app.appWindow.showError("unable to set vote: no pools")
             return
         voteBits = pools[0].purchaseInfo.voteBits
         for dropdown in self.dropdowns:
@@ -2050,7 +2097,7 @@ class AgendasScreen(Screen):
                         index = idx
                         break
                 else:
-                    self.app.appWindow.showError(
+                    app.appWindow.showError(
                         "unable to set vote: vote " + "bit match not found"
                     )
                     return
@@ -2063,7 +2110,7 @@ class AgendasScreen(Screen):
         Set the displayed agenda widgets.
         """
         if len(agendas) == 0:
-            self.app.appWindow.showError("unable to set agendas")
+            app.appWindow.showError("unable to set agendas")
             return
         Q.clearLayout(self.agendasLyt, delete=True)
         for agenda in agendas:
@@ -2106,7 +2153,7 @@ class AgendasScreen(Screen):
         def func(idx):
             if idx == dropdown.lastIndex:
                 return
-            acct = self.app.wallet.selectedAccount
+            acct = self.account
             pools = acct.stakePools
             voteBits = pools[0].purchaseInfo.voteBits
             maxuint16 = (1 << 16) - 1
@@ -2116,20 +2163,20 @@ class AgendasScreen(Screen):
             voteBits |= dropdown.voteBitsList[dropdown.currentIndex()]
 
             def changeVote():
-                self.app.emitSignal(ui.WORKING_SIGNAL)
+                app.emitSignal(ui.WORKING_SIGNAL)
                 try:
                     pools[0].setVoteBits(voteBits)
-                    self.app.appWindow.showSuccess("vote choices updated")
+                    app.appWindow.showSuccess("vote choices updated")
                     dropdown.lastIndex = idx
                 except Exception as e:
                     log.error("error changing vote: %s" % e)
-                    self.app.appWindow.showError(
+                    app.appWindow.showError(
                         "unable to update vote choices: pool connection"
                     )
                     dropdown.setCurrentIndex(dropdown.lastIndex)
-                self.app.emitSignal(ui.DONE_SIGNAL)
+                app.emitSignal(ui.DONE_SIGNAL)
 
-            self.app.makeThread(changeVote)
+            app.makeThread(changeVote)
 
         return func
 
@@ -2140,20 +2187,22 @@ class PoolAccountScreen(Screen):
     accounts or changing the selected account.
     """
 
-    def __init__(self, app, poolScreen):
+    def __init__(self, acct, poolScreen):
         """
         Args:
             app (TinyDecred): The TinyDecred application instance.
+            poolScreen: The screen for adding VSPs.
         """
-        super().__init__(app)
+        super().__init__()
         self.isPoppable = True
         self.canGoHome = True
 
+        self.account = acct
         self.pages = []
         self.page = 0
 
         self.poolScreen = poolScreen
-        self.app.registerSignal(ui.SYNC_SIGNAL, self.setPools)
+        app.registerSignal(ui.SYNC_SIGNAL, self.setPools)
         self.wgt.setMinimumWidth(400)
         self.wgt.setMinimumHeight(225)
 
@@ -2221,7 +2270,7 @@ class PoolAccountScreen(Screen):
         Reset the stake pools list from that active account and set the first
         page.
         """
-        acct = self.app.wallet.selectedAccount
+        acct = self.account
         if not acct:
             log.error("no account selected")
         pools = acct.stakePools
@@ -2233,7 +2282,7 @@ class PoolAccountScreen(Screen):
         except Exception as e:
             log.error("error fetching purchase info: %s" % e)
         # Notify that vote data should be updated.
-        self.app.emitSignal(ui.PURCHASEINFO_SIGNAL)
+        app.emitSignal(ui.PURCHASEINFO_SIGNAL)
         self.pages = [pools[i * 2 : i * 2 + 2] for i in range((len(pools) + 1) // 2)]
         self.page = 0
         self.setWidgets(self.pages[0])
@@ -2266,16 +2315,16 @@ class PoolAccountScreen(Screen):
         Args:
             pool (VotingServiceProvider): The new active pool.
         """
-        self.app.appWindow.showSuccess("new pool selected")
-        self.app.wallet.selectedAccount.setPool(pool)
+        app.appWindow.showSuccess("new pool selected")
+        self.account.setPool(pool)
         self.setPools()
 
     def addClicked(self, e=None):
         """
         The clicked slot for the add pool button. Stacks the pool screen.
         """
-        self.app.appWindow.pop(self)
-        self.app.appWindow.stack(self.poolScreen)
+        app.appWindow.pop(self)
+        app.appWindow.stack(self.poolScreen)
 
 
 class ConfirmScreen(Screen):
@@ -2286,12 +2335,8 @@ class ConfirmScreen(Screen):
     Screen.
     """
 
-    def __init__(self, app):
-        """
-        Args:
-            app (TinyDecred): The TinyDecred application instance.
-        """
-        super().__init__(app)
+    def __init__(self):
+        super().__init__()
         self.isPoppable = True
         self.canGoHome = False
 
@@ -2328,13 +2373,13 @@ class ConfirmScreen(Screen):
         """
         The user has clicked "no". Just pop this screen.
         """
-        self.app.appWindow.pop(self)
+        app.appWindow.pop(self)
 
     def goClicked(self, e=None):
         """
         The user has clicked the "ok" button. Pop self and call the callback.
         """
-        self.app.appWindow.pop(self)
+        app.appWindow.pop(self)
         if self.callback:
             self.callback()
 
@@ -2344,29 +2389,20 @@ class Spinner(QtWidgets.QLabel):
     A waiting/loading spinner.
     """
 
-    tickName = "spin"
-    tickTime = 1 / 30
-
-    def __init__(self, app, spinnerSize, width=4, pad=2):
+    def __init__(self, spinnerSize, penWidth=4, pad=2):
         """
         Args:
-            app (TinyDecred): The TinyDecred application instance.
             spinnerSize (int): Pixel width and height of the spinner.
+            penWidth (int): The width of the line.
+            pad (int): Additional padding to place around the spinner.
         """
         super().__init__()
-        self.app = app
-        # self.pic = pixmapFromSvg("spinner.svg", spinnerSize, spinnerSize)
         self.period = 1  # 1 rotation per second
-        self.sz = spinnerSize
-        self.width = width
+        self.penWidth = penWidth
         self.setFixedSize(spinnerSize, spinnerSize)
         self.c = spinnerSize / 2.0
-        # g = self.gradient = QtGui.QConicalGradient(c, c, 0)
-        # g.setColorAt(0.0, QtGui.QColor("black"))
-        # g.setColorAt(1.0, QtGui.QColor("white"))
-        # self.qPen = QtGui.QPen(QtGui.QBrush(g), width, cap=QtCore.Qt.RoundCap)
 
-        p = width + pad
+        p = penWidth + pad
         self.rect = (p, p, spinnerSize - 2 * p, spinnerSize - 2 * p)
 
         ani = self.ani = QtCore.QVariantAnimation()
@@ -2382,7 +2418,7 @@ class Spinner(QtWidgets.QLabel):
         g.setColorAt(0.0, QtGui.QColor("black"))
         g.setColorAt(1.0, QtGui.QColor("white"))
         g.setAngle((time.time() % self.period) / self.period * -360)
-        return QtGui.QPen(QtGui.QBrush(g), self.width, cap=QtCore.Qt.RoundCap)
+        return QtGui.QPen(QtGui.QBrush(g), self.penWidth, cap=QtCore.Qt.RoundCap)
 
     def paintEvent(self, e):
         super().paintEvent(e)
@@ -2392,9 +2428,37 @@ class Spinner(QtWidgets.QLabel):
         painter.drawEllipse(*self.rect)
 
 
-def getTicketPrice(blockchain):
-    try:
-        return blockchain.stakeDiff() / 1e8
-    except Exception as e:
-        log.error("error fetching ticket price: %s" % e)
-        return False
+def withUnlockedAccount(acct, f, cb):
+    """
+    Run the provided function with the account open. If the account is not
+    already open, the user will be prompted for their password and the account
+    opened before the function is run.
+
+    Args:
+        f (func): A function to run with the account open.
+        cb (func(x)): A callback to receive the return value from f.
+    """
+    if acct.isUnlocked():
+        app.waitThread(f, cb)
+        return
+
+    def done(ret):
+        app.emitSignal(ui.DONE_SIGNAL)
+        app.appWindow.pop(app.waitingScreen)
+        app.appWindow.pop(app.pwDialog)
+        cb(ret)
+
+    def withpw(pw):
+        try:
+            cryptoKey = app.wallet.cryptoKey(pw)
+            acct.unlock(cryptoKey)
+            app.emitSignal(ui.WORKING_SIGNAL)
+            app.waitThread(f, done)
+        except Exception as e:
+            log.warning(
+                "exception encountered while performing wallet action: %s"
+                % formatTraceback(e)
+            )
+            app.appWindow.showError("error")
+
+    app.getPassword(withpw)

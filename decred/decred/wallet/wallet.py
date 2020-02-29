@@ -4,17 +4,12 @@ Copyright (c) 2019, The Decred developers
 See LICENSE for details
 """
 
-from threading import Lock as Mutex
-
-from decred import config
 from decred.crypto import crypto, mnemonic, rando
 from decred.util import chains, encode, helpers
 from decred.util.database import KeyValueDatabase
 
 from . import accounts
 
-
-cfg = config.load()
 
 log = helpers.getLogger("WLLT")  # , logLvl=0)
 
@@ -38,18 +33,8 @@ class Wallet(object):
     passed as arguments, so Wallet has no concept of full node, SPV node, light
     wallet, etc., just data senders and sources.
 
-    The Wallet is not typically created directly, but through its static methods
-    `openFile` and `create`.
-
-    The wallet has a mutex lock to sequence operations. The easiest way to use
-    wallet is with the `with` statement, i.e.
-        ```
-        sender = lambda h: dcrdata.insight.api.tx.send.post({"rawtx": h})
-        with wallet.open("dcr", ...) as w:
-            w.sendToAddress(v, addr, sender)
-        ```
-    If the wallet is used in this way, the mutex will be locked and unlocked
-    appropriately.
+    A new Wallet is not typically created directly, but through the static
+    methods Wallet.create and Wallet.createFromMnemonic.
     """
 
     def __init__(self, path):
@@ -68,10 +53,8 @@ class Wallet(object):
         self.mgrCache = {}
         # The best block.
         self.users = 0
-        # User provided callbacks for certain events.
-        self.mtx = Mutex()
 
-    def initialize(self, seed, pw):
+    def initialize(self, seed, pw, net):
         """
         Initialize the wallet.
 
@@ -87,13 +70,11 @@ class Wallet(object):
         self.masterDB[DBKeys.checkKey] = pwKey.encrypt(CHECKPHRASE)
         self.masterDB[DBKeys.keyParams] = crypto.ByteArray(pwKey.params().serialize())
         db = self.coinDB.child(str(BipIDs.decred), table=False)
-        acctManager = accounts.createNewAccountManager(
-            root, cryptoKey, "dcr", cfg.net, db
-        )
+        acctManager = accounts.createNewAccountManager(root, cryptoKey, "dcr", net, db)
         self.coinDB[BipIDs.decred] = acctManager
 
     @staticmethod
-    def create(path, password):
+    def create(path, password, net):
         """
         Create a wallet, locked by `password`. The seed will be randomly
         generated.
@@ -113,12 +94,12 @@ class Wallet(object):
             raise AssertionError("empty password not allowed")
         seed = rando.generateSeed(crypto.KEY_SIZE)
         wallet = Wallet(path)
-        wallet.initialize(seed, password.encode())
+        wallet.initialize(seed, password.encode(), net)
         words = mnemonic.encode(seed)
         return words, wallet
 
     @staticmethod
-    def createFromMnemonic(words, path, password):
+    def createFromMnemonic(words, path, password, net):
         """
         Creates the wallet from the mnemonic seed.
 
@@ -137,7 +118,7 @@ class Wallet(object):
         if cs != cksum:
             raise Exception("bad checksum %r != %r" % (cs, cksum))
         wallet = Wallet(path)
-        wallet.initialize(userSeed.b, password.encode())
+        wallet.initialize(userSeed.b, password.encode(), net)
         userSeed.zero()
         return wallet
 
@@ -159,22 +140,6 @@ class Wallet(object):
             raise AssertionError("wrong password")
         return pwKey.decrypt(self.masterDB[DBKeys.cryptoKey])
 
-    @staticmethod
-    def openFile(filepath, password, signals):
-        """
-        Just checks that the provided password is correct, raising an exception
-        on error.
-
-        Args:
-            password (string): The wallet password.
-        """
-        wallet = Wallet(filepath)
-        # check that the password is correct.
-        wallet.cryptoKey(password).zero()
-        # Open the zeroth account. This will likely change.
-        wallet.open("dcr", 0, password, signals)
-        return wallet
-
     def accountManager(self, coinType, signals):
         coinType = chains.parseCoinType(coinType)
         if coinType in self.mgrCache:
@@ -184,113 +149,3 @@ class Wallet(object):
         acctMgr.load(acctDB, signals)
         self.mgrCache[coinType] = acctMgr
         return acctMgr
-
-    def open(self, coinType, acct, password, signals):
-        """
-        Open an account. The Wallet is returned so that it can be used in
-            `with ... as` block for context management.
-
-        Args:
-            coinType (str|int): Asset identifier.
-            acct (int): The account number to open.
-            password (str): Wallet password. Should be the same as used to open
-                the wallet.
-            signals (object): An api.Signals.
-
-        Returns:
-            Wallet: The wallet with the default account open.
-        """
-
-        cryptoKey = self.cryptoKey(password)
-        acctManager = self.accountManager(coinType, signals)
-        self.selectedAccount = self.openAccount = acctManager.openAccount(
-            acct, cryptoKey
-        )
-        return self
-
-    def lock(self):
-        """
-        Lock the wallet for use. The preferred way to lock and unlock the wallet
-        is indirectly through a contextual `with ... as` block.
-        """
-        self.mtx.acquire()
-
-    def unlock(self):
-        """
-        Unlock the wallet for use. The preferred way to lock and unlock the
-        wallet is indirectly through a contextual `with ... as` block.
-        """
-        self.mtx.release()
-
-    def __enter__(self):
-        """
-        For use in a `with ... as` block. The returned value is assigned to the
-        `as` variable.
-        """
-        # The user count must be incremented before locking. In python, simple
-        # assignment is thead-safe, but compound assignment, e.g. +=, is not.
-        u = self.users
-        self.users = u + 1
-        self.lock()
-        return self
-
-    def __exit__(self, xType, xVal, xTB):
-        """
-        Executed at the end of the `with ... as` block. Decrement the user
-        count and close the wallet if nobody is waiting.
-        The arguments are provided by Python, and have information about any
-        exception encountered and a traceback.
-        """
-        u = self.users
-        self.users = u - 1
-        self.unlock()
-        if u == 1:
-            self.close()
-
-    def close(self):
-        """
-        Save the wallet and close any open account.
-        """
-        if self.openAccount:
-            self.openAccount.close()
-            self.openAccount = None
-
-    def getNewAddress(self):
-        """
-        Get the next unused external address.
-
-        Returns:
-            str: The next unused external address.
-        """
-        return self.selectedAccount.nextExternalAddress()
-
-    def currentAddress(self):
-        """
-        Gets the payment address at the cursor.
-
-        Returns:
-            str: The current external address.
-        """
-        return self.selectedAccount.currentAddress()
-
-    def balance(self):
-        """
-        Get the balance of the currently selected account.
-
-        Returns:
-            Balance: The current account's Balance object.
-        """
-        return self.selectedAccount.balance
-
-    def sync(self):
-        """
-        Synchronize the UTXO set with the server. This should be the first
-        action after the account is opened or changed.
-
-        Returns:
-            bool: `True` if no exceptions were encountered.
-        """
-        # send the initial balance. This was the balance the last time the
-        # wallet was saved, but may be innacurate until sync in complete.
-        self.openAccount.sync()
-        return True
