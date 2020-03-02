@@ -2930,13 +2930,15 @@ def isUnspendable(amount, pkScript):
     versions.
 
     Args:
+        amount (int): Value of the txOut the script spends.
         pkScript (ByteArray): The pubkey script.
 
     Returns:
-        bool: True is script is unspendable.
+        bool: True is script unspendable.
     """
-    # The script is unspendable if starts with OP_RETURN or is guaranteed to
-    # fail at execution due to being larger than the max allowed script size.
+    # The script is unspendable if amount is zero, it starts with OP_RETURN or
+    # is guaranteed to fail at execution due to being larger than the max
+    # allowed script size.
     if (
         amount == 0
         or len(pkScript) > MaxScriptSize
