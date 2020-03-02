@@ -1,15 +1,13 @@
 """
-Copyright (c) 2019, the Decred developers
+Copyright (c) 2019-2020, the Decred developers
 See LICENSE for details
 """
-
-import unittest
 
 from decred.dcr.wire import msgblock
 from decred.util.encode import ByteArray
 
 
-class TestBlockHeader(unittest.TestCase):
+class TestBlockHeader:
     def make_block_header(self):
         bh = msgblock.BlockHeader()
         bh.version = 6
@@ -56,30 +54,30 @@ class TestBlockHeader(unittest.TestCase):
     def test_decode(self):
         bh, encoded = self.make_block_header()
         b = bh.serialize()
-        self.assertEqual(b, encoded)
+        assert b == encoded
         reBH = msgblock.BlockHeader.unblob(ByteArray.hex(b))
-        self.assertEqual(bh.version, reBH.version)
-        self.assertEqual(bh.prevBlock, reBH.prevBlock)
-        self.assertEqual(bh.merkleRoot, reBH.merkleRoot)
-        self.assertEqual(bh.stakeRoot, reBH.stakeRoot)
-        self.assertEqual(bh.voteBits, reBH.voteBits)
-        self.assertEqual(bh.finalState, reBH.finalState)
-        self.assertEqual(bh.voters, reBH.voters)
-        self.assertEqual(bh.freshStake, reBH.freshStake)
-        self.assertEqual(bh.revocations, reBH.revocations)
-        self.assertEqual(bh.poolSize, reBH.poolSize)
-        self.assertEqual(bh.bits, reBH.bits)
-        self.assertEqual(bh.sBits, reBH.sBits)
-        self.assertEqual(bh.height, reBH.height)
-        self.assertEqual(bh.size, reBH.size)
-        self.assertEqual(bh.timestamp, reBH.timestamp)
-        self.assertEqual(bh.nonce, reBH.nonce)
-        self.assertEqual(bh.extraData, reBH.extraData)
-        self.assertEqual(bh.stakeVersion, reBH.stakeVersion)
-        self.assertEqual(bh.id(), reBH.id())
+        assert bh.version == reBH.version
+        assert bh.prevBlock == reBH.prevBlock
+        assert bh.merkleRoot == reBH.merkleRoot
+        assert bh.stakeRoot == reBH.stakeRoot
+        assert bh.voteBits == reBH.voteBits
+        assert bh.finalState == reBH.finalState
+        assert bh.voters == reBH.voters
+        assert bh.freshStake == reBH.freshStake
+        assert bh.revocations == reBH.revocations
+        assert bh.poolSize == reBH.poolSize
+        assert bh.bits == reBH.bits
+        assert bh.sBits == reBH.sBits
+        assert bh.height == reBH.height
+        assert bh.size == reBH.size
+        assert bh.timestamp == reBH.timestamp
+        assert bh.nonce == reBH.nonce
+        assert bh.extraData == reBH.extraData
+        assert bh.stakeVersion == reBH.stakeVersion
+        assert bh.id() == reBH.id()
 
     def test_cached_hash(self):
         bh, _ = self.make_block_header()
-        self.assertIsNone(bh.cachedH)
+        assert bh.cachedH is None
         hash_ = bh.cachedHash()
-        self.assertEqual(hash_, bh.cachedHash())
+        assert hash_ == bh.cachedHash()
