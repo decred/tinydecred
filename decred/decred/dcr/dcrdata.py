@@ -666,9 +666,11 @@ class DcrdataBlockchain:
         except database.NoValueError:
             # If the blockhash is not in the database, get it from dcrdata
             decodedTx = self.dcrdata.tx(txid)
+            # Make sure the block hash is there and is not empty.
             try:
                 hexHash = decodedTx["block"]["blockhash"]
-            except KeyError:
+                hexHash[0]
+            except (KeyError, IndexError):
                 return None
             header = self.blockHeader(hexHash)
             self.txBlockMap[txHash] = header.cachedHash().bytes()
