@@ -135,7 +135,7 @@ class BlockHeader:
 
     @staticmethod
     def deserialize(b):
-        return BlockHeader.btcDecode(b, 0)
+        return BlockHeader.btcDecode(ByteArray(b), 0)
 
     # blob and unblob satisfy the Blobber API from  util.database
     @staticmethod

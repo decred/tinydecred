@@ -57,7 +57,7 @@ class TestBlockHeader(unittest.TestCase):
         bh, encoded = self.make_block_header()
         b = bh.serialize()
         self.assertEqual(b, encoded)
-        reBH = msgblock.BlockHeader.unblob(b)
+        reBH = msgblock.BlockHeader.unblob(ByteArray.hex(b))
         self.assertEqual(bh.version, reBH.version)
         self.assertEqual(bh.prevBlock, reBH.prevBlock)
         self.assertEqual(bh.merkleRoot, reBH.merkleRoot)
