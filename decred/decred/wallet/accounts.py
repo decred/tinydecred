@@ -225,7 +225,8 @@ class AccountManager(object):
         if len(sortedAccts) != sortedAccts[-1][0] + 1:
             raise AssertionError(
                 "account index mismatch. expected last index {} got {}".format(
-                    len(sortedAccts) - 1, sortedAccts[-1][0])
+                    len(sortedAccts) - 1, sortedAccts[-1][0]
+                )
             )
         return [a for _, a in sortedAccts]
 

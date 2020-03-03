@@ -604,10 +604,15 @@ class AccountScreen(Screen):
         Start syncing the account.
         """
 
-        def done(x):
+        def done(ret):
+            app.emitSignal(ui.DONE_SIGNAL)
             app.emitSignal(ui.SYNC_SIGNAL)
 
-        withUnlockedAccount(self.account, self.account.sync, done)
+        def sync(x):
+            app.emitSignal(ui.WORKING_SIGNAL)
+            app.makeThread(self.account.sync, done)
+
+        unlockAccount(self.account, sync)
 
 
 class PasswordDialog(Screen):
@@ -970,7 +975,12 @@ class SendScreen(Screen):
                 log.error("failed to send: %s" % formatTraceback(e))
             return False
 
-        withUnlockedAccount(self.account, send, self.sent)
+        def confirmed():
+            withUnlockedAccount(self.account, send, self.sent)
+
+        app.confirm(
+            f"Are you sure you want to send {val:.8f} to {address}?", confirmed,
+        )
 
     def sent(self, res):
         """
@@ -2443,7 +2453,6 @@ def withUnlockedAccount(acct, f, cb):
         return
 
     def done(ret):
-        app.emitSignal(ui.DONE_SIGNAL)
         app.appWindow.pop(app.waitingScreen)
         app.appWindow.pop(app.pwDialog)
         cb(ret)
@@ -2452,7 +2461,6 @@ def withUnlockedAccount(acct, f, cb):
         try:
             cryptoKey = app.wallet.cryptoKey(pw)
             acct.unlock(cryptoKey)
-            app.emitSignal(ui.WORKING_SIGNAL)
             app.waitThread(f, done)
         except Exception as e:
             log.warning(
@@ -2461,4 +2469,16 @@ def withUnlockedAccount(acct, f, cb):
             )
             app.appWindow.showError("error")
 
+    app.waiting()
     app.getPassword(withpw)
+
+
+def unlockAccount(acct, cb):
+    """
+    Similar to withUnlockedAccount, but doesn't run a function, just a callback
+    once the accopunt is successfully unlocked.
+
+    Args:
+        cb (func(x)): A callback to receive the return value from f.
+    """
+    withUnlockedAccount(acct, lambda: True, cb)
