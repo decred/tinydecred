@@ -3283,13 +3283,6 @@ def test_spend_script_size():
 
 
 def test_get_P2PKH_pCode():
-    """
-    Args:
-        name (str): Short description of the test.
-        pkScript (ByteArray): The script.
-        wantException (Exception): If present this exception should be thrown.
-        want (int): The expected stake opcode or txscript.opNonstake.
-    """
     # P2PKH is a valid pay to public key hash script.
     P2PKH = ByteArray(
         [
@@ -3301,40 +3294,46 @@ def test_get_P2PKH_pCode():
             opcode.OP_CHECKSIG,
         ]
     )
+    """
+    name (str): Short description of the test.
+    pkScript (ByteArray): The script.
+    wantException (Exception): If present this exception should be thrown.
+    want (int): The expected stake opcode or txscript.opNonstake.
+    """
     tests = [
-        {"name": "P2PKH", "pkScript": P2PKH, "want": txscript.opNonstake},
-        {
-            "name": "P2PK",
-            "pkScript": ByteArray(
+        dict(name="P2PKH", pkScript=P2PKH, want=txscript.opNonstake),
+        dict(
+            name="P2PK",
+            pkScript=ByteArray(
                 [opcode.OP_DATA_33, 0x02, *([0x00] * 32), opcode.OP_CHECKSIG]
             ),
-            "want": txscript.opNonstake,
-        },
-        {
-            "name": "stake submission",
-            "pkScript": ByteArray(opcode.OP_SSTX) + P2PKH,
-            "want": txscript.opcode.OP_SSTX,
-        },
-        {
-            "name": "revocation",
-            "pkScript": ByteArray(opcode.OP_SSRTX) + P2PKH,
-            "want": txscript.opcode.OP_SSRTX,
-        },
-        {
-            "name": "stake change",
-            "pkScript": ByteArray(opcode.OP_SSTXCHANGE) + P2PKH,
-            "want": txscript.opcode.OP_SSTXCHANGE,
-        },
-        {
-            "name": "stake gen",
-            "pkScript": ByteArray(opcode.OP_SSGEN) + P2PKH,
-            "want": txscript.opcode.OP_SSGEN,
-        },
-        {
-            "name": "unknown script class",
-            "pkScript": ByteArray(255) + P2PKH,
-            "wantException": NotImplementedError,
-        },
+            want=txscript.opNonstake,
+        ),
+        dict(
+            name="stake submission",
+            pkScript=ByteArray(opcode.OP_SSTX) + P2PKH,
+            want=txscript.opcode.OP_SSTX,
+        ),
+        dict(
+            name="revocation",
+            pkScript=ByteArray(opcode.OP_SSRTX) + P2PKH,
+            want=txscript.opcode.OP_SSRTX,
+        ),
+        dict(
+            name="stake change",
+            pkScript=ByteArray(opcode.OP_SSTXCHANGE) + P2PKH,
+            want=txscript.opcode.OP_SSTXCHANGE,
+        ),
+        dict(
+            name="stake gen",
+            pkScript=ByteArray(opcode.OP_SSGEN) + P2PKH,
+            want=txscript.opcode.OP_SSGEN,
+        ),
+        dict(
+            name="unknown script class",
+            pkScript=ByteArray(255) + P2PKH,
+            wantException=NotImplementedError,
+        ),
     ]
     for test in tests:
         if test.get("wantException"):
