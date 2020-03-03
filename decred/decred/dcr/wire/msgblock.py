@@ -1,16 +1,16 @@
 """
 Copyright (c) 2019, Brian Stafford
-Copyright (c) 2019, The Decred developers
+Copyright (c) 2019-2020, The Decred developers
 See LICENSE for details
 
 Based on dcrd MsgBlock.
 """
 
-from decred.crypto.crypto import hashH
+from decred.crypto import crypto
 from decred.util.encode import ByteArray
 
 
-# chainhash.HashSize in go
+# chainhash.HashSize in Go
 HASH_SIZE = 32
 
 MaxHeaderSize = 180
@@ -86,10 +86,14 @@ class BlockHeader:
     @staticmethod
     def btcDecode(b, pver):
         """
-        BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
-        This is part of the Message interface implementation.
-        See Deserialize for decoding block headers stored to disk, such as in a
-        database, as opposed to decoding block headers from the wire.
+        BtcDecode decodes b using the bitcoin protocol encoding into the
+        receiver. This is part of the Message interface implementation.
+        See Deserialize for decoding block headers stored to disk, such as
+        in a database, as opposed to decoding block headers from the wire.
+
+        Args:
+            b (ByteArray): the bytes to decode.
+            pver (int): the protocol version.
         """
         bh = BlockHeader()
 
@@ -135,7 +139,11 @@ class BlockHeader:
 
     @staticmethod
     def deserialize(b):
-        return BlockHeader.btcDecode(b, 0)
+        """
+        Args:
+            b (bytes): the bytes to deserialize.
+        """
+        return BlockHeader.btcDecode(ByteArray(b), 0)
 
     # blob and unblob satisfy the Blobber API from  util.database
     @staticmethod
@@ -145,10 +153,19 @@ class BlockHeader:
 
     @staticmethod
     def unblob(b):
-        """Satisfies the encode.Blobber API"""
+        """
+        Satisfies the encode.Blobber API.
+
+        Args:
+            b (bytes): the bytes to unblob.
+        """
         return BlockHeader.deserialize(b)
 
     def btcEncode(self, pver):
+        """
+        Args:
+            pver (int): the protocol version.
+        """
         # byte sizes
         int64 = 8
         int32 = uint32 = 4
@@ -200,7 +217,7 @@ class BlockHeader:
         """
         hash computes the block identifier hash for the given block header.
         """
-        return hashH(self.serialize().bytes())
+        return crypto.hashH(self.serialize().bytes())
 
     def cachedHash(self):
         """
