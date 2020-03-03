@@ -4,7 +4,7 @@ Copyright (c) 2020, The Decred developers
 See LICENSE for details
 """
 
-import os
+from pathlib import Path
 
 from decred import DecredError
 from decred.crypto import crypto, mnemonic, rando
@@ -28,9 +28,9 @@ def paths(base, network):
     Get the paths for the network directory, the wallet database file, and the
     blockchain database file.
     """
-    netDir = os.path.join(base, network)
-    dbPath = os.path.join(netDir, "wallet.db")
-    dcrPath = os.path.join(netDir, "dcr.db")
+    netDir = Path(base) / network
+    dbPath = netDir / "wallet.db"
+    dcrPath = netDir / "dcr.db"
     return netDir, dbPath, dcrPath
 
 
@@ -57,7 +57,7 @@ class SimpleWallet(Wallet):
         signals = signals if signals else DefaultSignals
         netParams = nets.parse(network)
         netDir, dbPath, dcrPath = paths(walletDir, netParams.Name)
-        if not os.path.exists(netDir):
+        if not Path(netDir).exists():
             mkdir(netDir)
         dcrdataDB = database.KeyValueDatabase(dcrPath)
         # The initialized DcrdataBlockchain will not be connected, as that is a
@@ -65,7 +65,7 @@ class SimpleWallet(Wallet):
         dcrdataURL = DCRDATA_PATHS[netParams.Name]
         self.dcrdata = DcrdataBlockchain(dcrdataDB, netParams, dcrdataURL)
         chains.registerChain("dcr", self.dcrdata)
-        walletExists = os.path.isfile(dbPath)
+        walletExists = Path(dbPath).is_file()
         if not walletExists and not allowCreate:
             raise DecredError("Wallet does not exist at %s", dbPath)
 
@@ -93,7 +93,7 @@ class SimpleWallet(Wallet):
         """
         netParams = nets.parse(network)
         _, dbPath, _ = paths(walletDir, netParams.Name)
-        if os.path.exists(dbPath):
+        if Path(dbPath).is_file():
             raise DecredError("wallet already exists at %s", dbPath)
         wallet = SimpleWallet(walletDir, pw, network, signals, True)
         words = wallet.words
