@@ -74,7 +74,7 @@ class Wallet(object):
         self.coinDB[BipIDs.decred] = acctManager
 
     @staticmethod
-    def create(path, password, net):
+    def create(path, password, netParams):
         """
         Create a wallet, locked by `password`. The seed will be randomly
         generated.
@@ -82,24 +82,24 @@ class Wallet(object):
         Args:
             path (str): Filepath to store wallet.
             password (str): User provided password. The password will be used to
-                both decrypt the wallet, and unlock any accounts created.
-            chain (object): Network parameters for the zeroth account ExtendedKey.
+                both decrypt the wallet and unlock any accounts created.
+            netParams (object): Network parameters.
 
         Returns:
-            Wallet: An initialized wallet with a single Decred account.
             list(str): A mnemonic seed. Only retured when the caller does not
                 provide a seed.
+            Wallet: An initialized wallet with a single Decred account.
         """
         if len(password) == 0:
             raise AssertionError("empty password not allowed")
         seed = rando.generateSeed(crypto.KEY_SIZE)
         wallet = Wallet(path)
-        wallet.initialize(seed, password.encode(), net)
+        wallet.initialize(seed, password.encode(), netParams)
         words = mnemonic.encode(seed)
         return words, wallet
 
     @staticmethod
-    def createFromMnemonic(words, path, password, net):
+    def createFromMnemonic(words, path, password, netParams):
         """
         Creates the wallet from the mnemonic seed.
 
@@ -118,7 +118,7 @@ class Wallet(object):
         if cs != cksum:
             raise Exception("bad checksum %r != %r" % (cs, cksum))
         wallet = Wallet(path)
-        wallet.initialize(userSeed.b, password.encode(), net)
+        wallet.initialize(userSeed.b, password.encode(), netParams)
         userSeed.zero()
         return wallet
 

@@ -86,7 +86,7 @@ def sprintAmount(thing):
 class TinyDialog(QtWidgets.QFrame):
     """
     TinyDialog is a widget for handling Screen instances. This is the primary
-    window of the TinyDecred application. It has a fixed (tiny!) size.
+    window of the TinyWallet application. It has a fixed (tiny!) size.
     """
 
     maxWidth = 525
@@ -98,14 +98,14 @@ class TinyDialog(QtWidgets.QFrame):
     successSig = QtCore.pyqtSignal(str)
     errorSig = QtCore.pyqtSignal(str)
 
-    def __init__(self, qApp):
+    def __init__(self, twApp):
         """
         Args:
-            app (TinyDecred): The TinyDecred application instance.
+            twApp (TinyWallet): The TinyWallet application instance.
         """
         super().__init__()
         global app
-        app = qApp
+        app = twApp
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
         self.popSig.connect(self.pop_)
         self.pop = lambda w=None: self.popSig.emit(w)
@@ -277,7 +277,7 @@ class TinyDialog(QtWidgets.QFrame):
 
     def closeClicked(self):
         """
-        User has clicked close. Since TinyDecred is a system tray application,
+        User has clicked close. Since TinyWallet is a system tray application,
         the window and it's application panel icon are hidden, but the
         application does not close.
         """
@@ -371,7 +371,7 @@ class Screen(QtWidgets.QWidget):
     def __init__(self):
         """
         Args:
-            app (TinyDecred): The TinyDecred application instance.
+            app (TinyWallet): The TinyWallet application instance.
         """
         super().__init__()
         # isPoppable indicates whether this screen can be popped by the user
@@ -430,7 +430,7 @@ class Screen(QtWidgets.QWidget):
 
 class AccountScreen(Screen):
     """
-    The standard home screen for a TinyDecred account.
+    The standard home screen for a TinyWallet account.
     """
 
     def __init__(self, acct):
@@ -443,8 +443,8 @@ class AccountScreen(Screen):
         self.account = acct
 
         # The TinyDialog won't allow popping of the bottom screen anyway.
-        self.isPoppable = True
-        self.canGoHome = True
+        self.isPoppable = False
+        self.canGoHome = False
         self.ticketStats = None
         self.balance = None
         self.sendScreen = SendScreen(acct)
@@ -620,7 +620,7 @@ class PasswordDialog(Screen):
     def __init__(self):
         """
         Args:
-            app (TinyDecred): The TinyDecred application instance.
+            app (TinyWallet): The TinyWallet application instance.
         """
         super().__init__()
         content, mainLayout = Q.makeWidget(QtWidgets.QWidget, Q.VERTICAL)
@@ -745,7 +745,7 @@ class InitializationScreen(Screen):
     def __init__(self):
         """
         Args:
-            app (TinyDecred): The TinyDecred application instance.
+            app (TinyWallet): The TinyWallet application instance.
         """
         super().__init__()
         self.canGoHome = False
@@ -759,7 +759,7 @@ class InitializationScreen(Screen):
         self.layout.addWidget(self.initBttn)
         self.initBttn.clicked.connect(self.initClicked)
 
-        # Load a TinyDecred wallet file.
+        # Load a TinyWallet wallet file.
         self.loadBttn = app.getButton(SMALL, "load wallet")
         self.layout.addWidget(self.loadBttn)
         self.loadBttn.clicked.connect(self.loadClicked)
@@ -2190,7 +2190,7 @@ class PoolAccountScreen(Screen):
     def __init__(self, acct, poolScreen):
         """
         Args:
-            app (TinyDecred): The TinyDecred application instance.
+            app (TinyWallet): The TinyWallet application instance.
             poolScreen: The screen for adding VSPs.
         """
         super().__init__()

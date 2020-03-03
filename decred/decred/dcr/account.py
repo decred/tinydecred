@@ -923,6 +923,9 @@ class Account:
 
         Args:
             db (database.Bucket): The database.
+            blockchain (Blockchain): A blockchain object.
+                (see dcrdata.DcrdataBlockchain)
+            signals (Signals): A signaller.
         """
         self.blockchain = blockchain
         self.signals = signals
@@ -978,7 +981,7 @@ class Account:
 
     def lock(self):
         """
-        Close the Decred account. Runs the parent's method, then performs some
+        Lock the Decred account. Runs the parent's method, then performs some
         Decred-specific clean up.
         """
         if self.privKey:

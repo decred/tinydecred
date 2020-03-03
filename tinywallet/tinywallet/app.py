@@ -55,13 +55,13 @@ class TinySignals(object):
         self.spentTickets = spentTickets if spentTickets else dummy
 
 
-class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
+class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
     """
-    TinyDecred is an PyQt application for interacting with the Decred
-    blockchain. TinyDecred currently implements a UI for creating and
+    TinyWallet is an PyQt application for interacting with the Decred
+    blockchain. TinyWallet currently implements a UI for creating and
     controlling a rudimentary, non-staking, Decred testnet light wallet.
 
-    TinyDecred is a system tray application.
+    TinyWallet is a system tray application.
     """
 
     qRawSignal = QtCore.pyqtSignal(tuple)
@@ -243,7 +243,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
 
     def minimizeApp(self, *a):
         """
-        Minimizes the application. Because TinyDecred is a system-tray app, the
+        Minimizes the application. Because TinyWallet is a system-tray app, the
         program does not halt execution, but the icon is removed from the
         application panel. Any arguments are ignored.
         """
@@ -494,7 +494,7 @@ def exception_hook(exctype, value, tb):
 
 def main():
     """
-    Start the TinyDecred application.
+    Start the TinyWallet application.
     """
     sys.excepthook = exception_hook
     QtWidgets.QApplication.setDesktopSettingsAware(False)
@@ -508,7 +508,7 @@ def main():
     qApp.setApplicationName("Tiny Decred")
     loadFonts()
 
-    decred = TinyDecred(qApp)
+    decred = TinyWallet(qApp)
     try:
         qApp.exec_()
     except Exception as e:

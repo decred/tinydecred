@@ -17,7 +17,7 @@ from decred.util import helpers
 
 
 # Set the data directory in a OS-appropriate location.
-_ad = AppDirs("TinyDecred", False)
+_ad = AppDirs("TinyWallet", False)
 DATA_DIR = _ad.user_data_dir
 
 helpers.mkdir(DATA_DIR)

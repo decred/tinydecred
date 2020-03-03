@@ -1,6 +1,6 @@
 """
 Copyright (c) 2019, Brian Stafford
-Copyright (c) 2019, The Decred developers
+Copyright (c) 2020, The Decred developers
 See LICENSE for details
 """
 
@@ -55,16 +55,15 @@ class SimpleWallet(Wallet):
             signals (Signals): A signal processor.
         """
         signals = signals if signals else DefaultSignals
-        self.net = net = nets.parse(network)
-        netDir, dbPath, dcrPath = paths(walletDir, net.Name)
-        netDir = os.path.join(walletDir, net.Name)
+        netParams = nets.parse(network)
+        netDir, dbPath, dcrPath = paths(walletDir, netParams.Name)
         if not os.path.exists(netDir):
             mkdir(netDir)
         dcrdataDB = database.KeyValueDatabase(dcrPath)
         # The initialized DcrdataBlockchain will not be connected, as that is a
         # blocking operation. It will be called when the wallet is open.
-        dcrdataURL = DCRDATA_PATHS[net.Name]
-        self.dcrdata = DcrdataBlockchain(dcrdataDB, net, dcrdataURL)
+        dcrdataURL = DCRDATA_PATHS[netParams.Name]
+        self.dcrdata = DcrdataBlockchain(dcrdataDB, netParams, dcrdataURL)
         chains.registerChain("dcr", self.dcrdata)
         walletExists = os.path.isfile(dbPath)
         if not walletExists and not allowCreate:
@@ -74,7 +73,7 @@ class SimpleWallet(Wallet):
         # words is only set the first time a wallet is created.
         if not walletExists:
             seed = rando.generateSeed(crypto.KEY_SIZE)
-            self.initialize(seed, pw.encode(), net)
+            self.initialize(seed, pw.encode(), netParams)
             self.words = mnemonic.encode(seed)
 
         cryptoKey = self.cryptoKey(pw)
@@ -92,8 +91,8 @@ class SimpleWallet(Wallet):
         Create a new wallet. Will not overwrite an existing wallet file. All
         arguments are the same as the SimpleWallet constructor.
         """
-        net = nets.parse(network)
-        _, dbPath, _ = paths(walletDir, net.Name)
+        netParams = nets.parse(network)
+        _, dbPath, _ = paths(walletDir, netParams.Name)
         if os.path.exists(dbPath):
             raise DecredError("wallet already exists at %s", dbPath)
         wallet = SimpleWallet(walletDir, pw, network, signals, True)

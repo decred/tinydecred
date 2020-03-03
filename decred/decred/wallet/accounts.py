@@ -223,8 +223,9 @@ class AccountManager(object):
 
         sortedAccts = sorted(self.accounts.items(), key=lambda pair: pair[0])
         if len(sortedAccts) != sortedAccts[-1][0] + 1:
-            raise DecredError(
-                f"account index mismatch. expected last index {len(sortedAccts) - 1} got {sortedAccts[-1][0]}"
+            raise AssertionError(
+                "account index mismatch. expected last index {} got {}".format(
+                    len(sortedAccts) - 1, sortedAccts[-1][0])
             )
         return [a for _, a in sortedAccts]
 

@@ -93,4 +93,4 @@ def chain(coinType):
     Returns:
         obj: Network parameters.
     """
-    return _chains.get(parseCoinType(coinType), None)
+    return _chains.get(parseCoinType(coinType))
