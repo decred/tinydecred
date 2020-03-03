@@ -54,13 +54,14 @@ class Wallet(object):
         # The best block.
         self.users = 0
 
-    def initialize(self, seed, pw, net):
+    def initialize(self, seed, pw, netParams):
         """
         Initialize the wallet.
 
         Args:
             seed (bytes-like): The wallet seed.
             pw   (bytes-like): The wallet password, UTF-8 encoded.
+            netParams (object): Network parameters.
         """
         pwKey = crypto.SecretKey(pw)
         cryptoKey = encode.ByteArray(rando.generateSeed(crypto.KEY_SIZE))
@@ -70,7 +71,9 @@ class Wallet(object):
         self.masterDB[DBKeys.checkKey] = pwKey.encrypt(CHECKPHRASE)
         self.masterDB[DBKeys.keyParams] = crypto.ByteArray(pwKey.params().serialize())
         db = self.coinDB.child(str(BipIDs.decred), table=False)
-        acctManager = accounts.createNewAccountManager(root, cryptoKey, "dcr", net, db)
+        acctManager = accounts.createNewAccountManager(
+            root, cryptoKey, "dcr", netParams, db
+        )
         self.coinDB[BipIDs.decred] = acctManager
 
     @staticmethod
