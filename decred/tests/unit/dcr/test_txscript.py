@@ -2361,31 +2361,83 @@ def test_is_unspendable():
     pkScript (ByteArray): Spending script.
     want (bool): Whether the tx is unspendable
     """
-    tests = [{
-        "name": "not spendable: begins with OP_RETURN",
-        "amount": 100,
-        "pkScript": ByteArray([0x6A, 0x04, 0x74, 0x65, 0x73, 0x74]),
-        "want": True,
-    }, {
-        "name": "not spendable: zero amount",
-        "amount": 0,
-        "pkScript": ByteArray([0x76, 0xa9, 0x14, 0x29, 0x95, 0xa0,
-                               0xfe, 0x68, 0x43, 0xfa, 0x9b, 0x95, 0x45,
-                               0x97, 0xf0, 0xdc, 0xa7, 0xa4, 0x4d, 0xf6,
-                               0xfa, 0x0b, 0x5c, 0x88, 0xac]),
-        "want": True,
-    }, {
-        "name": "spendable",
-        "amount": 100,
-        "pkScript": ByteArray([0x76, 0xa9, 0x14, 0x29, 0x95, 0xa0,
-                               0xfe, 0x68, 0x43, 0xfa, 0x9b, 0x95, 0x45,
-                               0x97, 0xf0, 0xdc, 0xa7, 0xa4, 0x4d, 0xf6,
-                               0xfa, 0x0b, 0x5c, 0x88, 0xac]),
-        "want": False,
-    }]
+    tests = [dict(
+        name="not spendable: begins with OP_RETURN",
+        amount=100,
+        pkScript=ByteArray([0x6A, 0x04, 0x74, 0x65, 0x73, 0x74]),
+        want=True,
+    ), dict(
+        name="not spendable: zero amount",
+        amount=0,
+        pkScript=ByteArray([0x76, 0xa9, 0x14, 0x29, 0x95, 0xa0,
+                            0xfe, 0x68, 0x43, 0xfa, 0x9b, 0x95, 0x45,
+                            0x97, 0xf0, 0xdc, 0xa7, 0xa4, 0x4d, 0xf6,
+                            0xfa, 0x0b, 0x5c, 0x88, 0xac]),
+        want=True,
+    ), dict(
+        name="spendable",
+        amount=100,
+        pkScript=ByteArray([0x76, 0xa9, 0x14, 0x29, 0x95, 0xa0,
+                            0xfe, 0x68, 0x43, 0xfa, 0x9b, 0x95, 0x45,
+                            0x97, 0xf0, 0xdc, 0xa7, 0xa4, 0x4d, 0xf6,
+                            0xfa, 0x0b, 0x5c, 0x88, 0xac]),
+        want=False,
+    )]
     # fmt: on
     for test in tests:
         res = txscript.isUnspendable(test["amount"], test["pkScript"])
+        assert (
+            res == test["want"]
+        ), f'wanted {test["want"]} but got {res} for test {test["name"]}'
+
+
+def test_calc_min_required_tx_relay_fee():
+    """
+    name (str): Short description of the test.
+    size (int): Transaction size in bytes.
+    relayFee (int): Minimum relay transaction fee.
+    want (bool): Expected Fee.
+    """
+    tests = [
+        dict(
+            # Ensure combination of size and fee that are less than 1000 produce a
+            # non-zero fee.
+            name="250 bytes with relay fee of 3",
+            size=250,
+            relayFee=3,
+            want=3,
+        ),
+        dict(
+            name="1000 bytes with default minimum relay fee",
+            size=1000,
+            relayFee=txscript.DefaultRelayFeePerKb,
+            want=1e4,
+        ),
+        dict(
+            name="max standard tx size with default minimum relay fee",
+            size=txscript.MaxStandardTxSize,
+            relayFee=txscript.DefaultRelayFeePerKb,
+            want=1e6,
+        ),
+        dict(
+            name="max standard tx size with max relay fee",
+            size=txscript.MaxStandardTxSize,
+            relayFee=txscript.MaxAmount,
+            want=txscript.MaxAmount,
+        ),
+        dict(
+            name="1500 bytes with 5000 relay fee", size=1500, relayFee=5000, want=7500,
+        ),
+        dict(
+            name="1500 bytes with 3000 relay fee", size=1500, relayFee=3000, want=4500,
+        ),
+        dict(name="782 bytes with 5000 relay fee", size=782, relayFee=5000, want=3910,),
+        dict(name="782 bytes with 3000 relay fee", size=782, relayFee=3000, want=2346,),
+        dict(name="782 bytes with 2550 relay fee", size=782, relayFee=2550, want=1994,),
+    ]
+
+    for test in tests:
+        res = txscript.calcMinRequiredTxRelayFee(test["relayFee"], test["size"])
         assert (
             res == test["want"]
         ), f'wanted {test["want"]} but got {res} for test {test["name"]}'
