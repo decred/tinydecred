@@ -22,7 +22,7 @@ from decred.dcr.dcrdata import (
     makeOutputs,
 )
 from decred.dcr.nets import testnet
-from decred.dcr.wire import msgblock, msgtx
+from decred.dcr.wire import msgtx
 from decred.util.encode import ByteArray
 
 
@@ -309,6 +309,10 @@ class TestDcrdataBlockchain:
 
         assert len(ddb.UTXOs([])) == 0
 
+        # txVout error
+        with pytest.raises(DecredError):
+            ddb.txVout(self.txs[2][0], 0).satoshis
+
         # Precompute the UTXO data.
         addrs = [utxo["address"] for utxo in self.utxos]
         addrStr = ",".join(addrs)
@@ -335,17 +339,21 @@ class TestDcrdataBlockchain:
         http_get_post(txsURL, {"transactions": "txs"})
         assert ddb.txsForAddr("the_address") == "txs"
 
-        # txVout
+        # txVout success
         assert ddb.txVout(self.txs[2][0], 0).satoshis == 14773017964
 
-        # blockForTx
-        # Preload the decoded tx.
-        txURL = f"{BASE_URL}api/tx/{self.txs[2][0]}"
+    def test_blocks(self, http_get_post, tmp_path):
+        preload_api_list(http_get_post)
+        http_get_post(f"{BASE_URL}api/block/best", 1)
+        ddb = DcrdataBlockchain(str(tmp_path / "test.db"), testnet, BASE_URL)
+
+        # blockHeaderByHeight
+        blockHeight = 427282
         blockHash = "00000000000000002b197e4018b990efb85e6bd43ffb15f7ede97a78f806a3f8"
-        decodedTx = {"block": {"blockhash": blockHash}}
-        http_get_post(txURL, decodedTx)
+        with pytest.raises(DecredError):
+            ddb.blockHeaderByHeight(blockHeight).id()
         # Preload the block header.
-        headerURL = f"{BASE_URL}api/block/hash/{blockHash}/header/raw"
+        headerURL = f"{BASE_URL}api/block/{blockHeight}/header/raw"
         blockHeader = {
             "hex": (
                 "07000000e00b3a83dc60f961d8f516ece63e6d009eff4c2af50139150000"
@@ -357,4 +365,29 @@ class TestDcrdataBlockchain:
             ),
         }
         http_get_post(headerURL, blockHeader)
-        assert isinstance(ddb.blockForTx(self.txs[2][0]), msgblock.BlockHeader)
+        assert ddb.blockHeaderByHeight(blockHeight).id() == blockHash
+        # Exercise the database code.
+        assert ddb.blockHeaderByHeight(blockHeight).id() == blockHash
+
+        # blockForTx
+        # Preload the first broken decoded tx.
+        txURL = f"{BASE_URL}api/tx/{self.txs[2][0]}"
+        decodedTx = {"block": {}}
+        http_get_post(txURL, decodedTx)
+        assert ddb.blockForTx(self.txs[2][0]) is None
+        # Preload the second broken decoded tx.
+        txURL = f"{BASE_URL}api/tx/{self.txs[2][0]}"
+        decodedTx = {"block": {"blockhash": ""}}
+        http_get_post(txURL, decodedTx)
+        assert ddb.blockForTx(self.txs[2][0]) is None
+        # Preload the right decoded tx.
+        txURL = f"{BASE_URL}api/tx/{self.txs[2][0]}"
+        decodedTx = {"block": {"blockhash": blockHash}}
+        http_get_post(txURL, decodedTx)
+        assert ddb.blockForTx(self.txs[2][0]).height == blockHeight
+        # Preload the block header.
+        headerURL = f"{BASE_URL}api/block/hash/{blockHash}/header/raw"
+        http_get_post(headerURL, blockHeader)
+        assert ddb.blockForTx(self.txs[2][0]).height == blockHeight
+        # Exercise the database code.
+        assert ddb.blockForTx(self.txs[2][0]).height == blockHeight

@@ -470,7 +470,7 @@ def hashFromHex(s):
     Parse a transaction hash or block hash from a hexadecimal string.
 
     Args:
-        s (str): A byte-revesed, hexadecimal string encoded hash.
+        s (str): A byte-reversed, hexadecimal string encoded hash.
 
     Returns:
         ByteArray: Decoded hash
@@ -483,9 +483,9 @@ def hexFromHash(h):
     Parse a tx or block hash from a ByteArray.
 
     Args:
-        h (ByteArray): A hash of the block or transaction.
+        h (str): A hash of the block or transaction.
     """
-    return reversed(h).hex()
+    return reversed(ByteArray(h)).hex()
 
 
 class DcrdataBlockchain:
@@ -793,12 +793,11 @@ class DcrdataBlockchain:
             BlockHeader: An object which implements the BlockHeader API.
         """
         try:
-            blockheader = self.headerDB[hashFromHex(hexHash).bytes()]
-            return blockheader
+            return self.headerDB[hashFromHex(hexHash).bytes()]
         except database.NoValueError:
             try:
                 block = self.dcrdata.block.hash.header.raw(hexHash)
-                blockHeader = msgblock.BlockHeader.deserialize(ByteArray(block["hex"]))
+                blockHeader = msgblock.BlockHeader.deserialize(block["hex"])
                 self.saveBlockHeader(blockHeader)
                 return blockHeader
             except Exception as e:
@@ -821,12 +820,12 @@ class DcrdataBlockchain:
             return self.headerDB[hashKey]
         except database.NoValueError:
             try:
-                hexBlock = self.blockchain.block.header.raw(idx=height)
-                blockHeader = msgblock.BlockHeader.deserialize(ByteArray(hexBlock))
+                hexBlock = self.dcrdata.block.header.raw(idx=height)
+                blockHeader = msgblock.BlockHeader.deserialize(hexBlock["hex"])
                 self.saveBlockHeader(blockHeader)
                 return blockHeader
-            except Exception:
-                log.warning("unable to retrieve block header")
+            except Exception as e:
+                log.warning(f"unable to retrieve block header: {formatTraceback(e)}")
         raise DecredError("failed to get block header at height %i" % height)
 
     def bestBlock(self):
