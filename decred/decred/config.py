@@ -103,7 +103,7 @@ class TinyConfig:
     def get(self, *keys):
         """
         Retrieve the setting at the provided key path. Multiple keys can be
-        provided, with each successive key being retreived from the previous
+        provided, with each successive key being retrieved from the previous
         key's value.
 
         Args:

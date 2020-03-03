@@ -22,7 +22,7 @@ from decred.dcr.dcrdata import (
     makeOutputs,
 )
 from decred.dcr.nets import testnet
-from decred.dcr.wire import msgtx
+from decred.dcr.wire import msgblock, msgtx
 from decred.util.encode import ByteArray
 
 
@@ -259,15 +259,16 @@ class TestDcrdataBlockchain:
             confirmations=3,
         ),
     ]
-    txs = {
-        "ba0ce58eaa1b1402b8f33d84034014712add4d2955d1dd01adea2612e9dc6b8a": (
+    # fmt: off
+    txs = (
+        ("ba0ce58eaa1b1402b8f33d84034014712add4d2955d1dd01adea2612e9dc6b8a", (
             "0100000001000000000000000000000000000000000000000000000000000000000000000"
             "0ffffffff00ffffffff03e8997c0700000000000017a914f5916158e3e2c4551c1796708d"
             "b8367207ed13bb87000000000000000000000e6a0c4a850600589b9dfdecb7e667eaa6052"
             "d0000000000001976a914f14f995d7b8c37c961bdb1baf431a18026f7e31088ac00000000"
             "00000000015a3568340000000000000000ffffffff0800002f646372642f"
-        ),
-        "40039b114c2a497ebd324d9d6c34a20b32caedfb036fbcb5523471adbafa32a1": (
+        )),
+        ("40039b114c2a497ebd324d9d6c34a20b32caedfb036fbcb5523471adbafa32a1", (
             "01000000024f23123ce6a665cc092d2947a56ff6a88dcde4c74f72adff76d976b188611df"
             "b0000000000ffffffff4f23123ce6a665cc092d2947a56ff6a88dcde4c74f72adff76d976"
             "b188611dfb0100000000ffffffff05c8518a7003000000000018baa914f5618dfc002becf"
@@ -283,8 +284,8 @@ class TestDcrdataBlockchain:
             "dce25b12cf5fb6d97123f7ed128df45452296c5f6b80736d34c23f71600445dc022062917"
             "c128406c371983eceaeb9fa47e417f1d6b84da1f7faa888a2cda6cee8ad0121021f2675b5"
             "f8403d9095c1874efde16719684d0490cc8836cbe5dadc3be4650dbb"
-        ),
-        "fe332b35fa0a8a8aa2d247a35f45553935e0b96d33e1a8158a1a863307d5bdf3": (
+        )),
+        ("fe332b35fa0a8a8aa2d247a35f45553935e0b96d33e1a8158a1a863307d5bdf3", (
             "01000000022b7417082c038ad30555f69723516b0372b2afbe7d888e3a52995a759c9b26b"
             "e0200000001ffffffff81f6d14d0cc35a385af056bd3c3dd95e951fc9007ba9aaa76c3f31"
             "7e7c7b969d0100000000ffffffff026c5d8a700300000000001976a914ead3999b4c08c93"
@@ -297,8 +298,9 @@ class TestDcrdataBlockchain:
             "a19ea462bf15a71eba2b5a6080c8b02e161022022d492ce6fc296d9cbc61122838add71e9"
             "a01bbb7c53659d0ee8f7927b26eef6012103c8656c7d5002fdead42f844a6ea370c34d581"
             "0bed487af9827a27a820b31a880"
-        ),
-    }
+        )),
+    )
+    # fmt: on
 
     def test_utxos(self, http_get_post, tmp_path):
         preload_api_list(http_get_post)
@@ -319,6 +321,40 @@ class TestDcrdataBlockchain:
 
         # Preload both the UTXOs and the txs.
         http_get_post(utxoURL, self.utxos)
-        for txid, tx in self.txs.items():
-            http_get_post(f"{BASE_URL}api/tx/hex/{txid}", tx)
+        for txid, tx in self.txs:
+            txURL = f"{BASE_URL}api/tx/hex/{txid}"
+            http_get_post(txURL, tx)
         assert len(ddb.UTXOs(addrs)) == 3
+
+        # txsForAddr
+        txsURL = f"{BASE_URL}insight/api/addr/the_address/txs"
+        # No transactions for an address.
+        http_get_post(txsURL, {})
+        assert ddb.txsForAddr("the_address") == []
+        # Some transactions for an address.
+        http_get_post(txsURL, {"transactions": "txs"})
+        assert ddb.txsForAddr("the_address") == "txs"
+
+        # txVout
+        assert ddb.txVout(self.txs[2][0], 0).satoshis == 14773017964
+
+        # blockForTx
+        # Preload the decoded tx.
+        txURL = f"{BASE_URL}api/tx/{self.txs[2][0]}"
+        blockHash = "00000000000000002b197e4018b990efb85e6bd43ffb15f7ede97a78f806a3f8"
+        decodedTx = {"block": {"blockhash": blockHash}}
+        http_get_post(txURL, decodedTx)
+        # Preload the block header.
+        headerURL = f"{BASE_URL}api/block/hash/{blockHash}/header/raw"
+        blockHeader = {
+            "hex": (
+                "07000000e00b3a83dc60f961d8f516ece63e6d009eff4c2af50139150000"
+                "000000000000873684038a5d384cf123ee39d39bdf9f65cf4051ec4d420f"
+                "e909c16344329aaa35879931c8695d9be6f9259fa7467c51d0c7e601d95c"
+                "c78fdd458210503865af0100721e0a6d2bf90500040091a40000e62f3418"
+                "c8518a700300000012850600213300003de0575e6e8b9d13e691326a1fd4"
+                "3a0000000000000000000000000000000000000000000000000007000000"
+            ),
+        }
+        http_get_post(headerURL, blockHeader)
+        assert isinstance(ddb.blockForTx(self.txs[2][0]), msgblock.BlockHeader)
