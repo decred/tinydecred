@@ -519,7 +519,7 @@ class DcrdataBlockchain:
         self.heightMap = db.child("height", datatypes=("INTEGER", "BLOB"))
         self.headerDB = db.child("header", blobber=msgblock.BlockHeader)
         self.txBlockMap = db.child("blocklink")
-        self.tip = None
+        self.tipHeight = None
         self.subsidyCache = calc.SubsidyCache(params)
         if not skipConnect:
             self.connect()
@@ -865,7 +865,7 @@ class DcrdataBlockchain:
         this can be used sparingly.
         """
         try:
-            self.tip = self.bestBlock()
+            self.tipHeight = self.bestBlock()["height"]
         except Exception as e:
             log.error("failed to retrieve tip from blockchain: %s" % formatTraceback(e))
             raise DecredError("no tip data retrieved")
@@ -928,12 +928,12 @@ class DcrdataBlockchain:
 
     def pubsubSignal(self, sig):
         """
-        Process a notifictation from the block explorer.
+        Process a notification from the block explorer.
 
         Arg:
             sig (obj or string): The block explorer's notification, decoded.
         """
-        # log.debug("pubsub signal recieved: %s" % repr(sig))
+        # log.debug("pubsub signal received: %s" % repr(sig))
         if "done" in sig:
             return
         sigType = sig["event"]
@@ -941,10 +941,9 @@ class DcrdataBlockchain:
             if sigType == "address":
                 msg = sig["message"]
                 log.debug("signal received for %s" % msg["address"])
-                self.addressReceiver(msg["address"], msg["transaction"])
+                self.addressReceiver(sig)
             elif sigType == "newblock":
-                self.tip = sig["message"]["block"]
-                self.tipHeight = self.tip["height"]
+                self.tipHeight = sig["message"]["block"]["height"]
                 self.blockReceiver(sig)
             elif sigType == "subscribeResp":
                 # should check for error.
@@ -966,7 +965,7 @@ class DcrdataBlockchain:
 
     def approveUTXO(self, utxo):
         # If the UTXO appears unconfirmed, see if it can be confirmed.
-        if utxo.maturity and self.tip["height"] < utxo.maturity:
+        if utxo.maturity and self.tipHeight < utxo.maturity:
             return False
         if utxo.isTicket():
             # Temporary until revocations implemented.
@@ -1172,8 +1171,7 @@ class DcrdataBlockchain:
             raise DecredError("negative expiry")
 
         # Perform a sanity check on expiry.
-        tipHeight = self.tip["height"]
-        if req.expiry <= tipHeight + 1 and req.expiry > 0:
+        if req.expiry <= self.tipHeight + 1 and req.expiry > 0:
             raise DecredError("expiry height must be above next block height")
 
         # Fetch a new address for creating a split transaction. Then,
@@ -1266,7 +1264,7 @@ class DcrdataBlockchain:
         poolFeeAmt = txscript.stakePoolTicketFee(
             ticketPrice,
             ticketFee,
-            tipHeight,
+            self.tipHeight,
             req.poolFees,
             self.subsidyCache,
             self.params,
