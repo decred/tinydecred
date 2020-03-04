@@ -35,6 +35,7 @@ pytest-cov = "^2.8"
 flake8 = "^3.7"
 black = "^19.10b0"
 isort = "^4.3"
+websocket-server = "^0.4"
 
 [tool.isort]
 atomic = "true"

@@ -20,6 +20,7 @@ from decred.dcr.dcrdata import (
     DcrdataPath,
     checkOutput,
     makeOutputs,
+    WS_DONE,
 )
 from decred.dcr.nets import testnet
 from decred.dcr.wire import msgtx
@@ -128,11 +129,15 @@ def test_checkoutput():
         checkOutput(tx, 0)
 
 
-class MockWebsocketClient:
+class MockWebSocketClient:
     def __init__(self):
         self.sent = []
 
     def send(self, msg):
+        try:
+            msg = json.loads(msg)
+        except json.JSONDecodeError:
+            pass
         self.sent.append(msg)
 
     def close(self):
@@ -167,8 +172,8 @@ class TestDcrdataClient:
         preload_api_list(http_get_post)
         ddc = DcrdataClient(BASE_URL)
 
-        # Set the mock WebsocketClient.
-        ddc.ps = MockWebsocketClient()
+        # Set the mock WebSocketClient.
+        ddc.ps = MockWebSocketClient()
 
         ddc.subscribedAddresses = ["already_there"]
         ddc.subscribeAddresses(["already_there", "new_one"])
@@ -265,7 +270,6 @@ class TestDcrdataBlockchain:
         )),
     )
     # fmt: on
-
     def test_misc(self, http_get_post, tmp_path):
         preload_api_list(http_get_post)
         http_get_post(f"{BASE_URL}api/block/best", dict(height=1))
@@ -289,7 +293,7 @@ class TestDcrdataBlockchain:
         ddb = DcrdataBlockchain(str(tmp_path / "test.db"), testnet, BASE_URL)
 
         # Set the mock WebsocketClient.
-        ddb.dcrdata.ps = MockWebsocketClient()
+        ddb.dcrdata.ps = MockWebSocketClient()
 
         # Receiver
         block_queue = []
@@ -315,7 +319,7 @@ class TestDcrdataBlockchain:
         assert ddb.dcrdata.ps.sent[0]["message"]["message"] == "address:new_one"
 
         # pubsubSignal
-        assert ddb.pubsubSignal("done") is None
+        assert ddb.pubsubSignal(WS_DONE) is None
         assert ddb.pubsubSignal(dict(event="subscribeResp")) is None
         assert ddb.pubsubSignal(dict(event="ping")) is None
         assert ddb.pubsubSignal(dict(event="unknown")) is None
@@ -384,7 +388,7 @@ class TestDcrdataBlockchain:
         assert len(ddb.UTXOs(addrs)) == 3
 
         # txsForAddr
-        txsURL = f"{BASE_URL}insight/api/addr/the_address/txs"
+        txsURL = f"{BASE_URL}insight/api/addr/the_address"
         # No transactions for an address.
         http_get_post(txsURL, {})
         assert ddb.txsForAddr("the_address") == []
