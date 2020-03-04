@@ -685,8 +685,6 @@ class DcrdataBlockchain:
             try:
                 # Grab the hex encoded transaction
                 txHex = self.dcrdata.tx.hex(txid)
-                if not txHex:
-                    raise DecredError("failed to retrieve tx hex from dcrdata")
                 msgTx = msgtx.MsgTx.deserialize(ByteArray(txHex))
                 self.txDB[hashKey] = msgTx
                 return msgTx

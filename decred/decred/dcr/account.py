@@ -34,8 +34,8 @@ class MetaKeys:
     vsp = "vsp".encode()
 
 
-# See CrazyKeyError docs. When an out-of-range key is created, a placeholder
-# is set for that child's position internally in Account.
+# See crypto.CrazyKeyError docs. When an out-of-range key is created,
+# a placeholder is set for that child's position internally in Account.
 CrazyAddress = "CRAZYADDRESS"
 
 # DefaultGapLimit is the default unused address gap limit defined by BIP0044.
@@ -139,6 +139,22 @@ class TicketStats:
         self.value = value
 
 
+def unblob_check(name, version, actual_pushes, expected_pushes):
+    """
+    Check version and pushes to unblob.
+
+    Raises:
+        NotImplementedError if version is not zero.
+        DecredError if actual_pushes and expected_pushes are not the same.
+    """
+    if version != 0:
+        raise NotImplementedError(f"{name}: unsupported version {version}")
+    if actual_pushes != expected_pushes:
+        raise DecredError(
+            f"{name}: expected {expected_pushes} pushes, got {actual_pushes}"
+        )
+
+
 class TinyBlock:
     """
     TinyBlock is a block hash and height that satisfies encode.Blobber.
@@ -164,10 +180,7 @@ class TinyBlock:
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        if ver != 0:
-            raise AssertionError("unsupported version")
-        if len(d) != 2:
-            raise AssertionError("wrong number of pushes. expected 2, got %d" % len(d))
+        unblob_check("TinyBlock", ver, len(d), 2)
         return TinyBlock(d[0], encode.intFromBytes(d[1]))
 
     def serialize(self):
@@ -266,9 +279,9 @@ class TicketInfo:
             purchaseBlock=TinyBlock.parse(obj["purchase_block"]),
             maturityHeight=obj["maturity_height"],
             expirationHeight=obj["expiration_height"],
-            lotteryBlock=TinyBlock.parse(obj["lottery_block"])
-            if obj["lottery_block"]
-            else None,
+            lotteryBlock=(
+                TinyBlock.parse(obj["lottery_block"]) if obj["lottery_block"] else None
+            ),
             vote=ba(obj["vote"]) if obj["vote"] else None,
             revocation=ba(obj["revocation"]) if obj["revocation"] else None,
         )
@@ -497,12 +510,7 @@ class UTXO:
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        if ver != 0:
-            raise AssertionError("wrong version for UTXO %d" % ver)
-        if len(d) != 9:
-            raise AssertionError(
-                "wrong number of pushes for UTXO. expected 9 got %d" % len(d)
-            )
+        unblob_check("UTXO", ver, len(d), 9)
 
         iFunc = encode.intFromBytes
         f = encode.extractNone
@@ -772,12 +780,7 @@ class Balance:
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, pushes = encode.decodeBlob(b)
-        if ver != 0:
-            raise AssertionError("invalid version for Balance %d" % ver)
-        if len(pushes) != 3:
-            raise AssertionError(
-                "wrong number of pushes for Balance. wanted 3, got %d" % len(pushes)
-            )
+        unblob_check("Balance", ver, len(pushes), 3)
         i = encode.intFromBytes
         return Balance(i(pushes[0]), i(pushes[1]), i(pushes[2]))
 
@@ -889,12 +892,7 @@ class Account:
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        if ver != 0:
-            raise AssertionError("invalid Account version %d" % ver)
-        if len(d) != 7:
-            raise AssertionError(
-                "wrong number of pushes for Account. wanted 7, got %d" % len(d)
-            )
+        unblob_check("Account", ver, len(d), 7)
 
         iFunc = encode.intFromBytes
 

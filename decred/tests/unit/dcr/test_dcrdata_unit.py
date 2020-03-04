@@ -221,7 +221,7 @@ class TestDcrdataBlockchain:
         assert isinstance(agsinfo, agenda.AgendasInfo)
 
     # Test data from block #427282.
-    utxos = [
+    utxos = (
         # Coinbase.
         dict(
             address="DsnxqhJX2tjyjbfb9y4yPdpJ744G9fLhbbF",
@@ -258,7 +258,7 @@ class TestDcrdataBlockchain:
             satoshis=8081940674,
             confirmations=3,
         ),
-    ]
+    )
     # fmt: off
     txs = (
         ("ba0ce58eaa1b1402b8f33d84034014712add4d2955d1dd01adea2612e9dc6b8a", (
@@ -307,11 +307,32 @@ class TestDcrdataBlockchain:
         http_get_post(f"{BASE_URL}api/block/best", 1)
         ddb = DcrdataBlockchain(str(tmp_path / "test.db"), testnet, BASE_URL)
 
-        assert len(ddb.UTXOs([])) == 0
-
         # txVout error
         with pytest.raises(DecredError):
             ddb.txVout(self.txs[2][0], 0).satoshis
+
+        # processNewUTXO
+        # Preload tx and tinfo.
+        txURL = f"{BASE_URL}api/tx/hex/{self.txs[1][0]}"
+        http_get_post(txURL, self.txs[1][1])
+        tinfoURL = f"{BASE_URL}api/tx/{self.utxos[1]['txid']}/tinfo"
+        tinfo = dict(
+            status="live",
+            purchase_block=dict(
+                hash="0000000000000000270916ab2705a3a2053f32344e195e87f787ffe0f977a528",
+                height=427325,
+            ),
+            maturity_height=427581,
+            expiration_height=468541,
+            lottery_block=None,
+            vote=None,
+            revocation=None,
+        )
+        http_get_post(tinfoURL, tinfo)
+        assert ddb.processNewUTXO(self.utxos[1]).maturity == 427581
+
+        # UTXOs
+        assert len(ddb.UTXOs([])) == 0
 
         # Precompute the UTXO data.
         addrs = [utxo["address"] for utxo in self.utxos]
@@ -347,9 +368,13 @@ class TestDcrdataBlockchain:
         http_get_post(f"{BASE_URL}api/block/best", 1)
         ddb = DcrdataBlockchain(str(tmp_path / "test.db"), testnet, BASE_URL)
 
+        # blockHeader
+        blockHash = "00000000000000002b197e4018b990efb85e6bd43ffb15f7ede97a78f806a3f8"
+        with pytest.raises(DecredError):
+            ddb.blockHeader(blockHash)
+
         # blockHeaderByHeight
         blockHeight = 427282
-        blockHash = "00000000000000002b197e4018b990efb85e6bd43ffb15f7ede97a78f806a3f8"
         with pytest.raises(DecredError):
             ddb.blockHeaderByHeight(blockHeight).id()
         # Preload the block header.
