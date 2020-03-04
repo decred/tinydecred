@@ -370,10 +370,6 @@ class TestDcrdataBlockchain:
         # UTXOs
         assert len(ddb.UTXOs([])) == 0
 
-        # txVout error
-        with pytest.raises(DecredError):
-            ddb.txVout(self.txs[2][0], 0).satoshis
-
         # Precompute the UTXO data.
         addrs = [utxo["address"] for utxo in self.utxos]
         addrStr = ",".join(addrs)
