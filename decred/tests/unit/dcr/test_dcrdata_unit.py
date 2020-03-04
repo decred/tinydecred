@@ -329,17 +329,10 @@ class TestDcrdataBlockchain:
             revocation=None,
         )
         http_get_post(tinfoURL, tinfo)
-        utxo = ddb.processNewUTXO(self.utxos[1])
-        assert utxo.tinfo.purchaseBlock.hash == reversed(
-            ByteArray(tinfo["purchase_block"]["hash"])
-        )
+        assert ddb.processNewUTXO(self.utxos[1]).maturity == 427581
 
         # UTXOs
         assert len(ddb.UTXOs([])) == 0
-
-        # txVout error
-        with pytest.raises(DecredError):
-            ddb.txVout(self.txs[2][0], 0).satoshis
 
         # Precompute the UTXO data.
         addrs = [utxo["address"] for utxo in self.utxos]
