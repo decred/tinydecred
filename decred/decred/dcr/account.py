@@ -139,28 +139,27 @@ class TicketStats:
         self.value = value
 
 
-def unblob_check(class_name, cur_version, cur_pushes, check_data):
+def unblob_check(class_name, version, pushes, check_data):
     """
     Check version and pushes to unblob.
 
     Args:
         class_name str: the class name that will appear in error messages.
-        cur_version int: the version number that will be checked.
-        cur_pushes int: the number of pushes that will be checked.
+        version int: the version number that will be checked.
+        pushes int: the number of pushes that will be checked.
         check_data dict: keys are version numbers, values are number of
             expected pushes.
 
     Raises:
         NotImplementedError if version is not in check_data keys.
-        DecredError if cur_pushes is not the value in check_data keyed by
-            cur_version.
+        DecredError if pushes is not the value in check_data keyed by version.
     """
-    if cur_version not in check_data.keys():
-        raise NotImplementedError(f"{class_name}: unsupported version {cur_version}")
-    exp_pushes = check_data[cur_version]
-    if cur_pushes != exp_pushes:
+    if version not in check_data.keys():
+        raise NotImplementedError(f"{class_name}: unsupported version {version}")
+    expected_pushes = check_data[version]
+    if pushes != expected_pushes:
         raise DecredError(
-            f"{class_name}: expected {exp_pushes} pushes, got {cur_pushes}"
+            f"{class_name}: expected {expected_pushes} pushes, got {pushes}"
         )
 
 
