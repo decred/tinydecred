@@ -5,7 +5,6 @@ See LICENSE for details
 
 import json
 import os
-from tempfile import TemporaryDirectory
 
 from decred.crypto import crypto, opcode, rando
 from decred.dcr import account, nets, txscript
@@ -15,7 +14,6 @@ from decred.util.database import KeyValueDatabase
 from decred.util.encode import ByteArray
 
 
-# TODO: use pytest tmp_path instead of TemporaryDirectory
 LOGGER_ID = "test_account"
 
 testSeed = ByteArray(
@@ -231,237 +229,234 @@ dcrdataUTXOs = json.loads(
 utxoTotal = 942168886 + 942093929
 
 
-def test_account(prepareLogger):
+def test_account(tmp_path):
     """
     Test account functionality.
     """
-    with TemporaryDirectory() as tempDir:
-        db = KeyValueDatabase(os.path.join(tempDir, "tmp.db")).child("tmp")
-        acct = newAccount(db)
-        for n in range(20):
-            acct.nextExternalAddress()
-        satoshis = int(round(5 * 1e8))
-        txHash = ByteArray(rando.generateSeed(32))
-        txid = reversed(txHash).hex()
-        vout = 2
-        address = acct.nextExternalAddress()
+    db = KeyValueDatabase(os.path.join(tmp_path, "tmp.db")).child("tmp")
+    acct = newAccount(db)
+    for n in range(20):
+        acct.nextExternalAddress()
+    satoshis = int(round(5 * 1e8))
+    txHash = ByteArray(rando.generateSeed(32))
+    txid = reversed(txHash).hex()
+    vout = 2
+    address = acct.nextExternalAddress()
 
-        utxo = account.UTXO(
-            address=address,
-            txHash=txHash,
-            vout=vout,
-            scriptPubKey=ByteArray(0),
-            satoshis=satoshis,
-            maturity=1,
-        )
+    utxo = account.UTXO(
+        address=address,
+        txHash=txHash,
+        vout=vout,
+        scriptPubKey=ByteArray(0),
+        satoshis=satoshis,
+        maturity=1,
+    )
 
-        # A helper function to get the current utxo count.
-        utxocount = lambda: len(list(acct.utxoscan()))
+    # A helper function to get the current utxo count.
+    utxocount = lambda: len(list(acct.utxoscan()))
 
-        # Add the utxo
-        acct.addUTXO(utxo)
-        # Check the count and balance categories.
-        assert utxocount() == 1
-        assert acct.calcBalance(1).total == satoshis
-        assert acct.calcBalance(1).available == satoshis
-        assert acct.calcBalance(0).available == 0
-        # Helper functions.
-        assert acct.caresAboutTxid(txid)
-        acct.addUTXO(utxo)
-        assert utxocount() == 1
-        acct.spendUTXO(utxo)
-        assert utxocount() == 0
+    # Add the utxo
+    acct.addUTXO(utxo)
+    # Check the count and balance categories.
+    assert utxocount() == 1
+    assert acct.calcBalance(1).total == satoshis
+    assert acct.calcBalance(1).available == satoshis
+    assert acct.calcBalance(0).available == 0
+    # Helper functions.
+    assert acct.caresAboutTxid(txid)
+    acct.addUTXO(utxo)
+    assert utxocount() == 1
+    acct.spendUTXO(utxo)
+    assert utxocount() == 0
 
-        b = acct.serialize()
-        reAcct = account.Account.unblob(b.b)
+    b = acct.serialize()
+    reAcct = account.Account.unblob(b.b)
 
-        assert acct.pubKeyEncrypted == reAcct.pubKeyEncrypted
-        assert acct.privKeyEncrypted == reAcct.privKeyEncrypted
-        assert acct.name == reAcct.name
-        assert acct.coinID == reAcct.coinID
-        assert acct.netID == reAcct.netID
-        assert acct.gapLimit == reAcct.gapLimit
-        assert acct.cursorExt == reAcct.cursorExt
-        assert acct.cursorInt == reAcct.cursorInt
-        assert acct.gapLimit == reAcct.gapLimit
+    assert acct.pubKeyEncrypted == reAcct.pubKeyEncrypted
+    assert acct.privKeyEncrypted == reAcct.privKeyEncrypted
+    assert acct.name == reAcct.name
+    assert acct.coinID == reAcct.coinID
+    assert acct.netID == reAcct.netID
+    assert acct.gapLimit == reAcct.gapLimit
+    assert acct.cursorExt == reAcct.cursorExt
+    assert acct.cursorInt == reAcct.cursorInt
+    assert acct.gapLimit == reAcct.gapLimit
 
-        # Create a faux blockchain for the account.
-        class Blockchain:
-            txsForAddr = lambda addr: []
-            UTXOs = lambda addrs: []
-            tip = {"height": 5}
+    # Create a faux blockchain for the account.
+    class Blockchain:
+        txsForAddr = lambda addr: []
+        UTXOs = lambda addrs: []
+        tip = {"height": 5}
 
-        acct.blockchain = Blockchain
+    acct.blockchain = Blockchain
 
-        class Signals:
-            b = None
+    class Signals:
+        b = None
 
-            @classmethod
-            def balance(cls, b):
-                cls.b = b
+        @classmethod
+        def balance(cls, b):
+            cls.b = b
 
-        acct.signals = Signals
+    acct.signals = Signals
 
-        # Add a txid for this first address
-        txid = ByteArray(rando.generateSeed(32)).hex()
-        zerothAddr = acct.externalAddresses[0]
-        acct.addTxid(zerothAddr, txid)
-        # Add a voting service provider
-        vspKey = ByteArray(rando.generateSeed(32)).hex()
-        ticketAddr = "ticketAddr"
-        pi = PurchaseInfo(
-            "addr", 1.0, ByteArray(b"scripthashscript"), ticketAddr, 1, 0, 2
-        )
-        vsp = VotingServiceProvider("https://myvsp.com", vspKey, nets.mainnet.Name, pi)
-        acct.setPool(vsp)
-        # Add UTXOs
-        utxos = [account.UTXO.parse(u) for u in dcrdataUTXOs]
-        acct.resolveUTXOs(utxos)
+    # Add a txid for this first address
+    txid = ByteArray(rando.generateSeed(32)).hex()
+    zerothAddr = acct.externalAddresses[0]
+    acct.addTxid(zerothAddr, txid)
+    # Add a voting service provider
+    vspKey = ByteArray(rando.generateSeed(32)).hex()
+    ticketAddr = "ticketAddr"
+    pi = PurchaseInfo("addr", 1.0, ByteArray(b"scripthashscript"), ticketAddr, 1, 0, 2)
+    vsp = VotingServiceProvider("https://myvsp.com", vspKey, nets.mainnet.Name, pi)
+    acct.setPool(vsp)
+    # Add UTXOs
+    utxos = [account.UTXO.parse(u) for u in dcrdataUTXOs]
+    acct.resolveUTXOs(utxos)
 
-        # Check that the addresses txid and the vsp load from the database.
-        acct.txs.clear()
-        acct.stakePools.clear()
-        acct.utxos.clear()
-        assert acct.stakePool() is None
-        acct.load(db)
-        assert zerothAddr in acct.txs
-        assert len(acct.txs[zerothAddr]) == 1
-        assert acct.txs[zerothAddr][0] == txid
-        assert len(acct.stakePools) == 1
-        assert acct.stakePool().apiKey == vspKey
-        assert acct.calcBalance().available == utxoTotal
-        assert len(acct.getUTXOs(utxoTotal)[0]) == 2
-        assert len(acct.getUTXOs(utxoTotal, lambda u: False)[0]) == 0
-        assert acct.lastSeen(acct.externalAddresses, -1) == 0
-        branch, idx = acct.branchAndIndex(zerothAddr)
-        assert branch == account.EXTERNAL_BRANCH
-        assert idx == 0
-        checkKey = acct.privKey.child(account.EXTERNAL_BRANCH).child(0).key
-        assert acct.privKeyForAddress(zerothAddr).key == checkKey
-        ticketAddrs = acct.addTicketAddresses([])
-        assert len(ticketAddrs) == 1
-        assert ticketAddrs[0] == ticketAddr
-        assert acct.hasPool()
+    # Check that the addresses txid and the vsp load from the database.
+    acct.txs.clear()
+    acct.stakePools.clear()
+    acct.utxos.clear()
+    assert acct.stakePool() is None
+    acct.load(db)
+    assert zerothAddr in acct.txs
+    assert len(acct.txs[zerothAddr]) == 1
+    assert acct.txs[zerothAddr][0] == txid
+    assert len(acct.stakePools) == 1
+    assert acct.stakePool().apiKey == vspKey
+    assert acct.calcBalance().available == utxoTotal
+    assert len(acct.getUTXOs(utxoTotal)[0]) == 2
+    assert len(acct.getUTXOs(utxoTotal, lambda u: False)[0]) == 0
+    assert acct.lastSeen(acct.externalAddresses, -1) == 0
+    branch, idx = acct.branchAndIndex(zerothAddr)
+    assert branch == account.EXTERNAL_BRANCH
+    assert idx == 0
+    checkKey = acct.privKey.child(account.EXTERNAL_BRANCH).child(0).key
+    assert acct.privKeyForAddress(zerothAddr).key == checkKey
+    ticketAddrs = acct.addTicketAddresses([])
+    assert len(ticketAddrs) == 1
+    assert ticketAddrs[0] == ticketAddr
+    assert acct.hasPool()
 
-        # Add a coinbase transaction output to the account.
-        coinbase = newCoinbaseTx()
-        cbUTXO = account.UTXO("addr", ByteArray(b"id"), 1, height=5, satoshis=int(1e8))
-        coinbase.addTxOut(msgtx.TxOut(int(1e8)))
-        coinbaseID = coinbase.id()
-        cbUTXO.txid = coinbaseID
-        acct.addUTXO(cbUTXO)
-        acct.addMempoolTx(coinbase)
-        assert coinbaseID in acct.mempool
-        # Send a block signal and have the transaction confirmed.
-        sig = {"message": {"block": {"Tx": [{"TxID": coinbaseID}]}}}
-        acct.blockchain.tipHeight = 5
-        acct.blockchain.tx = lambda *a: coinbase
-        acct.blockSignal(sig)
-        assert coinbaseID not in acct.mempool
-        assert cbUTXO.key() in acct.utxos
-        maturity = 5 + nets.mainnet.CoinbaseMaturity
-        assert acct.utxos[cbUTXO.key()].maturity == maturity
-        assert acct.calcBalance(maturity).available == utxoTotal + cbUTXO.satoshis
-        assert acct.calcBalance(0).available == utxoTotal
-        acct.spendUTXOs([cbUTXO])
-        assert acct.calcBalance(maturity).available == utxoTotal
+    # Add a coinbase transaction output to the account.
+    coinbase = newCoinbaseTx()
+    cbUTXO = account.UTXO("addr", ByteArray(b"id"), 1, height=5, satoshis=int(1e8))
+    coinbase.addTxOut(msgtx.TxOut(int(1e8)))
+    coinbaseID = coinbase.id()
+    cbUTXO.txid = coinbaseID
+    acct.addUTXO(cbUTXO)
+    acct.addMempoolTx(coinbase)
+    assert coinbaseID in acct.mempool
+    # Send a block signal and have the transaction confirmed.
+    sig = {"message": {"block": {"Tx": [{"TxID": coinbaseID}]}}}
+    acct.blockchain.tipHeight = 5
+    acct.blockchain.tx = lambda *a: coinbase
+    acct.blockSignal(sig)
+    assert coinbaseID not in acct.mempool
+    assert cbUTXO.key() in acct.utxos
+    maturity = 5 + nets.mainnet.CoinbaseMaturity
+    assert acct.utxos[cbUTXO.key()].maturity == maturity
+    assert acct.calcBalance(maturity).available == utxoTotal + cbUTXO.satoshis
+    assert acct.calcBalance(0).available == utxoTotal
+    acct.spendUTXOs([cbUTXO])
+    assert acct.calcBalance(maturity).available == utxoTotal
 
-        # make a ticket and a vote
-        ticket = account.UTXO.parse(dcrdataUTXO)
-        utxo.setTicketInfo(dcrdataTinfo)
-        utxo.scriptPubKey = ticketScript
-        utxo.parseScriptClass()
-        acct.addUTXO(ticket)
-        expVal = acct.calcBalance().available - ticket.satoshis
-        voteTx = msgtx.MsgTx.new()
-        voteTx.addTxIn(
-            msgtx.TxIn(msgtx.OutPoint(reversed(ByteArray(ticket.txid)), ticket.vout, 0))
-        )
-        acct.blockchain.tx = lambda *a: voteTx
-        acct.addressSignal(ticketAddr, "somehash")
-        assert Signals.b.available == expVal
+    # make a ticket and a vote
+    ticket = account.UTXO.parse(dcrdataUTXO)
+    utxo.setTicketInfo(dcrdataTinfo)
+    utxo.scriptPubKey = ticketScript
+    utxo.parseScriptClass()
+    acct.addUTXO(ticket)
+    expVal = acct.calcBalance().available - ticket.satoshis
+    voteTx = msgtx.MsgTx.new()
+    voteTx.addTxIn(
+        msgtx.TxIn(msgtx.OutPoint(reversed(ByteArray(ticket.txid)), ticket.vout, 0))
+    )
+    acct.blockchain.tx = lambda *a: voteTx
+    acct.addressSignal(ticketAddr, "somehash")
+    assert Signals.b.available == expVal
 
-        # Detect a new utxo for the account.
-        newVal = int(5e8)
-        expVal = acct.calcBalance().available + newVal
-        addr = acct.externalAddresses[1]
-        a = txscript.decodeAddress(addr, nets.mainnet)
-        script = txscript.payToAddrScript(a)
-        newTx = msgtx.MsgTx.new()
-        op = msgtx.TxOut(newVal, script)
-        newTx.addTxOut(op)
-        acct.blockchain.tx = lambda *a: newTx
-        utxo = account.UTXO(addr, ByteArray(b"txid"), 0, satoshis=newVal)
-        acct.blockchain.txVout = lambda *a: utxo
-        acct.addressSignal(addr, "somehash")
-        assert Signals.b.available == expVal
+    # Detect a new utxo for the account.
+    newVal = int(5e8)
+    expVal = acct.calcBalance().available + newVal
+    addr = acct.externalAddresses[1]
+    a = txscript.decodeAddress(addr, nets.mainnet)
+    script = txscript.payToAddrScript(a)
+    newTx = msgtx.MsgTx.new()
+    op = msgtx.TxOut(newVal, script)
+    newTx.addTxOut(op)
+    acct.blockchain.tx = lambda *a: newTx
+    utxo = account.UTXO(addr, ByteArray(b"txid"), 0, satoshis=newVal)
+    acct.blockchain.txVout = lambda *a: utxo
+    acct.addressSignal(addr, "somehash")
+    assert Signals.b.available == expVal
 
-        # test syncing. add a single output for external address #2
-        acct.stakePool().getPurchaseInfo = lambda: None
-        acct.stakePool().authorize = lambda a: True
-        newVal = int(3e8)
-        addr = acct.externalAddresses[2]
-        a = txscript.decodeAddress(addr, nets.mainnet)
-        script = txscript.payToAddrScript(a)
-        newTx = msgtx.MsgTx.new()
-        op = msgtx.TxOut(newVal, script)
-        newTx.addTxOut(op)
-        utxo = account.UTXO(addr, ByteArray(b"txid"), 0, satoshis=newVal)
+    # test syncing. add a single output for external address #2
+    acct.stakePool().getPurchaseInfo = lambda: None
+    acct.stakePool().authorize = lambda a: True
+    newVal = int(3e8)
+    addr = acct.externalAddresses[2]
+    a = txscript.decodeAddress(addr, nets.mainnet)
+    script = txscript.payToAddrScript(a)
+    newTx = msgtx.MsgTx.new()
+    op = msgtx.TxOut(newVal, script)
+    newTx.addTxOut(op)
+    utxo = account.UTXO(addr, ByteArray(b"txid"), 0, satoshis=newVal)
 
-        def t4a(*a):
-            acct.blockchain.txsForAddr = lambda *a: []
-            return [newTx.id()]
+    def t4a(*a):
+        acct.blockchain.txsForAddr = lambda *a: []
+        return [newTx.id()]
 
-        acct.blockchain.txsForAddr = t4a
+    acct.blockchain.txsForAddr = t4a
 
-        def utxos4a(*a):
-            acct.blockchain.UTXOs = lambda *a: []
-            return [utxo]
+    def utxos4a(*a):
+        acct.blockchain.UTXOs = lambda *a: []
+        return [utxo]
 
-        acct.blockchain.UTXOs = utxos4a
-        acct.blockchain.subscribeAddresses = lambda addrs: None
-        acct.blockchain.subscribeBlocks = lambda a: None
-        acct.sync()
-        assert Signals.b.available == newVal
+    acct.blockchain.UTXOs = utxos4a
+    acct.blockchain.subscribeAddresses = lambda addrs: None
+    acct.blockchain.subscribeBlocks = lambda a: None
+    acct.sync()
+    assert Signals.b.available == newVal
 
-        # spend the utxo by sending it. Reusing newTx for convenience.
-        changeVal = int(5e7)
-        addr = acct.internalAddresses[0]
-        change = account.UTXO(addr, ByteArray(b"newtxid"), 0, satoshis=changeVal)
-        acct.blockchain.sendToAddress = lambda *a: (newTx, [utxo], [change])
-        acct.sendToAddress(1, "recipient")
-        assert Signals.b.available == changeVal
+    # spend the utxo by sending it. Reusing newTx for convenience.
+    changeVal = int(5e7)
+    addr = acct.internalAddresses[0]
+    change = account.UTXO(addr, ByteArray(b"newtxid"), 0, satoshis=changeVal)
+    acct.blockchain.sendToAddress = lambda *a: (newTx, [utxo], [change])
+    acct.sendToAddress(1, "recipient")
+    assert Signals.b.available == changeVal
 
-        # purchase some tickets. Reusing newTx for convenience again.
-        ticket = account.UTXO.parse(dcrdataUTXO)
-        ticket.setTicketInfo(dcrdataTinfo)
-        ticket.scriptPubKey = ticketScript
-        ticket.parseScriptClass()
-        acct.blockchain.purchaseTickets = lambda *a: ([newTx, []], [], [ticket])
-        acct.signals.spentTickets = lambda: True
-        acct.purchaseTickets(1, 1)
-        assert Signals.b.total == changeVal + ticket.satoshis
+    # purchase some tickets. Reusing newTx for convenience again.
+    ticket = account.UTXO.parse(dcrdataUTXO)
+    ticket.setTicketInfo(dcrdataTinfo)
+    ticket.scriptPubKey = ticketScript
+    ticket.parseScriptClass()
+    acct.blockchain.purchaseTickets = lambda *a: ([newTx, []], [], [ticket])
+    acct.signals.spentTickets = lambda: True
+    acct.purchaseTickets(1, 1)
+    assert Signals.b.total == changeVal + ticket.satoshis
 
-        # revoke the ticket
-        ticketTx = msgtx.MsgTx.new()
-        op = msgtx.TxOut(ticket.satoshis, ticket.scriptPubKey)
-        ticketTx.addTxOut(op)
-        ticket.tinfo.status = "missed"
-        redeemHash = crypto.AddressScriptHash(
-            nets.mainnet.ScriptHashAddrID,
-            txscript.extractStakeScriptHash(ticketScript, opcode.OP_SSTX),
-        )
-        acct.stakePool().purchaseInfo.ticketAddress = redeemHash.string()
-        revoked = False
+    # revoke the ticket
+    ticketTx = msgtx.MsgTx.new()
+    op = msgtx.TxOut(ticket.satoshis, ticket.scriptPubKey)
+    ticketTx.addTxOut(op)
+    ticket.tinfo.status = "missed"
+    redeemHash = crypto.AddressScriptHash(
+        nets.mainnet.ScriptHashAddrID,
+        txscript.extractStakeScriptHash(ticketScript, opcode.OP_SSTX),
+    )
+    acct.stakePool().purchaseInfo.ticketAddress = redeemHash.string()
+    revoked = False
 
-        def rev(*a):
-            nonlocal revoked
-            revoked = True
+    def rev(*a):
+        nonlocal revoked
+        revoked = True
 
-        acct.blockchain.tx = lambda *a: ticketTx
-        acct.blockchain.revokeTicket = rev
-        acct.revokeTickets()
-        assert revoked
+    acct.blockchain.tx = lambda *a: ticketTx
+    acct.blockchain.revokeTicket = rev
+    acct.revokeTickets()
+    assert revoked
 
 
 def test_balance(prepareLogger):
@@ -473,89 +468,86 @@ def test_balance(prepareLogger):
     assert bal.staked == reBal.staked
 
 
-def test_gap_handling(prepareLogger):
-    with TemporaryDirectory() as tempDir:
-        db = KeyValueDatabase(os.path.join(tempDir, "tmp.db")).child("tmp")
-        internalAddrs = [
-            "DskHpgbEb6hqkuHchHhtyojpehFToEtjQSo",
-            "Dsm4oCLnLraGDedfU5unareezTNT75kPbRb",
-            "DsdN6A9bWhKKJ7PAGdcDLxQrYPKEnjnDv2N",
-            "Dsifz8eRHvQrfaPXgHHLMDHZopFJq2pBPU9",
-            "DsmmzJiTTmpafdt2xx7LGk8ZW8cdAKe53Zx",
-            "DsVB47P4N23PK5C1RyaJdqkQDzVuCDKGQbj",
-            "DsouVzScdUUswvtCAv6nxRzi2MeufpWnELD",
-            "DsSoquT5SiDPfksgnveLv3r524k1v8RamYm",
-            "DsbVDrcfhbdLy4YaSmThmWN47xhxT6FC8XB",
-            "DsoSrtGYKruQLbvhA92xeJ6eeuAR1GGJVQA",
-        ]
+def test_gap_handling(tmp_path):
+    db = KeyValueDatabase(os.path.join(tmp_path, "tmp.db")).child("tmp")
+    internalAddrs = [
+        "DskHpgbEb6hqkuHchHhtyojpehFToEtjQSo",
+        "Dsm4oCLnLraGDedfU5unareezTNT75kPbRb",
+        "DsdN6A9bWhKKJ7PAGdcDLxQrYPKEnjnDv2N",
+        "Dsifz8eRHvQrfaPXgHHLMDHZopFJq2pBPU9",
+        "DsmmzJiTTmpafdt2xx7LGk8ZW8cdAKe53Zx",
+        "DsVB47P4N23PK5C1RyaJdqkQDzVuCDKGQbj",
+        "DsouVzScdUUswvtCAv6nxRzi2MeufpWnELD",
+        "DsSoquT5SiDPfksgnveLv3r524k1v8RamYm",
+        "DsbVDrcfhbdLy4YaSmThmWN47xhxT6FC8XB",
+        "DsoSrtGYKruQLbvhA92xeJ6eeuAR1GGJVQA",
+    ]
 
-        externalAddrs = [
-            "DsmP6rBEou9Qr7jaHnFz8jTfrUxngWqrKBw",
-            "DseZQKiWhN3ceBwDJEgGhmwKD3fMbwF4ugf",
-            "DsVxujP11N72PJ46wgU9sewptWztYUy3L7o",
-            "DsYa4UBo379cRMCTpDLxYVfpMvMNBdAGrGS",
-            "DsVSEmQozEnsZ9B3D4Xn4H7kEedDyREgc18",
-            "DsifDp8p9mRocNj7XNNhGAsYtfWhccc2cry",
-            "DsV78j9aF8NBwegbcpPkHYy9cnPM39jWXZm",
-            "DsoLa9Rt1L6qAVT9gSNE5F5XSDLGoppMdwC",
-            "DsXojqzUTnyRciPDuCFFoKyvQFd6nQMn7Gb",
-            "DsWp4nShu8WxefgoPej1rNv4gfwy5AoULfV",
-        ]
+    externalAddrs = [
+        "DsmP6rBEou9Qr7jaHnFz8jTfrUxngWqrKBw",
+        "DseZQKiWhN3ceBwDJEgGhmwKD3fMbwF4ugf",
+        "DsVxujP11N72PJ46wgU9sewptWztYUy3L7o",
+        "DsYa4UBo379cRMCTpDLxYVfpMvMNBdAGrGS",
+        "DsVSEmQozEnsZ9B3D4Xn4H7kEedDyREgc18",
+        "DsifDp8p9mRocNj7XNNhGAsYtfWhccc2cry",
+        "DsV78j9aF8NBwegbcpPkHYy9cnPM39jWXZm",
+        "DsoLa9Rt1L6qAVT9gSNE5F5XSDLGoppMdwC",
+        "DsXojqzUTnyRciPDuCFFoKyvQFd6nQMn7Gb",
+        "DsWp4nShu8WxefgoPej1rNv4gfwy5AoULfV",
+    ]
 
-        account.DefaultGapLimit = gapLimit = 5
-        acct = newAccount(db)
-        acct.gapLimit = gapLimit
+    account.DefaultGapLimit = gapLimit = 5
+    acct = newAccount(db)
+    acct.gapLimit = gapLimit
 
-        listsAreEqual = lambda a, b: len(a) == len(b) and all(
-            x == y for x, y in zip(a, b)
-        )
+    listsAreEqual = lambda a, b: len(a) == len(b) and all(x == y for x, y in zip(a, b))
 
-        watchAddrs = internalAddrs[:gapLimit] + externalAddrs[: gapLimit + 1]
-        assert len(acct.watchAddrs()) == len(watchAddrs)
-        assert set(acct.watchAddrs()) == set(watchAddrs)
-        assert listsAreEqual(acct.internalAddresses, internalAddrs[:gapLimit])
+    watchAddrs = internalAddrs[:gapLimit] + externalAddrs[: gapLimit + 1]
+    assert len(acct.watchAddrs()) == len(watchAddrs)
+    assert set(acct.watchAddrs()) == set(watchAddrs)
+    assert listsAreEqual(acct.internalAddresses, internalAddrs[:gapLimit])
 
-        # The external branch starts with the "last seen" at the zeroth address, so
-        # has one additional address to start.
-        assert listsAreEqual(acct.externalAddresses, externalAddrs[: gapLimit + 1])
+    # The external branch starts with the "last seen" at the zeroth address, so
+    # has one additional address to start.
+    assert listsAreEqual(acct.externalAddresses, externalAddrs[: gapLimit + 1])
 
-        # Open the account to generate addresses.
-        acct.open(cryptoKey, None, None)
-        acct.addTxid(internalAddrs[0], "C4fA6958A1847D")
-        newAddrs = acct.generateGapAddresses()
-        assert len(newAddrs) == 1
-        assert newAddrs[0] == internalAddrs[5]
+    # Open the account to generate addresses.
+    acct.open(cryptoKey, None, None)
+    acct.addTxid(internalAddrs[0], "C4fA6958A1847D")
+    newAddrs = acct.generateGapAddresses()
+    assert len(newAddrs) == 1
+    assert newAddrs[0] == internalAddrs[5]
 
-        # The zeroth external address is considered "seen", so this should not
-        # change anything.
-        acct.addTxid(externalAddrs[0], "C4fA6958A1847D")
-        newAddrs = acct.generateGapAddresses()
-        assert len(newAddrs) == 0
+    # The zeroth external address is considered "seen", so this should not
+    # change anything.
+    acct.addTxid(externalAddrs[0], "C4fA6958A1847D")
+    newAddrs = acct.generateGapAddresses()
+    assert len(newAddrs) == 0
 
-        # Mark the 1st address as seen.
-        acct.addTxid(externalAddrs[1], "C4fA6958A1847D")
-        newAddrs = acct.generateGapAddresses()
-        assert len(newAddrs) == 1
-        assert externalAddrs[1] == acct.currentAddress()
+    # Mark the 1st address as seen.
+    acct.addTxid(externalAddrs[1], "C4fA6958A1847D")
+    newAddrs = acct.generateGapAddresses()
+    assert len(newAddrs) == 1
+    assert externalAddrs[1] == acct.currentAddress()
 
-        # cursor should be at index 0, last seen 1, max index 6, so calling
-        # nextExternalAddress 5 time should put the cursor at index 6, which is
-        # the gap limit.
-        for i in range(5):
-            acct.nextExternalAddress()
-        assert acct.currentAddress() == externalAddrs[6]
+    # cursor should be at index 0, last seen 1, max index 6, so calling
+    # nextExternalAddress 5 time should put the cursor at index 6, which is
+    # the gap limit.
+    for i in range(5):
+        acct.nextExternalAddress()
+    assert acct.currentAddress() == externalAddrs[6]
 
-        # one more should wrap the cursor back to 1, not zero, so the current
-        # address is lastSeenExt(=1) + cursor(=1) = 2
-        a1 = acct.nextExternalAddress()
-        assert acct.currentAddress() == externalAddrs[2]
-        assert a1 == acct.currentAddress()
+    # one more should wrap the cursor back to 1, not zero, so the current
+    # address is lastSeenExt(=1) + cursor(=1) = 2
+    a1 = acct.nextExternalAddress()
+    assert acct.currentAddress() == externalAddrs[2]
+    assert a1 == acct.currentAddress()
 
-        # Sanity check that internal addresses are wrapping too.
-        for i in range(20):
-            acct.nextInternalAddress()
-        addrs = acct.internalAddresses
-        assert addrs[len(addrs) - 1] == internalAddrs[5]
+    # Sanity check that internal addresses are wrapping too.
+    for i in range(20):
+        acct.nextInternalAddress()
+    addrs = acct.internalAddresses
+    assert addrs[len(addrs) - 1] == internalAddrs[5]
 
 
 def test_ticket_info_from_spending_tx():
@@ -728,7 +720,7 @@ def test_ticket_info_from_spending_tx():
     assert tinfo.spendTxFee == 1
 
 
-def test_account_update_spent_tickets():
+def test_account_update_spent_tickets(tmp_path):
     """
     Test updating spent tickets.
     """
@@ -749,166 +741,165 @@ def test_account_update_spent_tickets():
             self.utxos = {}
             self.net = nets.testnet
 
-    with TemporaryDirectory() as tempDir:
-        db = KeyValueDatabase(os.path.join(tempDir, "tmp.db")).child("tmp")
+    db = KeyValueDatabase(os.path.join(tmp_path, "tmp.db")).child("tmp")
 
-        acct = FakeAccount()
-        tDB = acct.ticketDB = db.child(
-            "tickets", datatypes=("TEXT", "BLOB"), blobber=account.UTXO
+    acct = FakeAccount()
+    tDB = acct.ticketDB = db.child(
+        "tickets", datatypes=("TEXT", "BLOB"), blobber=account.UTXO
+    )
+
+    def fail():
+        assert False
+
+    acct.signals.spentTickets = fail
+
+    # tickets and ticketDB empty, noop
+    acct.updateSpentTickets()
+
+    stakeSubmission = ByteArray(opcode.OP_SSTX)
+    stakeSubmission += opcode.OP_HASH160
+    stakeSubmission += opcode.OP_DATA_20
+    stakeSubmission += 1 << (8 * 19)
+    stakeSubmission += opcode.OP_EQUAL
+
+    def newTinfo():
+        return account.TicketInfo(
+            status="live",
+            purchaseBlock=account.TinyBlock(ByteArray(0), 42),
+            maturityHeight=0,
+            expirationHeight=0,
+            lotteryBlock=None,
+            vote=None,
+            revocation=None,
+            poolFee=0,
+            purchaseTxFee=1,
+            spendTxFee=0,
+            stakebase=0,
         )
 
-        def fail():
-            assert False
+    txid = "aa"
 
-        acct.signals.spentTickets = fail
+    def utxoWithTxid(txid):
+        return account.UTXO(
+            address="ticketaddress",
+            txHash=reversed(ByteArray(txid)),
+            vout=0,
+            scriptPubKey=stakeSubmission,
+            satoshis=2,
+            tinfo=newTinfo(),
+        )
 
-        # tickets and ticketDB empty, noop
-        acct.updateSpentTickets()
+    utxo = utxoWithTxid(txid)
 
-        stakeSubmission = ByteArray(opcode.OP_SSTX)
-        stakeSubmission += opcode.OP_HASH160
-        stakeSubmission += opcode.OP_DATA_20
-        stakeSubmission += 1 << (8 * 19)
-        stakeSubmission += opcode.OP_EQUAL
+    def txWithTxid(txid):
+        txInOne = msgtx.TxIn(msgtx.OutPoint(ByteArray("ff"), 0, 0), valueIn=1)
+        txInTwo = msgtx.TxIn(None, valueIn=3)
+        txOutOne = msgtx.TxOut(pkScript=stakeSubmission, value=3)
+        txOutTwo = msgtx.TxOut()
+        txOutThree = msgtx.TxOut()
+        txOutFour = msgtx.TxOut()
+        txOutFive = msgtx.TxOut()
+        txsIn = [txInOne, txInTwo]
+        txsOut = [txOutOne, txOutTwo, txOutThree, txOutFour, txOutFive]
+        return msgtx.MsgTx(
+            reversed(ByteArray(txid)), None, None, txsIn, txsOut, None, None
+        )
 
-        def newTinfo():
-            return account.TicketInfo(
-                status="live",
-                purchaseBlock=account.TinyBlock(ByteArray(0), 42),
-                maturityHeight=0,
-                expirationHeight=0,
-                lotteryBlock=None,
-                vote=None,
-                revocation=None,
-                poolFee=0,
-                purchaseTxFee=1,
-                spendTxFee=0,
-                stakebase=0,
-            )
+    tx = txWithTxid(txid)
+    utxo.tinfo.status = "mempool"
+    tDB[txid] = utxo
+    acct.mempool[txid] = tx
 
-        txid = "aa"
+    # mempool and ticketDB have the same txid and status, noop
+    acct.updateSpentTickets()
 
-        def utxoWithTxid(txid):
-            return account.UTXO(
-                address="ticketaddress",
-                txHash=reversed(ByteArray(txid)),
-                vout=0,
-                scriptPubKey=stakeSubmission,
-                satoshis=2,
-                tinfo=newTinfo(),
-            )
+    called = False
 
-        utxo = utxoWithTxid(txid)
+    def ok():
+        nonlocal called
+        called = True
 
-        def txWithTxid(txid):
-            txInOne = msgtx.TxIn(msgtx.OutPoint(ByteArray("ff"), 0, 0), valueIn=1)
-            txInTwo = msgtx.TxIn(None, valueIn=3)
-            txOutOne = msgtx.TxOut(pkScript=stakeSubmission, value=3)
-            txOutTwo = msgtx.TxOut()
-            txOutThree = msgtx.TxOut()
-            txOutFour = msgtx.TxOut()
-            txOutFive = msgtx.TxOut()
-            txsIn = [txInOne, txInTwo]
-            txsOut = [txOutOne, txOutTwo, txOutThree, txOutFour, txOutFive]
-            return msgtx.MsgTx(
-                reversed(ByteArray(txid)), None, None, txsIn, txsOut, None, None
-            )
+    acct.signals.spentTickets = ok
 
-        tx = txWithTxid(txid)
-        utxo.tinfo.status = "mempool"
-        tDB[txid] = utxo
-        acct.mempool[txid] = tx
+    tinfos = {
+        "aa": utxo.tinfo,
+        "ab": newTinfo(),
+        "ac": newTinfo(),
+        "ad": newTinfo(),
+    }
 
-        # mempool and ticketDB have the same txid and status, noop
-        acct.updateSpentTickets()
+    txs = {k: txWithTxid(k) for k in tinfos.keys() if k != "ab"}
 
-        called = False
+    blockheader = Dummy()
+    blockheader.height = 0
+    blockheader.timestamp = 0
 
-        def ok():
-            nonlocal called
-            called = True
+    vote = "ff"
+    revocation = "fe"
 
-        acct.signals.spentTickets = ok
+    def setVoteOrRevoke(txid):
+        if txid == vote:
+            ticket = tDB["ac"]
+            ticket.tinfo.vote = reversed(ByteArray(vote))
+        if txid == revocation:
+            ticket = tDB["ad"]
+            ticket.tinfo.revocation = reversed(ByteArray(revocation))
 
-        tinfos = {
-            "aa": utxo.tinfo,
-            "ab": newTinfo(),
-            "ac": newTinfo(),
-            "ad": newTinfo(),
-        }
+    acct.spendTicket = lambda tx: setVoteOrRevoke(reversed(tx.cachedH).hex())
+    acct.blockchain.tx = lambda txid: txs[txid]
+    acct.blockchain.ticketInfo = lambda txid: tinfos[txid]
+    acct.blockchain.blockForTx = lambda *args: blockheader
+    acct.utxos = {k + "#0": utxoWithTxid(k) for k in txs.keys()}
+    acct.mempool = {"ab": txWithTxid("ab")}
 
-        txs = {k: txWithTxid(k) for k in tinfos.keys() if k != "ab"}
+    txs[vote] = txWithTxid(vote)
+    txs[revocation] = txWithTxid(revocation)
 
-        blockheader = Dummy()
-        blockheader.height = 0
-        blockheader.timestamp = 0
+    # Live tickets are now different than database.
+    acct.updateSpentTickets()
+    assert called
 
-        vote = "ff"
-        revocation = "fe"
+    # The tickets are now stored in the database.
+    assert "ab" in tDB and "ac" in tDB and "ad" in tDB
+    # They are unspent tickets.
+    ut = acct.unspentTickets()
+    assert "ab" in ut and "ac" in ut and "ad" in ut
 
-        def setVoteOrRevoke(txid):
-            if txid == vote:
-                ticket = tDB["ac"]
-                ticket.tinfo.vote = reversed(ByteArray(vote))
-            if txid == revocation:
-                ticket = tDB["ad"]
-                ticket.tinfo.revocation = reversed(ByteArray(revocation))
+    called = False
+    txid = "ac"
+    tinfos["ac"].vote = reversed(ByteArray(vote))
+    del acct.utxos[txid + "#0"]
 
-        acct.spendTicket = lambda tx: setVoteOrRevoke(reversed(tx.cachedH).hex())
-        acct.blockchain.tx = lambda txid: txs[txid]
-        acct.blockchain.ticketInfo = lambda txid: tinfos[txid]
-        acct.blockchain.blockForTx = lambda *args: blockheader
-        acct.utxos = {k + "#0": utxoWithTxid(k) for k in txs.keys()}
-        acct.mempool = {"ab": txWithTxid("ab")}
+    # A ticket has been voted.
+    acct.updateSpentTickets()
+    assert called
+    # It is an voted ticket.
+    assert txid in acct.votedTickets() and txid not in acct.unspentTickets()
 
-        txs[vote] = txWithTxid(vote)
-        txs[revocation] = txWithTxid(revocation)
+    called = False
+    txid = "ad"
+    tinfos["ad"].revocation = reversed(ByteArray(revocation))
+    del acct.utxos[txid + "#0"]
 
-        # Live tickets are now different than database.
-        acct.updateSpentTickets()
-        assert called
+    # A ticket has been revoked.
+    acct.updateSpentTickets()
+    assert called
+    # It is a revoked ticket.
+    assert txid in acct.revokedTickets() and txid not in acct.unspentTickets()
 
-        # The tickets are now stored in the database.
-        assert "ab" in tDB and "ac" in tDB and "ad" in tDB
-        # They are unspent tickets.
-        ut = acct.unspentTickets()
-        assert "ab" in ut and "ac" in ut and "ad" in ut
+    txid = "ae"
+    called = False
+    tDB[txid] = utxo
 
-        called = False
-        txid = "ac"
-        tinfos["ac"].vote = reversed(ByteArray(vote))
-        del acct.utxos[txid + "#0"]
-
-        # A ticket has been voted.
-        acct.updateSpentTickets()
-        assert called
-        # It is an voted ticket.
-        assert txid in acct.votedTickets() and txid not in acct.unspentTickets()
-
-        called = False
-        txid = "ad"
-        tinfos["ad"].revocation = reversed(ByteArray(revocation))
-        del acct.utxos[txid + "#0"]
-
-        # A ticket has been revoked.
-        acct.updateSpentTickets()
-        assert called
-        # It is a revoked ticket.
-        assert txid in acct.revokedTickets() and txid not in acct.unspentTickets()
-
-        txid = "ae"
-        called = False
-        tDB[txid] = utxo
-
-        # A txid is in the ticketDB but not in utxos or mempool or the
-        # blockchain.
-        acct.updateSpentTickets()
-        assert called
-        # It was removed.
-        assert txid not in tDB
+    # A txid is in the ticketDB but not in utxos or mempool or the
+    # blockchain.
+    acct.updateSpentTickets()
+    assert called
+    # It was removed.
+    assert txid not in tDB
 
 
-def test_account_clac_ticket_profits():
+def test_account_calc_ticket_profits(tmp_path):
     """
     Test ticket profit calculation.
     """
@@ -917,57 +908,56 @@ def test_account_clac_ticket_profits():
         def __init__(self):
             pass
 
-    with TemporaryDirectory() as tempDir:
-        db = KeyValueDatabase(os.path.join(tempDir, "tmp.db")).child("tmp")
+    db = KeyValueDatabase(os.path.join(tmp_path, "tmp.db")).child("tmp")
 
-        acct = FakeAccount()
-        tDB = acct.ticketDB = db.child(
-            "tickets", datatypes=("TEXT", "BLOB"), blobber=account.UTXO
+    acct = FakeAccount()
+    tDB = acct.ticketDB = db.child(
+        "tickets", datatypes=("TEXT", "BLOB"), blobber=account.UTXO
+    )
+
+    def newTinfo(poolFee, purchaseTxFee, spendTxFee, stakebase):
+        return account.TicketInfo(
+            status="",
+            purchaseBlock=account.TinyBlock(ByteArray(0), 0),
+            maturityHeight=0,
+            expirationHeight=0,
+            lotteryBlock=None,
+            vote=None,
+            revocation=None,
+            poolFee=poolFee,
+            purchaseTxFee=purchaseTxFee,
+            spendTxFee=spendTxFee,
+            stakebase=stakebase,
         )
 
-        def newTinfo(poolFee, purchaseTxFee, spendTxFee, stakebase):
-            return account.TicketInfo(
-                status="",
-                purchaseBlock=account.TinyBlock(ByteArray(0), 0),
-                maturityHeight=0,
-                expirationHeight=0,
-                lotteryBlock=None,
-                vote=None,
-                revocation=None,
-                poolFee=poolFee,
-                purchaseTxFee=purchaseTxFee,
-                spendTxFee=spendTxFee,
-                stakebase=stakebase,
-            )
+    utxo = account.UTXO(
+        address="",
+        txHash=reversed(ByteArray("aa")),
+        vout=0,
+        scriptPubKey=None,
+        satoshis=5,
+    )
 
-        utxo = account.UTXO(
-            address="",
-            txHash=reversed(ByteArray("aa")),
-            vout=0,
-            scriptPubKey=None,
-            satoshis=5,
-        )
+    tinfo = newTinfo(0, 1, 1, 1)
+    utxo.tinfo = tinfo
+    tDB["aa"] = utxo
+    tinfo = newTinfo(1, 1, 1, 1)
+    utxo.tinfo = tinfo
+    tDB["ab"] = utxo
+    tinfo = newTinfo(0, 1, 0, 0)
+    utxo.tinfo = tinfo
+    tDB["ac"] = utxo
 
-        tinfo = newTinfo(0, 1, 1, 1)
-        utxo.tinfo = tinfo
-        tDB["aa"] = utxo
-        tinfo = newTinfo(1, 1, 1, 1)
-        utxo.tinfo = tinfo
-        tDB["ab"] = utxo
-        tinfo = newTinfo(0, 1, 0, 0)
-        utxo.tinfo = tinfo
-        tDB["ac"] = utxo
+    stakebases, poolFees, txFees = acct.calcTicketProfits()
 
-        stakebases, poolFees, txFees = acct.calcTicketProfits()
+    s, p, t = 2, 1, 5
 
-        s, p, t = 2, 1, 5
-
-        assert stakebases == s
-        assert poolFees == p
-        assert txFees == t
+    assert stakebases == s
+    assert poolFees == p
+    assert txFees == t
 
 
-def test_account_spend_ticket():
+def test_account_spend_ticket(tmp_path):
     """
     Test updating spent tickets.
     """
@@ -1020,47 +1010,46 @@ def test_account_spend_ticket():
             self.blockchain = Dummy()
             self.net = nets.testnet
 
-    with TemporaryDirectory() as tempDir:
-        db = KeyValueDatabase(os.path.join(tempDir, "tmp.db")).child("tmp")
+    db = KeyValueDatabase(os.path.join(tmp_path, "tmp.db")).child("tmp")
 
-        acct = FakeAccount()
-        tDB = acct.ticketDB = db.child(
-            "tickets", datatypes=("TEXT", "BLOB"), blobber=account.UTXO
+    acct = FakeAccount()
+    tDB = acct.ticketDB = db.child(
+        "tickets", datatypes=("TEXT", "BLOB"), blobber=account.UTXO
+    )
+
+    def newTinfo(status):
+        return account.TicketInfo(
+            status=status,
+            purchaseBlock=account.TinyBlock(ByteArray(0), 0),
+            maturityHeight=0,
+            expirationHeight=0,
         )
 
-        def newTinfo(status):
-            return account.TicketInfo(
-                status=status,
-                purchaseBlock=account.TinyBlock(ByteArray(0), 0),
-                maturityHeight=0,
-                expirationHeight=0,
-            )
+    utxo = account.UTXO(
+        address="",
+        txHash=reversed(ByteArray("aa")),
+        vout=0,
+        scriptPubKey=None,
+        satoshis=5,
+    )
 
-        utxo = account.UTXO(
-            address="",
-            txHash=reversed(ByteArray("aa")),
-            vout=0,
-            scriptPubKey=None,
-            satoshis=5,
-        )
+    txidToTinfo = {
+        voteTxid: newTinfo("vote"),
+        revocationTxid: newTinfo("revocation"),
+    }
+    acct.blockchain.ticketInfoForSpendingTx = lambda txid, net: txidToTinfo[txid]
 
-        txidToTinfo = {
-            voteTxid: newTinfo("vote"),
-            revocationTxid: newTinfo("revocation"),
-        }
-        acct.blockchain.ticketInfoForSpendingTx = lambda txid, net: txidToTinfo[txid]
+    tDB[ticketVotedTxid] = utxo
+    tDB[ticketRevokedTxid] = utxo
 
-        tDB[ticketVotedTxid] = utxo
-        tDB[ticketRevokedTxid] = utxo
+    v = msgtx.MsgTx.deserialize(ByteArray(vote))
 
-        v = msgtx.MsgTx.deserialize(ByteArray(vote))
+    acct.spendTicket(v)
+    tinfo = tDB[ticketVotedTxid].tinfo
+    assert tinfo.status == "vote"
 
-        acct.spendTicket(v)
-        tinfo = tDB[ticketVotedTxid].tinfo
-        assert tinfo.status == "vote"
+    rev = msgtx.MsgTx.deserialize(ByteArray(revocation))
 
-        rev = msgtx.MsgTx.deserialize(ByteArray(revocation))
-
-        acct.spendTicket(rev)
-        tinfo = tDB[ticketRevokedTxid].tinfo
-        assert tinfo.status == "revocation"
+    acct.spendTicket(rev)
+    tinfo = tDB[ticketRevokedTxid].tinfo
+    assert tinfo.status == "revocation"

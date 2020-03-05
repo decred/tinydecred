@@ -1003,7 +1003,7 @@ class Account:
             list(str): txids for revoked tickets.
             list(str): txids of tickets with "unconfirmed" status.
         """
-        live, unconfirmed, voted, revoked = {}, [], [], []
+        unspent, unconfirmed, voted, revoked = {}, [], [], []
         for txid, ticket in self.ticketDB.items():
             if ticket.tinfo.status == "unconfirmed":
                 unconfirmed.append(txid)
@@ -1012,8 +1012,8 @@ class Account:
             elif ticket.tinfo.revocation:
                 revoked.append(txid)
             else:
-                live[txid] = ticket
-        return live, voted, revoked, unconfirmed
+                unspent[txid] = ticket
+        return unspent, voted, revoked, unconfirmed
 
     def unspentTickets(self):
         """
@@ -1026,7 +1026,9 @@ class Account:
         return {
             k: v
             for k, v in self.ticketDB.items()
-            if not v.tinfo.revocation and not v.tinfo.vote
+            if not v.tinfo.revocation
+            and not v.tinfo.vote
+            and v.tinfo.status != "unconfirmed"
         }
 
     def calcBalance(self, tipHeight=None):

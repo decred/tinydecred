@@ -41,7 +41,6 @@ PubkeyHashAltTy = 11  # Alternative signature pubkey hash.
 # representing extended Decred script.
 DefaultScriptVersion = 0
 
-# consensusVersion = txscript.consensusVersion
 consensusVersion = 0
 
 # MaxInputsPerSStx is the maximum number of inputs allowed in an SStx.
