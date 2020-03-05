@@ -286,7 +286,7 @@ def test_account(tmp_path):
     class Blockchain:
         txsForAddr = lambda addr: []
         UTXOs = lambda addrs: []
-        tip = {"height": 5}
+        tipHeight = 5
 
     acct.blockchain = Blockchain
 

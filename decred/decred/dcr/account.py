@@ -139,19 +139,28 @@ class TicketStats:
         self.value = value
 
 
-def unblob_check(name, version, actual_pushes, expected_pushes):
+def unblob_check(class_name, cur_version, cur_pushes, check_data):
     """
     Check version and pushes to unblob.
 
+    Args:
+        class_name str: the class name that will appear in error messages.
+        cur_version int: the version number that will be checked.
+        cur_pushes int: the number of pushes that will be checked.
+        check_data dict: keys are version numbers, values are number of
+            expected pushes.
+
     Raises:
-        NotImplementedError if version is not zero.
-        DecredError if actual_pushes and expected_pushes are not the same.
+        NotImplementedError if version is not in check_data keys.
+        DecredError if cur_pushes is not the value in check_data keyed by
+            cur_version.
     """
-    if version != 0:
-        raise NotImplementedError(f"{name}: unsupported version {version}")
-    if actual_pushes != expected_pushes:
+    if cur_version not in check_data.keys():
+        raise NotImplementedError(f"{class_name}: unsupported version {cur_version}")
+    exp_pushes = check_data[cur_version]
+    if cur_pushes != exp_pushes:
         raise DecredError(
-            f"{name}: expected {expected_pushes} pushes, got {actual_pushes}"
+            f"{class_name}: expected {exp_pushes} pushes, got {cur_pushes}"
         )
 
 
@@ -180,7 +189,7 @@ class TinyBlock:
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        unblob_check("TinyBlock", ver, len(d), 2)
+        unblob_check("TinyBlock", ver, len(d), {0: 2})
         return TinyBlock(d[0], encode.intFromBytes(d[1]))
 
     def serialize(self):
@@ -314,21 +323,7 @@ class TicketInfo:
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        if ver == 0:
-            if len(d) != 7:
-                # TODO change to DecredError
-                raise AssertionError(
-                    "wrong number of pushes for TicketInfo. wanted 7, got %d" % len(d)
-                )
-            d.extend([b"", b"", b"", b""])
-        elif ver == 1:
-            if len(d) != 11:
-                # TODO change to DecredError
-                raise AssertionError(
-                    "wrong number of pushes for TicketInfo. wanted 11, got %d" % len(d)
-                )
-        else:
-            raise AssertionError("invalid TicketInfo version %d" % ver)
+        unblob_check("TicketInfo", ver, len(d), {0: 7, 1: 11})
 
         iFunc = encode.intFromBytes
         f = encode.extractNone
@@ -510,7 +505,7 @@ class UTXO:
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        unblob_check("UTXO", ver, len(d), 9)
+        unblob_check("UTXO", ver, len(d), {0: 9})
 
         iFunc = encode.intFromBytes
         f = encode.extractNone
@@ -575,8 +570,8 @@ class UTXO:
         Args:
             tx (msgtx.MsgTx): The ticket transaction.
             netParams (obj): Network parameters.
-            block (msgblock.BlockHeader): Optional. Default=None. The block the ticket was
-                purchased in.
+            block (msgblock.BlockHeader): Optional. Default=None. The block
+                the ticket was purchased in.
             tinfo (TicketInfo): Optional. Default of None is replaced with
                 immature status TicketInfo.
 
@@ -780,7 +775,7 @@ class Balance:
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, pushes = encode.decodeBlob(b)
-        unblob_check("Balance", ver, len(pushes), 3)
+        unblob_check("Balance", ver, len(pushes), {0: 3})
         i = encode.intFromBytes
         return Balance(i(pushes[0]), i(pushes[1]), i(pushes[2]))
 
@@ -892,7 +887,7 @@ class Account:
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        unblob_check("Account", ver, len(d), 7)
+        unblob_check("Account", ver, len(d), {0: 7})
 
         iFunc = encode.intFromBytes
 
@@ -1060,15 +1055,14 @@ class Account:
 
         Args:
             tipHeight (int): optional. The current tip height. If not provided,
-                the height from the current blockchain.tip will be used.
+                the height from the current blockchain tip will be used.
 
         Returns:
             Balance: The current balance. The balance is also assigned to the
                 Account.balance property.
         """
-        tipHeight = (
-            tipHeight if tipHeight is not None else self.blockchain.tip["height"]
-        )
+        if tipHeight is None:
+            tipHeight = self.blockchain.tipHeight
         tot = 0
         avail = 0
         staked = 0
