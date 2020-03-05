@@ -329,7 +329,9 @@ class TestDcrdataBlockchain:
             revocation=None,
         )
         http_get_post(tinfoURL, tinfo)
-        assert ddb.processNewUTXO(self.utxos[1]).maturity == 427581
+        utxo = ddb.processNewUTXO(self.utxos[1])
+        assert utxo.tinfo.purchaseBlock.hash == reversed(ByteArray(
+            tinfo["purchase_block"]["hash"]))
 
         # UTXOs
         assert len(ddb.UTXOs([])) == 0
