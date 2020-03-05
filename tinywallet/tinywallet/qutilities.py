@@ -65,7 +65,7 @@ class ThreadUtilities(object):
         thread.start()
         newThreadList = []
         for oldThread in self.threads:
-            if not oldThread.isFinished():
+            if not oldThread.completed:
                 newThreadList.append(oldThread)
         self.threads = newThreadList
         self.threads.append(thread)
@@ -96,7 +96,8 @@ class SmartThread(QtCore.QThread):
         self.kwargs = kwargs
         self.returns = None
         self.callback = callback
-        self.finished.connect(lambda: self.callitback(), type=qtConnectType)
+        self.completed = False
+        self.finished.connect(self.callitback, type=qtConnectType)
 
     def run(self):
         """
@@ -115,7 +116,10 @@ class SmartThread(QtCore.QThread):
         QThread Slot connected to the connect Signal. Send the value returned
         from `func` to the callback function.
         """
-        self.callback(self.returns)
+        try:
+            self.callback(self.returns)
+        finally:
+            self.completed = True
 
 
 class QConsole(QtWidgets.QPlainTextEdit):

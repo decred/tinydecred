@@ -1053,4 +1053,3 @@ def test_account_spend_ticket(tmp_path):
     acct.spendTicket(rev)
     tinfo = tDB[ticketRevokedTxid].tinfo
     assert tinfo.status == "revocation"
-

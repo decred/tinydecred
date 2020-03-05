@@ -884,6 +884,7 @@ class AssetScreen(Screen):
         wgt, self.accountsList = Q.makeWidget(QtWidgets.QWidget, Q.GRID)
         self.layout.addWidget(wgt)
         self.acctMgr = app.wallet.accountManager("dcr", app.blockchainSignals)
+
         for i, acct in enumerate(self.acctMgr.listAccounts()):
             selector = app.getButton(SMALL, acct.name)
 
@@ -904,6 +905,7 @@ class AssetScreen(Screen):
             idx (int): The BIP-0044 account index.
         """
         acctScreen = self.accountScreens.get(idx, None)
+
         if not acctScreen:
             acct = self.acctMgr.account(idx)
             acctScreen = AccountScreen(acct)
@@ -1159,14 +1161,11 @@ class StakingScreen(Screen):
         self.canGoHome = True
         self.account = acct
         self.layout.setSpacing(20)
-        self.poolScreen = PoolScreen(app, self.poolAuthed)
-        self.accountScreen = PoolAccountScreen(app, self.poolScreen)
-        self.agendasScreen = AgendasScreen(app, self.accountScreen)
-        self.statsScreen = StakeStatsScreen(app)
         self.poolScreen = PoolScreen(acct, self.poolAuthed)
         self.accountScreen = PoolAccountScreen(acct, self.poolScreen)
+
         self.agendasScreen = AgendasScreen(acct)
-        self.statsScreen = StakeStatsScreen()
+        self.statsScreen = StakeStatsScreen(acct)
         self.balance = None
         self.wgt.setContentsMargins(5, 5, 5, 5)
         self.wgt.setMinimumWidth(400)
@@ -1248,9 +1247,7 @@ class StakingScreen(Screen):
 
         # Navigate to account screen, to choose or add a different VSP account.
         self.currentPool = Q.makeLabel("", 15)
-        lbl2 = ClickyLabel(
-            lambda: app.appWindow.stack(self.accountScreen), "change"
-        )
+        lbl2 = ClickyLabel(lambda: app.appWindow.stack(self.accountScreen), "change")
         Q.setProperties(lbl2, underline=True, fontSize=15)
         Q.addHoverColor(lbl2, "#f5ffff")
         wgt, lyt = Q.makeSeries(Q.HORIZONTAL, self.currentPool, Q.STRETCH, lbl2)
@@ -1468,12 +1465,12 @@ class LiveTicketsScreen(Screen):
     A screen that shows network and ticket stats.
     """
 
-    def __init__(self, app):
+    def __init__(self):
         """
         Args:
             app (TinyDecred): The TinyDecred application instance.
         """
-        super().__init__(app)
+        super().__init__()
         self.isPoppable = True
         self.canGoHome = True
 
@@ -1528,7 +1525,7 @@ class StakeStatsScreen(Screen):
     A screen that shows network and ticket stats.
     """
 
-    def __init__(self):
+    def __init__(self, acct):
         """
         Args:
             app (TinyDecred): The TinyDecred application instance.
@@ -1537,7 +1534,8 @@ class StakeStatsScreen(Screen):
         self.isPoppable = True
         self.canGoHome = True
 
-        self.liveTicketsScreen = LiveTicketsScreen(app)
+        self.account = acct
+        self.liveTicketsScreen = LiveTicketsScreen()
 
         self.updatingLock = threading.Lock()
 
@@ -1661,7 +1659,7 @@ class StakeStatsScreen(Screen):
         self.updatingLock.acquire()
         self.liveTicketsListBtn.hide()
 
-        def set():
+        def setstats():
             app.emitSignal(ui.WORKING_SIGNAL)
             self.setStatsNetwork()
             self.setStatsLifetime()
@@ -1670,7 +1668,7 @@ class StakeStatsScreen(Screen):
             self.lastUpdated = time.time()
             self.updatingLock.release()
 
-        app.makeThread(set)
+        app.makeThread(setstats)
 
     def setStatsNetwork(self):
         """
@@ -1701,11 +1699,10 @@ class StakeStatsScreen(Screen):
         """
         Set lifetime statistics.
         """
-        acct = app.wallet.selectedAccount
 
         r = sprintDcr
 
-        allStakebases, allPoolFees, allTxFees = acct.calcTicketProfits()
+        allStakebases, allPoolFees, allTxFees = self.account.calcTicketProfits()
         self.allStakebases.setText(r(allStakebases, ", "))
         self.allPoolFees.setText(r(allPoolFees, ", "))
         self.allTxFees.setText(r(allTxFees))
@@ -1716,12 +1713,11 @@ class StakeStatsScreen(Screen):
         """
         Set current, unspent tickets. Populate live ticket list.
         """
-        acct = app.wallet.selectedAccount
 
         r = sprintDcr
         t = sprintAmount("ticket")
 
-        unSpent, voted, revoked, _ = acct.sortedTickets()
+        unSpent, voted, revoked, _ = self.account.sortedTickets()
         self.votedCount.setText(t(len(voted), ", "))
         self.revokedCount.setText(t(len(revoked)))
         live = 0
@@ -1744,7 +1740,7 @@ class StakeStatsScreen(Screen):
         if len(self.liveTickets) > 0:
             self.liveTicketsScreen.addItems(self.liveTickets)
             self.liveTicketsListBtn.show()
-        stats = acct.ticketStats()
+        stats = self.account.ticketStats()
         self.ticketValue.setText(r(stats.value))
 
 
@@ -1848,14 +1844,14 @@ class PoolScreen(Screen):
         """
         net = app.dcrdata.params
 
-        def get():
+        def getvsp():
             try:
                 return VotingServiceProvider.providers(net)
             except Exception as e:
                 log.error("error retrieving stake pools: %s" % e)
                 return False
 
-        app.makeThread(get, self.setPools)
+        app.makeThread(getvsp, self.setPools)
 
     def setPools(self, pools):
         """
@@ -2054,19 +2050,20 @@ class AgendasScreen(Screen):
         Set the dcrdata blockchain on connected signal. Then set agendas.
         """
 
-        def get():
+        def getagendas():
             # dcrdata will send 422 Unprocessible Entity if on simnet.
             try:
                 return self.blockchain.getAgendasInfo().agendas
             except Exception:
                 log.warning("error fetching agendas. OK on simnet")
 
-        app.makeThread(get, self.setAgendas)
+        app.makeThread(getagendas, self.setAgendas)
 
     def setAgendas(self, agendas):
         """
         Set agendas from dcrdata.
         """
+
         if not agendas:
             return
 
@@ -2082,6 +2079,7 @@ class AgendasScreen(Screen):
         """
         Set the users current vote choice.
         """
+
         self.voteSet = False
         if len(self.agendas) == 0:
             app.appWindow.showError("unable to set vote: no agendas")

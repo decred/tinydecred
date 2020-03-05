@@ -94,7 +94,7 @@ class SimpleWallet(Wallet):
         netParams = nets.parse(network)
         _, dbPath, _ = paths(walletDir, netParams.Name)
         if Path(dbPath).is_file():
-            raise DecredError("wallet already exists at %s", dbPath)
+            raise DecredError("wallet already exists at %s" % dbPath)
         wallet = SimpleWallet(walletDir, pw, network, signals, True)
         words = wallet.words
         wallet.words.clear()
