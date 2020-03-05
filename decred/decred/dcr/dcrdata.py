@@ -202,11 +202,8 @@ class DcrdataClient:
                     msg = json.loads(msg)
                     # Ignore pings. They are used as a connection probe and do
                     # not require a response.
-                    try:
-                        if msg["event"] == "ping":
-                            return
-                    except KeyError:
-                        pass
+                    if msg.get("event") == "ping":
+                        return
                 except json.JSONDecodeError:
                     # If it's not JSON, let the caller handle the string.
                     pass

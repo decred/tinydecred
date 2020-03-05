@@ -14,13 +14,13 @@ from decred import DecredError
 from decred.crypto import opcode
 from decred.dcr import account, agenda, txscript
 from decred.dcr.dcrdata import (
+    WS_DONE,
     DcrdataBlockchain,
     DcrdataClient,
     DcrdataError,
     DcrdataPath,
     checkOutput,
     makeOutputs,
-    WS_DONE,
 )
 from decred.dcr.nets import testnet
 from decred.dcr.wire import msgtx
