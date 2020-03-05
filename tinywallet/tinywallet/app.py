@@ -42,7 +42,7 @@ class TinySignals(object):
     by the Wallet to broadcast notifications.
     """
 
-    def __init__(self, balance=None, working=None, done=None):
+    def __init__(self, balance=None, working=None, done=None, spentTickets=None):
         """
         Args:
             balance (func(Balance)): A function to receive balance updates.
@@ -52,6 +52,7 @@ class TinySignals(object):
         self.balance = balance if balance else dummy
         self.working = working if working else dummy
         self.done = done if done else dummy
+        self.spentTickets = spentTickets if spentTickets else dummy
 
 
 class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
@@ -94,6 +95,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
             balance=self.balanceSync,
             working=lambda: self.emitSignal(ui.WORKING_SIGNAL),
             done=lambda: self.emitSignal(ui.DONE_SIGNAL),
+            spentTickets=lambda: self.emitSignal(ui.SPENT_TICKETS_SIGNAL),
         )
 
         self.loadSettings()

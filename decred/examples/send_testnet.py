@@ -7,17 +7,17 @@ faucet at https://faucet.decred.org/.
 Before running this script, send the wallet some DCR from the faucet.
 """
 
-import os
 from getpass import getpass
+import os
 
 from decred import config
-
-# Set the configuration for testnet before loading decred modules.
-config.load("testnet")
-
 from decred.dcr.dcrdata import DcrdataBlockchain
 from decred.dcr.nets import testnet
 from decred.wallet.wallet import Wallet
+
+
+# Set the configuration for testnet before loading decred modules.
+config.load("testnet")
 
 
 # We need a class that implements the Signals API.

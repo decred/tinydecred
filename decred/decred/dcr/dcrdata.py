@@ -382,6 +382,38 @@ class WebsocketClient:
             self.socket.close()
 
 
+class TicketPoolInfo:
+    """
+    Ticket pool statistics.
+    """
+
+    def __init__(
+        self, height, size, value, valAvg, winners,
+    ):
+        """
+        height (int): Height this data was taken.
+        size (int): Number of live tickets.
+        value (float): Total value of live tickets.
+        valAvg (float): Average value of one ticket.
+        winners (list(str)): Winners of this block.
+        """
+        self.height = height
+        self.size = size
+        self.value = value
+        self.valAvg = valAvg
+        self.winners = winners
+
+    @staticmethod
+    def parse(obj):
+        return TicketPoolInfo(
+            height=obj["height"],
+            size=obj["size"],
+            value=obj["value"],
+            valAvg=obj["valavg"],
+            winners=[winner for winner in obj["winners"]],
+        )
+
+
 def makeOutputs(pairs, chain):
     """
     makeOutputs creates a slice of transaction outputs from a pair of address
@@ -564,11 +596,7 @@ class DcrdataBlockchain:
         if utxo.isTicket():
             # Mempool tickets will be returned from the utxo endpoint, but
             # the tinfo endpoint is an error until mined.
-            try:
-                rawTinfo = self.dcrdata.tx.tinfo(utxo.txid)
-                utxo.setTicketInfo(rawTinfo)
-            except Exception:
-                utxo.tinfo = account.TicketInfo("mempool", None, 0, 0, None, None, None)
+            utxo.tinfo = self.ticketInfo(utxo.txid)
         return utxo
 
     def UTXOs(self, addrs):
@@ -622,6 +650,25 @@ class DcrdataBlockchain:
         self.confirmUTXO(utxo, None, tx)
         return utxo
 
+    def ticketInfo(self, txid):
+        """
+        Get the Ticket Info for txid.
+
+        Args:
+            txid (str): The tickets txid.
+
+        Returns:
+            TicketInfo: The txid's ticket info.
+        """
+        # Mempool tickets will be returned from the utxo endpoint, but the
+        # tinfo endpoint is an error until mined.
+        try:
+            tinfo = account.TicketInfo.parse(self.dcrdata.tx.tinfo(txid))
+        except Exception:
+            tinfo = account.TicketInfo("mempool", None, 0, 0, None, None, None)
+
+        return tinfo
+
     def tx(self, txid):
         """
         Get the MsgTx. Retreive it from the blockchain if necessary.
@@ -651,18 +698,36 @@ class DcrdataBlockchain:
                 )
         raise DecredError("failed to retrieve transaction")
 
+    def tinyBlockForTx(self, txid):
+        """
+        Get the TinyBlock for txid.
+
+        Args:
+            txid(str): The transaction ID for the block.
+
+        Returns:
+            account.TinyBlock: The block hash and height.
+        """
+        block = self.blockForTx(txid)
+        if not block:
+            return None
+        return account.TinyBlock(block.cachedHash(), block.height)
+
     def blockForTx(self, txid):
         """
         Get the BlockHeader for the transaction.
 
         Args:
             txid (str): The transaction ID.
+
+        Returns:
+            msgblock.BlockHeader: The block header or None.
         """
         txHash = hashFromHex(txid).bytes()
         try:
             # Try to get the blockhash from the database.
             bHash = self.txBlockMap[txHash]
-            return self.blockHeader(hexFromHash(bHash))
+            return self.blockHeader(hexFromHash(ByteArray(bHash)))
         except database.NoValueError:
             # If the blockhash is not in the database, get it from dcrdata
             decodedTx = self.dcrdata.tx(txid)
@@ -676,6 +741,48 @@ class DcrdataBlockchain:
             self.txBlockMap[txHash] = header.cachedHash().bytes()
             return header
 
+    def ticketForTx(self, txid, net):
+        """
+        Retrieve the ticket with txid on net. If tinfo data is not found the
+        ticket will be given "mempool" status.
+
+        Args:
+            txid(str): The ticket's transaction ID.
+            net(obj): The network parameters.
+
+        Returns:
+            UTXO: The ticket.
+        """
+        tx = self.tx(txid)
+        if not tx.isTicket():
+            raise Exception("not a ticket: {}".format(txid))
+        block = self.blockForTx(txid)
+        tinfo = self.ticketInfo(txid)
+        return account.UTXO.ticketFromTx(tx, net, block=block, tinfo=tinfo)
+
+    def ticketInfoForSpendingTx(self, txid, net):
+        """
+        Get ticket info for the ticket that txid votes or revokes.
+
+        Args:
+            txid (str): The txid of the spending tx.
+            net (obj): Network parameters.
+
+        Returns:
+            TicketInfo: The ticket info for the ticket spent by txid.
+        """
+        tx = self.tx(txid)
+        isVote = txscript.isSSGen(tx)
+        idx = 1 if isVote else 0
+        ticketTxid = tx.txIn[idx].previousOutPoint.txid()
+        ticket = self.tx(ticketTxid)
+        purchaseBlock = self.tinyBlockForTx(ticketTxid)
+        lotteryBlock = self.tinyBlockForTx(tx.txid())
+
+        return account.TicketInfo.fromSpendingTx(
+            ticket, tx, purchaseBlock, lotteryBlock, net
+        )
+
     def blockHeader(self, hexHash):
         """
         blockHeader will produce a blockHeader implements the BlockHeader API.
@@ -687,8 +794,8 @@ class DcrdataBlockchain:
             BlockHeader: An object which implements the BlockHeader API.
         """
         try:
-            serialized = self.headerDB[hashFromHex(hexHash).bytes()]
-            return msgblock.BlockHeader.deserialize(serialized)
+            blockheader = self.headerDB[hashFromHex(hexHash).bytes()]
+            return blockheader
         except database.NoValueError:
             try:
                 block = self.dcrdata.block.hash.header.raw(hexHash)
@@ -728,6 +835,24 @@ class DcrdataBlockchain:
         bestBlock will produce a decoded block as a Python dict.
         """
         return self.dcrdata.block.best()
+
+    def ticketPoolInfo(self):
+        """
+        The current ticket pool info.
+
+        Returns:
+            TicketPoolInfo: the ticket pool info.
+        """
+        return TicketPoolInfo.parse(self.dcrdata.stake.pool())
+
+    def nextStakeDiff(self):
+        """
+        Get the estimated next stake difficulty a.k.a. ticket price.
+
+        Returns:
+            int: The ticket price.
+        """
+        return int(round(self.dcrdata.stake.diff()["estimates"]["expected"] * 1e8))
 
     def stakeDiff(self):
         """

@@ -5,15 +5,16 @@ This example script will prompt for a password and create a password-encrypted
 testnet wallet. The mnemonic seed and an address are printed.
 """
 
-import os
 from getpass import getpass
+import os
 
 from decred import config
+from decred.util.helpers import mkdir
+from decred.wallet.wallet import Wallet
+
 
 # Set the configuration for testnet before loading TD modules.
 config.load("testnet")
-from decred.util.helpers import mkdir
-from decred.wallet.wallet import Wallet
 
 
 def main():

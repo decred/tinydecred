@@ -17,6 +17,7 @@ import sys
 from tempfile import TemporaryDirectory
 import time
 import traceback
+import webbrowser
 
 from appdirs import AppDirs
 
@@ -32,6 +33,29 @@ def coinify(atoms):
         float: The coin value.
     """
     return round(atoms / 1e8, 8)
+
+
+def normalizeNetName(netName):
+    """
+    Remove the numerals from testnet.
+
+    Args:
+        netName (string): The raw network name.
+
+    Returns:
+        string: The network name with numerals stripped.
+    """
+    return "testnet" if netName == "testnet3" else netName
+
+
+def openInBrowser(url):
+    """
+    Open url in the users browser
+
+    Args:
+        url (string): the url to open.
+    """
+    webbrowser.open(url, new=2)
 
 
 def formatTraceback(e):

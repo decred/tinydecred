@@ -235,7 +235,7 @@ class VotingServiceProvider(object):
             list(object): The vsp list.
         """
         vsps = tinyhttp.get("https://api.decred.org/?c=gsd")
-        network = "testnet" if net.Name == "testnet3" else net.Name
+        network = nets.normalizeName(net.Name)
         return [vsp for vsp in vsps.values() if vsp["Network"] == network]
 
     def apiPath(self, command):
