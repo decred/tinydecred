@@ -1820,13 +1820,7 @@ class Account:
                 matches += 1
         # scan the outputs for any new UTXOs
         for vout, txout in enumerate(tx.txOut):
-            try:
-                _, addresses, _ = txscript.extractPkScriptAddrs(
-                    0, txout.pkScript, self.net
-                )
-            except (DecredError, NotImplementedError):
-                # log.debug("unsupported script %s" % txout.pkScript.hex())
-                continue
+            _, addresses, _ = txscript.extractPkScriptAddrs(0, txout.pkScript, self.net)
             # convert the Address objects to strings.
             if addr in (a.string() for a in addresses):
                 utxo = self.blockchain.txVout(txid, vout)
