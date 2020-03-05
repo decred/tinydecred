@@ -15,7 +15,7 @@ The wallet can then be "opened" again through the icon in the system tray.
 
 ![alt text][screenshot]
 
-TinyDecred is pretty small.
+TinyWallet is pretty small.
 Like Decred, it's meant to be an omnipresent yet largely invisible and
 unobtrusive part of your digital environment.
 The small dialog size keeps user interactions focused.

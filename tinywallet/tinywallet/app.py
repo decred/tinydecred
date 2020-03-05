@@ -14,7 +14,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from decred import config
 from decred.dcr import constants as DCR
 from decred.dcr.dcrdata import DcrdataBlockchain
-from decred.util import database, helpers
+from decred.util import chains, database, helpers
 from decred.wallet.wallet import Wallet
 from tinywallet import qutilities as Q, screens, ui
 
@@ -55,17 +55,18 @@ class TinySignals(object):
         self.spentTickets = spentTickets if spentTickets else dummy
 
 
-class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
+class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
     """
-    TinyDecred is an PyQt application for interacting with the Decred
-    blockchain. TinyDecred currently implements a UI for creating and
+    TinyWallet is an PyQt application for interacting with the Decred
+    blockchain. TinyWallet currently implements a UI for creating and
     controlling a rudimentary, non-staking, Decred testnet light wallet.
 
-    TinyDecred is a system tray application.
+    TinyWallet is a system tray application.
     """
 
     qRawSignal = QtCore.pyqtSignal(tuple)
-    homeSig = QtCore.pyqtSignal()
+    homeSig = QtCore.pyqtSignal(Q.PyObj)
+    walletSig = QtCore.pyqtSignal(Q.PyObj)
 
     def __init__(self, qApp):
         """
@@ -75,7 +76,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         super().__init__()
         self.qApp = qApp
         self.cfg = config.load()
-        self.log = self.init_logging()
+        self.log = self.initLogging()
         self.wallet = None
         # trackedCssItems are CSS-styled elements to be updated if dark mode is
         # enabled/disabled.
@@ -108,33 +109,41 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         self.dcrdata = DcrdataBlockchain(
             dcrdataDB, self.cfg.net, self.getNetSetting("dcrdata"), skipConnect=True,
         )
-
-        self.registerSignal(ui.WALLET_CONNECTED, self.syncWallet)
+        chains.registerChain("dcr", self.dcrdata)
 
         # appWindow is the main application window. The TinyDialog class has
         # methods for organizing a stack of Screen widgets.
         self.appWindow = screens.TinyDialog(self)
 
-        self.homeScreen = screens.HomeScreen(self)
         self.homeSig.connect(self.home_)
-        self.home = lambda: self.homeSig.emit()
 
-        self.appWindow.stack(self.homeScreen)
+        def gohome(screen=None):
+            self.homeSig.emit(screen)
 
-        self.pwDialog = screens.PasswordDialog(self)
+        self.home = gohome
+        self.homeScreen = None
 
-        self.waitingScreen = screens.WaitingScreen(self)
+        self.pwDialog = screens.PasswordDialog()
 
-        self.sendScreen = screens.SendScreen(self)
+        self.waitingScreen = screens.WaitingScreen()
+        # Set waiting screen as initial home screen.
+        self.appWindow.stack(self.waitingScreen)
 
-        self.confirmScreen = screens.ConfirmScreen(self)
+        self.confirmScreen = screens.ConfirmScreen()
+
+        self.walletSig.connect(self.setWallet_)
+
+        def setwallet(wallet):
+            self.walletSig.emit(wallet)
+
+        self.setWallet = setwallet
 
         self.sysTray.show()
         self.appWindow.show()
 
         self.initialize()
 
-    def init_logging(self):
+    def initLogging(self):
         """
         Initialize logging for the entire app.
         """
@@ -152,18 +161,23 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         """
         # If there is a wallet file, prompt for a password to open the wallet.
         # Otherwise, show the initialization screen.
-        if os.path.isfile(self.walletFilename()):
+        path = self.walletFilename()
+        if os.path.isfile(path):
 
-            def login(pw):
-                if pw is None or pw == "":
-                    self.appWindow.showError("you must enter a password to continue")
-                else:
-                    path = self.walletFilename()
-                    self.waitThread(self.openWallet, None, path, pw)
+            try:
+                self.dcrdata.connect()
+                w = Wallet(path)
+                self.setWallet(w)
+                self.home(self.assetScreen)
+            except Exception as e:
+                self.log.warning(
+                    "exception encountered while attempting to initialize wallet: %s"
+                    % formatTraceback(e)
+                )
+                self.appWindow.showError("error opening wallet")
 
-            self.getPassword(login)
         else:
-            initScreen = screens.InitializationScreen(self)
+            initScreen = screens.InitializationScreen()
             initScreen.setFadeIn(True)
             self.appWindow.stack(initScreen)
 
@@ -172,27 +186,6 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         Stack the waiting screen.
         """
         self.appWindow.stack(self.waitingScreen)
-
-    def tryExecute(self, f, *a, **k):
-        """
-        Execute the function, catching exceptions and logging as an error. Return
-        False to indicate an exception.
-
-        Args:
-            f (func): The function.
-            *a (tuple): Optional positional arguments.
-            **k (dict): Optional keyword arguments.
-
-        Returns:
-            value or bool: `False` on failure, the function's return value on
-                success.
-        """
-        try:
-            return f(*a, **k)
-        except Exception as e:
-            err_msg = "tryExecute {} failed: {}"
-            self.log.error(err_msg.format(f.__name__, formatTraceback(e)))
-        return False
 
     def waitThread(self, f, cb, *a, **k):
         """
@@ -208,32 +201,16 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         cb = cb if cb else lambda *a, **k: None
         self.waiting()
 
-        def unwaiting(*cba, **cbk):
-            self.appWindow.pop(self.waitingScreen)
-            cb(*cba, **cbk)
+        def run():
+            try:
+                return f(*a, **k)
+            except Exception as e:
+                err_msg = "waitThread execution error {} failed: {}"
+                self.log.error(err_msg.format(f.__name__, formatTraceback(e)))
+            finally:
+                self.appWindow.pop(self.waitingScreen)
 
-        self.makeThread(self.tryExecute, unwaiting, f, *a, **k)
-
-    def openWallet(self, path, pw):
-        """
-        Callback for the initial wallet load. If the load failed, probably
-        because of a bad password, the provided wallet will be None.
-
-        Args:
-            wallet (Wallet): The newly opened Wallet instance.
-        """
-        try:
-            self.dcrdata.connect()
-            self.emitSignal(ui.BLOCKCHAIN_CONNECTED)
-            w = Wallet.openFile(path, pw, self.blockchainSignals)
-            self.setWallet(w)
-            self.home()
-        except Exception as e:
-            self.log.warning(
-                "exception encountered while attempting to open wallet: %s"
-                % formatTraceback(e)
-            )
-            self.appWindow.showError("incorrect password")
+        self.makeThread(run, cb)
 
     def getPassword(self, f, *args, **kwargs):
         """
@@ -266,7 +243,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
 
     def minimizeApp(self, *a):
         """
-        Minimizes the application. Because TinyDecred is a system-tray app, the
+        Minimizes the application. Because TinyWallet is a system-tray app, the
         program does not halt execution, but the icon is removed from the
         application panel. Any arguments are ignored.
         """
@@ -392,7 +369,7 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         cb, sigA, a, sigK, k = s
         cb(*sigA, *a, **sigK, **k)
 
-    def setWallet(self, wallet):
+    def setWallet_(self, wallet):
         """
         Set the current wallet.
 
@@ -400,77 +377,13 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
             wallet (Wallet): The wallet to use.
         """
         self.wallet = wallet
-        self.emitSignal(ui.BALANCE_SIGNAL, wallet.balance())
-        self.emitSignal(ui.WALLET_CONNECTED)
-
-    def withUnlockedWallet(self, f, cb, *a, **k):
-        """
-        Run the provided function with the wallet open. This is the preferred
-        method of wallet interaction, since the context is properly managed,
-        i.e. the account is locked, unlocked appropriately and the mutex is
-        used to ensure sequential access.
-
-        Args:
-            f (func(Wallet, ...)): A function to run with the wallet open. The
-                first argument provided to f will be the open wallet.
-            cb (func): A callback to receive the return value from f.
-            *a (optional tuple): Additional arguments to provide to f.
-            **k (optional dict): Additional keyword arguments to provide to
-                f.
-        """
-        # step 1 receives the user password.
-        def step1(pw, cb, a, k):
-            if pw:
-                self.waitThread(step2, cb, pw, a, k)
-            else:
-                self.appWindow.showError("password required to open wallet")
-
-        # step 2 receives the open wallet.
-        def step2(pw, a, k):
-            self.emitSignal(ui.WORKING_SIGNAL)
-            try:
-                with self.wallet.open("dcr", 0, pw, self.blockchainSignals) as w:
-                    r = f(w, *a, **k)
-                    self.appWindow.pop(self.waitingScreen)
-                    self.appWindow.pop(self.pwDialog)
-                    return r
-            except Exception as e:
-                self.log.warning(
-                    "exception encountered while performing wallet action: %s"
-                    % formatTraceback(e)
-                )
-                self.appWindow.showError("error")
-            finally:
-                self.emitSignal(ui.DONE_SIGNAL)
-            return False
-
-        self.getPassword(step1, cb, a, k)
+        self.assetScreen = screens.AssetScreen()
 
     def confirm(self, msg, cb):
         """
         Call the callback function only if the user confirms the prompt.
         """
         self.appWindow.stack(self.confirmScreen.withPurpose(msg, cb))
-
-    def syncWallet(self):
-        """
-        If conditions are right, start syncing the wallet.
-        """
-        wallet = self.wallet
-        if wallet and wallet.openAccount:
-            wallet.lock()
-            self.emitSignal(ui.WORKING_SIGNAL)
-            self.makeThread(wallet.sync, self.doneSyncing)
-
-    def doneSyncing(self, res):
-        """
-        The wallet sync is complete. Close and lock the wallet. Any arguments
-        are ignored.
-        """
-        self.emitSignal(ui.DONE_SIGNAL)
-        self.wallet.unlock()
-        self.wallet.close()
-        self.emitSignal(ui.SYNC_SIGNAL)
 
     def balanceSync(self, balance):
         """
@@ -515,11 +428,27 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
             self.trackedCssItems.append(button)
         return button
 
-    def home_(self):
+    def home_(self, screen=None):
         """
-        Go to the home screen.
+        Go to the home screen or set a new home screen.
+
+        Args:
+            screen (Screen | tuple(Screen)): Behavior will differ depending on
+                type passed. If no screen is passed, the last home screen will
+                be used. If screen is a Screen, it will be set as the new home
+                screen. If screen is a tuple of Screen, The first Screen in the
+                tuple will be set to the home screen, and the rest will be
+                stacked.
         """
+        stacks = tuple()
+        if isinstance(screen, tuple):
+            stacks = screen[1:]
+            screen = screen[0]
+        if screen:
+            self.homeScreen = screen
         self.appWindow.setHomeScreen(self.homeScreen)
+        for stack in stacks:
+            self.appWindow.stack(stack)
 
     def showMnemonics(self, words):
         """
@@ -528,8 +457,8 @@ class TinyDecred(QtCore.QObject, Q.ThreadUtilities):
         Args:
             list(str): List of mnemonic words.
         """
-        screen = screens.MnemonicScreen(self, words)
-        self.appWindow.stack(screen)
+        screen = screens.MnemonicScreen(words)
+        self.home((self.assetScreen, screen))
 
 
 def loadFonts():
@@ -539,10 +468,9 @@ def loadFonts():
     # see https://github.com/google/material-design-icons/blob/master/iconfont/codepoints
     # for conversions to unicode
     # http://zavoloklom.github.io/material-design-iconic-font/cheatsheet.html
-    fontDir = os.path.join(ui.FONTDIR)
-    for filename in os.listdir(fontDir):
+    for filename in os.listdir(ui.FONTDIR):
         if filename.endswith(".ttf"):
-            QtGui.QFontDatabase.addApplicationFont(os.path.join(fontDir, filename))
+            QtGui.QFontDatabase.addApplicationFont(os.path.join(ui.FONTDIR, filename))
 
 
 # Some issues' responses have indicated that certain exceptions may not be
@@ -566,7 +494,7 @@ def exception_hook(exctype, value, tb):
 
 def main():
     """
-    Start the TinyDecred application.
+    Start the TinyWallet application.
     """
     sys.excepthook = exception_hook
     QtWidgets.QApplication.setDesktopSettingsAware(False)
@@ -580,7 +508,7 @@ def main():
     qApp.setApplicationName("Tiny Decred")
     loadFonts()
 
-    decred = TinyDecred(qApp)
+    decred = TinyWallet(qApp)
     try:
         qApp.exec_()
     except Exception as e:

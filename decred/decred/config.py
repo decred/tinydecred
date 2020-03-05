@@ -17,7 +17,7 @@ from decred.util import helpers
 
 
 # Set the data directory in a OS-appropriate location.
-_ad = AppDirs("TinyDecred", False)
+_ad = AppDirs("TinyWallet", False)
 DATA_DIR = _ad.user_data_dir
 
 helpers.mkdir(DATA_DIR)
@@ -36,7 +36,7 @@ MainnetConfig = {"dcrdata": "https://explorer.dcrdata.org/"}
 
 TestnetConfig = {"dcrdata": "https://testnet.dcrdata.org/"}
 
-SimnetConfig = {"dcrdata": "http://localhost:7777"}  # Run dcrdata locally
+SimnetConfig = {"dcrdata": "http://localhost:17779"}  # Run dcrdata locally
 
 log = helpers.getLogger("CONFIG")  # , logLvl=0)
 

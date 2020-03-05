@@ -93,5 +93,4 @@ def chain(coinType):
     Returns:
         obj: Network parameters.
     """
-    coinType = parseCoinType(coinType)
-    return _chains[coinType] if coinType in _chains else None
+    return _chains.get(parseCoinType(coinType))

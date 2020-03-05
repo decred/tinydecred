@@ -193,7 +193,7 @@ def newAccount(db):
     privKeyEncrypted = crypto.encrypt(cryptoKey, acctKey.serialize())
     pubKeyEncrypted = crypto.encrypt(cryptoKey, acctKeyPub.serialize())
     acct = account.Account(pubKeyEncrypted, privKeyEncrypted, "acctName", "mainnet", db)
-    acct.open(cryptoKey, None, None)
+    acct.unlock(cryptoKey)
     acct.generateGapAddresses()
     return acct
 
@@ -318,7 +318,7 @@ def test_account(tmp_path):
     acct.stakePools.clear()
     acct.utxos.clear()
     assert acct.stakePool() is None
-    acct.load(db)
+    acct.load(db, Blockchain, Signals)
     assert zerothAddr in acct.txs
     assert len(acct.txs[zerothAddr]) == 1
     assert acct.txs[zerothAddr][0] == txid
@@ -512,7 +512,7 @@ def test_gap_handling(tmp_path):
     assert listsAreEqual(acct.externalAddresses, externalAddrs[: gapLimit + 1])
 
     # Open the account to generate addresses.
-    acct.open(cryptoKey, None, None)
+    acct.unlock(cryptoKey)
     acct.addTxid(internalAddrs[0], "C4fA6958A1847D")
     newAddrs = acct.generateGapAddresses()
     assert len(newAddrs) == 1

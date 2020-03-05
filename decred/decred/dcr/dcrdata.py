@@ -20,7 +20,7 @@ import websocket
 
 from decred import DecredError
 from decred.crypto import crypto
-from decred.util import chains, database, tinyhttp
+from decred.util import database, tinyhttp
 from decred.util.database import KeyValueDatabase
 from decred.util.encode import ByteArray
 from decred.util.helpers import formatTraceback, getLogger
@@ -523,7 +523,6 @@ class DcrdataBlockchain:
         self.subsidyCache = calc.SubsidyCache(params)
         if not skipConnect:
             self.connect()
-        chains.registerChain("dcr", self)
 
     def connect(self):
         """

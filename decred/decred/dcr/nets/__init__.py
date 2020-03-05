@@ -9,6 +9,8 @@ from . import mainnet, simnet, testnet
 
 
 the_nets = {n.Name: n for n in (mainnet, testnet, simnet)}
+if "testnet3" in the_nets:
+    the_nets["testnet"] = the_nets["testnet3"]
 
 
 def parse(name):

@@ -797,7 +797,16 @@ class Account:
     Account is a Decred account.
     """
 
-    def __init__(self, pubKeyEncrypted, privKeyEncrypted, name, netID, db=None):
+    def __init__(
+        self,
+        pubKeyEncrypted,
+        privKeyEncrypted,
+        name,
+        netID,
+        db=None,
+        blockchain=None,
+        signals=None,
+    ):
         """
         Args:
             pubKeyEncrypted (ByteArray): The encrypted public key bytes.
@@ -805,7 +814,13 @@ class Account:
             name (str): Name for the account.
             netID (str): An identifier that can identify the network for an
                 asset. Probably a string such as "testnet".
-            db (database.Bucket): A database bucket for the account.
+            db (database.Bucket): A database bucket for the account. If db is
+                provided, the account will be inititialized. If db is provided
+                blockchain and signals should be provided as well.
+            blockchain (Blockchain): A blockchain. Only used if db and signals
+                are specified.
+            signals (Signals): A signaller. Only used if db and blockchain are
+                specified.
         """
         self.pubKeyEncrypted = pubKeyEncrypted
         self.privKeyEncrypted = privKeyEncrypted
@@ -853,7 +868,7 @@ class Account:
         # If a database was provided, load it. This would be the case when
         # the account is first created, as opposed to be unblobbed.
         if db is not None:
-            self.load(db)
+            self.load(db, blockchain, signals)
 
     @staticmethod
     def blob(acct):
@@ -902,13 +917,18 @@ class Account:
         """
         return ByteArray(Account.blob(self))
 
-    def load(self, db):
+    def load(self, db, blockchain, signals):
         """
         Prep the database and read the account data.
 
         Args:
             db (database.Bucket): The database.
+            blockchain (Blockchain): A blockchain object.
+                (see dcrdata.DcrdataBlockchain)
+            signals (Signals): A signaller.
         """
+        self.blockchain = blockchain
+        self.signals = signals
         self.masterDB = db.child("meta")
         self.utxoDB = db.child("utxos", blobber=UTXO)
         self.utxos = {k: v for k, v in self.utxoDB.items()}
@@ -933,13 +953,14 @@ class Account:
             apiKeys = encode.unblobStrList(self.masterDB[MetaKeys.vsp])
             self.stakePools = [self.vspDB[apiKey] for apiKey in apiKeys]
 
-    def open(self, cryptoKey, blockchain, signals):
+    def unlock(self, cryptoKey):
         """
         Open the Decred account. Runs the parent's method, then performs some
         Decred-specific initialization.
+
+        Args:
+            cryptoKey (SecretKey): The encryption key.
         """
-        self.blockchain = blockchain
-        self.signals = signals
         self.privKey = self.privateExtendedKey(cryptoKey)
         pubX = self.privKey.neuter()
         self.extPub = pubX.child(EXTERNAL_BRANCH)
@@ -954,9 +975,13 @@ class Account:
         # It is realistically impossible to reach here.
         raise DecredError("error finding voting key")
 
-    def close(self):
+    def isUnlocked(self):
+        """True if account is currently unlocked."""
+        return self.privKey is not None
+
+    def lock(self):
         """
-        Close the Decred account. Runs the parent's method, then performs some
+        Lock the Decred account. Runs the parent's method, then performs some
         Decred-specific clean up.
         """
         if self.privKey:
@@ -1520,7 +1545,7 @@ class Account:
         SecretKey.
 
         Args:
-            pw (SecretKey): The secret key.
+            cryptoKey (SecretKey): The encryption key.
 
         Returns:
             crypto.ExtendedKey: The current account's decoded private key.
@@ -1533,7 +1558,7 @@ class Account:
         SecretKey.
 
         Args:
-            pw (SecretKey): The secret key.
+            cryptoKey (SecretKey): The encryption key.
 
         Returns:
             crypto.ExtendedKey: The current account's decoded public key.
