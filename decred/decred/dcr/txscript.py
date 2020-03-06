@@ -868,8 +868,7 @@ def extractPubKeyAltDetails(script):
 
     if (
         len(script) == 35
-        and script[0]
-        and opcode.OP_DATA_32
+        and script[0] == opcode.OP_DATA_32
         and isSmallInt(script[33])
         and asSmallInt(script[33]) == crypto.STEd25519
     ):

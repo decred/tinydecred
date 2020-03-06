@@ -30,6 +30,8 @@ def parseShortForm(asm):
     for token in asm.split():
         if token.startswith("0x"):
             b += ByteArray(token[2:])
+        elif token.startswith("NULL_BYTES_"):
+            b += ByteArray(bytes(int(token[len("NULL_BYTES_"):])))
         else:
             longToken = "OP_" + token
             if hasattr(opcode, longToken):
@@ -62,6 +64,30 @@ def scriptClassTests():
             script="DUP HASH160 DATA_20 0x660d4ef3a743e3e696ad990364e555"
             + "c271ad504b EQUALVERIFY CHECKSIG",
             scriptClass=txscript.PubKeyHashTy,
+        ),
+        # OP_DATA_32 <32-byte pubkey> <1-byte ed25519 sigtype> OP_CHECKSIGALT
+        scriptClassTest(
+            name="Pay PubkeyAltScript STEd25519",
+            script="DATA_32 NULL_BYTES_32 1 CHECKSIGALT",
+            scriptClass=txscript.PubkeyAltTy,
+        ),
+        # OP_DATA_33 <1-byte prefix and 32-byte remaining pubkey> <1-byte schnorr+secp sigtype> OP_CHECKSIGALT
+        scriptClassTest(
+            name="Pay PubkeyAltScript STSchnorrSecp256k1",
+            script="DATA_33 0x02 NULL_BYTES_32 2 CHECKSIGALT",
+            scriptClass=txscript.PubkeyAltTy,
+        ),
+        # DUP HASH160 <20-byte hash> EQUALVERIFY <1-byte ed25519 sigtype> CHECKSIG
+        scriptClassTest(
+            name="Pay PubkeyHashAltScript STEd25519",
+            script="DUP HASH160 DATA_20 NULL_BYTES_20 EQUALVERIFY 1 CHECKSIGALT",
+            scriptClass=txscript.PubkeyHashAltTy,
+        ),
+        # DUP HASH160 <20-byte hash> EQUALVERIFY <1-byte schnorr+secp sigtype> CHECKSIG
+        scriptClassTest(
+            name="Pay PubkeyHashAltScript STSchnorrSecp256k1",
+            script="DUP HASH160 DATA_20 NULL_BYTES_20 EQUALVERIFY 2 CHECKSIGALT",
+            scriptClass=txscript.PubkeyHashAltTy,
         ),
         # part of tx 6d36bc17e947ce00bb6f12f8e7a56a1585c5a36188ffa2b05e10b4743273a74b
         # codeseparator parts have been elided. (bitcoin core's checks for
