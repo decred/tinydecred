@@ -2754,7 +2754,7 @@ class TestTxScript(unittest.TestCase):
                 reqSigs=0,
                 scriptClass=txscript.NonStandardTy,
             ),
-            # Note the technically the pubkey is the second item on the
+            # Note that technically the pubkey is the second item on the
             # stack, but since the address extraction intentionally only
             # works with standard PkScripts, this should not return any
             # addresses.
@@ -2820,14 +2820,12 @@ class TestTxScript(unittest.TestCase):
 
         def checkAddrs(a, b, name):
             assert len(a) == len(b), (
-                f"extracted address length mismatch. expected %d, got %d"
-                % (len(a), len(b))
+                f"extracted address length mismatch. expected {len(a)}, got {len(b)} for test {name}"
             )
 
             for av, bv in zip(a, b):
                 assert av.scriptAddress() == bv.scriptAddress(), (
-                    f"scriptAddress mismatch. expected %s, got %s (%s)"
-                    % (av.scriptAddress().hex(), bv.scriptAddress().hex(), name)
+                    f"scriptAddress mismatch. expected {av.scriptAddress().hex()}, got {bv.scriptAddress().hex()} for test {name}"
                 )
 
         for test in tests:

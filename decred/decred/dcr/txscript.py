@@ -848,7 +848,7 @@ def extractPubKeyAltDetails(script):
 
     Returns:
         (bytes-like): The pubkey or None.
-        (int): The signature type or None.
+        (int): The signature type or 0.
     """
     # A pay-to-alt-pubkey script is of the form:
     #  PUBKEY SIGTYPE OP_CHECKSIGALT
@@ -905,7 +905,7 @@ def isStandardAltSignatureType(op):
         return False
 
     sigType = asSmallInt(op)
-    return sigType == crypto.STEd25519 or sigType == crypto.STSchnorrSecp256k1
+    return sigType in (crypto.STEd25519, crypto.STSchnorrSecp256k1)
 
 
 def extractPubKeyHashAltDetails(script):
@@ -919,7 +919,7 @@ def extractPubKeyHashAltDetails(script):
 
     Returns:
         (bytes-like): The pubkey hash or None.
-        (int): The signature type or None.
+        (int): The signature type or 0.
     """
     # A pay-to-alt-pubkey-hash script is of the form:
     #  DUP HASH160 <20-byte hash> EQUALVERIFY SIGTYPE CHECKSIG
@@ -2630,15 +2630,12 @@ def extractPkScriptAddrs(version, pkScript, netParams):
     # Check for pay-to-alt-pubkey-hash script.
     data, sigType = extractPubKeyHashAltDetails(pkScript)
     if data:
-        addrs = []
-        addr = crypto.newAddressPubKeyHash(data, netParams, sigType)
-        addrs.append(addr)
+        addrs = [crypto.newAddressPubKeyHash(data, netParams, sigType)]
         return PubkeyHashAltTy, addrs, 1
 
     # Check for pay-to-pubkey script.
     data = extractPubKey(pkScript)
     if data:
-        addrs = []
         pk = Curve.parsePubKey(data)
         addrs = [crypto.AddressSecpPubKey(pk.serializeCompressed(), netParams)]
         return PubKeyTy, addrs, 1
