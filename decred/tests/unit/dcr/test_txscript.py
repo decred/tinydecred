@@ -30,6 +30,8 @@ def parseShortForm(asm):
     for token in asm.split():
         if token.startswith("0x"):
             b += ByteArray(token[2:])
+        elif token.startswith("NULL_BYTES_"):
+            b += ByteArray(bytes(int(token[len("NULL_BYTES_"):])))
         else:
             longToken = "OP_" + token
             if hasattr(opcode, longToken):
@@ -3284,16 +3286,7 @@ def test_spend_script_size():
 
 def test_get_P2PKH_pCode():
     # P2PKH is a valid pay to public key hash script.
-    P2PKH = ByteArray(
-        [
-            opcode.OP_DUP,
-            opcode.OP_HASH160,
-            opcode.OP_DATA_20,
-            *([0x00] * 20),
-            opcode.OP_EQUALVERIFY,
-            opcode.OP_CHECKSIG,
-        ]
-    )
+    P2PKH = parseShortForm("DUP HASH160 DATA_20 NULL_BYTES_20 EQUALVERIFY CHECKSIG")
     """
     name (str): Short description of the test.
     pkScript (ByteArray): The script.
@@ -3304,9 +3297,7 @@ def test_get_P2PKH_pCode():
         dict(name="P2PKH", pkScript=P2PKH, want=txscript.opNonstake),
         dict(
             name="P2PK",
-            pkScript=ByteArray(
-                [opcode.OP_DATA_33, 0x02, *([0x00] * 32), opcode.OP_CHECKSIG]
-            ),
+            pkScript=parseShortForm("DATA_33 0x02 NULL_BYTES_32 CHECKSIG"),
             want=txscript.opNonstake,
         ),
         dict(
