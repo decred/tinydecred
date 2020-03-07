@@ -30,6 +30,8 @@ def parseShortForm(asm):
     for token in asm.split():
         if token.startswith("0x"):
             b += ByteArray(token[2:])
+        elif token.startswith("NULL_BYTES_"):
+            b += ByteArray(bytes(int(token[len("NULL_BYTES_"):])))
         else:
             longToken = "OP_" + token
             if hasattr(opcode, longToken):
@@ -3277,6 +3279,59 @@ def test_spend_script_size():
                 txscript.spendScriptSize(test["pkScript"])
             continue
         res = txscript.spendScriptSize(test["pkScript"])
+        assert (
+            res == test["want"]
+        ), f'wanted {test["want"]} but got {res} for test {test["name"]}'
+
+
+def test_get_P2PKH_pCode():
+    # P2PKH is a valid pay to public key hash script.
+    P2PKH = parseShortForm("DUP HASH160 DATA_20 NULL_BYTES_20 EQUALVERIFY CHECKSIG")
+    """
+    name (str): Short description of the test.
+    pkScript (ByteArray): The script.
+    wantException (Exception): If present this exception should be thrown.
+    want (int): The expected stake opcode or txscript.opNonstake.
+    """
+    tests = [
+        dict(name="P2PKH", pkScript=P2PKH, want=txscript.opNonstake),
+        dict(
+            name="P2PK",
+            pkScript=parseShortForm("DATA_33 0x02 NULL_BYTES_32 CHECKSIG"),
+            want=txscript.opNonstake,
+        ),
+        dict(
+            name="stake submission",
+            pkScript=ByteArray(opcode.OP_SSTX) + P2PKH,
+            want=txscript.opcode.OP_SSTX,
+        ),
+        dict(
+            name="revocation",
+            pkScript=ByteArray(opcode.OP_SSRTX) + P2PKH,
+            want=txscript.opcode.OP_SSRTX,
+        ),
+        dict(
+            name="stake change",
+            pkScript=ByteArray(opcode.OP_SSTXCHANGE) + P2PKH,
+            want=txscript.opcode.OP_SSTXCHANGE,
+        ),
+        dict(
+            name="stake gen",
+            pkScript=ByteArray(opcode.OP_SSGEN) + P2PKH,
+            want=txscript.opcode.OP_SSGEN,
+        ),
+        dict(
+            name="unknown script class",
+            pkScript=ByteArray(255) + P2PKH,
+            wantException=NotImplementedError,
+        ),
+    ]
+    for test in tests:
+        if test.get("wantException"):
+            with pytest.raises(test["wantException"]):
+                txscript.getP2PKHOpCode(test["pkScript"])
+            continue
+        res = txscript.getP2PKHOpCode(test["pkScript"])
         assert (
             res == test["want"]
         ), f'wanted {test["want"]} but got {res} for test {test["name"]}'
