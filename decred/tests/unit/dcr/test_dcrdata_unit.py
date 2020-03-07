@@ -12,7 +12,7 @@ import pytest
 
 from decred import DecredError
 from decred.crypto import opcode
-from decred.dcr import agenda, txscript
+from decred.dcr import account, agenda, txscript
 from decred.dcr.dcrdata import (
     DcrdataBlockchain,
     DcrdataClient,
@@ -184,42 +184,6 @@ class TestDcrdataClient:
 
 
 class TestDcrdataBlockchain:
-    def test_subscriptions(self, http_get_post, tmp_path):
-
-        # Exception in updateTip.
-        preload_api_list(http_get_post)
-        with pytest.raises(DecredError):
-            DcrdataBlockchain(str(tmp_path / "test.db"), testnet, BASE_URL)
-
-        # Successful creation.
-        preload_api_list(http_get_post)
-        http_get_post(f"{BASE_URL}api/block/best", 1)
-        ddb = DcrdataBlockchain(str(tmp_path / "test.db"), testnet, BASE_URL)
-        assert ddb.tip == 1
-
-        # Set the mock WebsocketClient.
-        ddb.dcrdata.ps = MockWebsocketClient()
-
-        # Subscribes.
-        def receiver(obj):
-            print("msg: %s" % repr(obj))
-
-        ddb.subscribeBlocks(receiver)
-        assert ddb.dcrdata.ps.sent[0]["message"]["message"] == "newblock"
-
-        # Exception in subscribeAddresses.
-        with pytest.raises(DecredError):
-            ddb.subscribeAddresses([])
-
-        ddb.dcrdata.ps.sent = []
-        ddb.subscribeAddresses(["new_one"], receiver)
-        assert ddb.dcrdata.ps.sent[0]["message"]["message"] == "address:new_one"
-
-        # getAgendasInfo.
-        http_get_post(f"{BASE_URL}api/stake/vote/info", AGENDAS_INFO_RAW)
-        agsinfo = ddb.getAgendasInfo()
-        assert isinstance(agsinfo, agenda.AgendasInfo)
-
     # Test data from block #427282.
     utxos = (
         # Coinbase.
@@ -302,9 +266,70 @@ class TestDcrdataBlockchain:
     )
     # fmt: on
 
+    def test_misc(self, http_get_post, tmp_path):
+        preload_api_list(http_get_post)
+        http_get_post(f"{BASE_URL}api/block/best", dict(height=1))
+        ddb = DcrdataBlockchain(str(tmp_path / "test.db"), testnet, BASE_URL)
+        assert ddb.tipHeight == 1
+
+        # getAgendasInfo
+        http_get_post(f"{BASE_URL}api/stake/vote/info", AGENDAS_INFO_RAW)
+        agsinfo = ddb.getAgendasInfo()
+        assert isinstance(agsinfo, agenda.AgendasInfo)
+
+    def test_subscriptions(self, http_get_post, tmp_path):
+        # Exception in updateTip.
+        preload_api_list(http_get_post)
+        with pytest.raises(DecredError):
+            DcrdataBlockchain(str(tmp_path / "test.db"), testnet, BASE_URL)
+
+        # Successful creation.
+        preload_api_list(http_get_post)
+        http_get_post(f"{BASE_URL}api/block/best", dict(height=1))
+        ddb = DcrdataBlockchain(str(tmp_path / "test.db"), testnet, BASE_URL)
+
+        # Set the mock WebsocketClient.
+        ddb.dcrdata.ps = MockWebsocketClient()
+
+        # Receiver
+        receive_queue = []
+
+        def receiver(obj):
+            receive_queue.append(obj)
+
+        # subscribeBlocks
+        ddb.subscribeBlocks(receiver)
+        assert ddb.dcrdata.ps.sent[0]["message"]["message"] == "newblock"
+        ddb.dcrdata.ps.sent = []
+
+        # subscribeAddresses
+        with pytest.raises(DecredError):
+            ddb.subscribeAddresses([])
+        ddb.subscribeAddresses(["new_one"], receiver)
+        assert ddb.dcrdata.ps.sent[0]["message"]["message"] == "address:new_one"
+
+        # pubsubSignal
+        assert ddb.pubsubSignal("done") is None
+        assert ddb.pubsubSignal(dict(event="subscribeResp")) is None
+        assert ddb.pubsubSignal(dict(event="ping")) is None
+        assert ddb.pubsubSignal(dict(event="unknown")) is None
+        # pubsubSignal address
+        sig = dict(
+            event="address",
+            message=dict(address="the_address", transaction="transaction",),
+        )
+        ddb.pubsubSignal(sig)
+        assert receive_queue[0] == sig
+        receive_queue.clear()
+        # pubsubSignal newblock
+        sig = dict(event="newblock", message=dict(block=dict(height=1)))
+        ddb.pubsubSignal(sig)
+        assert receive_queue[0] == sig
+        receive_queue.clear()
+
     def test_utxos(self, http_get_post, tmp_path):
         preload_api_list(http_get_post)
-        http_get_post(f"{BASE_URL}api/block/best", 1)
+        http_get_post(f"{BASE_URL}api/block/best", dict(height=1))
         ddb = DcrdataBlockchain(str(tmp_path / "test.db"), testnet, BASE_URL)
 
         # txVout error
@@ -366,9 +391,41 @@ class TestDcrdataBlockchain:
         # txVout success
         assert ddb.txVout(self.txs[2][0], 0).satoshis == 14773017964
 
+        # approveUTXO
+        utxo = account.UTXO.parse(self.utxos[1])
+        utxo.maturity = 2
+        assert ddb.approveUTXO(utxo) is False
+        utxo.maturity = None
+        assert ddb.approveUTXO(utxo) is False
+        utxo = account.UTXO.parse(self.utxos[0])
+        assert ddb.approveUTXO(utxo) is True
+
+        # confirmUTXO
+        # No confirmation.
+        utxo = account.UTXO.parse(self.utxos[2])
+        assert ddb.confirmUTXO(utxo) is False
+        # Confirmation.
+        blockHash = "00000000000000002b197e4018b990efb85e6bd43ffb15f7ede97a78f806a3f8"
+        txURL = f"{BASE_URL}api/tx/{self.txs[2][0]}"
+        decodedTx = {"block": {"blockhash": blockHash}}
+        http_get_post(txURL, decodedTx)
+        headerURL = f"{BASE_URL}api/block/hash/{blockHash}/header/raw"
+        blockHeader = {
+            "hex": (
+                "07000000e00b3a83dc60f961d8f516ece63e6d009eff4c2af50139150000"
+                "000000000000873684038a5d384cf123ee39d39bdf9f65cf4051ec4d420f"
+                "e909c16344329aaa35879931c8695d9be6f9259fa7467c51d0c7e601d95c"
+                "c78fdd458210503865af0100721e0a6d2bf90500040091a40000e62f3418"
+                "c8518a700300000012850600213300003de0575e6e8b9d13e691326a1fd4"
+                "3a0000000000000000000000000000000000000000000000000007000000"
+            ),
+        }
+        http_get_post(headerURL, blockHeader)
+        assert ddb.confirmUTXO(utxo) is True
+
     def test_blocks(self, http_get_post, tmp_path):
         preload_api_list(http_get_post)
-        http_get_post(f"{BASE_URL}api/block/best", 1)
+        http_get_post(f"{BASE_URL}api/block/best", dict(height=1))
         ddb = DcrdataBlockchain(str(tmp_path / "test.db"), testnet, BASE_URL)
 
         # blockHeader
