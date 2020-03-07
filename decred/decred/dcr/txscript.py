@@ -805,12 +805,12 @@ def getScriptClass(scriptVersion, script):
         return NonStandardTy
     elif isPubKeyScript(script):
         return PubKeyTy
-    # elif isPubKeyAltScript(script):
-    #     return PubkeyAltTy
+    elif isPubKeyAltScript(script):
+        return PubkeyAltTy
     elif isPubKeyHashScript(script):
         return PubKeyHashTy
-    # elif isPubKeyHashAltScript(script):
-    #     return PubkeyHashAltTy
+    elif isPubKeyHashAltScript(script):
+        return PubkeyHashAltTy
     elif isScriptHashScript(script):
         return ScriptHashTy
     elif isMultisigScript(scriptVersion, script):
@@ -826,6 +826,122 @@ def getScriptClass(scriptVersion, script):
     elif isStakeChangeScript(scriptVersion, script):
         return StakeSubChangeTy
     return NonStandardTy
+
+
+def isPubKeyAltScript(script):
+    """
+    isPubKeyAltScript returns whether or not the passed script is a standard
+    pay-to-alt-pubkey script.
+    """
+    pk, _ = extractPubKeyAltDetails(script)
+    return pk is not None
+
+
+def extractPubKeyAltDetails(script):
+    """
+    extractPubKeyAltDetails extracts the public key and signature type from the
+    passed script if it is a standard pay-to-alt-pubkey script.  It will return
+    None otherwise.
+
+    Args:
+        script (bytes-like): The script to extract from.
+
+    Returns:
+        (bytes-like): The pubkey or None.
+        (int): The signature type or 0.
+    """
+    # A pay-to-alt-pubkey script is of the form:
+    #  PUBKEY SIGTYPE OP_CHECKSIGALT
+    #
+    # The only two currently supported alternative signature types are ed25519
+    # and schnorr + secp256k1 (with a compressed pubkey).
+    #
+    #  OP_DATA_32 <32-byte pubkey> <1-byte ed25519 sigtype> OP_CHECKSIGALT
+    #  OP_DATA_33 <33-byte pubkey> <1-byte schnorr+secp sigtype> OP_CHECKSIGALT
+
+    # The script can't possibly be a pay-to-alt-pubkey script if it doesn't
+    # end with OP_CHECKSIGALT or have at least two small integer pushes
+    # preceding it (although any reasonable pubkey will certainly be larger).
+    # Fail fast to avoid more work below.
+    if len(script) < 3 or script[-1] != opcode.OP_CHECKSIGALT:
+        return None, 0
+
+    if (
+        len(script) == 35
+        and script[0] == opcode.OP_DATA_32
+        and isSmallInt(script[33])
+        and asSmallInt(script[33]) == crypto.STEd25519
+    ):
+        return script[1:33], crypto.STEd25519
+
+    if (
+        len(script) == 36
+        and script[0] == opcode.OP_DATA_33
+        and isSmallInt(script[34])
+        and asSmallInt(script[34]) == crypto.STSchnorrSecp256k1
+        and isStrictPubKeyEncoding(script[1:34])
+    ):
+        return script[1:34], crypto.STSchnorrSecp256k1
+
+    return None, 0
+
+
+def isPubKeyHashAltScript(script):
+    """
+    isPubKeyHashAltScript returns whether or not the passed script is a standard
+    pay-to-alt-pubkey-hash script.
+    """
+    pk, _ = extractPubKeyHashAltDetails(script)
+    return pk is not None
+
+
+def isStandardAltSignatureType(op):
+    """
+    isStandardAltSignatureType returns whether or not the provided opcode
+    represents a push of a standard alt signature type.
+    """
+    if not isSmallInt(op):
+        return False
+
+    sigType = asSmallInt(op)
+    return sigType in (crypto.STEd25519, crypto.STSchnorrSecp256k1)
+
+
+def extractPubKeyHashAltDetails(script):
+    """
+    extractPubKeyHashAltDetails extracts the public key hash and signature type
+    from the passed script if it is a standard pay-to-alt-pubkey-hash script.  It
+    will return None otherwise.
+
+    Args:
+        script (bytes-like): The script to extract from.
+
+    Returns:
+        (bytes-like): The pubkey hash or None.
+        (int): The signature type or 0.
+    """
+    # A pay-to-alt-pubkey-hash script is of the form:
+    #  DUP HASH160 <20-byte hash> EQUALVERIFY SIGTYPE CHECKSIG
+    #
+    # The only two currently supported alternative signature types are ed25519
+    # and schnorr + secp256k1 (with a compressed pubkey).
+    #
+    #  DUP HASH160 <20-byte hash> EQUALVERIFY <1-byte ed25519 sigtype> CHECKSIG
+    #  DUP HASH160 <20-byte hash> EQUALVERIFY <1-byte schnorr+secp sigtype> CHECKSIG
+    #
+    #  Notice that OP_0 is not specified since signature type 0 disabled.
+    if (
+        len(script) == 26
+        and script[0] == opcode.OP_DUP
+        and script[1] == opcode.OP_HASH160
+        and script[2] == opcode.OP_DATA_20
+        and script[23] == opcode.OP_EQUALVERIFY
+        and isStandardAltSignatureType(script[24])
+        and script[25] == opcode.OP_CHECKSIGALT
+    ):
+        return script[3:23], asSmallInt(script[24])
+
+    return None, 0
 
 
 def isPubKeyHashScript(script):
@@ -2486,7 +2602,7 @@ def scriptHashToAddrs(scriptHash, params):
     return [crypto.newAddressScriptHashFromHash(scriptHash, params)]
 
 
-def extractPkScriptAddrs(version, pkScript, chainParams):
+def extractPkScriptAddrs(version, pkScript, netParams):
     """
     extractPkScriptAddrs returns the type of script, addresses and required
     signatures associated with the passed PkScript.  Note that it only works for
@@ -2503,20 +2619,40 @@ def extractPkScriptAddrs(version, pkScript, chainParams):
     # Check for pay-to-pubkey-hash script.
     pkHash = extractPubKeyHash(pkScript)
     if pkHash:
-        return PubKeyHashTy, pubKeyHashToAddrs(pkHash, chainParams), 1
+        return PubKeyHashTy, pubKeyHashToAddrs(pkHash, netParams), 1
 
     # Check for pay-to-script-hash.
     scriptHash = extractScriptHash(pkScript)
     if scriptHash:
-        return ScriptHashTy, scriptHashToAddrs(scriptHash, chainParams), 1
+        return ScriptHashTy, scriptHashToAddrs(scriptHash, netParams), 1
+
+    # Check for pay-to-alt-pubkey-hash script.
+    data, sigType = extractPubKeyHashAltDetails(pkScript)
+    if data:
+        addrs = [crypto.newAddressPubKeyHash(data, netParams, sigType)]
+        return PubkeyHashAltTy, addrs, 1
 
     # Check for pay-to-pubkey script.
     data = extractPubKey(pkScript)
     if data:
-        addrs = []
         pk = Curve.parsePubKey(data)
-        addrs = [crypto.AddressSecpPubKey(pk.serializeCompressed(), chainParams)]
+        addrs = [crypto.AddressSecpPubKey(pk.serializeCompressed(), netParams)]
         return PubKeyTy, addrs, 1
+
+    # Check for pay-to-alt-pubkey script.
+    pk, sigType = extractPubKeyAltDetails(pkScript)
+    if pk:
+        raise NotImplementedError("only secp256k1 signatures are currently supported")
+        # addrs = []
+        # if sigType == dcrec.STEd25519:
+        #     addr = crypto.NewAddressEdwardsPubKey(pk, netParams)
+        #     addrs.append(addr)
+
+        # elif sigType == crypto.STSchnorrSecp256k1:
+        #     addr = crypto.NewAddressSecSchnorrPubKey(pk, netParams)
+        #     addrs.append(addr)
+
+        # return PubkeyAltTy, addrs, 1
 
     # Check for multi-signature script.
     details = extractMultisigScriptDetails(version, pkScript, True)
@@ -2525,49 +2661,53 @@ def extractPkScriptAddrs(version, pkScript, chainParams):
         addrs = []
         for encodedPK in details.pubKeys:
             pk = Curve.parsePubKey(encodedPK)
-            addrs.append(
-                crypto.AddressSecpPubKey(pk.serializeCompressed(), chainParams)
-            )
+            addrs.append(crypto.AddressSecpPubKey(pk.serializeCompressed(), netParams))
         return MultiSigTy, addrs, details.requiredSigs
 
     # Check for stake submission script.  Only stake-submission-tagged
     # pay-to-pubkey-hash and pay-to-script-hash are allowed.
     pkHash = extractStakePubKeyHash(pkScript, opcode.OP_SSTX)
     if pkHash:
-        return StakeSubmissionTy, pubKeyHashToAddrs(pkHash, chainParams), 1
+        return StakeSubmissionTy, pubKeyHashToAddrs(pkHash, netParams), 1
     scriptHash = extractStakeScriptHash(pkScript, opcode.OP_SSTX)
     if scriptHash:
-        return StakeSubmissionTy, scriptHashToAddrs(scriptHash, chainParams), 1
+        return StakeSubmissionTy, scriptHashToAddrs(scriptHash, netParams), 1
 
     # Check for stake generation script.  Only stake-generation-tagged
     # pay-to-pubkey-hash and pay-to-script-hash are allowed.
     pkHash = extractStakePubKeyHash(pkScript, opcode.OP_SSGEN)
     if pkHash:
-        return StakeGenTy, pubKeyHashToAddrs(pkHash, chainParams), 1
+        return StakeGenTy, pubKeyHashToAddrs(pkHash, netParams), 1
     scriptHash = extractStakeScriptHash(pkScript, opcode.OP_SSGEN)
     if scriptHash:
-        return StakeGenTy, scriptHashToAddrs(scriptHash, chainParams), 1
+        return StakeGenTy, scriptHashToAddrs(scriptHash, netParams), 1
 
     # Check for stake revocation script.  Only stake-revocation-tagged
     # pay-to-pubkey-hash and pay-to-script-hash are allowed.
     pkHash = extractStakePubKeyHash(pkScript, opcode.OP_SSRTX)
     if pkHash:
-        return StakeRevocationTy, pubKeyHashToAddrs(pkHash, chainParams), 1
+        return StakeRevocationTy, pubKeyHashToAddrs(pkHash, netParams), 1
     scriptHash = extractStakeScriptHash(pkScript, opcode.OP_SSRTX)
     if scriptHash:
-        return StakeRevocationTy, scriptHashToAddrs(scriptHash, chainParams), 1
+        return StakeRevocationTy, scriptHashToAddrs(scriptHash, netParams), 1
 
     # Check for stake change script.  Only stake-change-tagged
     # pay-to-pubkey-hash and pay-to-script-hash are allowed.
     pkHash = extractStakePubKeyHash(pkScript, opcode.OP_SSTXCHANGE)
     if pkHash:
-        return StakeSubChangeTy, pubKeyHashToAddrs(pkHash, chainParams), 1
+        return StakeSubChangeTy, pubKeyHashToAddrs(pkHash, netParams), 1
     scriptHash = extractStakeScriptHash(pkScript, opcode.OP_SSTXCHANGE)
     if scriptHash:
-        return StakeSubChangeTy, scriptHashToAddrs(scriptHash, chainParams), 1
+        return StakeSubChangeTy, scriptHashToAddrs(scriptHash, netParams), 1
 
-    # EVERYTHING AFTER TIHS IS UN-IMPLEMENTED
-    raise NotImplementedError("unsupported script")
+    # Check for null data script.
+    if isNullDataScript(version, pkScript):
+        # Null data transactions have no addresses or required signatures.
+        return NullDataTy, [], 0
+
+    # Don't attempt to extract addresses or required signatures for nonstandard
+    # transactions.
+    return NonStandardTy, [], 0
 
 
 def sign(chainParams, tx, idx, subScript, hashType, keysource, sigType):
