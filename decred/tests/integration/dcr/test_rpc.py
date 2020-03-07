@@ -273,14 +273,18 @@ def test_rpc(config):
 
     rawaddr = txscript.extractStakeScriptHash(
         getRawTransaction.txOut[0].pkScript, opcode.OP_SSTX
-    ).bytes()
-    if not rawaddr:
+    )
+    if rawaddr:
+        addressWithTickets = crypto.AddressScriptHash(
+            mainnet.ScriptHashAddrID, rawaddr
+        ).string()
+    else:
         rawaddr = txscript.extractStakePubKeyHash(
             getRawTransaction.txOut[0].pkScript, opcode.OP_SSTX
         )
-    addressWithTickets = crypto.AddressScriptHash(
-        mainnet.ScriptHashAddrID, rawaddr
-    ).string()
+        addressWithTickets = crypto.AddressPubKeyHash(
+            mainnet.PubKeyHashAddrID, rawaddr
+        ).string()
 
     getRawTransaction = rpcClient.getRawTransaction(aTicket, 1)
     assert isinstance(getRawTransaction, rpc.RawTransactionResult)
