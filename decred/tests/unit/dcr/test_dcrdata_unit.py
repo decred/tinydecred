@@ -292,20 +292,26 @@ class TestDcrdataBlockchain:
         ddb.dcrdata.ps = MockWebsocketClient()
 
         # Receiver
-        receive_queue = []
+        block_queue = []
 
-        def receiver(obj):
-            receive_queue.append(obj)
+        def blockReceiver(sig):
+            block_queue.append(sig)
+
+        # Receiver
+        addr_queue = []
+
+        def addrReceiver(addr, txid):
+            addr_queue.append((addr, txid))
 
         # subscribeBlocks
-        ddb.subscribeBlocks(receiver)
+        ddb.subscribeBlocks(blockReceiver)
         assert ddb.dcrdata.ps.sent[0]["message"]["message"] == "newblock"
         ddb.dcrdata.ps.sent = []
 
         # subscribeAddresses
         with pytest.raises(DecredError):
             ddb.subscribeAddresses([])
-        ddb.subscribeAddresses(["new_one"], receiver)
+        ddb.subscribeAddresses(["new_one"], addrReceiver)
         assert ddb.dcrdata.ps.sent[0]["message"]["message"] == "address:new_one"
 
         # pubsubSignal
@@ -316,16 +322,14 @@ class TestDcrdataBlockchain:
         # pubsubSignal address
         sig = dict(
             event="address",
-            message=dict(address="the_address", transaction="transaction",),
+            message=dict(address="the_address", transaction="transaction"),
         )
         ddb.pubsubSignal(sig)
-        assert receive_queue[0] == sig
-        receive_queue.clear()
+        assert addr_queue[0] == ("the_address", "transaction")
         # pubsubSignal newblock
         sig = dict(event="newblock", message=dict(block=dict(height=1)))
         ddb.pubsubSignal(sig)
-        assert receive_queue[0] == sig
-        receive_queue.clear()
+        assert block_queue[0] == sig
 
     def test_utxos(self, http_get_post, tmp_path):
         preload_api_list(http_get_post)

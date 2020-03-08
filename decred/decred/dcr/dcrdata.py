@@ -941,7 +941,7 @@ class DcrdataBlockchain:
             if sigType == "address":
                 msg = sig["message"]
                 log.debug("signal received for %s" % msg["address"])
-                self.addressReceiver(sig)
+                self.addressReceiver(msg["address"], msg["transaction"])
             elif sigType == "newblock":
                 self.tipHeight = sig["message"]["block"]["height"]
                 self.blockReceiver(sig)
