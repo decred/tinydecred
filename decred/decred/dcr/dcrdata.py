@@ -639,24 +639,24 @@ class DcrdataBlockchain:
             self.txBlockMap[txHash] = header.cachedHash().bytes()
             return header
 
-    def ticketForTx(self, txid, net):
+    def ticketForTx(self, txid, netParams):
         """
         Retrieve the ticket with txid on net. If tinfo data is not found the
         ticket will be given "mempool" status.
 
         Args:
-            txid(str): The ticket's transaction ID.
-            net(obj): The network parameters.
+            txid (str): The ticket's transaction ID.
+            netparams (obj): The network parameters.
 
         Returns:
             UTXO: The ticket.
         """
         tx = self.tx(txid)
         if not tx.isTicket():
-            raise Exception("not a ticket: {}".format(txid))
+            raise DecredError(f"Not a ticket: {txid}")
         block = self.blockForTx(txid)
         tinfo = self.ticketInfo(txid)
-        return account.UTXO.ticketFromTx(tx, net, block=block, tinfo=tinfo)
+        return account.UTXO.ticketFromTx(tx, netParams, block=block, tinfo=tinfo)
 
     def ticketInfoForSpendingTx(self, txid, net):
         """
