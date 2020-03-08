@@ -2502,8 +2502,15 @@ def signP2PKHMsgTx(msgtx, prevOutputs, keysource, params):
 def paysHighFees(totalInput, tx):
     """
     paysHighFees checks whether the signed transaction pays insanely high fees.
-    Transactons are defined to have a high fee if they have pay a fee rate that
-    is 1000 time higher than the default fee.
+    Transactons are defined as having a high fee if they pay a fee rate that is
+    1000 times higher than the default fee.
+
+    Args:
+        totalInput (int): Input amount for the output transaciton.
+        tx (msgtx.MsgTx): the transaction to be spent.
+
+    Returns:
+        bool: Wether this transaction pays insanely high fees.
     """
     fee = totalInput - sum([op.value for op in tx.txOut])
     if fee <= 0:
