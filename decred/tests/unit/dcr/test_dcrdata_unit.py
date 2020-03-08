@@ -446,7 +446,7 @@ class TestDcrdataBlockchain:
         # txVout success
         assert ddb.txVout(self.txs[2][0], 0).satoshis == 14773017964
 
-        # self.txs[1][0] approveUTXO
+        # approveUTXO
         utxo = account.UTXO.parse(self.utxos[1])
         utxo.maturity = 2
         assert ddb.approveUTXO(utxo) is False
