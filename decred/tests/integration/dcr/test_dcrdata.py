@@ -39,7 +39,6 @@ class TestDcrdata(unittest.TestCase):
 
         client = self.client(emitter=emitter)
         client.subscribeAddresses("Dcur2mcGjmENx4DhNqDctW5wJCVyT3Qeqkx")
-        time.sleep(1)
         client.close()
 
     def test_get_block_header(self):

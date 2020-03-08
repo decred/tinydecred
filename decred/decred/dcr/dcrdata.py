@@ -9,18 +9,12 @@ DcrdataClient.endpointList() for available enpoints.
 import atexit
 import calendar
 import json
-import select
-import ssl
-import sys
-import threading
 import time
 from urllib.parse import urlencode, urlparse
 
-import websocket
-
 from decred import DecredError
 from decred.crypto import crypto
-from decred.util import database, tinyhttp
+from decred.util import database, tinyhttp, ws
 from decred.util.database import KeyValueDatabase
 from decred.util.encode import ByteArray
 from decred.util.helpers import formatTraceback, getLogger
@@ -38,6 +32,7 @@ POST_HEADERS = {
     "User-Agent": "tinydecred/%s" % VERSION,
     "Content-Type": "application/json; charset=utf-8",
 }
+WS_DONE = object()
 
 
 class DcrdataError(DecredError):
@@ -115,7 +110,7 @@ def getSocketURIs(uri):
 InsightPaths = [
     "/tx/send",
     "/insight/api/addr/{address}/utxo",
-    "/insight/api/addr/{address}/txs",
+    "/insight/api/addr/{address}",
     "insight/api/tx/send",
 ]
 
@@ -187,6 +182,7 @@ class DcrdataClient:
     def close(self):
         if self.ps:
             self.ps.close()
+            self.ps = None
 
     def endpointList(self):
         return [entry[1] for entry in self.listEntries]
@@ -200,10 +196,32 @@ class DcrdataClient:
 
     def psClient(self):
         if self.ps is None:
-            self.ps = WebsocketClient(
-                self.psURI, emitter=self.emitter, exitObject={"done": "done"}
+
+            def on_message(ws, msg):
+                try:
+                    msg = json.loads(msg)
+                    # Ignore pings. They are used as a connection probe and do
+                    # not require a response.
+                    if msg.get("event") == "ping":
+                        return
+                except json.JSONDecodeError:
+                    # If it's not JSON, let the caller handle the string.
+                    pass
+                self.emitter(msg)
+
+            def on_close(ws):
+                self.emitter(WS_DONE)
+
+            def on_error(ws, error):
+                log.error(f"pubsub error: {error}")
+
+            self.ps = ws.Client(
+                url=self.psURI,
+                on_message=on_message,
+                on_close=on_close,
+                on_error=on_error,
             )
-            self.ps.activate()
+
         return self.ps
 
     def subscribeAddresses(self, addrs):
@@ -240,146 +258,29 @@ _subcounter = 0
 def makeSubscription(eventID):
     global _subcounter
     _subcounter += 1
-    return {
-        "event": "subscribe",
-        "message": {"request_id": _subcounter, "message": eventID},
-    }
+    return json.dumps(
+        {
+            "event": "subscribe",
+            "message": {"request_id": _subcounter, "message": eventID},
+        }
+    )
 
 
 class Sub:
     newblock = makeSubscription("newblock")
     mempool = makeSubscription("mempool")
-    ping = makeSubscription("ping")
     newtxs = makeSubscription("newtxs")
     blockchainSync = makeSubscription("blockchainSync")
 
     def address(addr):
         global _subcounter
         _subcounter += 1
-        return {
-            "event": "subscribe",
-            "message": {"request_id": _subcounter, "message": "address:%s" % addr},
-        }
-
-
-class WebsocketClient:
-    """
-    A WebSocket client.
-    """
-
-    def __init__(self, path, emitter=None, exitObject=None, decoder=None, encoder=None):
-        """
-        See python `socketserver documentation
-        <https://docs.python.org/3/library/socketserver.html/>`_.
-        for inherited attributes and methods.
-
-        Parameters
-        ----------
-        path: string
-            URI for the websocket connection
-        decoder: func(str), default json.loads
-            A function for processing the string from the server
-
-        """
-        self.path = path
-        self.emitter = emitter
-        self.exitObject = exitObject
-        self.killerBool = False
-        self.earThread = None
-        self.handlinBidness = False
-        self.socket = None
-        self.decoder = decoder if decoder else json.loads
-        self.encoder = encoder if encoder else json.dumps
-
-    def activate(self):
-        """
-        Start the server and begin parsing messages
-        Returns:
-            bool: True on success.
-        """
-        self.socket = websocket.WebSocket(sslopt={"cert_reqs": ssl.CERT_NONE})
-        self.socket.connect(self.path)
-        self.earThread = threading.Thread(target=self.listenLoop)
-        self.earThread.start()
-        if not self.earThread.is_alive():
-            self.errMsg = "Failed to create a server thread"
-            return False
-        self.errMsg = ""
-        return True
-
-    def listenLoop(self):
-        """
-        This will listen on the socket, with appropriate looping impelemented with
-        select.select
-        """
-        stringBuffer = ""
-        self.handlinBidness = True
-        decoder = self.decoder
-        while True:
-            if self.killerBool:
-                break
-            while True:
-                if self.killerBool:
-                    break
-                try:
-                    status = select.select([self.socket], [], [], 1)
-                    sys.stdout.flush()
-                except OSError as e:
-                    if e.errno == 9:
-                        # OSError: [Errno 9] Bad file descriptor
-                        pass  # probably client closed socket
-                    break
-                if status[0]:
-                    try:
-                        stringBuffer += self.socket.recv()
-                    except ConnectionResetError:
-                        # ConnectionResetError: [Errno 104] Connection reset by peer
-                        break
-                    except UnicodeDecodeError as e:
-                        log.error(
-                            "Error decoding message from client. Msg: '%s', Error:  %s"
-                            % (stringBuffer, formatTraceback(e))
-                        )
-                        continue
-                    except websocket._exceptions.WebSocketConnectionClosedException:
-                        # Connection has been closed
-                        break
-                    except OSError as e:
-                        if e.errno == 9:
-                            # OSError: [Errno 9] Bad file descriptor
-                            pass  # socket was closed
-                        break
-                    if stringBuffer == "":  # server probably closed socket
-                        break
-                    else:
-                        try:
-                            job = decoder(stringBuffer)
-                            self.emitter(job)
-                            stringBuffer = ""
-                            continue
-                        except Exception as e:
-                            log.Error("error loading message: %s" % formatTraceback(e))
-                            continue
-        if self.exitObject:
-            self.emitter(self.exitObject)
-        self.handlinBidness = False
-
-    def send(self, msg):
-        if not self.socket:
-            log.error("no socket")
-            return
-        try:
-            self.socket.send(self.encoder(msg))
-        except Exception as e:
-            log.error("Error while sending websocket message: %s" % formatTraceback(e))
-
-    def close(self):
-        """
-        Attempts to shutdown the server gracefully.
-        """
-        self.killerBool = True
-        if self.socket:
-            self.socket.close()
+        return json.dumps(
+            {
+                "event": "subscribe",
+                "message": {"request_id": _subcounter, "message": "address:%s" % addr},
+            }
+        )
 
 
 class TicketPoolInfo:
@@ -624,7 +525,7 @@ class DcrdataBlockchain:
         Args:
             addrs (string): Base-58 encoded address
         """
-        addrInfo = self.dcrdata.insight.api.addr.txs(addr)
+        addrInfo = self.dcrdata.insight.api.addr(addr)
         if "transactions" not in addrInfo:
             return []
         return addrInfo["transactions"]
@@ -933,8 +834,8 @@ class DcrdataBlockchain:
         Arg:
             sig (obj or string): The block explorer's notification, decoded.
         """
-        # log.debug("pubsub signal received: %s" % repr(sig))
-        if "done" in sig:
+        # log.debug("pubsub signal recieved: %s" % repr(sig))
+        if sig == WS_DONE:
             return
         sigType = sig["event"]
         try:
