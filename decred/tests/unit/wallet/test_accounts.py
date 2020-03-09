@@ -1,22 +1,24 @@
 """
-Copyright (c) 2019, the Decred developers
+Copyright (c) 2019-2020, the Decred developers
 See LICENSE for details
 """
 
 import os
 from tempfile import TemporaryDirectory
 
+import pytest
+
+from decred import DecredError
 from decred.crypto import crypto, rando
 from decred.dcr import nets
-from decred.util import database
-from decred.util.encode import ByteArray
+from decred.util import database, encode
 from decred.wallet import accounts
 
 
 LOGGER_ID = "test_accounts"
 
 
-testSeed = ByteArray(
+testSeed = encode.ByteArray(
     "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 ).b
 
@@ -42,7 +44,7 @@ def test_change_addresses(prepareLogger):
     """
     Test internal branch address derivation.
     """
-    cryptoKey = crypto.ByteArray(rando.generateSeed(32))
+    cryptoKey = encode.ByteArray(rando.generateSeed(32))
     with TemporaryDirectory() as tempDir:
         db = database.KeyValueDatabase(os.path.join(tempDir, "tmp.db")).child("tmp")
         # ticker for coin type is ok. Case insensitive.
@@ -53,15 +55,26 @@ def test_change_addresses(prepareLogger):
 
 
 def test_account_manager(prepareLogger):
-    cryptoKey = crypto.ByteArray(rando.generateSeed(32))
+    cryptoKey = encode.ByteArray(rando.generateSeed(32))
     with TemporaryDirectory() as tempDir:
         db = database.KeyValueDatabase(os.path.join(tempDir, "tmp.db")).child("tmp")
         # 42 = Decred
         am = accounts.createNewAccountManager(tRoot, cryptoKey, 42, nets.mainnet, db)
 
         acct = am.openAccount(0, cryptoKey)
-        zeroth = acct.currentAddress()
+        tempAcct = am.addAccount(cryptoKey, "temp")
+        assert am.account(1) == tempAcct
+        assert am.listAccounts() == [acct, tempAcct]
+        am.accounts[3] = tempAcct
+        del am.accounts[1]
+        with pytest.raises(AssertionError):
+            am.listAccounts()
+        del am.accounts[3]
 
+        with pytest.raises(DecredError):
+            accounts.AccountManager.unblob(encode.BuildyBytes(0))
+
+        zeroth = acct.currentAddress()
         b = am.serialize()
         reAM = accounts.AccountManager.unblob(b.b)
 

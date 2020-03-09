@@ -1,6 +1,6 @@
 """
 Copyright (c) 2019, Brian Stafford
-Copyright (c) 2019, The Decred developers
+Copyright (c) 2019-2020, The Decred developers
 See LICENSE for details
 
 accounts module
@@ -12,15 +12,12 @@ from decred.crypto import crypto
 from decred.util import chains, encode, helpers
 
 
-ByteArray = encode.ByteArray
-BuildyBytes = encode.BuildyBytes
-
 EXTERNAL_BRANCH = 0
 INTERNAL_BRANCH = 1
 
 DEFAULT_ACCOUNT_NAME = "default"
 
-log = helpers.getLogger("TCRYP")  # , logLvl=0)
+log = helpers.getLogger("TCRYP")
 
 
 def checkBranchKeys(acctKey):
@@ -99,15 +96,13 @@ class AccountManager(object):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
         if ver != 0:
-            raise AssertionError("invalid AccountManager version %d" % ver)
+            raise NotImplementedError("unsupported AccountManager version %d" % ver)
         if len(d) != 4:
-            raise AssertionError(
-                "expected 4 pushes for AccountManager, got %d" % len(d)
-            )
+            raise DecredError("expected 4 pushes for AccountManager, got %d" % len(d))
 
         am = AccountManager(
             coinType=encode.intFromBytes(d[0]),
-            coinKeyEnc=ByteArray(d[1]),
+            coinKeyEnc=encode.ByteArray(d[1]),
             netName=d[2].decode("utf-8"),
         )
         am.watchingOnly = encode.boolFromBytes(d[3])
@@ -120,7 +115,7 @@ class AccountManager(object):
         Returns:
             ByteArray: The serialized AccountManager.
         """
-        return ByteArray(AccountManager.blob(self))
+        return encode.ByteArray(AccountManager.blob(self))
 
     def netParams(self):
         """
@@ -247,7 +242,7 @@ class AccountManager(object):
         return acct
 
 
-def createNewAccountManager(root, cryptoKey, coinType, chainParams, db):
+def createNewAccountManager(root, cryptoKey, coinType, netParams, db):
     """
     Create a new account manager and a set of BIP0044 keys for creating
     accounts. The zeroth account is created for the provided network parameters.
@@ -255,18 +250,18 @@ def createNewAccountManager(root, cryptoKey, coinType, chainParams, db):
     Args:
         root (crypto.ExtendedKey): The wallet key.
         cryptoKey (crypto.SecretKey): The master encryption key.
-        chainParams (object): Network parameters.
+        netParams (object): Network parameters.
 
     Returns:
         AccountManager: An initialized account manager.
     """
-    coinKey = root.deriveCoinTypeKey(chainParams)
+    coinKey = root.deriveCoinTypeKey(netParams)
     coinKeyEnc = crypto.encrypt(cryptoKey, coinKey.serialize())
 
     manager = AccountManager(
         coinType=chains.parseCoinType(coinType),
         coinKeyEnc=coinKeyEnc,
-        netName=chainParams.Name,
+        netName=netParams.Name,
         db=db,
     )
     manager.addAccount(cryptoKey, DEFAULT_ACCOUNT_NAME)
@@ -276,7 +271,7 @@ def createNewAccountManager(root, cryptoKey, coinType, chainParams, db):
 def createAccount(
     cryptoKey, coinExtKey, coinType, acct, netName, acctName, db, signals
 ):
-    # Create the zeroth account132
+    # Create the zeroth account.
     # Derive the account key for the first account according to BIP0044.
     acctKeyPriv = coinExtKey.deriveAccountKey(acct)
 
