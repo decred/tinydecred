@@ -46,25 +46,35 @@ def test_websocket():
     time.sleep(1)
 
     class test:
-        closed = False
+        was_opened = False
+        was_closed = False
+
+    def on_open(ws):
+        test.was_opened = True
 
     def on_message(ws, msg):
         clientQ.put(msg, timeout=1)
 
     def on_close(ws):
-        test.closed = True
+        test.was_closed = True
 
     def on_error(ws, error):
         errorQ.put(error, timeout=1)
 
     def client(url):
         return ws.Client(
-            url=url, on_message=on_message, on_close=on_close, on_error=on_error,
+            url=url,
+            on_open=on_open,
+            on_message=on_message,
+            on_close=on_close,
+            on_error=on_error,
         )
 
     try:
         # Send a hello and make sure it is received.
         cl = client(URL)
+        assert test.was_opened
+
         cl.send(HELLO)
         msg = serverQ.get(timeout=1)
         assert msg == HELLO
@@ -78,7 +88,7 @@ def test_websocket():
         serverQ.get(timeout=1)
 
         # Make sure the close callback was called.
-        assert test.closed
+        assert test.was_closed
 
         # Make sure a send fails.
         with pytest.raises(websocket.WebSocketConnectionClosedException):
