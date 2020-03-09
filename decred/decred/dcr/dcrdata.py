@@ -42,7 +42,7 @@ class DcrdataError(DecredError):
 class DcrdataPath:
     """
     DcrdataPath represents some point along a URL. It may just be a node that
-    is not an endpoint, or it may be an enpoint, in which case it's `get`
+    is not an endpoint, or it may be an endpoint, in which case its `get`
     method will be a valid api call. If it is a node of a longer URL,
     the following nodes are available as attributes. e.g. if this is node A
     along the URL base/A/B, then node B is available as client.A.B.
@@ -117,8 +117,8 @@ InsightPaths = [
 
 class DcrdataClient:
     """
-    DcrdataClient represents the base node. The only argument to the
-    constructor is the path to a DCRData server, e.g. http://explorer.dcrdata.org.
+    DcrdataClient represents the base node. The only argument to the constructor
+    is the path to a DCRData server, e.g. http://explorer.dcrdata.org.
     """
 
     timeFmt = "%Y-%m-%d %H:%M:%S"
@@ -351,9 +351,8 @@ def checkOutput(output, fee):
         output (TxOut): The output to check
         fee (float): The transaction fee rate (/kB).
 
-    Returns:
-        There is no return value. If an output is deemed invalid, DecredError
-        is raised.
+    Raises:
+        DecredError if an output is deemed invalid.
     """
     if output.value < 0:
         raise DecredError("transaction output amount is negative")

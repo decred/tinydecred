@@ -3,7 +3,7 @@ Copyright (c) 2020, the Decred developers
 See LICENSE for details
 """
 
-from decred.dcr import agenda
+from decred.dcr.agenda import Agenda, AgendaChoices, AgendaInfo, AgendasInfo
 
 
 AGENDA_INFO_RAW = dict(status="defined", since=1, starttime=2, expiretime=3,)
@@ -19,7 +19,7 @@ AGENDA_INFO_ATTRS = (
 
 def test_agenda_info():
     do_test(
-        agenda.AgendaInfo, AGENDA_INFO_RAW, AGENDA_INFO_PARSED, AGENDA_INFO_ATTRS,
+        AgendaInfo, AGENDA_INFO_RAW, AGENDA_INFO_PARSED, AGENDA_INFO_ATTRS,
     )
 
 
@@ -47,10 +47,7 @@ AGENDA_CHOICES_ATTRS = (
 
 def test_agenda_choices():
     do_test(
-        agenda.AgendaChoices,
-        AGENDA_CHOICES_RAW,
-        AGENDA_CHOICES_PARSED,
-        AGENDA_CHOICES_ATTRS,
+        AgendaChoices, AGENDA_CHOICES_RAW, AGENDA_CHOICES_PARSED, AGENDA_CHOICES_ATTRS,
     )
 
 
@@ -66,7 +63,7 @@ AGENDA_RAW = dict(
 )
 # Make a copy of the raw dict in order not to overwrite it.
 AGENDA_PARSED = dict(AGENDA_RAW)
-AGENDA_PARSED["choices"] = [agenda.AgendaChoices.parse(AGENDA_CHOICES_RAW)]
+AGENDA_PARSED["choices"] = [AgendaChoices.parse(AGENDA_CHOICES_RAW)]
 AGENDA_ATTRS = (
     "id",
     "description",
@@ -81,7 +78,7 @@ AGENDA_ATTRS = (
 
 def test_agenda():
     do_test(
-        agenda.Agenda, AGENDA_RAW, AGENDA_PARSED, AGENDA_ATTRS,
+        Agenda, AGENDA_RAW, AGENDA_PARSED, AGENDA_ATTRS,
     )
 
 
@@ -97,7 +94,7 @@ AGENDAS_INFO_RAW = {
 }
 # Make a copy of the raw dict in order not to overwrite it.
 AGENDAS_INFO_PARSED = dict(AGENDAS_INFO_RAW)
-AGENDAS_INFO_PARSED["agendas"] = [agenda.Agenda.parse(AGENDA_RAW)]
+AGENDAS_INFO_PARSED["agendas"] = [Agenda.parse(AGENDA_RAW)]
 AGENDAS_INFO_ATTRS = (
     "currentHeight",
     "startHeight",
@@ -112,7 +109,7 @@ AGENDAS_INFO_ATTRS = (
 
 def test_agendas_info():
     do_test(
-        agenda.AgendasInfo, AGENDAS_INFO_RAW, AGENDAS_INFO_PARSED, AGENDAS_INFO_ATTRS,
+        AgendasInfo, AGENDAS_INFO_RAW, AGENDAS_INFO_PARSED, AGENDAS_INFO_ATTRS,
     )
 
 
@@ -128,3 +125,17 @@ def do_test(class_, raw, parsed, attrs):
     obj = class_.parse(raw)
     for attr in attrs:
         assert getattr(obj, attr) == parsed[attr.lower()]
+
+
+def test_eq():
+    # AgendaChoices
+    choices = AgendaChoices.parse(AGENDA_CHOICES_RAW)
+    assert choices != object()
+    choices2 = AgendaChoices.parse(AGENDA_CHOICES_RAW)
+    assert choices == choices2
+
+    # Agenda
+    agenda = Agenda.parse(AGENDA_RAW)
+    assert agenda != object()
+    agenda2 = Agenda.parse(AGENDA_RAW)
+    assert agenda == agenda2

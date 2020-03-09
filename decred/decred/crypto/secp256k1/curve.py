@@ -383,8 +383,8 @@ class KoblitzCurve:
 
     def decompressPoint(self, x, ybit):
         """
-        decompressPoint decompresses a point on the given curve given the X point and
-        the solution to use.
+        decompressPoint decompresses a point on the given curve given
+        the X point and the solution to use.
         """
         # TODO(oga) This will probably only work for secp256k1 due to
         # optimizations.
@@ -400,7 +400,7 @@ class KoblitzCurve:
         if ybit == isEven(y):
             y = self.P - y
         if ybit == isEven(y):
-            raise DecredError("ybit doesn't match oddnes")
+            raise DecredError("ybit doesn't match oddness")
         return y
 
     def addJacobian(self, x1, y1, z1, x2, y2, z2, x3, y3, z3):  # *fieldVal) {

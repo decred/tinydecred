@@ -281,7 +281,7 @@ class ByteArray(object):
     def __setitem__(self, i, v):
         v = decodeBA(v, copy=False)
         if i + len(v) > len(self.b):
-            raise AssertionError("source bytes too long")
+            raise DecredError("source bytes too long")
         for j in range(len(v)):
             self.b[i + j] = v[j]
 
@@ -378,7 +378,7 @@ class BuildyBytes(ByteArray):
         lenBytes = intToBytes(len(d))
         bLen = len(lenBytes)
         if bLen > 2:
-            raise AssertionError("cannot push data longer than 65535")
+            raise DecredError("cannot push data longer than 65535")
         if bLen == 2:
             lBytes = bytearray((0xFF, lenBytes[0], lenBytes[1]))
         elif bLen == 1:

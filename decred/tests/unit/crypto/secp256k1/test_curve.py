@@ -1,5 +1,5 @@
 """
-Copyright (c) 2019, the Decred developers
+Copyright (c) 2019-2020, the Decred developers
 See LICENSE for details
 """
 
@@ -774,6 +774,11 @@ def test_public_keys():
                 0xa6, 0x85, 0x54, 0x19, 0x9c, 0x47, 0xd0, 0x8f, 0xfb,
                 0x10, 0xd4, 0xb8,
             )),
+            isValid=False,
+        ),
+        dict(
+            name="empty",
+            key=bytes(),
             isValid=False,
         ),
     ]
