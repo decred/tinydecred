@@ -2163,7 +2163,15 @@ def addInt(val):
 
 
 def addData(data):
-    dataLen = len(data)
+    """
+    Prefaces data with the correct opcode when adding it to the stack.
+
+    Args:
+        value (ByteArray): Data to add.
+    Returns:
+        ByteArray: The data preceded with the correct opcode.
+    """
+    dataLen = len(data) if data else 0
     b = ByteArray(b"")
 
     # When the data consists of a single number that can be represented
