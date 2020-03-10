@@ -1,6 +1,6 @@
 """
 Copyright (c) 2019, Brian Stafford
-Copyright (c) 2019, The Decred developers
+Copyright (c) 2019-2020, The Decred developers
 See LICENSE for details
 
 Constants and common routines from the dcrd wire package.
@@ -121,6 +121,10 @@ def writeVarInt(pver, val):
     """
     writeVarInt serializes val to w using a variable number of bytes depending
     on its value.
+
+    Args:
+        pver int: the protocol version.
+        val int: the value to be serialized.
     """
 
     if val < 0xFD:
@@ -141,7 +145,7 @@ def writeVarInt(pver, val):
     return b
 
 
-def writeVarBytes(pver, inBytes):  # w io.Writer, pver uint32, bytes []byte) error {
+def writeVarBytes(pver, inBytes):
     """
     writeVarBytes serializes a variable length byte array to w as a varInt
     containing the number of bytes, followed by the bytes themselves.
@@ -152,41 +156,36 @@ def writeVarBytes(pver, inBytes):  # w io.Writer, pver uint32, bytes []byte) err
     return b
 
 
-def readVarInt(b, pver):  # r io.Reader, pver uint32) (uint64, error) {
+def readVarInt(b, pver):
     """
-    readVarInt reads a variable length integer from r and returns it as a uint64.
+    readVarInt reads a variable length integer from b and returns it as an int.
+
+    Args:
+        b ByteArray: the encoded integer.
+        pver int: the protocol version (unused).
     """
+    data = {
+        0xFF: dict(
+            pop_bytes=8,
+            minRv=0x100000000,
+        ),
+        0xFE: dict(
+            pop_bytes=4,
+            minRv=0x10000,
+        ),
+        0xFD: dict(
+            pop_bytes=2,
+            minRv=0xFD,
+        ),
+    }
     discriminant = b.pop(1).int()
-    rv = 0
-    err_msg = "ReadVarInt noncanon error: {} - {} <= {}"
-    if discriminant == 0xFF:
-        rv = b.pop(8).unLittle().int()
-
-        # The encoding is not canonical if the value could have been
-        # encoded using fewer bytes.
-        minRv = 0x100000000
-        if rv < minRv:
-            raise DecredError(err_msg.format(rv, discriminant, minRv))
-
-    elif discriminant == 0xFE:
-        rv = b.pop(4).unLittle().int()
-
-        # The encoding is not canonical if the value could have been
-        # encoded using fewer bytes.
-        minRv = 0x10000
-        if rv < minRv:
-            raise DecredError(err_msg.format(rv, discriminant, minRv))
-
-    elif discriminant == 0xFD:
-        rv = b.pop(2).unLittle().int()
-
-        # The encoding is not canonical if the value could have been
-        # encoded using fewer bytes.
-        minRv = 0xFD
-        if rv < minRv:
-            raise DecredError(err_msg.format(rv, discriminant, minRv))
-
-    else:
-        rv = discriminant
-
+    if discriminant not in data.keys():
+        return discriminant
+    rv = b.pop(data[discriminant]["pop_bytes"]).unLittle().int()
+    # The encoding is not canonical if the value could have been
+    # encoded using fewer bytes.
+    minRv = data[discriminant]["minRv"]
+    if rv < minRv:
+        raise DecredError("ReadVarInt noncanon error: {} - {} <= {}".format(
+            rv, discriminant, minRv))
     return rv
