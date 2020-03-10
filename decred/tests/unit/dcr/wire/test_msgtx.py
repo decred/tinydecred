@@ -4,13 +4,15 @@ See LICENSE for details
 """
 
 import time
-import unittest
+
+import pytest
 
 from decred import DecredError
 from decred.crypto import rando
 from decred.dcr.wire import msgtx, wire
-from decred.util import helpers
 from decred.util.encode import ByteArray
+
+LOGGER_ID = "TestMsgTx"
 
 
 def newHash():
@@ -290,12 +292,8 @@ def multiTxEncoded():
 # fmt: off
 
 
-class TestMsgTx(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        helpers.prepareLogger("TestMsgTx")
-
-    def test_tx_serialize_size(self):
+class TestMsgTx:
+    def test_tx_serialize_size(self, prepareLogger):
         """
         test_tx_serialize_size performs tests to ensure the serialize size for
         various transactions is accurate.
@@ -312,9 +310,9 @@ class TestMsgTx(unittest.TestCase):
         ]
 
         for i, (txIn, size) in enumerate(tests):
-            self.assertEqual(txIn.serializeSize(), size)
+            assert txIn.serializeSize() == size
 
-    def test_tx_hash(self):
+    def test_tx_hash(self, prepareLogger):
         """
         test_tx_hash tests the ability to generate the hash of a transaction
         accurately.
@@ -361,11 +359,11 @@ class TestMsgTx(unittest.TestCase):
         msgTx.lockTime = 0
         msgTx.expiry = 0
         # Check that this is the very first tx in the chain.
-        self.assertTrue(msgTx.looksLikeCoinbase())
+        assert msgTx.looksLikeCoinbase()
         # Ensure the hash produced is expected.
-        self.assertEqual(msgTx.hash(), wantHash)
+        assert msgTx.hash() == wantHash
 
-    def test_tx_serialize_prefix(self):
+    def test_tx_serialize_prefix(self, prepareLogger):
         """
         test_tx_serialize_prefix tests MsgTx serialize and deserialize of
         prefix-only transactions.
@@ -406,27 +404,26 @@ class TestMsgTx(unittest.TestCase):
         for i, (inTx, out, testBuf, pkScriptLocs) in enumerate(tests):
             # Serialize the transaction.
             buf = inTx.serialize()
-            self.assertEqual(len(buf), inTx.serializeSize())
-            self.assertEqual(buf, testBuf)
+            assert len(buf) == inTx.serializeSize()
+            assert buf == testBuf
 
             # Deserialize the transaction.
             tx = msgtx.MsgTx.deserialize(testBuf.copy())
-
-            self.assertEqual(tx, out)
+            assert tx == out
 
             # Ensure the public key script locations are accurate.
             psl = inTx.pkScriptLocs()
 
             if pkScriptLocs is None:
-                self.assertEqual(psl, pkScriptLocs)
+                assert psl == pkScriptLocs
             else:
-                self.assertListEqual(psl, pkScriptLocs)
+                assert psl == pkScriptLocs
                 for j, loc in enumerate(psl):
                     wantPkScript = inTx.txOut[j].pkScript
                     gotPkScript = testBuf[loc : loc + len(wantPkScript)]
-                    self.assertEqual(gotPkScript, wantPkScript)
+                    assert gotPkScript == wantPkScript
 
-    def test_tx_serialize_witness(self):
+    def test_tx_serialize_witness(self, prepareLogger):
         """
         test_tx_serialize_witness tests MsgTx serialize and deserialize of
         witness-only transactions.
@@ -458,25 +455,25 @@ class TestMsgTx(unittest.TestCase):
         for i, (inTx, out, testBuf, pkScriptLocs) in enumerate(tests):
             # Serialize the transaction.
             buf = inTx.serialize()
-            self.assertEqual(len(buf), inTx.serializeSize())
-            self.assertEqual(buf, testBuf)
+            assert len(buf) == inTx.serializeSize()
+            assert buf == testBuf
 
             # Deserialize the transaction.
             tx = msgtx.MsgTx.deserialize(testBuf.copy())
-            self.assertEqual(tx, out)
+            assert tx == out
 
             # Ensure the public key script locations are accurate.
             psl = inTx.pkScriptLocs()
             if pkScriptLocs is None:
-                self.assertEqual(psl, pkScriptLocs)
+                assert psl == pkScriptLocs
             else:
-                self.assertListEqual(psl, pkScriptLocs)
+                assert psl == pkScriptLocs
                 for j, loc in enumerate(psl):
                     wantPkScript = inTx.TxIn[j].pkScript
                     gotPkScript = testBuf[loc : loc + len(wantPkScript)]
-                    self.assertEqual(gotPkScript, wantPkScript)
+                    assert gotPkScript == wantPkScript
 
-    def test_tx_serialize(self):
+    def test_tx_serialize(self, prepareLogger):
         """
         test_tx_serialize tests MsgTx serialize and deserialize.
         """
@@ -511,26 +508,25 @@ class TestMsgTx(unittest.TestCase):
         for i, (inTx, out, testBuf, pkScriptLocs) in enumerate(tests):
             # Serialize the transaction.
             buf = inTx.serialize()
-            self.assertEqual(len(buf), inTx.serializeSize(), msg="buflen %i" % i)
-            self.assertEqual(buf, testBuf, msg="buf contents %i" % i)
+            assert len(buf) == inTx.serializeSize(), f"buflen {i}"
+            assert buf == testBuf, f"buf contents {i}"
 
             # Deserialize the transaction.
             tx = msgtx.MsgTx.deserialize(testBuf.copy())
-
-            self.assertEqual(tx, out, msg="txs %i" % i)
+            assert tx == out, f"txs {i}"
 
             # Ensure the public key script locations are accurate.
             psl = inTx.pkScriptLocs()
             if pkScriptLocs is None:
-                self.assertEqual(psl, pkScriptLocs, msg="psl none %i" % i)
+                assert psl == pkScriptLocs, f"psl none {i}"
             else:
-                self.assertListEqual(psl, pkScriptLocs, msg="psl %i" % i)
+                assert psl == pkScriptLocs, f"psl {i}"
                 for j, loc in enumerate(psl):
                     wantPkScript = inTx.txOut[j].pkScript
                     gotPkScript = testBuf[loc : loc + len(wantPkScript)]
-                    self.assertEqual(gotPkScript, wantPkScript, msg="scripts %i" % i)
+                    assert gotPkScript == wantPkScript, f"scripts {i}"
 
-    def test_tx_overflow_errors(self):
+    def test_tx_overflow_errors(self, prepareLogger):
         """
         test_tx_overflow_errors performs tests to ensure deserializing
         transactions which are intentionally crafted to use large values for
@@ -628,12 +624,12 @@ class TestMsgTx(unittest.TestCase):
         ]
         # fmt: on
 
-        for i, buf in enumerate(tests):
+        for buf in tests:
             # Decode from wire format.
-            with self.assertRaises(DecredError, msg="test %i" % i):
+            with pytest.raises(DecredError):
                 msgtx.MsgTx.btcDecode(buf, pver)
 
-    def test_tx_serialize_errors(self):
+    def test_tx_serialize_errors(self, prepareLogger):
         """
         test_tx_serialize_errors performs negative tests against wire encode
         and decode of MsgTx to confirm error paths work correctly.
@@ -703,44 +699,40 @@ class TestMsgTx(unittest.TestCase):
         #           i, err, test.readErr)
         #       continue
 
-    def test_tx(self):
+    def test_tx(self, prepareLogger):
         """
         Substantially truncated compared to its counterpart in Go.
         """
         msg = msgtx.MsgTx.new()
 
         # Check the tx id.
-        self.assertEqual(
-            msg.id(), "bfc0e650ad0cc0dd5fa88b6bc84beb5ea4a675b4353671532796171ed319341b"
+        assert msg.id() == (
+            "bfc0e650ad0cc0dd5fa88b6bc84beb5ea4a675b4353671532796171ed319341b"
         )
 
         # Check the blob.
         # fmt: off
-        self.assertEqual(
-            msgtx.MsgTx.blob(msg),
-            ByteArray([
-                0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
-                0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
-            ]),
-        )
+        assert msgtx.MsgTx.blob(msg) == ByteArray([
+            0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+            0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+        ])
         # fmt: on
 
         # Ensure the command is expected value.
-        wantCmd = "tx"
-        self.assertEqual(msg.command(), wantCmd)
+        assert msg.command() == "tx"
 
         # Ensure max payload is expected value for latest protocol version.
         # Num addresses (varInt) + max allowed addresses.
         wantPayload = 1310720
         maxPayload = msg.maxPayloadLength(wire.ProtocolVersion)
-        self.assertEqual(maxPayload, wantPayload)
+        assert maxPayload == wantPayload
 
         # Ensure max payload is expected value for protocol version 3.
         wantPayload = 1000000
         maxPayload = msg.maxPayloadLength(3)
-        self.assertEqual(wantPayload, maxPayload)
+        assert wantPayload == maxPayload
 
-    def test_tx_from_hex(self):
+    def test_tx_from_hex(self, prepareLogger):
         tx = msgtx.MsgTx(
             cachedHash=None,
             serType=0,
@@ -767,61 +759,58 @@ class TestMsgTx(unittest.TestCase):
         b = tx.serialize()
         reTx = msgtx.MsgTx.unblob(b)
 
-        self.assertEqual(tx.serType, reTx.serType)
-        self.assertEqual(tx.version, reTx.version)
-        self.assertEqual(tx.lockTime, reTx.lockTime)
-        self.assertEqual(tx.expiry, reTx.expiry)
+        assert tx.serType == reTx.serType
+        assert tx.version == reTx.version
+        assert tx.lockTime == reTx.lockTime
+        assert tx.expiry == reTx.expiry
 
         for i, txIn in enumerate(tx.txIn):
             reTxIn = reTx.txIn[i]
-            self.assertEqual(txIn.previousOutPoint.hash, reTxIn.previousOutPoint.hash)
-            self.assertEqual(txIn.previousOutPoint.index, reTxIn.previousOutPoint.index)
-            self.assertEqual(txIn.previousOutPoint.tree, reTxIn.previousOutPoint.tree)
-            self.assertEqual(txIn.sequence, reTxIn.sequence)
-            self.assertEqual(txIn.valueIn, reTxIn.valueIn)
-            self.assertEqual(txIn.blockHeight, reTxIn.blockHeight)
-            self.assertEqual(txIn.blockIndex, reTxIn.blockIndex)
-            self.assertEqual(txIn.signatureScript, reTxIn.signatureScript)
+            assert txIn.previousOutPoint.hash == reTxIn.previousOutPoint.hash
+            assert txIn.previousOutPoint.index == reTxIn.previousOutPoint.index
+            assert txIn.previousOutPoint.tree == reTxIn.previousOutPoint.tree
+            assert txIn.sequence == reTxIn.sequence
+            assert txIn.valueIn == reTxIn.valueIn
+            assert txIn.blockHeight == reTxIn.blockHeight
+            assert txIn.blockIndex == reTxIn.blockIndex
+            assert txIn.signatureScript == reTxIn.signatureScript
 
         for i, txOut in enumerate(tx.txOut):
             reTxOut = reTx.txOut[i]
-            self.assertEqual(txOut.value, reTxOut.value)
-            self.assertEqual(txOut.version, reTxOut.version)
-            self.assertEqual(txOut.pkScript, reTxOut.pkScript)
+            assert txOut.value == reTxOut.value
+            assert txOut.version == reTxOut.version
+            assert txOut.pkScript == reTxOut.pkScript
 
-    def test_read_tx_in_prefix(self):
-        self.assertRaises(
-            DecredError,
-            msgtx.readTxInPrefix,
-            None,
-            None,
-            wire.TxSerializeOnlyWitness,
-            None,
-            None,
-        )
+    def test_read_tx_in_prefix(self, prepareLogger):
+        with pytest.raises(DecredError):
+            msgtx.readTxInPrefix(
+                None,
+                None,
+                wire.TxSerializeOnlyWitness,
+                None,
+                None,
+            )
 
-    def test_read_script(self):
-        self.assertRaises(
-            DecredError,
-            msgtx.readScript,
-            ByteArray([0xFC]),
-            wire.ProtocolVersion,
-            0,
-            "Field",
-        )
+    def test_read_script(self, prepareLogger):
+        with pytest.raises(DecredError):
+            msgtx.readScript(
+                ByteArray([0xFC]),
+                wire.ProtocolVersion,
+                0,
+                "Field",
+            )
 
-    def test_outpoint_txid(self):
+    def test_outpoint_txid(self, prepareLogger):
         outp = msgtx.OutPoint(txHash=None, idx=0, tree=0)
-        self.assertEqual(
-            outp.txid(),
-            "0000000000000000000000000000000000000000000000000000000000000000",
+        assert outp.txid() == (
+            "0000000000000000000000000000000000000000000000000000000000000000"
         )
 
-    def test_decodeWitness_errors(self):
+    def test_decodeWitness_errors(self, prepareLogger):
         tx = msgtx.MsgTx.new()
         # Too many input transactions.
-        with self.assertRaises(DecredError):
+        with pytest.raises(DecredError):
             tx.decodeWitness(ByteArray([0xFE, 0xFF, 0xFF, 0xFF]), 1, False)
         # Number of signature scripts different from number of TxIns.
-        with self.assertRaises(DecredError):
+        with pytest.raises(DecredError):
             tx.decodeWitness(ByteArray([0x01]), 1, True)

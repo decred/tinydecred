@@ -165,18 +165,9 @@ def readVarInt(b, pver):
         pver int: the protocol version (unused).
     """
     data = {
-        0xFF: dict(
-            pop_bytes=8,
-            minRv=0x100000000,
-        ),
-        0xFE: dict(
-            pop_bytes=4,
-            minRv=0x10000,
-        ),
-        0xFD: dict(
-            pop_bytes=2,
-            minRv=0xFD,
-        ),
+        0xFF: dict(pop_bytes=8, minRv=0x100000000,),
+        0xFE: dict(pop_bytes=4, minRv=0x10000,),
+        0xFD: dict(pop_bytes=2, minRv=0xFD,),
     }
     discriminant = b.pop(1).int()
     if discriminant not in data.keys():
@@ -186,6 +177,7 @@ def readVarInt(b, pver):
     # encoded using fewer bytes.
     minRv = data[discriminant]["minRv"]
     if rv < minRv:
-        raise DecredError("ReadVarInt noncanon error: {} - {} <= {}".format(
-            rv, discriminant, minRv))
+        raise DecredError(
+            "ReadVarInt noncanon error: {} - {} <= {}".format(rv, discriminant, minRv)
+        )
     return rv
