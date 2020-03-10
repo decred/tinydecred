@@ -3532,10 +3532,18 @@ def test_merge_scripts():
     ])
     # fmt: on
     tx = msgtx.MsgTx.deserialize(rawTx)
-    P2PKHsig = txscript.rawTxInSignature(tx, 0, P2PKH, txscript.SigHashAll, privKey1)
-    multisigSig1 = txscript.addData(txscript.rawTxInSignature(tx, 0, multisig, txscript.SigHashAll, privKey1))
-    multisigSig2 = txscript.addData(txscript.rawTxInSignature(tx, 0, multisig, txscript.SigHashAll, privKey2))
-    multisigSig3 = txscript.addData(txscript.rawTxInSignature(tx, 0, multisig, txscript.SigHashAll, privKey3))
+    P2PKHsig = txscript.addData(
+        txscript.rawTxInSignature(tx, 0, P2PKH, txscript.SigHashAll, privKey1)
+    )
+    multisigSig1 = txscript.addData(
+        txscript.rawTxInSignature(tx, 0, multisig, txscript.SigHashAll, privKey1)
+    )
+    multisigSig2 = txscript.addData(
+        txscript.rawTxInSignature(tx, 0, multisig, txscript.SigHashAll, privKey2)
+    )
+    multisigSig3 = txscript.addData(
+        txscript.rawTxInSignature(tx, 0, multisig, txscript.SigHashAll, privKey3)
+    )
     emptySig1x = ByteArray(opcode.OP_0)
     emptySig2x = ByteArray(*([opcode.OP_0] * 2))
 
