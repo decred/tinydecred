@@ -2895,7 +2895,9 @@ class TestTxScript(unittest.TestCase):
             for av, bv in zip(a, b):
                 assert (
                     av.scriptAddress() == bv.scriptAddress()
-                ), f"scriptAddress mismatch. expected {av.scriptAddress().hex()}, got {bv.scriptAddress().hex()} for test {name}"
+                ), "scriptAddress mismatch. expected {}, got {} for test {}".format(
+                    av.scriptAddress().hex(), bv.scriptAddress().hex(), name
+                )
 
         for test in tests:
             if "exception" in test:
@@ -3479,4 +3481,4 @@ def test_is_dust_amount():
         res = txscript.isDustAmount(test["value"], size, test["relayFee"])
         assert (
             res == test["want"]
-        ), 'wanted {test["want"]} but got {test["got"]} for test {test["name"]}'
+        ), f'wanted {test["want"]} but got {res} for test {test["name"]}'
