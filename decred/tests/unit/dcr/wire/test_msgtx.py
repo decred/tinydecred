@@ -816,3 +816,12 @@ class TestMsgTx(unittest.TestCase):
             outp.txid(),
             "0000000000000000000000000000000000000000000000000000000000000000",
         )
+
+    def test_decodeWitness_errors(self):
+        tx = msgtx.MsgTx.new()
+        # Too many input transactions.
+        with self.assertRaises(DecredError):
+            tx.decodeWitness(ByteArray([0xFE, 0xFF, 0xFF, 0xFF]), 1, False)
+        # Number of signature scripts different from number of TxIns.
+        with self.assertRaises(DecredError):
+            tx.decodeWitness(ByteArray([0x01]), 1, True)
