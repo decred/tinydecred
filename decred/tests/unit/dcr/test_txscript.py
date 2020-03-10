@@ -3489,24 +3489,32 @@ def test_merge_scripts():
     privKey1 = root.child(0).privateKey().key
     privKey2 = root.child(1).privateKey().key
     privKey3 = root.child(2).privateKey().key
-    pub1 = crypto.AddressSecpPubKey(root.child(0).publicKey().serializeCompressed(), testnet)
-    pub2 = crypto.AddressSecpPubKey(root.child(1).publicKey().serializeCompressed(), testnet)
-    pub3 = crypto.AddressSecpPubKey(root.child(2).publicKey().serializeCompressed(), testnet)
-    pub4 = crypto.AddressSecpPubKey(root.child(3).publicKey().serializeCompressed(), testnet)
+    pub1 = crypto.AddressSecpPubKey(
+        root.child(0).publicKey().serializeCompressed(), testnet
+    )
+    pub2 = crypto.AddressSecpPubKey(
+        root.child(1).publicKey().serializeCompressed(), testnet
+    )
+    pub3 = crypto.AddressSecpPubKey(
+        root.child(2).publicKey().serializeCompressed(), testnet
+    )
+    pub4 = crypto.AddressSecpPubKey(
+        root.child(3).publicKey().serializeCompressed(), testnet
+    )
     # P2PKH is a valid pay to public key hash script.
     P2PKH = parseShortForm("DUP HASH160 DATA_20 NULL_BYTES_20 EQUALVERIFY CHECKSIG")
     # 3 of 4 multisig
-    multisig = parseShortForm("3 DATA_33 0x{} DATA_33 0x{} DATA_33 0x{} DATA_33 0x{} 4 CHECKMULTISIG"
-                              .format(pub1.serialize().hex(), pub2.serialize().hex(),
-                                      pub3.serialize().hex(), pub4.serialize().hex()))
+    multisig = parseShortForm(
+        "3 DATA_33 0x{} DATA_33 0x{} DATA_33 0x{} DATA_33 0x{} 4 CHECKMULTISIG".format(
+            pub1.serialize().hex(),
+            pub2.serialize().hex(),
+            pub3.serialize().hex(),
+            pub4.serialize().hex(),
+        )
+    )
     multisigHash = crypto.hash160(multisig.bytes())
     multisigP2SH = ByteArray(
-        [
-            opcode.OP_HASH160,
-            opcode.OP_DATA_20,
-            *multisigHash,
-            opcode.OP_EQUAL,
-        ]
+        [opcode.OP_HASH160, opcode.OP_DATA_20, *multisigHash, opcode.OP_EQUAL,]
     )
     # fmt: off
     rawTx = ByteArray([
@@ -3559,73 +3567,105 @@ def test_merge_scripts():
     prevScript (ByteArray): The previous script.
     want (ByteArray): Merged script.
     """
-    tests = [dict(
-        name="pay to public key hash",
-        pkScript=P2PKH,
-        scriptClass=txscript.PubKeyHashTy,
-        sigScript=P2PKHsig,
-        want=P2PKHsig,
-    ), dict(
-        name="pay to public key hash prevScript longer",
-        pkScript=P2PKH,
-        scriptClass=txscript.PubKeyHashTy,
-        sigScript=P2PKHsig,
-        prevScript=P2PKHsig + emptySig1x,
-        want=P2PKHsig + emptySig1x,
-    ), dict(
-        name="3 of 4 multisig one signature",
-        tx=tx,
-        pkScript=multisig,
-        addresses=[pub1],
-        nRequired=3,
-        scriptClass=txscript.MultiSigTy,
-        sigScript=multisigSig1 + emptySig2x,
-        want=multisigSig1 + emptySig2x,
-    ), dict(
-        name="3 of 4 multisig two signatures",
-        tx=tx,
-        pkScript=multisig,
-        addresses=[pub1, pub2],
-        nRequired=3,
-        scriptClass=txscript.MultiSigTy,
-        sigScript=multisigSig1 + multisigSig2 + emptySig1x,
-        want=multisigSig1 + multisigSig2 + emptySig1x,
-    ), dict(
-        name="3 of 4 multisig merging two signatures",
-        tx=tx,
-        idx=0,
-        pkScript=multisig,
-        addresses=[pub1, pub2],
-        nRequired=3,
-        scriptClass=txscript.MultiSigTy,
-        sigScript=multisigSig2 + emptySig2x,
-        prevScript=multisigSig1 + emptySig2x,
-        want=multisigSig1 + multisigSig2 + emptySig1x,
-    ), dict(
-        name="3 of 4 multisig pay to script hash",
-        tx=tx,
-        idx=0,
-        pkScript=multisigP2SH,
-        addresses=[pub1],
-        nRequired=3,
-        scriptClass=txscript.ScriptHashTy,
-        sigScript=multisigSig1 + emptySig2x + txscript.addData(multisig),
-        want=multisigSig1 + emptySig2x + txscript.addData(multisig),
-    ), dict(
-        name="3 of 4 multisig pay to script hash merging three signatures",
-        tx=tx,
-        idx=0,
-        pkScript=multisigP2SH,
-        addresses=[pub3, pub2, pub1],
-        nRequired=3,
-        scriptClass=txscript.ScriptHashTy,
-        sigScript=multisigSig2 + emptySig2x + txscript.addData(multisig),
-        prevScript=multisigSig1 + multisigSig3 + emptySig1x + txscript.addData(multisig),
-        want=multisigSig1 + multisigSig2 + multisigSig3 + txscript.addData(multisig),
-    )]
+    tests = [
+        dict(
+            name="pay to public key hash no prevSCript",
+            pkScript=P2PKH,
+            scriptClass=txscript.PubKeyHashTy,
+            sigScript=P2PKHsig,
+            want=P2PKHsig,
+        ),
+        dict(
+            name="pay to public key hash sigScript longer",
+            pkScript=P2PKH,
+            scriptClass=txscript.PubKeyHashTy,
+            sigScript=P2PKHsig + emptySig1x,
+            prevScript=P2PKHsig,
+            want=P2PKHsig + emptySig1x,
+        ),
+        dict(
+            name="pay to public key hash sigScript and prevScript same size",
+            pkScript=P2PKH,
+            scriptClass=txscript.PubKeyHashTy,
+            sigScript=bytes(len(P2PKHsig)),
+            prevScript=P2PKHsig,
+            want=P2PKHsig,
+        ),
+        dict(
+            name="3 of 4 multisig one signature",
+            tx=tx,
+            pkScript=multisig,
+            addresses=[pub1],
+            nRequired=3,
+            scriptClass=txscript.MultiSigTy,
+            sigScript=multisigSig1 + emptySig2x,
+            want=multisigSig1 + emptySig2x,
+        ),
+        dict(
+            name="3 of 4 multisig two signatures",
+            tx=tx,
+            pkScript=multisig,
+            addresses=[pub1, pub2],
+            nRequired=3,
+            scriptClass=txscript.MultiSigTy,
+            sigScript=multisigSig1 + multisigSig2 + emptySig1x,
+            want=multisigSig1 + multisigSig2 + emptySig1x,
+        ),
+        dict(
+            name="3 of 4 multisig merging two signatures",
+            tx=tx,
+            idx=0,
+            pkScript=multisig,
+            addresses=[pub1, pub2],
+            nRequired=3,
+            scriptClass=txscript.MultiSigTy,
+            sigScript=multisigSig2 + emptySig2x,
+            prevScript=multisigSig1 + emptySig2x,
+            want=multisigSig1 + multisigSig2 + emptySig1x,
+        ),
+        dict(
+            name="3 of 4 multisig pay to script hash",
+            tx=tx,
+            idx=0,
+            pkScript=multisigP2SH,
+            addresses=[pub1],
+            nRequired=3,
+            scriptClass=txscript.ScriptHashTy,
+            sigScript=multisigSig1 + emptySig2x + txscript.addData(multisig),
+            want=multisigSig1 + emptySig2x + txscript.addData(multisig),
+        ),
+        dict(
+            name="3 of 4 multisig pay to script hash merging three signatures",
+            tx=tx,
+            idx=0,
+            pkScript=multisigP2SH,
+            addresses=[pub3, pub2, pub1],
+            nRequired=3,
+            scriptClass=txscript.ScriptHashTy,
+            sigScript=multisigSig2 + emptySig2x + txscript.addData(multisig),
+            prevScript=multisigSig1
+            + multisigSig3
+            + emptySig1x
+            + txscript.addData(multisig),
+            want=multisigSig1
+            + multisigSig2
+            + multisigSig3
+            + txscript.addData(multisig),
+        ),
+    ]
 
     for test in tests:
-        res = txscript.mergeScripts(testnet, test.get("tx"), test.get("idx"), test.get("pkScript"), test.get("scriptClass"), test.get("addresses"), test.get("nRequired"), test.get("sigScript"), test.get("prevScript"))
+        res = txscript.mergeScripts(
+            testnet,
+            test.get("tx"),
+            test.get("idx"),
+            test.get("pkScript"),
+            test.get("scriptClass"),
+            test.get("addresses"),
+            test.get("nRequired"),
+            test.get("sigScript"),
+            test.get("prevScript"),
+        )
         assert (
             res == test["want"]
         ), f'wanted {test["want"].hex()} but got {res.hex()} for test {test["name"]}'
