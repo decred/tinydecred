@@ -3742,3 +3742,39 @@ def test_pays_high_fees():
         assert (
             res == test["want"]
         ), f'wanted {test["want"]} but got {res} for test {test["name"]}'
+
+
+def test_is_dust_output():
+    """
+    name (str): Short description of the test.
+    output (wire.TxOut): The transaction output.
+    relayFeePerKb (int): Minimum transaction fee allowable.
+    want (bool): True if output is a dust output.
+    """
+
+    def txOut(script, value):
+        return msgtx.TxOut(
+            version=wire.DefaultPkScriptVersion, pkScript=script, value=value
+        )
+
+    nullDataScript = parseShortForm("RETURN")
+    P2PKH = parseShortForm("DUP HASH160 DATA_20 NULL_BYTES_20 EQUALVERIFY CHECKSIG")
+    tests = [
+        dict(name="not dust", output=txOut(P2PKH, 1e8), want=False,),
+        dict(name="zero amount", output=txOut(P2PKH, 0), want=True,),
+        dict(name="script length zero", output=txOut(ByteArray(b""), 0), want=True,),
+        dict(
+            name="starts with op return",
+            output=txOut(ByteArray(opcode.OP_RETURN) + P2PKH, 1e8),
+            want=True,
+        ),
+        dict(name="script doesn't parse", output=txOut(P2PKH[:-3], 1e8), want=True,),
+        dict(name="null data script", output=txOut(nullDataScript, 0), want=False,),
+    ]
+
+    for test in tests:
+        # No fee for all tests. Fee amounts are tested in test_is_dust_amount.
+        res = txscript.isDustOutput(test["output"], 0)
+        assert (
+            res == test["want"]
+        ), f'wanted {test["want"]} but got {res} for test {test["name"]}'
