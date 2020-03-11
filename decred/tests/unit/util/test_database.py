@@ -1,11 +1,9 @@
 """
-Copyright (c) 2019, the Decred developers
+Copyright (c) 2019-2020, the Decred developers
 See LICENSE for details
 """
 
-import os.path
 import random
-from tempfile import TemporaryDirectory
 
 import pytest
 
@@ -34,62 +32,60 @@ class TBlobber:
         return self.b == other.b
 
 
-def test_database(prepareLogger, randBytes):
-    with TemporaryDirectory() as tempDir:
+def test_database(prepareLogger, randBytes, tmpdir):
+    # Open a key value db in the temp directory.
+    master = database.KeyValueDatabase(tmpdir.join("tmp.sqlite"))
 
-        # Open a key value db in the temp directory.
-        master = database.KeyValueDatabase(os.path.join(tempDir, "tmp.sqlite"))
+    # '$' in bucket name is illegal.
+    with pytest.raises(DecredError):
+        master.child("a$b")
 
-        # '$' in bucket name is illegal.
+    try:
+        db = master.child("test")
+
+        # Again, '$' in bucket name is illegal.
         with pytest.raises(DecredError):
-            master.child("a$b")
+            db.child("c$d")
 
-        try:
-            db = master.child("test")
+        # Create some test data.
+        random.seed(0)
+        testPairs = [(randBytes(low=1), randBytes()) for _ in range(20)]
+        runPairs(db, testPairs)
 
-            # Again, '$' in bucket name is illegal.
-            with pytest.raises(DecredError):
-                db.child("c$d")
+        # check integer keys and child naming scheme
+        intdb = db.child("inttest", datatypes=("INTEGER", "BLOB"))
+        assert intdb.name == "test$inttest"
+        intdb[5] = b"asdf"
+        assert intdb[5] == b"asdf"
 
-            # Create some test data.
-            random.seed(0)
-            testPairs = [(randBytes(low=1), randBytes()) for _ in range(20)]
-            runPairs(db, testPairs)
+        # check uniqueness of keys:
+        k = testPairs[0][0]
+        db[k] = b"some new bytes"
+        assert len([key for key in db if key == k]) == 1
 
-            # check integer keys and child naming scheme
-            intdb = db.child("inttest", datatypes=("INTEGER", "BLOB"))
-            assert intdb.name == "test$inttest"
-            intdb[5] = b"asdf"
-            assert intdb[5] == b"asdf"
+        # test a serializable object
+        randBlobber = lambda: TBlobber(ByteArray(randBytes()))
+        objDB = master.child("blobber", blobber=TBlobber, unique=False)
+        testPairs = [(randBytes(low=1), randBlobber()) for _ in range(20)]
+        runPairs(objDB, testPairs)
 
-            # check uniqueness of keys:
-            k = testPairs[0][0]
-            db[k] = b"some new bytes"
-            assert len([key for key in db if key == k]) == 1
+        # non-uniqueness of keys
+        k = testPairs[0][0]
+        objDB[k] = randBlobber()
+        assert len([key for key in objDB if key == k]) == 2
 
-            # test a serializable object
-            randBlobber = lambda: TBlobber(ByteArray(randBytes()))
-            objDB = master.child("blobber", blobber=TBlobber, unique=False)
-            testPairs = [(randBytes(low=1), randBlobber()) for _ in range(20)]
-            runPairs(objDB, testPairs)
+        # test a second-level child
+        kidDB = db.child("kid")
+        testPairs = [(randBytes(low=1), randBytes()) for _ in range(20)]
+        runPairs(kidDB, testPairs)
 
-            # non-uniqueness of keys
-            k = testPairs[0][0]
-            objDB[k] = randBlobber()
-            assert len([key for key in objDB if key == k]) == 2
+        # uniqueness of table keys
+        k = testPairs[0][0]
+        kidDB[k] = b"some new bytes"
+        assert len([key for key in kidDB if key == k]) == 1
 
-            # test a second-level child
-            kidDB = db.child("kid")
-            testPairs = [(randBytes(low=1), randBytes()) for _ in range(20)]
-            runPairs(kidDB, testPairs)
-
-            # uniqueness of table keys
-            k = testPairs[0][0]
-            kidDB[k] = b"some new bytes"
-            assert len([key for key in kidDB if key == k]) == 1
-
-        finally:
-            master.close()
+    finally:
+        master.close()
 
 
 def runPairs(db, testPairs):
