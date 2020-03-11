@@ -2148,7 +2148,14 @@ def putVarInt(val):
 
 def addInt(val):
     """
-    addInt pushes the passed integer to the end of the script.
+    addInt returns the passed integer in a form that can be pushed to the end
+    of a script.
+
+    Args:
+        val (int): The integer to format.
+
+    Returns:
+        ByteArray: The formatted integer.
     """
     b = ByteArray(b"")
 

@@ -3910,3 +3910,57 @@ def test_add_data():
         assert (
             res == test["want"]
         ), f'wanted {test["want"].hex()} but got {res.hex()} for test {test["name"]}'
+
+
+def test_add_int():
+    psf = parseShortForm
+    """
+    name (str): Short description of the test.
+    val (int): Number to add.
+    want (ByteArray): The value's expected representation.
+    """
+    tests = [
+        dict(name="push -1", val=-1, want=psf("1NEGATE")),
+        dict(name="push small int 0", val=0, want=psf("0")),
+        dict(name="push small int 1", val=1, want=psf("1")),
+        dict(name="push small int 2", val=2, want=psf("2")),
+        dict(name="push small int 3", val=3, want=psf("3")),
+        dict(name="push small int 4", val=4, want=psf("4")),
+        dict(name="push small int 5", val=5, want=psf("5")),
+        dict(name="push small int 6", val=6, want=psf("6")),
+        dict(name="push small int 7", val=7, want=psf("7")),
+        dict(name="push small int 8", val=8, want=psf("8")),
+        dict(name="push small int 9", val=9, want=psf("9")),
+        dict(name="push small int 10", val=10, want=psf("10")),
+        dict(name="push small int 11", val=11, want=psf("11")),
+        dict(name="push small int 12", val=12, want=psf("12")),
+        dict(name="push small int 13", val=13, want=psf("13")),
+        dict(name="push small int 14", val=14, want=psf("14")),
+        dict(name="push small int 15", val=15, want=psf("15")),
+        dict(name="push small int 16", val=16, want=psf("16")),
+        dict(name="push 17", val=17, want=psf("DATA_1 0x11")),
+        dict(name="push 65", val=65, want=psf("DATA_1 0x41")),
+        dict(name="push 127", val=127, want=psf("DATA_1 0x7f")),
+        dict(name="push 128", val=128, want=psf("DATA_2 0x80 0")),
+        dict(name="push 255", val=255, want=psf("DATA_2 0xff 0")),
+        dict(name="push 256", val=256, want=psf("DATA_2 0 0x01")),
+        dict(name="push 32767", val=32767, want=psf("DATA_2 0xff 0x7f")),
+        dict(name="push 32768", val=32768, want=psf("DATA_3 0 0x80 0")),
+        dict(name="push -2", val=-2, want=psf("DATA_1 0x82")),
+        dict(name="push -3", val=-3, want=psf("DATA_1 0x83")),
+        dict(name="push -4", val=-4, want=psf("DATA_1 0x84")),
+        dict(name="push -5", val=-5, want=psf("DATA_1 0x85")),
+        dict(name="push -17", val=-17, want=psf("DATA_1 0x91")),
+        dict(name="push -65", val=-65, want=psf("DATA_1 0xc1")),
+        dict(name="push -127", val=-127, want=psf("DATA_1 0xff")),
+        dict(name="push -128", val=-128, want=psf("DATA_2 0x80 0x80")),
+        dict(name="push -255", val=-255, want=psf("DATA_2 0xff 0x80")),
+        dict(name="push -256", val=-256, want=psf("DATA_2 0x00 0x81")),
+        dict(name="push -32767", val=-32767, want=psf("DATA_2 0xff 0xff")),
+        dict(name="push -32768", val=-32768, want=psf("DATA_3 0x00 0x80 0x80")),
+    ]
+    for test in tests:
+        res = txscript.addInt(test["val"])
+        assert (
+            res == test["want"]
+        ), f'wanted {test["want"]} but got {res} for test {test["name"]}'
