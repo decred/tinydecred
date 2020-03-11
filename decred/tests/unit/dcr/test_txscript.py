@@ -3964,3 +3964,29 @@ def test_add_int():
         assert (
             res == test["want"]
         ), f'wanted {test["want"]} but got {res} for test {test["name"]}'
+
+
+def test_put_var_int():
+    psf = parseShortForm
+    """
+    name (str): Short description of the test.
+    val (int): Number to add.
+    want (ByteArray): The value's expected representation.
+    """
+    tests = [
+        dict(name="Single byte", val=0, want=psf("0x00")),
+        dict(name="Max single", val=0xFC, want=psf("0xfc")),
+        dict(name="Min 3-byte", val=0xFD, want=psf("0xfdfd00")),
+        dict(name="Max 3-byte", val=0xFFFF, want=psf("0xfdffff")),
+        dict(name="Min 5-byte", val=0x10000, want=psf("0xfe00000100")),
+        dict(name="Max 5-byte", val=0xFFFFFFFF, want=psf("0xfeffffffff")),
+        dict(name="Min 9-byte", val=0x100000000, want=psf("0xff0000000001000000")),
+        dict(
+            name="Max 9-byte", val=0xFFFFFFFFFFFFFFFF, want=psf("0xffffffffffffffffff")
+        ),
+    ]
+    for test in tests:
+        res = txscript.putVarInt(test["val"])
+        assert (
+            res == test["want"]
+        ), f'wanted {test["want"].hex()} but got {res.hex()} for test {test["name"]}'

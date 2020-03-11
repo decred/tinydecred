@@ -2124,9 +2124,7 @@ def putVarInt(val):
     """
     putVarInt serializes the provided number to a variable-length integer and
     according to the format described above returns the number of bytes of the
-    encoded value.  The result is placed directly into the passed byte slice
-    which must be at least large enough to handle the number of bytes returned by
-    the varIntSerializeSize function or it will panic.
+    encoded value.
     """
     if val < 0xFD:
         return ByteArray(val, length=1)
