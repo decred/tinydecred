@@ -1,6 +1,6 @@
 """
 Copyright (c) 2019, Brian Stafford
-Copyright (c) 2019, The Decred developers
+Copyright (c) 2019-2020, The Decred developers
 See LICENSE for details
 
 Based on dcrd MsgTx.
@@ -713,6 +713,11 @@ class MsgTx:
     def decodeWitness(self, b, pver, isFull):
         """
         Witness only; generate the TxIn list and fill out only the sigScripts.
+
+        Args:
+            b ByteArray: the encoded witnesses.
+            pver int: the protocol version.
+            isFull book: whether this is a full transaction.
         """
         totalScriptSize = 0
         count = wire.readVarInt(b, pver)
@@ -753,9 +758,9 @@ class MsgTx:
     @staticmethod
     def btcDecode(b, pver):
         """
-        BtcDecode decodes r using the Decred protocol encoding into the receiver.
-        This is part of the Message interface implementation.
-        See Deserialize for decoding transactions stored to disk, such as in a
+        btcDecode decodes r using the Decred protocol encoding into the
+        receiver. This is part of the Message interface implementation.
+        See deserialize for decoding transactions stored to disk, such as in a
         database, as opposed to decoding transactions from the wire.
         """
         # The serialized encoding of the version includes the real transaction
@@ -862,275 +867,3 @@ class MsgTx:
         return len(self.txOut) > 0 and txscript.isStakeSubmissionScript(
             0, self.txOut[0].pkScript
         )
-
-
-# fmt: off
-
-
-def multiTxPrefix():
-    """
-    multiTxPrefix is a MsgTx prefix with an input and output and used in various tests.
-    """
-    return MsgTx(
-        cachedHash=None,
-        serType=wire.TxSerializeNoWitness,
-        version=1,
-        txIn=[
-            TxIn(
-                previousOutPoint=OutPoint(
-                    txHash=None,
-                    idx=0xFFFFFFFF,
-                    tree=TxTreeRegular,
-                ),
-                sequence=0xFFFFFFFF,
-            ),
-        ],
-        txOut=[
-            TxOut(
-                value=0x12A05F200,
-                version=0xABAB,
-                pkScript=ByteArray([
-                    0x41, # OP_DATA_65
-                    0X04, 0XD6, 0X4B, 0XDF, 0XD0, 0X9E, 0XB1, 0XC5,
-                    0XFE, 0X29, 0X5A, 0XBD, 0XEB, 0X1D, 0XCA, 0X42,
-                    0X81, 0XBE, 0X98, 0X8E, 0X2D, 0XA0, 0XB6, 0XC1,
-                    0XC6, 0XA5, 0X9D, 0XC2, 0X26, 0XC2, 0X86, 0X24,
-                    0XE1, 0X81, 0X75, 0XE8, 0X51, 0XC9, 0X6B, 0X97,
-                    0X3D, 0X81, 0XB0, 0X1C, 0XC3, 0X1F, 0X04, 0X78,
-                    0X34, 0XBC, 0X06, 0XD6, 0XD6, 0XED, 0XF6, 0X20,
-                    0XD1, 0X84, 0X24, 0X1A, 0X6A, 0XED, 0X8B, 0X63,
-                    0xA6, # 65-byte signature
-                    0xAC, # OP_CHECKSIG
-                ]),
-            ),
-            TxOut(
-                value=0x5F5E100,
-                version=0xBCBC,
-                pkScript=ByteArray([
-                    0x41, # OP_DATA_65
-                    0X04, 0XD6, 0X4B, 0XDF, 0XD0, 0X9E, 0XB1, 0XC5,
-                    0XFE, 0X29, 0X5A, 0XBD, 0XEB, 0X1D, 0XCA, 0X42,
-                    0X81, 0XBE, 0X98, 0X8E, 0X2D, 0XA0, 0XB6, 0XC1,
-                    0XC6, 0XA5, 0X9D, 0XC2, 0X26, 0XC2, 0X86, 0X24,
-                    0XE1, 0X81, 0X75, 0XE8, 0X51, 0XC9, 0X6B, 0X97,
-                    0X3D, 0X81, 0XB0, 0X1C, 0XC3, 0X1F, 0X04, 0X78,
-                    0X34, 0XBC, 0X06, 0XD6, 0XD6, 0XED, 0XF6, 0X20,
-                    0XD1, 0X84, 0X24, 0X1A, 0X6A, 0XED, 0X8B, 0X63,
-                    0xA6, # 65-byte signature
-                    0xAC, # OP_CHECKSIG
-                ]),
-            ),
-        ],
-        lockTime=0,
-        expiry=0,
-    )
-
-
-def multiTxPrefixEncoded():
-    """
-    multiTxPrefixEncoded is the wire encoded bytes for multiTx using protocol
-    version 1 and is used in the various tests.
-    """
-    return ByteArray([
-        0x01, 0x00, 0x01, 0x00, # Version [0]
-        0x01,                           # Varint for number of input transactions [4]
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, # [5]
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, # Previous output hash
-        0XFF, 0XFF, 0XFF, 0XFF,         # Previous output index [37]
-        0x00,                           # Previous output tree [41]
-        0XFF, 0XFF, 0XFF, 0XFF,         # Sequence [43]
-        0x02,                           # Varint for number of output transactions [47]
-        0x00, 0xF2, 0x05, 0x2A, 0x01, 0x00, 0x00, 0x00, # Transaction amount [48]
-        0xAB, 0xAB,                     # Script version
-        0x43,                           # Varint for length of pk script [56]
-        0x41,                           # OP_DATA_65 [57]
-        0X04, 0XD6, 0X4B, 0XDF, 0XD0, 0X9E, 0XB1, 0XC5,
-        0XFE, 0X29, 0X5A, 0XBD, 0XEB, 0X1D, 0XCA, 0X42,
-        0X81, 0XBE, 0X98, 0X8E, 0X2D, 0XA0, 0XB6, 0XC1,
-        0XC6, 0XA5, 0X9D, 0XC2, 0X26, 0XC2, 0X86, 0X24,
-        0XE1, 0X81, 0X75, 0XE8, 0X51, 0XC9, 0X6B, 0X97,
-        0X3D, 0X81, 0XB0, 0X1C, 0XC3, 0X1F, 0X04, 0X78,
-        0X34, 0XBC, 0X06, 0XD6, 0XD6, 0XED, 0XF6, 0X20,
-        0XD1, 0X84, 0X24, 0X1A, 0X6A, 0XED, 0X8B, 0X63,
-        0xA6,                                           # 65-byte signature
-        0xAC,                                           # OP_CHECKSIG
-        0x00, 0xe1, 0xF5, 0x05, 0x00, 0x00, 0x00, 0x00, # Transaction amount [124]
-        0xBC, 0xBC,                     # Script version
-        0x43,                           # Varint for length of pk script [132]
-        0x41,                           # OP_DATA_65
-        0X04, 0XD6, 0X4B, 0XDF, 0XD0, 0X9E, 0XB1, 0XC5,
-        0XFE, 0X29, 0X5A, 0XBD, 0XEB, 0X1D, 0XCA, 0X42,
-        0X81, 0XBE, 0X98, 0X8E, 0X2D, 0XA0, 0XB6, 0XC1,
-        0XC6, 0XA5, 0X9D, 0XC2, 0X26, 0XC2, 0X86, 0X24,
-        0XE1, 0X81, 0X75, 0XE8, 0X51, 0XC9, 0X6B, 0X97,
-        0X3D, 0X81, 0XB0, 0X1C, 0XC3, 0X1F, 0X04, 0X78,
-        0X34, 0XBC, 0X06, 0XD6, 0XD6, 0XED, 0XF6, 0X20,
-        0XD1, 0X84, 0X24, 0X1A, 0X6A, 0XED, 0X8B, 0X63,
-        0xA6,                           # 65-byte signature
-        0xAC,                           # OP_CHECKSIG
-        0x00, 0x00, 0x00, 0x00,         # Lock time [198]
-        0x00, 0x00, 0x00, 0x00,         # Expiry [202]
-    ])
-
-
-multiTxPkScriptLocs = [58, 136]
-
-
-def multiTxWitness():
-    """
-    multiTxWitness is a MsgTx witness with only input witness.
-    """
-    return MsgTx(
-        cachedHash=None,
-        serType=wire.TxSerializeOnlyWitness,
-        version=1,
-        txIn=[
-            TxIn(
-                previousOutPoint=None,
-                sequence=0,
-                valueIn=0x1212121212121212,
-                blockHeight=0x15151515,
-                blockIndex=0x34343434,
-                signatureScript=ByteArray([
-                    0x04, 0x31, 0xDC, 0x00, 0x1B, 0x01, 0x62
-                ]),
-            ),
-        ],
-        txOut=[],
-        lockTime=0,
-        expiry=0,
-    )
-
-
-def multiTxWitnessEncoded():
-    return ByteArray([
-        0x01, 0x00, 0x02, 0x00, # Version
-        0x01,                           # Varint for number of input signature
-        0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, # ValueIn
-        0x15, 0x15, 0x15, 0x15,         # BlockHeight
-        0x34, 0x34, 0x34, 0x34,         # BlockIndex
-        0x07,                           # Varint for length of signature script
-        0x04, 0x31, 0xDC, 0x00, 0x1B, 0x01, 0x62, # Signature script
-    ])
-
-
-def multiTx():
-    """
-    multiTx is a MsgTx with an input and output and used in various tests.
-    """
-    return MsgTx(
-        cachedHash=None,
-        serType=wire.TxSerializeFull,
-        version=1,
-        txIn=[
-            TxIn(
-                previousOutPoint=OutPoint(
-                    txHash=None,
-                    idx=0xFFFFFFFF,
-                    tree=0,
-                ),
-                sequence=0xFFFFFFFF,
-                valueIn=0x1212121212121212,
-                blockHeight=0x15151515,
-                blockIndex=0x34343434,
-                signatureScript=ByteArray([
-                    0x04, 0x31, 0xDC, 0x00, 0x1B, 0x01, 0x62
-                ]),
-            ),
-        ],
-        txOut=[
-            TxOut(
-                value=0x12A05F200,
-                version=0xABAB,
-                pkScript=ByteArray([
-                    0x41, # OP_DATA_65
-                    0X04, 0XD6, 0X4B, 0XDF, 0XD0, 0X9E, 0XB1, 0XC5,
-                    0XFE, 0X29, 0X5A, 0XBD, 0XEB, 0X1D, 0XCA, 0X42,
-                    0X81, 0XBE, 0X98, 0X8E, 0X2D, 0XA0, 0XB6, 0XC1,
-                    0XC6, 0XA5, 0X9D, 0XC2, 0X26, 0XC2, 0X86, 0X24,
-                    0XE1, 0X81, 0X75, 0XE8, 0X51, 0XC9, 0X6B, 0X97,
-                    0X3D, 0X81, 0XB0, 0X1C, 0XC3, 0X1F, 0X04, 0X78,
-                    0X34, 0XBC, 0X06, 0XD6, 0XD6, 0XED, 0XF6, 0X20,
-                    0XD1, 0X84, 0X24, 0X1A, 0X6A, 0XED, 0X8B, 0X63,
-                    0xA6, # 65-byte signature
-                    0xAC, # OP_CHECKSIG
-                ]),
-            ),
-            TxOut(
-                value=0x5F5E100,
-                version=0xBCBC,
-                pkScript=ByteArray([
-                    0x41, # OP_DATA_65
-                    0X04, 0XD6, 0X4B, 0XDF, 0XD0, 0X9E, 0XB1, 0XC5,
-                    0XFE, 0X29, 0X5A, 0XBD, 0XEB, 0X1D, 0XCA, 0X42,
-                    0X81, 0XBE, 0X98, 0X8E, 0X2D, 0XA0, 0XB6, 0XC1,
-                    0XC6, 0XA5, 0X9D, 0XC2, 0X26, 0XC2, 0X86, 0X24,
-                    0XE1, 0X81, 0X75, 0XE8, 0X51, 0XC9, 0X6B, 0X97,
-                    0X3D, 0X81, 0XB0, 0X1C, 0XC3, 0X1F, 0X04, 0X78,
-                    0X34, 0XBC, 0X06, 0XD6, 0XD6, 0XED, 0XF6, 0X20,
-                    0XD1, 0X84, 0X24, 0X1A, 0X6A, 0XED, 0X8B, 0X63,
-                    0xA6, # 65-byte signature
-                    0xAC, # OP_CHECKSIG
-                ]),
-            ),
-        ],
-        lockTime=0,
-        expiry=0,
-    )
-
-
-def multiTxEncoded():
-    """
-    multiTxEncoded is the wire encoded bytes for multiTx using protocol version
-    0 and is used in the various tests.
-    """
-    return ByteArray([
-        0x01, 0x00, 0x00, 0x00, # Version [0]
-        0x01,                           # Varint for number of input transactions [4]
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, # [5]
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, # Previous output hash
-        0XFF, 0XFF, 0XFF, 0XFF,         # Previous output index [37]
-        0x00,                           # Previous output tree [41]
-        0XFF, 0XFF, 0XFF, 0XFF,         # Sequence [42]
-        0x02,                           # Varint for number of output transactions [46]
-        0x00, 0xF2, 0x05, 0x2A, 0x01, 0x00, 0x00, 0x00, # Transaction amount [47]
-        0xAB, 0xAB,                     # Script version [55]
-        0x43,                           # Varint for length of pk script [57]
-        0x41,                           # OP_DATA_65 [58]
-        0X04, 0XD6, 0X4B, 0XDF, 0XD0, 0X9E, 0XB1, 0XC5,
-        0XFE, 0X29, 0X5A, 0XBD, 0XEB, 0X1D, 0XCA, 0X42,
-        0X81, 0XBE, 0X98, 0X8E, 0X2D, 0XA0, 0XB6, 0XC1,
-        0XC6, 0XA5, 0X9D, 0XC2, 0X26, 0XC2, 0X86, 0X24,
-        0XE1, 0X81, 0X75, 0XE8, 0X51, 0XC9, 0X6B, 0X97,
-        0X3D, 0X81, 0XB0, 0X1C, 0XC3, 0X1F, 0X04, 0X78,
-        0X34, 0XBC, 0X06, 0XD6, 0XD6, 0XED, 0XF6, 0X20,
-        0XD1, 0X84, 0X24, 0X1A, 0X6A, 0XED, 0X8B, 0X63,
-        0xA6,                                           # 65-byte pubkey
-        0xAC,                                           # OP_CHECKSIG
-        0x00, 0xE1, 0xF5, 0x05, 0x00, 0x00, 0x00, 0x00, # Transaction amount [123]
-        0xBC, 0xBC,                     # Script version [134]
-        0x43,                           # Varint for length of pk script [136]
-        0x41,                           # OP_DATA_65
-        0X04, 0XD6, 0X4B, 0XDF, 0XD0, 0X9E, 0XB1, 0XC5,
-        0XFE, 0X29, 0X5A, 0XBD, 0XEB, 0X1D, 0XCA, 0X42,
-        0X81, 0XBE, 0X98, 0X8E, 0X2D, 0XA0, 0XB6, 0XC1,
-        0XC6, 0XA5, 0X9D, 0XC2, 0X26, 0XC2, 0X86, 0X24,
-        0XE1, 0X81, 0X75, 0XE8, 0X51, 0XC9, 0X6B, 0X97,
-        0X3D, 0X81, 0XB0, 0X1C, 0XC3, 0X1F, 0X04, 0X78,
-        0X34, 0XBC, 0X06, 0XD6, 0XD6, 0XED, 0XF6, 0X20,
-        0XD1, 0X84, 0X24, 0X1A, 0X6A, 0XED, 0X8B, 0X63,
-        0xA6,                           # 65-byte signature
-        0xAC,                           # OP_CHECKSIG
-        0x00, 0x00, 0x00, 0x00,         # Lock time [203]
-        0x00, 0x00, 0x00, 0x00,         # Expiry [207]
-        0x01,                           # Varint for number of input signature [211]
-        0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12, # ValueIn [212]
-        0x15, 0x15, 0x15, 0x15,         # BlockHeight [220]
-        0x34, 0x34, 0x34, 0x34,         # BlockIndex [224]
-        0x07,                           # Varint for length of signature script [228]
-        0x04, 0x31, 0xDC, 0x00, 0x1B, 0x01, 0x62, # Signature script [229]
-    ])
