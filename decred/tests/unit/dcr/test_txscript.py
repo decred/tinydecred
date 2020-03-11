@@ -4025,3 +4025,81 @@ def test_verify_sig():
         assert (
             res == test["want"]
         ), f'wanted {test["want"]} but got {res} for test {test["name"]}'
+
+
+def test_nonce_RFC6979():
+    psf = parseShortForm
+    """
+    name (str): Short description of the test.
+    privKey (int): Private key bytes.
+    inHash (ByteArray): The input hash.
+    wantException (DecredError): Expected exception if present.
+    want (int): The expected nonce.
+    """
+    tests = [
+        dict(
+            name="key 32 bytes, hash 32 bytes",
+            key=psf(
+                "0x0011111111111111111111111111111111111111111111111111111111111111"
+            ),
+            inHash=psf(
+                "0x0000000000000000000000000000000000000000000000000000000000000001"
+            ),
+            want=psf(
+                "0x154e92760f77ad9af6b547edd6f14ad0fae023eb2221bc8be2911675d8a686a3"
+            ).int(),
+        ),
+        dict(
+            # Should be same as key with 32 bytes due to zero padding.
+            name="key <32 bytes, hash 32 bytes",
+            key=psf("0x11111111111111111111111111111111111111111111111111111111111111"),
+            inHash=psf(
+                "0x0000000000000000000000000000000000000000000000000000000000000001"
+            ),
+            want=psf(
+                "0x154e92760f77ad9af6b547edd6f14ad0fae023eb2221bc8be2911675d8a686a3"
+            ).int(),
+        ),
+        dict(
+            # Should be same as key with 32 bytes due to truncation.
+            name="key >32 bytes, hash 32 bytes",
+            key=psf(
+                "0x001111111111111111111111111111111111111111111111111111111111111111"
+            ),
+            inHash=psf(
+                "0x0000000000000000000000000000000000000000000000000000000000000001"
+            ),
+            want=psf(
+                "0x154e92760f77ad9af6b547edd6f14ad0fae023eb2221bc8be2911675d8a686a3"
+            ).int(),
+        ),
+        dict(
+            name="hash <32 bytes (padded)",
+            key=psf(
+                "0x0011111111111111111111111111111111111111111111111111111111111111"
+            ),
+            inHash=psf(
+                "0x00000000000000000000000000000000000000000000000000000000000001"
+            ),
+            want=psf(
+                "0x154e92760f77ad9af6b547edd6f14ad0fae023eb2221bc8be2911675d8a686a3"
+            ).int(),
+        ),
+        dict(
+            name="hash >32 bytes (truncated)",
+            key=psf(
+                "0x0011111111111111111111111111111111111111111111111111111111111111"
+            ),
+            inHash=psf(
+                "0x000000000000000000000000000000000000000000000000000000000000000100"
+            ),
+            want=psf(
+                "0x154e92760f77ad9af6b547edd6f14ad0fae023eb2221bc8be2911675d8a686a3"
+            ).int(),
+        ),
+    ]
+    for test in tests:
+        res = txscript.nonceRFC6979(test["key"], test["inHash"])
+        assert (
+            res == test["want"]
+        ), f'wanted {test["want"]} but got {res} for test {test["name"]}'

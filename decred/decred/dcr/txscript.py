@@ -1995,12 +1995,23 @@ def bits2octets(bits, rolen):
     return int2octets(z2, rolen)
 
 
-def nonceRFC6979(privKey, inHash, extra, version):
+def nonceRFC6979(privKey, inHash):
     """
     nonceRFC6979 generates an ECDSA nonce (`k`) deterministically according to
     RFC 6979. It takes a 32-byte hash as an input and returns 32-byte nonce to
     be used in ECDSA algorithm.
+
+    Args:
+        privKey (ByteArray): Private key bytes.
+        inHash (ByteArray): The input hash.
+
+    Returns:
+        int: The deterministic nonce.
     """
+    # Truncate private key if too long.
+    if len(privKey) > 32:
+        privKey = privKey[:32]
+
     q = Curve.N
     x = privKey
 
@@ -2008,13 +2019,6 @@ def nonceRFC6979(privKey, inHash, extra, version):
     holen = SHA256_SIZE
     rolen = (qlen + 7) >> 3
     bx = int2octets(x, rolen) + bits2octets(inHash, rolen)
-    if len(extra) == 32:
-        bx += extra
-    if len(version) == 16 and len(extra) == 32:
-        bx += extra
-    if len(version) == 16 and len(extra) != 32:
-        bx += ByteArray(0, length=32)
-        bx += version
 
     # Step B
     v = ByteArray(bytearray([1] * holen))
@@ -2098,7 +2102,7 @@ def signRFC6979(privateKey, inHash):
     and BIP 62.
     """
     N = Curve.N
-    k = nonceRFC6979(privateKey, inHash, ByteArray(b""), ByteArray(b""))
+    k = nonceRFC6979(privateKey, inHash)
 
     inv = crypto.modInv(k, N)
     r = Curve.scalarBaseMult(k)[0] % N
