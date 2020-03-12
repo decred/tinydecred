@@ -15,7 +15,6 @@ from urllib.parse import urlencode, urlparse
 from decred import DecredError
 from decred.crypto import crypto
 from decred.util import database, tinyhttp, ws
-from decred.util.database import KeyValueDatabase
 from decred.util.encode import ByteArray
 from decred.util.helpers import formatTraceback, getLogger
 from decred.wallet import api
@@ -396,17 +395,18 @@ class DcrdataBlockchain:
     def __init__(self, db, params, datapath, skipConnect=False):
         """
         Args:
-            db (str | database.Bucket): the database bucket or a filepath.
-                If a filepath, a new database will be created.
+            db (database.Bucket | database.KeyValueDatabase | filepath):
+                the database or a filepath. If a filepath, a new database
+                will be created.
             params obj: blockchain network parameters.
             datapath str: a URI for a dcrdata server.
             skipConnect bool: skip initial connection to dcrdata.
         """
         # Allow string arguments for database.
         self.ownsDB = False
-        if isinstance(db, str):
+        if not isinstance(db, (database.Bucket, database.KeyValueDatabase)):
             self.ownsDB = True
-            db = KeyValueDatabase(db)
+            db = database.KeyValueDatabase(db)
         self.db = db
         self.params = params
         # The blockReceiver and addressReceiver will be set when the respective
