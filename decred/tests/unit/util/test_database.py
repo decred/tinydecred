@@ -32,9 +32,9 @@ class TBlobber:
         return self.b == other.b
 
 
-def test_database(prepareLogger, randBytes, tmpdir):
+def test_database(prepareLogger, randBytes):
     # Open a key value db in the temp directory.
-    master = database.KeyValueDatabase(tmpdir.join("tmp.sqlite"))
+    master = database.KeyValueDatabase(":memory:")
 
     # '$' in bucket name is illegal.
     with pytest.raises(DecredError):

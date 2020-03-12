@@ -228,11 +228,11 @@ dcrdataUTXOs = json.loads(
 utxoTotal = 942168886 + 942093929
 
 
-def test_account(tmpdir):
+def test_account():
     """
     Test account functionality.
     """
-    db = KeyValueDatabase(tmpdir.join("tmp.db")).child("tmp")
+    db = KeyValueDatabase(":memory:").child("tmp")
     acct = newAccount(db)
     for n in range(20):
         acct.nextExternalAddress()
@@ -467,8 +467,8 @@ def test_balance(prepareLogger):
     assert bal.staked == reBal.staked
 
 
-def test_gap_handling(tmpdir):
-    db = KeyValueDatabase(tmpdir.join("tmp.db")).child("tmp")
+def test_gap_handling():
+    db = KeyValueDatabase(":memory:").child("tmp")
     internalAddrs = [
         "DskHpgbEb6hqkuHchHhtyojpehFToEtjQSo",
         "Dsm4oCLnLraGDedfU5unareezTNT75kPbRb",
@@ -719,7 +719,7 @@ def test_ticket_info_from_spending_tx():
     assert tinfo.spendTxFee == 1
 
 
-def test_account_update_spent_tickets(tmpdir):
+def test_account_update_spent_tickets():
     """
     Test updating spent tickets.
     """
@@ -740,7 +740,7 @@ def test_account_update_spent_tickets(tmpdir):
             self.utxos = {}
             self.net = nets.testnet
 
-    db = KeyValueDatabase(tmpdir.join("tmp.db")).child("tmp")
+    db = KeyValueDatabase(":memory:").child("tmp")
 
     acct = FakeAccount()
     tDB = acct.ticketDB = db.child(
@@ -898,7 +898,7 @@ def test_account_update_spent_tickets(tmpdir):
     assert txid not in tDB
 
 
-def test_account_calc_ticket_profits(tmpdir):
+def test_account_calc_ticket_profits():
     """
     Test ticket profit calculation.
     """
@@ -907,7 +907,7 @@ def test_account_calc_ticket_profits(tmpdir):
         def __init__(self):
             pass
 
-    db = KeyValueDatabase(tmpdir.join("tmp.db")).child("tmp")
+    db = KeyValueDatabase(":memory:").child("tmp")
 
     acct = FakeAccount()
     tDB = acct.ticketDB = db.child(
@@ -956,7 +956,7 @@ def test_account_calc_ticket_profits(tmpdir):
     assert txFees == t
 
 
-def test_account_spend_ticket(tmpdir):
+def test_account_spend_ticket():
     """
     Test updating spent tickets.
     """
@@ -1009,7 +1009,7 @@ def test_account_spend_ticket(tmpdir):
             self.blockchain = Dummy()
             self.net = nets.testnet
 
-    db = KeyValueDatabase(tmpdir.join("tmp.db")).child("tmp")
+    db = KeyValueDatabase(":memory:").child("tmp")
 
     acct = FakeAccount()
     tDB = acct.ticketDB = db.child(

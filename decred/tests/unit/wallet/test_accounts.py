@@ -37,12 +37,12 @@ def test_child_neuter(prepareLogger):
     assert pub.string() == expStr
 
 
-def test_change_addresses(prepareLogger, tmpdir):
+def test_change_addresses(prepareLogger):
     """
     Test internal branch address derivation.
     """
     cryptoKey = encode.ByteArray(rando.generateSeed(32))
-    db = database.KeyValueDatabase(tmpdir.join("tmp.db")).child("tmp")
+    db = database.KeyValueDatabase(":memory:").child("tmp")
     # ticker for coin type is ok. Case insensitive.
     am = accounts.createNewAccountManager(tRoot, cryptoKey, "DcR", nets.mainnet, db)
     acct = am.openAccount(0, cryptoKey)
@@ -50,9 +50,9 @@ def test_change_addresses(prepareLogger, tmpdir):
         acct.nextInternalAddress()
 
 
-def test_account_manager(prepareLogger, tmpdir):
+def test_account_manager(prepareLogger):
     cryptoKey = encode.ByteArray(rando.generateSeed(32))
-    db = database.KeyValueDatabase(tmpdir.join("tmp.db")).child("tmp")
+    db = database.KeyValueDatabase(":memory:").child("tmp")
     # 42 = Decred
     am = accounts.createNewAccountManager(tRoot, cryptoKey, 42, nets.mainnet, db)
 

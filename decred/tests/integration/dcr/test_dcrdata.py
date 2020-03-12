@@ -38,9 +38,9 @@ class TestDcrdata:
         client.subscribeAddresses("Dcur2mcGjmENx4DhNqDctW5wJCVyT3Qeqkx")
         client.close()
 
-    def test_get_block_header(self, tmpdir):
+    def test_get_block_header(self):
         blockchain = dcrdata.DcrdataBlockchain(
-            tmpdir.join("db.db"), mainnet, "https://alpha.dcrdata.org"
+            ":memory:", mainnet, "https://alpha.dcrdata.org"
         )
         try:
             blockchain.connect()
@@ -50,9 +50,9 @@ class TestDcrdata:
         finally:
             blockchain.close()
 
-    def test_purchase_ticket(self, tmpdir):
+    def test_purchase_ticket(self):
         blockchain = dcrdata.DcrdataBlockchain(
-            tmpdir.join("db.db"), testnet, "https://testnet.dcrdata.org"
+            ":memory:", testnet, "https://testnet.dcrdata.org"
         )
         try:
             blockchain.connect()
@@ -147,9 +147,9 @@ class TestDcrdata:
         finally:
             blockchain.close()
 
-    def test_revoke_ticket(self, tmpdir):
+    def test_revoke_ticket(self):
         blockchain = dcrdata.DcrdataBlockchain(
-            tmpdir.join("db.db"), testnet, "https://testnet.dcrdata.org"
+            ":memory:", testnet, "https://testnet.dcrdata.org"
         )
         blockchain.connect()
 

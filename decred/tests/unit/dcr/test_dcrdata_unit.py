@@ -321,10 +321,10 @@ class TestDcrdataBlockchain:
         revocation=None,
     )
 
-    def test_misc(self, http_get_post, tmpdir):
+    def test_misc(self, http_get_post):
         preload_api_list(http_get_post)
         http_get_post(f"{BASE_URL}api/block/best", dict(height=1))
-        ddb = DcrdataBlockchain(tmpdir.join("test.db"), testnet, BASE_URL)
+        ddb = DcrdataBlockchain(":memory:", testnet, BASE_URL)
         assert ddb.tipHeight == 1
 
         # getAgendasInfo
@@ -340,16 +340,16 @@ class TestDcrdataBlockchain:
         http_get_post(f"{BASE_URL}api/stake/diff", {"estimates": {"expected": 1}})
         assert ddb.nextStakeDiff() == 1e8
 
-    def test_subscriptions(self, http_get_post, tmpdir):
+    def test_subscriptions(self, http_get_post):
         # Exception in updateTip.
         preload_api_list(http_get_post)
         with pytest.raises(DecredError):
-            DcrdataBlockchain(tmpdir.join("test.db"), testnet, BASE_URL)
+            DcrdataBlockchain(":memory:", testnet, BASE_URL)
 
         # Successful creation.
         preload_api_list(http_get_post)
         http_get_post(f"{BASE_URL}api/block/best", dict(height=1))
-        ddb = DcrdataBlockchain(tmpdir.join("test.db"), testnet, BASE_URL)
+        ddb = DcrdataBlockchain(":memory:", testnet, BASE_URL)
 
         # Set the mock WebsocketClient.
         ddb.dcrdata.ps = MockWebSocketClient()
@@ -394,10 +394,10 @@ class TestDcrdataBlockchain:
         ddb.pubsubSignal(sig)
         assert block_queue[0] == sig
 
-    def test_utxos(self, http_get_post, tmpdir):
+    def test_utxos(self, http_get_post):
         preload_api_list(http_get_post)
         http_get_post(f"{BASE_URL}api/block/best", dict(height=1))
-        ddb = DcrdataBlockchain(tmpdir.join("test.db"), testnet, BASE_URL)
+        ddb = DcrdataBlockchain(":memory:", testnet, BASE_URL)
 
         # txVout error
         with pytest.raises(DecredError):
@@ -467,10 +467,10 @@ class TestDcrdataBlockchain:
         http_get_post(headerURL, self.blockHeader)
         assert ddb.confirmUTXO(utxo) is True
 
-    def test_blocks(self, http_get_post, tmpdir):
+    def test_blocks(self, http_get_post):
         preload_api_list(http_get_post)
         http_get_post(f"{BASE_URL}api/block/best", dict(height=1))
-        ddb = DcrdataBlockchain(tmpdir.join("test.db"), testnet, BASE_URL)
+        ddb = DcrdataBlockchain(":memory:", testnet, BASE_URL)
 
         # blockHeader
         with pytest.raises(DecredError):
@@ -513,10 +513,10 @@ class TestDcrdataBlockchain:
             ByteArray(self.blockHash)
         )
 
-    def test_for_tx(self, http_get_post, tmpdir):
+    def test_for_tx(self, http_get_post):
         preload_api_list(http_get_post)
         http_get_post(f"{BASE_URL}api/block/best", dict(height=1))
-        ddb = DcrdataBlockchain(tmpdir.join("test.db"), testnet, BASE_URL)
+        ddb = DcrdataBlockchain(":memory:", testnet, BASE_URL)
 
         # tinyBlockForTx
         # Preload the broken decoded tx.
