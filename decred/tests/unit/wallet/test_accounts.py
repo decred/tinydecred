@@ -41,7 +41,7 @@ def test_change_addresses(prepareLogger):
     """
     Test internal branch address derivation.
     """
-    cryptoKey = encode.ByteArray(rando.generateSeed(32))
+    cryptoKey = rando.newKey()
     db = database.KeyValueDatabase(":memory:").child("tmp")
     # ticker for coin type is ok. Case insensitive.
     am = accounts.createNewAccountManager(tRoot, cryptoKey, "DcR", nets.mainnet, db)
@@ -51,7 +51,7 @@ def test_change_addresses(prepareLogger):
 
 
 def test_account_manager(prepareLogger):
-    cryptoKey = encode.ByteArray(rando.generateSeed(32))
+    cryptoKey = rando.newKey()
     db = database.KeyValueDatabase(":memory:").child("tmp")
     # 42 = Decred
     am = accounts.createNewAccountManager(tRoot, cryptoKey, 42, nets.mainnet, db)

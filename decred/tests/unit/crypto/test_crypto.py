@@ -121,7 +121,7 @@ class TestCrypto(unittest.TestCase):
             self.assertEqual(addr.string(), addrStr)
 
     def test_kdf_params(self):
-        salt = ByteArray(rando.generateSeed(32))
+        salt = rando.newHash()
         digest = ByteArray(32)
         kdf = crypto.KDFParams(salt, digest)
         b = kdf.serialize()

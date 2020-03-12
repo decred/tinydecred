@@ -13,10 +13,6 @@ from decred.dcr.wire import msgtx
 from decred.util.encode import ByteArray
 
 
-def newHash():
-    return ByteArray(rando.generateSeed(32))
-
-
 class TestDcrdata:
     def client(self, **k):
         return dcrdata.DcrdataClient("https://alpha.dcrdata.org", **k)
@@ -103,7 +99,7 @@ class TestDcrdata:
                     addrString = addr.string()
                     keys[addrString] = privKey
                     pkScript = txscript.makePayToAddrScript(addrString, testnet)
-                    txHash = newHash()
+                    txHash = rando.newHash()
                     txid = reversed(txHash).hex()
                     utxos.append(
                         account.UTXO(

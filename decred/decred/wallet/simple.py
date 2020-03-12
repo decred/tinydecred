@@ -7,7 +7,7 @@ See LICENSE for details
 from pathlib import Path
 
 from decred import DecredError
-from decred.crypto import crypto, mnemonic, rando
+from decred.crypto import mnemonic, rando
 from decred.dcr import nets
 from decred.dcr.dcrdata import DcrdataBlockchain
 from decred.util import chains, database
@@ -72,7 +72,7 @@ class SimpleWallet(Wallet):
         super().__init__(dbPath)
         # words is only set the first time a wallet is created.
         if not walletExists:
-            seed = rando.generateSeed(crypto.KEY_SIZE)
+            seed = rando.newKeyRaw()
             self.initialize(seed, pw.encode(), netParams)
             self.words = mnemonic.encode(seed)
 

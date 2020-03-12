@@ -1,6 +1,6 @@
 """
 Copyright (c) 2019, Brian Stafford
-Copyright (c) 2019, The Decred developers
+Copyright (c) 2019-2020, The Decred developers
 See LICENSE for details
 
 Cryptographic functions.
@@ -21,8 +21,6 @@ from . import rando
 from .secp256k1.curve import PrivateKey, PublicKey, curve as Curve
 
 
-KEY_SIZE = 32
-HASH_SIZE = 32
 BLAKE256_SIZE = 32
 RIPEMD160_SIZE = 20
 SERIALIZED_KEY_LENGTH = 4 + 1 + 4 + 4 + 32 + 33  # 78 bytes
@@ -628,9 +626,7 @@ class ExtendedKey:
         Returns:
             crypto.ExtendedKey: A master hierarchical deterministic key.
         """
-        seedLen = len(seed)
-        if seedLen < rando.MinSeedBytes or seedLen > rando.MaxSeedBytes:
-            raise AssertionError("invalid seed length %d" % seedLen)
+        rando.checkSeed(len(seed))
 
         # First take the HMAC-SHA512 of the master key and the seed data:
         # SHA512 hash is 64 bytes.
@@ -1137,7 +1133,7 @@ class SecretKey(object):
             pw (byte-like): A password that deterministically generates the key.
         """
         super().__init__()
-        salt = ByteArray(rando.generateSeed(KEY_SIZE))
+        salt = rando.newKey()
         b = lambda v: ByteArray(v).bytes()
         _, hashName, iterations = defaultKDFParams()
         self.key = ByteArray(
