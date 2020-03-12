@@ -307,12 +307,13 @@ class SequencedConnection(sqlite3.Connection):
     A SequencedConnection is a sqlite3.Connection with a mutex lock.
     """
 
-    def __init__(self, *a, **k):
+    def __init__(self, filepath, *a, **k):
         """
         Constructor for a SequencedConnection. All arguments are passed
-        directly to the sqlite.Connection construtor.
+        to the sqlite.Connection construtor.
         """
-        super().__init__(*a, **k)
+        # Converting filepath to str for Python 3.6 compatibility.
+        super().__init__(str(filepath), *a, **k)
         self.mtx = threading.Lock()
 
     def lock(self):
