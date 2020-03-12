@@ -2878,7 +2878,7 @@ def handleStakeOutSign(
 
 
 def mergeScripts(
-    chainParams,
+    netParams,
     tx,
     idx,
     pkScript,
@@ -2899,6 +2899,17 @@ def mergeScripts(
     NOTE: This function is only valid for version 0 scripts.  Since the function
     does not accept a script version, the results are undefined for other script
     versions.
+
+    Args:
+        netParams (obj): Network parameters.
+        tx (msgtx.Tx): Transaction that pkScript belongs to.
+        idx (int): The output index that pkScript belongs to.
+        pkScript (ByteArray): The script that spends output idx of tx.
+        scriptClass (int): Type of script.
+        addresses list(str): Addresses that comprise a multisig.
+        nRequired (int): Number of addresses required for a multisig.
+        sigScript (ByteArray): The signed script.
+        prevScript (ByteArray): The previous script.
     """
     # TODO(oga) the scripthash and multisig paths here are overly
     # inefficient in that they will recompute already known data.
@@ -2915,7 +2926,8 @@ def mergeScripts(
         ):
             return prevScript
         if (
-            len(prevScript) == 0
+            not prevScript
+            or len(prevScript) == 0
             or checkScriptParses(scriptVersion, prevScript) is not None
         ):
             return sigScript
@@ -2930,12 +2942,12 @@ def mergeScripts(
         # We already know this information somewhere up the stack,
         # therefore the error is ignored.
         scriptClass, addresses, nrequired = extractPkScriptAddrs(
-            DefaultScriptVersion, script, chainParams
+            DefaultScriptVersion, script, netParams
         )
 
         # Merge
         mergedScript = mergeScripts(
-            chainParams,
+            netParams,
             tx,
             idx,
             script,
@@ -2956,11 +2968,11 @@ def mergeScripts(
             tx, idx, addresses, nRequired, pkScript, sigScript, prevScript
         )
     else:
-        # It doesn't actually make sense to merge anything other than multiig
+        # It doesn't actually make sense to merge anything other than multisig
         # and scripthash (because it could contain multisig). Everything else
-        # has either zero signature, can't be spent, or has a single signature
+        # has either zero signatures, can't be spent, or has a single signature
         # which is either present or not. The other two cases are handled
-        # above. In the conflict case here we just assume the longest is
+        # above. In the conflicting case here we just assume the longest is
         # correct (this matches behaviour of the reference implementation).
         if prevScript is None or len(sigScript) > len(prevScript):
             return sigScript
@@ -3005,14 +3017,17 @@ def mergeMultiSig(tx, idx, addresses, nRequired, pkScript, sigScript, prevScript
     possibleSigs = []
 
     def extractSigs(script):
+        found = False
         scriptVersion = 0
         tokenizer = ScriptTokenizer(scriptVersion, script)
         while tokenizer.next():
             data = tokenizer.data()
             if len(data) != 0:
+                found = True
                 possibleSigs.append(data)
         if tokenizer.err is not None:
-            raise DecredError("mergeMultisig: extractSigs: {}".format(tokenizer.err))
+            raise DecredError("mergeMultiSig: extractSigs: {}".format(tokenizer.err))
+        return found
 
     # Attempt to extract signatures from the two scripts.  Return the other
     # script that is intended to be merged in the case signature extraction
@@ -3039,8 +3054,9 @@ def mergeMultiSig(tx, idx, addresses, nRequired, pkScript, sigScript, prevScript
         tSig = sig[:-1]
         hashType = sig[-1]
 
-        pSig = Signature.parse(tSig, True)
-        if not pSig:
+        try:
+            pSig = Signature.parse(tSig, True)
+        except DecredError:
             continue
 
         # We have to do this each round since hash types may vary
@@ -3048,7 +3064,7 @@ def mergeMultiSig(tx, idx, addresses, nRequired, pkScript, sigScript, prevScript
         # however, assume no sigs etc are in the script since that
         # would make the transaction nonstandard and thus not
         # MultiSigTy, so we just need to hash the full thing.
-        hash = calcSignatureHash(pkScript, hashType, tx, idx, None)
+        sigHash = calcSignatureHash(pkScript, hashType, tx, idx, None)
 
         for addr in addresses:
             # All multisig addresses should be pubkey addresses
@@ -3058,15 +3074,16 @@ def mergeMultiSig(tx, idx, addresses, nRequired, pkScript, sigScript, prevScript
             # If it matches we put it in the map. We only
             # can take one signature per public key so if we
             # already have one, we can throw this away.
-            if verifySig(addr.pubkey, hash, pSig.r.int(), pSig.s.int()):
+            if verifySig(addr.pubkey, sigHash, pSig.r.int(), pSig.s.int()):
                 addrToSig[addr.string()] = sig
 
     script = ByteArray(b"")
     doneSigs = 0
     # This assumes that addresses are in the same order as in the script.
     for addr in addresses:
-        if addr.string() in addrToSig:
-            script += addData(addrToSig[addr.string()])
+        a = addr.string()
+        if a in addrToSig:
+            script += addData(addrToSig[a])
             doneSigs += 1
         if doneSigs == nRequired:
             break
