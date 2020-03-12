@@ -1969,7 +1969,18 @@ def makePayToAddrScript(addrStr, netParams):
 
 
 def int2octets(v, rolen):
-    """ https://tools.ietf.org/html/rfc6979#section-2.3.3"""
+    """
+    Converts the passed integer into a byte array with length of rolen in big
+    endian notation padded with zeros. Overflow is discarded.
+
+    https://tools.ietf.org/html/rfc6979#section-2.3.3
+    Args:
+        v (int): Integer value to convert.
+        rolen (int): Number of octects, or bytes, to return.
+
+    Returns:
+        ByteArray: The integer in bytes.
+    """
     out = ByteArray(v)
 
     # left pad with zeros if it's too short
@@ -1987,7 +1998,18 @@ def int2octets(v, rolen):
 
 
 def bits2octets(bits, rolen):
-    """ https://tools.ietf.org/html/rfc6979#section-2.3.4"""
+    """
+    Converts bits into octects modulo Curve.N, padded with zeros. Overflow is
+    discarded.
+
+    https://tools.ietf.org/html/rfc6979#section-2.3.4
+    Args:
+        bits (ByteArray): Bytes to convert.
+        rolen (int): Number of digits to allow.
+
+    Returns:
+        ByteArray: The bytes modulo Curve.N
+    """
     z1 = hashToInt(bits)
     z2 = z1 - Curve.N
     if z2 < 0:
