@@ -2207,7 +2207,7 @@ class TestTxScript(unittest.TestCase):
 
     def test_sign_stake_p2pkh_outputs(self):
         txIn = msgtx.TxIn(
-            previousOutPoint=msgtx.OutPoint(txHash=rando.newHash(), idx=0, tree=0,),
+            previousOutPoint=msgtx.OutPoint(txHash=rando.newHash(), idx=0, tree=0),
             sequence=4294967295,
             valueIn=1,
             blockHeight=78901,
