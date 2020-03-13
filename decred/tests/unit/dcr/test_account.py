@@ -5,6 +5,9 @@ See LICENSE for details
 
 import json
 
+import pytest
+
+from decred import DecredError
 from decred.crypto import crypto, opcode, rando
 from decred.dcr import account, nets, txscript
 from decred.dcr.vsp import PurchaseInfo, VotingServiceProvider
@@ -14,10 +17,6 @@ from decred.util.encode import ByteArray
 
 
 LOGGER_ID = "test_account"
-
-testSeed = ByteArray(
-    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-).b
 
 cryptoKey = crypto.ByteArray(rando.generateSeed(32))
 
@@ -42,6 +41,18 @@ dcrdataTinfo = json.loads(
 }
 """
 )
+
+
+def test_unblob_check():
+    data = {0: 1}
+    # Unsupported version.
+    with pytest.raises(NotImplementedError):
+        account.unblob_check("test", 1, 0, data)
+    # Unexpected pushes.
+    with pytest.raises(DecredError):
+        account.unblob_check("test", 0, 2, data)
+    # No errors.
+    assert account.unblob_check("test", 0, 1, data) is None
 
 
 def test_tinfo(prepareLogger):
@@ -185,16 +196,16 @@ def test_tiny_block(prepareLogger):
 
 def newAccount(db):
     # Create an account key
+    testSeed = ByteArray(
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    ).b
     xk = crypto.ExtendedKey.new(testSeed)
     dcrKey = xk.deriveCoinTypeKey(nets.mainnet)
     acctKey = dcrKey.deriveAccountKey(0)
     acctKeyPub = acctKey.neuter()
     privKeyEncrypted = crypto.encrypt(cryptoKey, acctKey.serialize())
     pubKeyEncrypted = crypto.encrypt(cryptoKey, acctKeyPub.serialize())
-    acct = account.Account(pubKeyEncrypted, privKeyEncrypted, "acctName", "mainnet", db)
-    acct.unlock(cryptoKey)
-    acct.generateGapAddresses()
-    return acct
+    return account.Account(pubKeyEncrypted, privKeyEncrypted, "acctName", "mainnet", db)
 
 
 # One utxo for each of external and internal branches.
@@ -234,6 +245,8 @@ def test_account():
     """
     db = KeyValueDatabase(":memory:").child("tmp")
     acct = newAccount(db)
+    acct.unlock(cryptoKey)
+    acct.generateGapAddresses()
     for n in range(20):
         acct.nextExternalAddress()
     satoshis = int(round(5 * 1e8))
@@ -458,6 +471,18 @@ def test_account():
     assert revoked
 
 
+def test_account_unlock(monkeypatch):
+    def mock_privateKey(self):
+        raise crypto.CrazyKeyError
+
+    monkeypatch.setattr(crypto.ExtendedKey, "privateKey", mock_privateKey)
+    db = KeyValueDatabase(":memory:").child("tmp")
+    acct = newAccount(db)
+    assert not acct.isUnlocked()
+    with pytest.raises(DecredError):
+        acct.unlock(cryptoKey)
+
+
 def test_balance(prepareLogger):
     bal = account.Balance(1, 2, 3)
     encoded = account.Balance.blob(bal)
@@ -497,6 +522,8 @@ def test_gap_handling():
 
     account.DefaultGapLimit = gapLimit = 5
     acct = newAccount(db)
+    acct.unlock(cryptoKey)
+    acct.generateGapAddresses()
     acct.gapLimit = gapLimit
 
     listsAreEqual = lambda a, b: len(a) == len(b) and all(x == y for x, y in zip(a, b))
@@ -511,7 +538,6 @@ def test_gap_handling():
     assert listsAreEqual(acct.externalAddresses, externalAddrs[: gapLimit + 1])
 
     # Open the account to generate addresses.
-    acct.unlock(cryptoKey)
     acct.addTxid(internalAddrs[0], "C4fA6958A1847D")
     newAddrs = acct.generateGapAddresses()
     assert len(newAddrs) == 1
@@ -611,9 +637,6 @@ def test_ticket_info_from_spending_tx():
         "0000000000000000000000008000000"
     )
 
-    class Dummy:
-        pass
-
     class FakeTicketInfo(account.TicketInfo):
         def __init__(self):
             pass
@@ -629,14 +652,17 @@ def test_ticket_info_from_spending_tx():
 
     tinfo = ti.fromSpendingTx(ticket, rev, tinyP, tinyL, nets.testnet)
 
+    assert tinfo.status == "revoked"
     assert tinfo.purchaseBlock.height == 353577
-    assert tinfo.lotteryBlock.height == 355718
-    assert tinfo.revocation == rev.txid()
     assert tinfo.maturityHeight == 353593
     assert tinfo.expirationHeight == 359737
-    assert tinfo.purchaseTxFee == 5420
+    assert tinfo.lotteryBlock.height == 355718
+    assert tinfo.vote is None
+    assert tinfo.revocation == rev.txid()
     assert tinfo.poolFee == 131056
+    assert tinfo.purchaseTxFee == 5420
     assert tinfo.spendTxFee == 2571
+    assert tinfo.stakebase == 0
 
     ticket = (
         "0100000002bde648ee89dec1e687f2ddcab3ddce2953717c47f8716923"
@@ -708,15 +734,47 @@ def test_ticket_info_from_spending_tx():
 
     tinfo = ti.fromSpendingTx(ticket, v, tinyP, tinyL, nets.testnet)
 
+    assert tinfo.status == "voted"
     assert tinfo.purchaseBlock.height == 356425
-    assert tinfo.lotteryBlock.height == 357760
-    assert tinfo.vote == v.txid()
     assert tinfo.maturityHeight == 356441
     assert tinfo.expirationHeight == 362585
-    assert tinfo.stakebase == 26556582
-    assert tinfo.purchaseTxFee == 5420
+    assert tinfo.lotteryBlock.height == 357760
+    assert tinfo.vote == v.txid()
+    assert tinfo.revocation is None
     assert tinfo.poolFee == 131472
+    assert tinfo.purchaseTxFee == 5420
     assert tinfo.spendTxFee == 1
+    assert tinfo.stakebase == 26556582
+
+    tinfo = ti.fromSpendingTx(ticket, v, tinyP, None, nets.testnet)
+
+    assert tinfo.status == "unconfirmed"
+    assert tinfo.purchaseBlock.height == 356425
+    assert tinfo.maturityHeight == 356441
+    assert tinfo.expirationHeight == 362585
+    assert tinfo.lotteryBlock is None
+    assert tinfo.vote == v.txid()
+    assert tinfo.revocation is None
+    assert tinfo.poolFee == 131472
+    assert tinfo.purchaseTxFee == 5420
+    assert tinfo.spendTxFee == 1
+    assert tinfo.stakebase == 26556582
+
+
+def test_utxo_ticket_from_tx():
+    stakeSubmission = ByteArray(opcode.OP_SSTX)
+    stakeSubmission += opcode.OP_HASH160
+    stakeSubmission += opcode.OP_DATA_20
+    stakeSubmission += 1 << (8 * 19)
+    stakeSubmission += opcode.OP_EQUAL
+
+    tx = msgtx.MsgTx.new()
+    tx.txOut = [msgtx.TxOut(pkScript=stakeSubmission, value=3)]
+    ticket = account.UTXO.ticketFromTx(tx, nets.testnet)
+    assert ticket.tinfo.status == "mempool"
+    tinfo = account.TicketInfo("no_status", None, 0, 0, None, None, None)
+    ticket = account.UTXO.ticketFromTx(tx, nets.testnet, None, tinfo)
+    assert ticket.tinfo.status == "unconfirmed"
 
 
 def test_account_update_spent_tickets():
@@ -761,9 +819,9 @@ def test_account_update_spent_tickets():
     stakeSubmission += 1 << (8 * 19)
     stakeSubmission += opcode.OP_EQUAL
 
-    def newTinfo():
+    def newTinfo(status="live"):
         return account.TicketInfo(
-            status="live",
+            status=status,
             purchaseBlock=account.TinyBlock(ByteArray(0), 42),
             maturityHeight=0,
             expirationHeight=0,
@@ -825,6 +883,7 @@ def test_account_update_spent_tickets():
         "ab": newTinfo(),
         "ac": newTinfo(),
         "ad": newTinfo(),
+        "ae": newTinfo(status="unconfirmed"),
     }
 
     txs = {k: txWithTxid(k) for k in tinfos.keys() if k != "ab"}
@@ -886,7 +945,7 @@ def test_account_update_spent_tickets():
     # It is a revoked ticket.
     assert txid in acct.revokedTickets() and txid not in acct.unspentTickets()
 
-    txid = "ae"
+    txid = "af"
     called = False
     tDB[txid] = utxo
 
