@@ -9,7 +9,7 @@ import pytest
 
 from decred import DecredError
 from decred.crypto import crypto, opcode, rando
-from decred.dcr import account, nets, txscript
+from decred.dcr import account, dcrdata, nets, txscript
 from decred.dcr.vsp import PurchaseInfo, VotingServiceProvider
 from decred.dcr.wire import msgblock, msgtx
 from decred.util.database import KeyValueDatabase
@@ -194,7 +194,7 @@ def test_tiny_block(prepareLogger):
     assert tb1 == reTB
 
 
-def newAccount(db):
+def newAccount(db, blockchain=None):
     # Create an account key
     testSeed = ByteArray(
         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
@@ -205,7 +205,9 @@ def newAccount(db):
     acctKeyPub = acctKey.neuter()
     privKeyEncrypted = crypto.encrypt(cryptoKey, acctKey.serialize())
     pubKeyEncrypted = crypto.encrypt(cryptoKey, acctKeyPub.serialize())
-    return account.Account(pubKeyEncrypted, privKeyEncrypted, "acctName", "mainnet", db)
+    return account.Account(
+        pubKeyEncrypted, privKeyEncrypted, "acctName", "mainnet", db, blockchain
+    )
 
 
 # One utxo for each of external and internal branches.
@@ -481,6 +483,20 @@ def test_account_unlock(monkeypatch):
     assert not acct.isUnlocked()
     with pytest.raises(DecredError):
         acct.unlock(cryptoKey)
+
+
+def test_account_spent_ticket_info():
+    class BlockchainFull:
+        ticketInfo = lambda txid: account.TicketInfo("mempool", None, 0, 0, None, True)
+
+    class BlockchainEmpty:
+        ticketInfo = lambda txid: account.TicketInfo("mempool", None, 0, 0)
+
+    db = KeyValueDatabase(":memory:").child("tmp")
+    acct = newAccount(db, BlockchainFull)
+    assert acct.spentTicketInfo("some_txid")
+    acct = newAccount(db, BlockchainEmpty)
+    assert not acct.spentTicketInfo("some_txid")
 
 
 def test_balance(prepareLogger):
@@ -772,7 +788,7 @@ def test_utxo_ticket_from_tx():
     tx.txOut = [msgtx.TxOut(pkScript=stakeSubmission, value=3)]
     ticket = account.UTXO.ticketFromTx(tx, nets.testnet)
     assert ticket.tinfo.status == "mempool"
-    tinfo = account.TicketInfo("no_status", None, 0, 0, None, None, None)
+    tinfo = account.TicketInfo("no_status", None, 0, 0)
     ticket = account.UTXO.ticketFromTx(tx, nets.testnet, None, tinfo)
     assert ticket.tinfo.status == "unconfirmed"
 
@@ -1015,7 +1031,7 @@ def test_account_calc_ticket_profits():
     assert txFees == t
 
 
-def test_account_spend_ticket():
+def test_account_spend_ticket(monkeypatch):
     """
     Test updating spent tickets.
     """
@@ -1111,3 +1127,11 @@ def test_account_spend_ticket():
     acct.spendTicket(rev)
     tinfo = tDB[ticketRevokedTxid].tinfo
     assert tinfo.status == "revocation"
+
+    # Test the error case.
+    def mock_isSSGen(tx):
+        return False
+
+    monkeypatch.setattr(txscript, "isSSGen", mock_isSSGen)
+    with pytest.raises(DecredError):
+        acct.spendTicket(v)

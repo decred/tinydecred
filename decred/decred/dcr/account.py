@@ -7,15 +7,13 @@ See LICENSE for details
 from decred import DecredError
 from decred.crypto import crypto, opcode
 from decred.util import encode, helpers
+from decred.util.encode import BuildyBytes, ByteArray
 
 from . import nets, txscript
 from .vsp import VotingServiceProvider
 
 
 log = helpers.getLogger("DCRACCT")
-
-ByteArray = encode.ByteArray
-BuildyBytes = encode.BuildyBytes
 
 # In addition to the standard internal and external branches, we'll have a third
 # branch. This should help accomodate upcoming changes to dcrstakepool. See also
@@ -589,9 +587,7 @@ class UTXO:
             scriptPubKey=txout.pkScript,
             satoshis=txout.value,
             maturity=netParams.TicketMaturity,
-            tinfo=tinfo
-            if tinfo
-            else TicketInfo("mempool", None, 0, 0, None, None, None),
+            tinfo=tinfo if tinfo else TicketInfo("mempool", None, 0, 0),
         )
         if block:
             ticket.confirm(block, tx, netParams)
@@ -1117,7 +1113,7 @@ class Account:
         tinfo = self.blockchain.ticketInfo(txid)
         if tinfo.vote or tinfo.revocation:
             return tinfo
-        log.debug("ticket's tinfo not found on the blockchain {}".format(txid))
+        log.debug(f"ticket's tinfo not found on the blockchain {txid}")
 
     def spendTicket(self, tx):
         """
@@ -1132,11 +1128,7 @@ class Account:
         idx = 1 if isVote else 0
         ticketTxid = tx.txIn[idx].previousOutPoint.txid()
         if ticketTxid not in self.ticketDB:
-            raise DecredError(
-                "spending tx came for ticket that was not found in the database: {}".format(
-                    ticketTxid
-                )
-            )
+            raise DecredError(f"spending tx for ticket not in database: {ticketTxid}")
         tinfo = self.blockchain.ticketInfoForSpendingTx(tx.txid(), self.net)
 
         ticket = self.ticketDB[ticketTxid]

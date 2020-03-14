@@ -564,7 +564,7 @@ class DcrdataBlockchain:
         try:
             tinfo = account.TicketInfo.parse(self.dcrdata.tx.tinfo(txid))
         except Exception:
-            tinfo = account.TicketInfo("mempool", None, 0, 0, None, None, None)
+            tinfo = account.TicketInfo("mempool", None, 0, 0)
 
         return tinfo
 
