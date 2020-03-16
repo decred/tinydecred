@@ -3669,3 +3669,76 @@ def test_merge_scripts():
         assert (
             res == test["want"]
         ), f'wanted {test["want"].hex()} but got {res.hex()} for test {test["name"]}'
+
+
+def test_pays_high_fees():
+    # txIn is 58 bytes
+    txIn = msgtx.TxIn(
+        previousOutPoint=msgtx.OutPoint(txHash=ByteArray(bytes(32)), idx=0, tree=0,),
+        sequence=0,
+        valueIn=0,
+        blockHeight=0,
+        blockIndex=0,
+    )
+
+    # txOut is 11 bytes
+    def txOut(value):
+        return msgtx.TxOut(version=wire.DefaultPkScriptVersion, value=value)
+
+    # tx is 73 bytes
+    def tx():
+        return msgtx.MsgTx(
+            serType=wire.TxSerializeFull,
+            version=1,
+            txIn=[txIn],
+            txOut=[],
+            lockTime=0,
+            expiry=0,
+            cachedHash=None,
+        )
+
+    def txWithTxOuts(outs):
+        t = tx()
+        for out in outs:
+            t.txOut.append(out)
+        return t
+
+    """
+    High fees are bytes * 1e4atoms/kb * 1000. This can be simplified to bytes *
+    1e4atoms/byte.
+
+    name (str): Short description of the test.
+    totalInput (int): Input amount for the output transaciton.
+    tx (msgtx.MsgTx): the transaction to be spent.
+    want (bool): Wether this transaction pays insanely high fees.
+    """
+    tests = [
+        dict(
+            name="fee is not insanely high",
+            totalInput=1000000,
+            # high fee is 95bytes * 1e4atoms is 950000
+            # transaction fee is 1000000 - 50000 is 950000
+            tx=txWithTxOuts([txOut(20000), txOut(30000)]),
+            want=False,
+        ),
+        dict(
+            name="fee is insanely high",
+            totalInput=1000000,
+            # transaction fee is 1000000 - 49999 is 950001
+            tx=txWithTxOuts([txOut(20000), txOut(29999)]),
+            want=True,
+        ),
+        dict(
+            name="zero fee is always false",
+            totalInput=1e6,
+            # transaction fee is 1e6 - 1e6 is 0
+            tx=txWithTxOuts([txOut(5e5), txOut(5e5)]),
+            want=False,
+        ),
+    ]
+
+    for test in tests:
+        res = txscript.paysHighFees(test["totalInput"], test["tx"])
+        assert (
+            res == test["want"]
+        ), f'wanted {test["want"]} but got {res} for test {test["name"]}'
