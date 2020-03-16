@@ -54,6 +54,47 @@ def filterCrazyAddress(addrs):
     return [a for a in addrs if a != CrazyAddress]
 
 
+def unblob_check(class_name, version, pushes, check_data):
+    """
+    Check version and pushes to unblob.
+
+    Args:
+        class_name str: the class name that will appear in error messages.
+        version int: the version number that will be checked.
+        pushes int: the number of pushes that will be checked.
+        check_data dict: keys are version numbers, values are number of
+            expected pushes.
+
+    Raises:
+        NotImplementedError if version is not in check_data keys.
+        DecredError if pushes is not the value in check_data keyed by version.
+    """
+    if version not in check_data.keys():
+        raise NotImplementedError(f"{class_name}: unsupported version {version}")
+    expected_pushes = check_data[version]
+    if pushes != expected_pushes:
+        raise DecredError(
+            f"{class_name}: expected {expected_pushes} pushes, got {pushes}"
+        )
+
+
+def readAddrs(db):
+    """
+    Read and verify the address index database. Create a list of addresses.
+
+    Args:
+        db (database.Bucket): The address table that maps address to child
+            index.
+
+    Returns:
+        list(string): The list of addresses.
+    """
+    pairs = sorted(db.items(), key=lambda pair: pair[0])
+    if pairs and len(pairs) != pairs[-1][0] + 1:
+        raise DecredError("address index mismatch")
+    return [pair[1] for pair in pairs]
+
+
 class KeySource:
     """
     Implements the KeySource API from tinydecred.api. Must provide access to
@@ -135,30 +176,6 @@ class TicketStats:
         """
         self.count = count
         self.value = value
-
-
-def unblob_check(class_name, version, pushes, check_data):
-    """
-    Check version and pushes to unblob.
-
-    Args:
-        class_name str: the class name that will appear in error messages.
-        version int: the version number that will be checked.
-        pushes int: the number of pushes that will be checked.
-        check_data dict: keys are version numbers, values are number of
-            expected pushes.
-
-    Raises:
-        NotImplementedError if version is not in check_data keys.
-        DecredError if pushes is not the value in check_data keyed by version.
-    """
-    if version not in check_data.keys():
-        raise NotImplementedError(f"{class_name}: unsupported version {version}")
-    expected_pushes = check_data[version]
-    if pushes != expected_pushes:
-        raise DecredError(
-            f"{class_name}: expected {expected_pushes} pushes, got {pushes}"
-        )
 
 
 class TinyBlock:
@@ -1986,20 +2003,3 @@ class Account:
         signals.balance(self.calcBalance())
 
         return True
-
-
-def readAddrs(db):
-    """
-    Read and verify the address index database. Create a list of addresses.
-
-    Args:
-        db (database.Bucket): The address table that maps address to child
-            index.
-
-    Returns:
-        list(string): The list of addresses.
-    """
-    pairs = sorted(db.items(), key=lambda pair: pair[0])
-    if pairs and len(pairs) != pairs[-1][0] + 1:
-        raise DecredError("address index mismatch")
-    return [pair[1] for pair in pairs]
