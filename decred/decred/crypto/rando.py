@@ -34,7 +34,10 @@ def checkSeedLength(length):
 
 def generateSeed(length=MaxSeedBytes):
     """
-    Generate a cryptographically-strong random string of the given length.
+    Generate a cryptographically-strong random seed.
+
+    Returns:
+        bytes: a random bytes object of the given length.
 
     Raises:
         DecredError if length is not between MinSeedBytes and MaxSeedBytes
@@ -46,27 +49,39 @@ def generateSeed(length=MaxSeedBytes):
 
 def newHashRaw():
     """
-    Generate a random hash of HASH_SIZE length as a string.
+    Generate a random hash of HASH_SIZE length.
+
+    Returns:
+        bytes: a random bytes object of HASH_SIZE length.
     """
     return generateSeed(HASH_SIZE)
 
 
 def newHash():
     """
-    Generate a random hash of HASH_SIZE length as a ByteArray.
+    Generate a wrapped random hash of HASH_SIZE length.
+
+    Returns:
+        bytes: a random ByteArray object of HASH_SIZE length.
     """
     return ByteArray(newHashRaw())
 
 
 def newKeyRaw():
     """
-    Generate a random key of KEY_SIZE length as a string.
+    Generate a random key of KEY_SIZE length.
+
+    Returns:
+        bytes: a random bytes object of KEY_SIZE length.
     """
     return generateSeed(KEY_SIZE)
 
 
 def newKey():
     """
-    Generate a random key of KEY_SIZE length as a ByteArray.
+    Generate a wrapped random key of KEY_SIZE length.
+
+    Returns:
+        bytes: a random ByteArray object of KEY_SIZE length.
     """
     return ByteArray(newKeyRaw())
