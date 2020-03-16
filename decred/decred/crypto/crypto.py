@@ -626,7 +626,7 @@ class ExtendedKey:
         Returns:
             crypto.ExtendedKey: A master hierarchical deterministic key.
         """
-        rando.checkSeed(len(seed))
+        rando.checkSeedLength(len(seed))
 
         # First take the HMAC-SHA512 of the master key and the seed data:
         # SHA512 hash is 64 bytes.

@@ -17,27 +17,56 @@ MinSeedBytes = 16  # 128 bits
 MaxSeedBytes = 64  # 512 bits
 
 
-def checkSeed(length):
+def checkSeedLength(length):
+    """
+    Check that seed length is correct.
+
+    Args:
+        length int: the seed length to be checked.
+
+    Raises:
+        DecredError if length is not between MinSeedBytes and MaxSeedBytes
+        included.
+    """
     if length < MinSeedBytes or length > MaxSeedBytes:
         raise DecredError(f"Invalid seed length {length}")
 
 
 def generateSeed(length=MaxSeedBytes):
-    checkSeed(length)
+    """
+    Generate a cryptographically-strong random string of the given length.
+
+    Raises:
+        DecredError if length is not between MinSeedBytes and MaxSeedBytes
+        included.
+    """
+    checkSeedLength(length)
     return os.urandom(length)
 
 
 def newHashRaw():
+    """
+    Generate a random hash of HASH_SIZE length as a string.
+    """
     return generateSeed(HASH_SIZE)
 
 
 def newHash():
+    """
+    Generate a random hash of HASH_SIZE length as a ByteArray.
+    """
     return ByteArray(newHashRaw())
 
 
 def newKeyRaw():
+    """
+    Generate a random key of KEY_SIZE length as a string.
+    """
     return generateSeed(KEY_SIZE)
 
 
 def newKey():
+    """
+    Generate a random key of KEY_SIZE length as a ByteArray.
+    """
     return ByteArray(newKeyRaw())
