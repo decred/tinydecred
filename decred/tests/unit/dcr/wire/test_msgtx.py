@@ -8,16 +8,12 @@ import time
 import pytest
 
 from decred import DecredError
-from decred.crypto import rando
+from decred.crypto.rando import newHash
 from decred.dcr.wire import msgtx, wire
 from decred.util.encode import ByteArray
 
 
 LOGGER_ID = "TestMsgTx"
-
-
-def newHash():
-    return ByteArray(rando.generateSeed(32))
 
 
 # fmt: off

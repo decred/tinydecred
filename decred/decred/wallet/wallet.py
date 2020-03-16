@@ -1,6 +1,6 @@
 """
 Copyright (c) 2019, Brian Stafford
-Copyright (c) 2019, The Decred developers
+Copyright (c) 2019-2020, The Decred developers
 See LICENSE for details
 """
 
@@ -64,7 +64,7 @@ class Wallet(object):
             netParams (object): Network parameters.
         """
         pwKey = crypto.SecretKey(pw)
-        cryptoKey = encode.ByteArray(rando.generateSeed(crypto.KEY_SIZE))
+        cryptoKey = rando.newKey()
         root = crypto.ExtendedKey.new(seed)
         self.masterDB[DBKeys.cryptoKey] = pwKey.encrypt(cryptoKey)
         self.masterDB[DBKeys.root] = root.serialize()
@@ -95,7 +95,7 @@ class Wallet(object):
         """
         if len(password) == 0:
             raise AssertionError("empty password not allowed")
-        seed = rando.generateSeed(crypto.KEY_SIZE)
+        seed = rando.newKeyRaw()
         wallet = Wallet(path)
         wallet.initialize(seed, password.encode(), netParams)
         words = mnemonic.encode(seed)

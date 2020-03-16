@@ -1,5 +1,5 @@
 """
-Copyright (c) 2019, the Decred developers
+Copyright (c) 2019-2020, the Decred developers
 See LICENSE for details
 """
 
@@ -18,10 +18,6 @@ from decred.dcr.calc import SubsidyCache
 from decred.dcr.nets import mainnet, testnet
 from decred.dcr.wire import msgtx, wire
 from decred.util.encode import ByteArray
-
-
-def newHash():
-    return ByteArray(rando.generateSeed(32))
 
 
 def parseShortForm(asm):
@@ -70,7 +66,8 @@ def scriptClassTests():
             script="DATA_32 NULL_BYTES_32 1 CHECKSIGALT",
             scriptClass=txscript.PubkeyAltTy,
         ),
-        # OP_DATA_33 <1-byte prefix and 32-byte remaining pubkey> <1-byte schnorr+secp sigtype> OP_CHECKSIGALT
+        # OP_DATA_33 <1-byte prefix and 32-byte remaining pubkey>
+        #   <1-byte schnorr+secp sigtype> OP_CHECKSIGALT
         scriptClassTest(
             name="Pay PubkeyAltScript STSchnorrSecp256k1",
             script="DATA_33 0x02 NULL_BYTES_32 2 CHECKSIGALT",
@@ -479,7 +476,7 @@ def sstxBadVersionOut():
     return msgtx.MsgTx(
         serType=wire.TxSerializeFull,
         version=1,
-        txIn=[sstxTxIn(), sstxTxIn(), sstxTxIn(),],
+        txIn=[sstxTxIn(), sstxTxIn(), sstxTxIn()],
         txOut=[
             sstxTxOut0(),
             sstxTxOut1(),
@@ -601,7 +598,7 @@ def ssgenTxOut1():
         value=0x00000000,  # 0
         version=0x0000,
         pkScript=ByteArray(
-            [0x6A, 0x02, 0x94, 0x8C,]  # OP_RETURN  # 2 bytes to be pushed  # Vote bits
+            [0x6A, 0x02, 0x94, 0x8C]  # OP_RETURN  # 2 bytes to be pushed  # Vote bits
         ),
     )
     # fmt: on
@@ -693,8 +690,8 @@ def ssgenMsgTx():
     return msgtx.MsgTx(
         serType=wire.TxSerializeFull,
         version=1,
-        txIn=[ssgenTxIn0(), ssgenTxIn1(),],
-        txOut=[ssgenTxOut0(), ssgenTxOut1(), ssgenTxOut2(), ssgenTxOut3(),],
+        txIn=[ssgenTxIn0(), ssgenTxIn1()],
+        txOut=[ssgenTxOut0(), ssgenTxOut1(), ssgenTxOut2(), ssgenTxOut3()],
         lockTime=0,
         expiry=0,
         cachedHash=None,
@@ -708,8 +705,8 @@ def ssgenMsgTxExtraInput():
     return msgtx.MsgTx(
         serType=wire.TxSerializeFull,
         version=1,
-        txIn=[ssgenTxIn0(), ssgenTxIn1(), ssgenTxIn1(),],
-        txOut=[ssgenTxOut0(), ssgenTxOut1(), ssgenTxOut2(),],
+        txIn=[ssgenTxIn0(), ssgenTxIn1(), ssgenTxIn1()],
+        txOut=[ssgenTxOut0(), ssgenTxOut1(), ssgenTxOut2()],
         lockTime=0,
         expiry=0,
         cachedHash=None,
@@ -724,7 +721,7 @@ def ssgenMsgTxExtraOutputs():
     return msgtx.MsgTx(
         serType=wire.TxSerializeFull,
         version=1,
-        txIn=[ssgenTxIn0(), ssgenTxIn1(),],
+        txIn=[ssgenTxIn0(), ssgenTxIn1()],
         txOut=[
             ssgenTxOut0(),
             ssgenTxOut1(),
@@ -760,8 +757,8 @@ def ssgenMsgTxStakeBaseWrong():
     return msgtx.MsgTx(
         serType=wire.TxSerializeFull,
         version=1,
-        txIn=[ssgenTxIn1(), ssgenTxIn0(),],
-        txOut=[ssgenTxOut0(), ssgenTxOut1(), ssgenTxOut2(),],
+        txIn=[ssgenTxIn1(), ssgenTxIn0()],
+        txOut=[ssgenTxOut0(), ssgenTxOut1(), ssgenTxOut2()],
         lockTime=0,
         expiry=0,
         cachedHash=None,
@@ -776,8 +773,8 @@ def ssgenMsgTxBadVerOut():
     return msgtx.MsgTx(
         serType=wire.TxSerializeFull,
         version=1,
-        txIn=[ssgenTxIn0(), ssgenTxIn1(),],
-        txOut=[ssgenTxOut0(), ssgenTxOut1(), ssgenTxOut2(), ssgenTxOut3BadVer(),],
+        txIn=[ssgenTxIn0(), ssgenTxIn1()],
+        txOut=[ssgenTxOut0(), ssgenTxOut1(), ssgenTxOut2(), ssgenTxOut3BadVer()],
         lockTime=0,
         expiry=0,
         cachedHash=None,
@@ -792,8 +789,8 @@ def ssgenMsgTxWrongZeroethOut():
     return msgtx.MsgTx(
         serType=wire.TxSerializeFull,
         version=1,
-        txIn=[ssgenTxIn0(), ssgenTxIn1(),],
-        txOut=[ssgenTxOut2(), ssgenTxOut1(), ssgenTxOut0(),],
+        txIn=[ssgenTxIn0(), ssgenTxIn1()],
+        txOut=[ssgenTxOut2(), ssgenTxOut1(), ssgenTxOut0()],
         lockTime=0,
         expiry=0,
         cachedHash=None,
@@ -808,8 +805,8 @@ def ssgenMsgTxWrongFirstOut():
     return msgtx.MsgTx(
         serType=wire.TxSerializeFull,
         version=1,
-        txIn=[ssgenTxIn0(), ssgenTxIn1(),],
-        txOut=[ssgenTxOut0(), ssgenTxOut2(), ssgenTxOut1(),],
+        txIn=[ssgenTxIn0(), ssgenTxIn1()],
+        txOut=[ssgenTxOut0(), ssgenTxOut2(), ssgenTxOut1()],
         lockTime=0,
         expiry=0,
         cachedHash=None,
@@ -1451,7 +1448,7 @@ class TestTxScript(unittest.TestCase):
         b = ssgen.serialize().bytes()
         # fmt: off
         b = b.replace(
-            bytes([0x04, 0x6A, 0x02, 0x94, 0x8C,]), bytes([0x03, 0x6A, 0x01, 0x94,])
+            bytes([0x04, 0x6A, 0x02, 0x94, 0x8C]), bytes([0x03, 0x6A, 0x01, 0x94])
         )
         # fmt: on
 
@@ -1467,9 +1464,9 @@ class TestTxScript(unittest.TestCase):
         b = ssgen.serialize().bytes()
         # fmt: off
         b = b.replace(
-            bytes([0x04, 0x6A, 0x02, 0x94, 0x8C,]),
+            bytes([0x04, 0x6A, 0x02, 0x94, 0x8C]),
             # This uses an OP_PUSHDATA_1 2-byte push to do the push in 5 bytes
-            bytes([0x05, 0x6a, 0x4c, 0x02, 0x00, 0x00,]),
+            bytes([0x05, 0x6a, 0x4c, 0x02, 0x00, 0x00]),
         )
         # fmt: on
 
@@ -1485,8 +1482,8 @@ class TestTxScript(unittest.TestCase):
         b = ssgen.serialize().bytes()
         # fmt: off
         b = b.replace(
-            bytes([0x1A, 0xBB, 0x76, 0xA9, 0x14, 0xC3, 0x98,]),
-            bytes([0x19, 0x76, 0xA9, 0x14, 0xC3, 0x98,]),
+            bytes([0x1A, 0xBB, 0x76, 0xA9, 0x14, 0xC3, 0x98]),
+            bytes([0x19, 0x76, 0xA9, 0x14, 0xC3, 0x98]),
         )
         # fmt: on
 
@@ -1959,15 +1956,27 @@ class TestTxScript(unittest.TestCase):
         tests = (
             (
                 "b78a743c0c6557f24a51192b82925942ebade0be86efd7dad58b9fa358d3857c",
-                "4730440220411b0a068d5b1c5fd6ec98a0e3f17ce632a863a9d57876c0bde2647a8dcd26c602204f05f109f0f185cc79a43168411075eb58fd350cc135f4872b0b8c81015e21c3012102e11d2c0e415343435294079ac0774a21c8e6b1e6fd9b671cb08af43a397f3df1",
+                #
+                "4730440220411b0a068d5b1c5fd6ec98a0e3f17ce632a863a9d57876c0bde264"
+                "7a8dcd26c602204f05f109f0f185cc79a43168411075eb58fd350cc135f4872b"
+                "0b8c81015e21c3012102e11d2c0e415343435294079ac0774a21c8e6b1e6fd9b"
+                "671cb08af43a397f3df1",
             ),
             (
                 "a00616c21b117ba621d4c72faf30d30cd665416bdc3c24e549de2348ac68cfb8",
-                "473044022050a359daf7db3db11e95ceb8494173f8ca168b32ccc6cc57dcad5f78564678af02200c09e2c7c72736ef9835f05eb0c6eb72fdd2e1e98cdaf7af7f2d9523ed5f410501210224397bd81b0e80ec1bbfe104fb251b57eb0adcf044c3eec05d913e2e8e04396b",
+                #
+                "473044022050a359daf7db3db11e95ceb8494173f8ca168b32ccc6cc57dcad5f"
+                "78564678af02200c09e2c7c72736ef9835f05eb0c6eb72fdd2e1e98cdaf7af7f"
+                "2d9523ed5f410501210224397bd81b0e80ec1bbfe104fb251b57eb0adcf044c3"
+                "eec05d913e2e8e04396b",
             ),
             (
                 "8902ea1f64c6fb7aa40dfbe798f5dc53b466a3fc01534e867581936a8ecbff5b",
-                "4730440220257fe3c52ce408561aec4446c30bca6d6fad98ba554917c4e7714a89badbfdbf02201aa569c5e28d728dd20ce32656915729ebc6679527bfe2401ea3723791e04538012103255f71eab9eb2a7e3f822569484448acbe2880d61b4db61020f73fd54cbe370d",
+                #
+                "4730440220257fe3c52ce408561aec4446c30bca6d6fad98ba554917c4e7714a"
+                "89badbfdbf02201aa569c5e28d728dd20ce32656915729ebc6679527bfe2401e"
+                "a3723791e04538012103255f71eab9eb2a7e3f822569484448acbe2880d61b4d"
+                "b61020f73fd54cbe370d",
             ),
         )
 
@@ -2023,15 +2032,27 @@ class TestTxScript(unittest.TestCase):
         tests = (
             (
                 "b78a743c0c6557f24a51192b82925942ebade0be86efd7dad58b9fa358d3857c",
-                "483045022100ad46b5bd365af6964562bfac90abad9d9cf30fdc53ae4011103c646df04a7d5f022076209ea5626cb9a3f16add11c361f6f66c7436eec8efe1688e43ac9f71a86b88012102e11d2c0e415343435294079ac0774a21c8e6b1e6fd9b671cb08af43a397f3df1",
+                #
+                "483045022100ad46b5bd365af6964562bfac90abad9d9cf30fdc53ae4011103c"
+                "646df04a7d5f022076209ea5626cb9a3f16add11c361f6f66c7436eec8efe168"
+                "8e43ac9f71a86b88012102e11d2c0e415343435294079ac0774a21c8e6b1e6fd"
+                "9b671cb08af43a397f3df1",
             ),
             (
                 "a00616c21b117ba621d4c72faf30d30cd665416bdc3c24e549de2348ac68cfb8",
-                "483045022100eeacc7f3fcba009f6ab319b2221e64d52d94d5009cfd037ef03c86dc1bcb2c990220212000f05d1a904d3d995b18b8b94bd0e84dc35aa308df5149094678f6cd40e501210224397bd81b0e80ec1bbfe104fb251b57eb0adcf044c3eec05d913e2e8e04396b",
+                #
+                "483045022100eeacc7f3fcba009f6ab319b2221e64d52d94d5009cfd037ef03c"
+                "86dc1bcb2c990220212000f05d1a904d3d995b18b8b94bd0e84dc35aa308df51"
+                "49094678f6cd40e501210224397bd81b0e80ec1bbfe104fb251b57eb0adcf044"
+                "c3eec05d913e2e8e04396b",
             ),
             (
                 "8902ea1f64c6fb7aa40dfbe798f5dc53b466a3fc01534e867581936a8ecbff5b",
-                "47304402200fa66dd2be65cd8c0e89bc299b99cadac36805af627432cbdc968c53b4c4f41b02200b117b145dfdb6ba7846b9b02c63d85d11bfc2188f58f083da6bb88220a9e517012103255f71eab9eb2a7e3f822569484448acbe2880d61b4db61020f73fd54cbe370d",
+                #
+                "47304402200fa66dd2be65cd8c0e89bc299b99cadac36805af627432cbdc968c"
+                "53b4c4f41b02200b117b145dfdb6ba7846b9b02c63d85d11bfc2188f58f083da"
+                "6bb88220a9e517012103255f71eab9eb2a7e3f822569484448acbe2880d61b4d"
+                "b61020f73fd54cbe370d",
             ),
         )
 
@@ -2091,15 +2112,36 @@ class TestTxScript(unittest.TestCase):
         tests = (
             (
                 "b78a743c0c6557f24a51192b82925942ebade0be86efd7dad58b9fa358d3857c",
-                "483045022100f12b12474e64b807eaeda6ac05b26d4b6bee2519385a84815f4ec2ccdf0aa45b022055c590d36a172c4735c8886572723037dc65329e70b8e5e012a9ec24993c284201483045022100ae2fec7236910b0bbc5eab37b7d987d61f22139f6381f2cc9781373e4f470c37022037d8b1658c2a83c40cc1b97036239eb0f4b313f3d2bf4558de33412e834c45d50147522102e11d2c0e415343435294079ac0774a21c8e6b1e6fd9b671cb08af43a397f3df1210224397bd81b0e80ec1bbfe104fb251b57eb0adcf044c3eec05d913e2e8e04396b52ae",
+                #
+                "483045022100f12b12474e64b807eaeda6ac05b26d4b6bee2519385a84815f4e"
+                "c2ccdf0aa45b022055c590d36a172c4735c8886572723037dc65329e70b8e5e0"
+                "12a9ec24993c284201483045022100ae2fec7236910b0bbc5eab37b7d987d61f"
+                "22139f6381f2cc9781373e4f470c37022037d8b1658c2a83c40cc1b97036239e"
+                "b0f4b313f3d2bf4558de33412e834c45d50147522102e11d2c0e415343435294"
+                "079ac0774a21c8e6b1e6fd9b671cb08af43a397f3df1210224397bd81b0e80ec"
+                "1bbfe104fb251b57eb0adcf044c3eec05d913e2e8e04396b52ae",
             ),
             (
                 "a00616c21b117ba621d4c72faf30d30cd665416bdc3c24e549de2348ac68cfb8",
-                "473044022047b34afd287cacbc4ba0d95d985b23a55069c0bd81d61eb32435348bef2dc6c602201e4c7c0c437d4d53172cac355eadd70c8b87d3936c7a0a0179201b9b9327852d01483045022100df1975379ac38dcc5caddb1f55974b5b08a22b4fdb6e88be9ba12da0c0ecfbed022042bc3420adde7410f463caa998a460d58b214bf082e004b5067a4c0f061e0769014752210224397bd81b0e80ec1bbfe104fb251b57eb0adcf044c3eec05d913e2e8e04396b2103255f71eab9eb2a7e3f822569484448acbe2880d61b4db61020f73fd54cbe370d52ae",
+                #
+                "473044022047b34afd287cacbc4ba0d95d985b23a55069c0bd81d61eb3243534"
+                "8bef2dc6c602201e4c7c0c437d4d53172cac355eadd70c8b87d3936c7a0a0179"
+                "201b9b9327852d01483045022100df1975379ac38dcc5caddb1f55974b5b08a2"
+                "2b4fdb6e88be9ba12da0c0ecfbed022042bc3420adde7410f463caa998a460d5"
+                "8b214bf082e004b5067a4c0f061e0769014752210224397bd81b0e80ec1bbfe1"
+                "04fb251b57eb0adcf044c3eec05d913e2e8e04396b2103255f71eab9eb2a7e3f"
+                "822569484448acbe2880d61b4db61020f73fd54cbe370d52ae",
             ),
             (
                 "8902ea1f64c6fb7aa40dfbe798f5dc53b466a3fc01534e867581936a8ecbff5b",
-                "473044022002d1251cb8a2f1a20225948f99e6c71a188915c3ca0dc433ca9c35c050ee1dd602206880d041a9a9f9888ab751a371768bffd89251edf354eccdac73fe1376095ba20147304402204ddebf367aea5750123c2b4807815487d07239c776b6cc70a99c46a8b3261f4c022044549b4aeda7eb08692fa500b5518655be61fd5299c07adf0caddf41ab391dd00147522103255f71eab9eb2a7e3f822569484448acbe2880d61b4db61020f73fd54cbe370d2102e11d2c0e415343435294079ac0774a21c8e6b1e6fd9b671cb08af43a397f3df152ae",
+                #
+                "473044022002d1251cb8a2f1a20225948f99e6c71a188915c3ca0dc433ca9c35"
+                "c050ee1dd602206880d041a9a9f9888ab751a371768bffd89251edf354eccdac"
+                "73fe1376095ba20147304402204ddebf367aea5750123c2b4807815487d07239"
+                "c776b6cc70a99c46a8b3261f4c022044549b4aeda7eb08692fa500b5518655be"
+                "61fd5299c07adf0caddf41ab391dd00147522103255f71eab9eb2a7e3f822569"
+                "484448acbe2880d61b4db61020f73fd54cbe370d2102e11d2c0e415343435294"
+                "079ac0774a21c8e6b1e6fd9b671cb08af43a397f3df152ae",
             ),
         )
 
@@ -2165,9 +2207,7 @@ class TestTxScript(unittest.TestCase):
 
     def test_sign_stake_p2pkh_outputs(self):
         txIn = msgtx.TxIn(
-            previousOutPoint=msgtx.OutPoint(
-                txHash=ByteArray(rando.generateSeed(32)), idx=0, tree=0,
-            ),
+            previousOutPoint=msgtx.OutPoint(txHash=rando.newHash(), idx=0, tree=0),
             sequence=4294967295,
             valueIn=1,
             blockHeight=78901,
@@ -2307,8 +2347,10 @@ class TestTxScript(unittest.TestCase):
         tests.append(
             test(
                 # Taken from transactions:
-                # output: 3c9018e8d5615c306d72397f8f5eef44308c98fb576a88e030c25456b4f3a7ac
-                # input:  837dea37ddc8b1e3ce646f1a656e79bbd8cc7f558ac56a169626d649ebe2a3ba.
+                # output:
+                #   3c9018e8d5615c306d72397f8f5eef44308c98fb576a88e030c25456b4f3a7ac
+                # input:
+                #   837dea37ddc8b1e3ce646f1a656e79bbd8cc7f558ac56a169626d649ebe2a3ba.
                 name="mainnet p2sh",
                 addr="DcuQKx8BES9wU7C6Q5VmLBjw436r27hayjS",
                 encoded="DcuQKx8BES9wU7C6Q5VmLBjw436r27hayjS",
@@ -2327,7 +2369,8 @@ class TestTxScript(unittest.TestCase):
         tests.append(
             test(
                 # Taken from transactions:
-                # output: b0539a45de13b3e0403909b8bd1a555b8cbe45fd4e3f3fda76f3a5f52835c29d
+                # output:
+                #   b0539a45de13b3e0403909b8bd1a555b8cbe45fd4e3f3fda76f3a5f52835c29d
                 # input: (not yet redeemed at time test was written)
                 name="mainnet p2sh 2",
                 addr="DcqgK4N4Ccucu2Sq4VDAdu4wH4LASLhzLVp",
@@ -2733,7 +2776,9 @@ class TestTxScript(unittest.TestCase):
                 reqSigs=1,
                 scriptClass=txscript.ScriptHashTy,
             ),
-            # from real tx 60a20bd93aa49ab4b28d514ec10b06e1829ce6818ec06cd3aabd013ebcdc4bb1, vout 0
+            # from real tx
+            # 60a20bd93aa49ab4b28d514ec10b06e1829ce6818ec06cd3aabd013ebcdc4bb1,
+            # vout 0
             dict(
                 name="standard 1 of 2 multisig",
                 script=ByteArray(
@@ -2762,7 +2807,9 @@ class TestTxScript(unittest.TestCase):
                 reqSigs=1,
                 scriptClass=txscript.MultiSigTy,
             ),
-            # from real tx d646f82bd5fbdb94a36872ce460f97662b80c3050ad3209bef9d1e398ea277ab, vin 1
+            # from real tx
+            # d646f82bd5fbdb94a36872ce460f97662b80c3050ad3209bef9d1e398ea277ab,
+            # vin 1
             dict(
                 name="standard 2 of 3 multisig",
                 script=ByteArray(
@@ -2888,9 +2935,10 @@ class TestTxScript(unittest.TestCase):
         ]
 
         def checkAddrs(a, b, name):
-            assert len(a) == len(
-                b
-            ), f"extracted address length mismatch. expected {len(a)}, got {len(b)} for test {name}"
+            assert len(a) == len(b), (
+                f"Extracted address length mismatch. "
+                f"Expected {len(a)}, got {len(b)} for test {name}"
+            )
 
             for av, bv in zip(a, b):
                 assert (
@@ -3485,7 +3533,7 @@ def test_is_dust_amount():
 
 
 def test_merge_scripts():
-    root = crypto.ExtendedKey.new(newHash().bytes())
+    root = crypto.ExtendedKey.new(rando.newHash().bytes())
     privKey1 = root.child(0).privateKey().key
     privKey2 = root.child(1).privateKey().key
     privKey3 = root.child(2).privateKey().key
@@ -3514,7 +3562,7 @@ def test_merge_scripts():
     )
     multisigHash = crypto.hash160(multisig.bytes())
     multisigP2SH = ByteArray(
-        [opcode.OP_HASH160, opcode.OP_DATA_20, *multisigHash, opcode.OP_EQUAL,]
+        [opcode.OP_HASH160, opcode.OP_DATA_20, *multisigHash, opcode.OP_EQUAL]
     )
     # fmt: off
     rawTx = ByteArray([

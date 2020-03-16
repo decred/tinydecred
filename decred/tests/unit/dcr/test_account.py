@@ -9,7 +9,7 @@ import pytest
 
 from decred import DecredError
 from decred.crypto import crypto, opcode, rando
-from decred.dcr import account, dcrdata, nets, txscript
+from decred.dcr import account, nets, txscript
 from decred.dcr.vsp import PurchaseInfo, VotingServiceProvider
 from decred.dcr.wire import msgblock, msgtx
 from decred.util.database import KeyValueDatabase
@@ -18,7 +18,7 @@ from decred.util.encode import ByteArray
 
 LOGGER_ID = "test_account"
 
-cryptoKey = crypto.ByteArray(rando.generateSeed(32))
+cryptoKey = rando.newKey()
 
 ticketScript = ByteArray("baa914f5618dfc002becfe840da65f6a49457f41d4f21787")
 
@@ -177,7 +177,7 @@ def test_utxo(prepareLogger):
 
 
 def test_tiny_block(prepareLogger):
-    blockHash = rando.generateSeed(32)
+    blockHash = rando.newHashRaw()
     height = 55
     TinyBlock = account.TinyBlock
     tb1 = TinyBlock(blockHash, height)
@@ -252,7 +252,7 @@ def test_account():
     for n in range(20):
         acct.nextExternalAddress()
     satoshis = int(round(5 * 1e8))
-    txHash = ByteArray(rando.generateSeed(32))
+    txHash = rando.newHash()
     txid = reversed(txHash).hex()
     vout = 2
     address = acct.nextExternalAddress()
@@ -314,11 +314,11 @@ def test_account():
     acct.signals = Signals
 
     # Add a txid for this first address
-    txid = ByteArray(rando.generateSeed(32)).hex()
+    txid = rando.newHash().hex()
     zerothAddr = acct.externalAddresses[0]
     acct.addTxid(zerothAddr, txid)
     # Add a voting service provider
-    vspKey = ByteArray(rando.generateSeed(32)).hex()
+    vspKey = rando.newKey().hex()
     ticketAddr = "ticketAddr"
     pi = PurchaseInfo("addr", 1.0, ByteArray(b"scripthashscript"), ticketAddr, 1, 0, 2)
     vsp = VotingServiceProvider("https://myvsp.com", vspKey, nets.mainnet.Name, pi)
