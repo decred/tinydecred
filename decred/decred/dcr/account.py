@@ -78,23 +78,6 @@ def unblob_check(class_name, version, pushes, check_data):
         )
 
 
-def readAddrs(db):
-    """
-    Read and verify the address index database. Create a list of addresses.
-
-    Args:
-        db (database.Bucket): The address table that maps address to child
-            index.
-
-    Returns:
-        list(string): The list of addresses.
-    """
-    pairs = sorted(db.items(), key=lambda pair: pair[0])
-    if pairs and len(pairs) != pairs[-1][0] + 1:
-        raise DecredError("address index mismatch")
-    return [pair[1] for pair in pairs]
-
-
 class KeySource:
     """
     Implements the KeySource API from tinydecred.api. Must provide access to
@@ -922,6 +905,23 @@ class Account:
         """
         return ByteArray(Account.blob(self))
 
+    @staticmethod
+    def readAddrs(db):
+        """
+        Read and verify the address index database. Create a list of addresses.
+
+        Args:
+            db (database.Bucket): The address table that maps address to child
+                index.
+
+        Returns:
+            list(string): The list of addresses.
+        """
+        pairs = sorted(db.items(), key=lambda pair: pair[0])
+        if pairs and len(pairs) != pairs[-1][0] + 1:
+            raise DecredError("address index mismatch")
+        return [pair[1] for pair in pairs]
+
     def load(self, db, blockchain, signals):
         """
         Prep the database and read the account data.
@@ -939,9 +939,9 @@ class Account:
         self.utxos = {k: v for k, v in self.utxoDB.items()}
         self.ticketDB = db.child("tickets", datatypes=("TEXT", "BLOB"), blobber=UTXO)
         self.addrIntDB = db.child("internal_addrs", datatypes=("INTEGER", "TEXT"))
-        self.internalAddresses = readAddrs(self.addrIntDB)
+        self.internalAddresses = self.readAddrs(self.addrIntDB)
         self.addrExtDB = db.child("external_addrs", datatypes=("INTEGER", "TEXT"))
-        self.externalAddresses = readAddrs(self.addrExtDB)
+        self.externalAddresses = self.readAddrs(self.addrExtDB)
         self.addrTxDB = db.child(
             "address_txid", datatypes=("TEXT", "BLOB"), unique=False
         )
