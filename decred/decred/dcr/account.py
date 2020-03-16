@@ -7,15 +7,13 @@ See LICENSE for details
 from decred import DecredError
 from decred.crypto import crypto, opcode
 from decred.util import encode, helpers
+from decred.util.encode import BuildyBytes, ByteArray
 
 from . import nets, txscript
 from .vsp import VotingServiceProvider
 
 
 log = helpers.getLogger("DCRACCT")
-
-ByteArray = encode.ByteArray
-BuildyBytes = encode.BuildyBytes
 
 # In addition to the standard internal and external branches, we'll have a third
 # branch. This should help accomodate upcoming changes to dcrstakepool. See also
@@ -417,10 +415,10 @@ class TicketInfo:
             lotteryBlock=lotteryBlock,
             vote=spendingTx.txid() if isVote else None,
             revocation=spendingTx.txid() if not isVote else None,
-            stakebase=stakebase if isVote else 0,
+            poolFee=poolFee,
             purchaseTxFee=purchaseTxFee,
             spendTxFee=spendTxFee,
-            poolFee=poolFee,
+            stakebase=stakebase if isVote else 0,
         )
 
     def serialize(self):
@@ -476,11 +474,11 @@ class UTXO:
         self.scriptPubKey = scriptPubKey
         self.height = height
         self.satoshis = satoshis
-        self.amount = round(satoshis / 1e8, 8)
         self.maturity = maturity
+        self.tinfo = tinfo
+        self.amount = round(satoshis / 1e8, 8)
         self.scriptClass = None
         self.parseScriptClass()
-        self.tinfo = tinfo
 
     @staticmethod
     def blob(utxo):
@@ -516,9 +514,9 @@ class UTXO:
         tinfo = TicketInfo.unblob(tinfoB) if tinfoB else None
 
         utxo = UTXO(
-            d[0].decode("utf-8"),
-            ByteArray(d[1]),
-            encode.intFromBytes(d[2]),
+            address=d[0].decode("utf-8"),
+            txHash=ByteArray(d[1]),
+            vout=encode.intFromBytes(d[2]),
             ts=ts,
             scriptPubKey=f(d[4]),
             height=iFunc(d[5], signed=True),
@@ -589,9 +587,7 @@ class UTXO:
             scriptPubKey=txout.pkScript,
             satoshis=txout.value,
             maturity=netParams.TicketMaturity,
-            tinfo=tinfo
-            if tinfo
-            else TicketInfo("mempool", None, 0, 0, None, None, None),
+            tinfo=tinfo if tinfo else TicketInfo("mempool", None, 0, 0),
         )
         if block:
             ticket.confirm(block, tx, netParams)
@@ -1117,7 +1113,7 @@ class Account:
         tinfo = self.blockchain.ticketInfo(txid)
         if tinfo.vote or tinfo.revocation:
             return tinfo
-        log.debug("ticket's tinfo not found on the blockchain {}".format(txid))
+        log.debug(f"ticket's tinfo not found on the blockchain {txid}")
 
     def spendTicket(self, tx):
         """
@@ -1132,11 +1128,7 @@ class Account:
         idx = 1 if isVote else 0
         ticketTxid = tx.txIn[idx].previousOutPoint.txid()
         if ticketTxid not in self.ticketDB:
-            raise DecredError(
-                "spending tx came for ticket that was not found in the database: {}".format(
-                    ticketTxid
-                )
-            )
+            raise DecredError(f"spending tx for ticket not in database: {ticketTxid}")
         tinfo = self.blockchain.ticketInfoForSpendingTx(tx.txid(), self.net)
 
         ticket = self.ticketDB[ticketTxid]
@@ -1715,7 +1707,7 @@ class Account:
             pool (vsp.VotingServiceProvider): The stake pool object.
         """
         if not isinstance(pool, VotingServiceProvider):
-            raise AssertionError("setPool given wrong type %s" % type(pool))
+            raise DecredError("setPool given wrong type %s" % type(pool))
         self.stakePools = [pool] + [
             p for p in self.stakePools if p.apiKey != pool.apiKey
         ]
@@ -2009,5 +2001,5 @@ def readAddrs(db):
     """
     pairs = sorted(db.items(), key=lambda pair: pair[0])
     if pairs and len(pairs) != pairs[-1][0] + 1:
-        raise AssertionError("address index mismatch")
+        raise DecredError("address index mismatch")
     return [pair[1] for pair in pairs]
