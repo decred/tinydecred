@@ -3745,13 +3745,6 @@ def test_pays_high_fees():
 
 
 def test_is_dust_output():
-    """
-    name (str): Short description of the test.
-    output (wire.TxOut): The transaction output.
-    relayFeePerKb (int): Minimum transaction fee allowable.
-    want (bool): True if output is a dust output.
-    """
-
     def txOut(script, value):
         return msgtx.TxOut(
             version=wire.DefaultPkScriptVersion, pkScript=script, value=value
@@ -3759,6 +3752,12 @@ def test_is_dust_output():
 
     nullDataScript = parseShortForm("RETURN")
     P2PKH = parseShortForm("DUP HASH160 DATA_20 NULL_BYTES_20 EQUALVERIFY CHECKSIG")
+    """
+    name (str): Short description of the test.
+    output (wire.TxOut): The transaction output.
+    relayFeePerKb (int): Minimum transaction fee allowable.
+    want (bool): True if output is a dust output.
+    """
     tests = [
         dict(name="not dust", output=txOut(P2PKH, 1e8), want=False,),
         dict(name="zero amount", output=txOut(P2PKH, 0), want=True,),
