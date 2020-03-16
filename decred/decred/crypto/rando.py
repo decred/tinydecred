@@ -52,7 +52,7 @@ def newHashRaw():
     Generate a random hash of HASH_SIZE length.
 
     Returns:
-        bytes: a random bytes object of HASH_SIZE length.
+        bytes: a random object of HASH_SIZE length.
     """
     return generateSeed(HASH_SIZE)
 
@@ -62,7 +62,7 @@ def newHash():
     Generate a wrapped random hash of HASH_SIZE length.
 
     Returns:
-        bytes: a random ByteArray object of HASH_SIZE length.
+        ByteArray: a random object of HASH_SIZE length.
     """
     return ByteArray(newHashRaw())
 
@@ -72,7 +72,7 @@ def newKeyRaw():
     Generate a random key of KEY_SIZE length.
 
     Returns:
-        bytes: a random bytes object of KEY_SIZE length.
+        bytes: a random object of KEY_SIZE length.
     """
     return generateSeed(KEY_SIZE)
 
@@ -82,6 +82,6 @@ def newKey():
     Generate a wrapped random key of KEY_SIZE length.
 
     Returns:
-        bytes: a random ByteArray object of KEY_SIZE length.
+        ByteArray: a random object of KEY_SIZE length.
     """
     return ByteArray(newKeyRaw())
