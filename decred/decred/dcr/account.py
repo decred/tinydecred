@@ -1733,6 +1733,20 @@ class Account:
         for utxo in bc.UTXOs([addr]):
             self.addUTXO(utxo)
         self.updateSpentTickets(checkTxids)
+        for txid in checkTxids:
+            tx = None
+            try:
+                tx = self.blockchain.tx(txid)
+            except Exception:
+                if txid in self.mempool:
+                    tx = self.mempool[txid]
+                else:
+                    # Should never make it here.
+                    log.error(f"unknown ticket: {txid}")
+                    continue
+            if tx and tx.isTicket() and txid not in pool.tickets:
+                pool.tickets.append(txid)
+        self.vspDB[pool.apiKey] = pool
         self.updateStakeStats()
         self.signals.balance(self.calcBalance())
 
@@ -1880,6 +1894,9 @@ class Account:
         # Add all tickets
         for tx in txs[1]:
             self.addMempoolTx(tx)
+            if tx.txid() not in pool.tickets:
+                pool.tickets.append(tx.txid())
+        self.vspDB[pool.apiKey] = pool
         # Store the txids.
         self.spendUTXOs(spentUTXOs)
         for utxo in newUTXOs:

@@ -6,6 +6,7 @@ See LICENSE for details
 DcrdataClient.endpointList() for available endpoints.
 """
 
+import base64
 import time
 
 from decred import DecredError
@@ -159,7 +160,7 @@ class VotingServiceProvider(object):
     the VSP API.
     """
 
-    def __init__(self, url, apiKey, netName, purchaseInfo=None):
+    def __init__(self, url, apiKey, netName, purchaseInfo=None, tickets=None):
         """
         Args:
             url (string): The stake pool URL.
@@ -176,6 +177,8 @@ class VotingServiceProvider(object):
         self.apiKey = apiKey
         self.net = nets.parse(netName)
         self.purchaseInfo = purchaseInfo
+        # a list of ticket txid purchased through this vsp
+        self.tickets = tickets if tickets else []
         self.stats = None
         self.err = None
 
@@ -184,11 +187,12 @@ class VotingServiceProvider(object):
         """Satisfies the encode.Blobber API"""
         pi = PurchaseInfo.blob(vsp.purchaseInfo) if vsp.purchaseInfo else None
         return (
-            encode.BuildyBytes(0)
+            encode.BuildyBytes(1)
             .addData(vsp.url.encode("utf-8"))
             .addData(vsp.apiKey.encode("utf-8"))
             .addData(vsp.net.Name.encode("utf-8"))
             .addData(encode.filterNone(pi))
+            .addData(encode.blobStrList(vsp.tickets))
             .b
         )
 
@@ -196,9 +200,9 @@ class VotingServiceProvider(object):
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        if ver != 0:
+        if ver != 1:
             raise AssertionError("invalid version for VotingServiceProvider %d" % ver)
-        if len(d) != 4:
+        if len(d) != 5:
             raise AssertionError(
                 "wrong number of pushes for VotingServiceProvider. wanted 4, got %d"
                 % len(d)
@@ -212,6 +216,7 @@ class VotingServiceProvider(object):
             apiKey=d[1].decode("utf-8"),
             netName=d[2].decode("utf-8"),
             purchaseInfo=pi,
+            tickets=encode.unblobStrList(d[4]),
         )
 
     def serialize(self):
@@ -258,6 +263,28 @@ class VotingServiceProvider(object):
             object: The headers as a Python object.
         """
         return {"Authorization": "Bearer %s" % self.apiKey}
+
+    def headersV3(self, acct, txid):
+        """
+        Make the API request headers.
+
+        Returns:
+            object: The headers as a Python object.
+        """
+        now = str(int(time.time()))
+        txOut = acct.blockchain.tx(txid).txOut[3]
+        addr = txscript.addrFromSStxPkScrCommitment(txOut.pkScript, acct.net)
+        msg = "Decred Signed Message:\n"
+        msgBA = txscript.putVarInt(len(msg))
+        msgBA += ByteArray(msg.encode())
+        msgBA += txscript.putVarInt(len(now))
+        msgBA += ByteArray(now.encode())
+        hashedMsg = crypto.hashH(msgBA.bytes())
+        sig = self.getSignature(acct, hashedMsg.bytes(), addr)
+        b64Sig = base64.b64encode(sig.bytes())
+        return {
+            "Authorization": f'TicketAuth SignedTimestamp={now},Signature={b64Sig.decode("utf-8")},TicketHash={txid}'
+        }
 
     def validate(self, addr):
         """
@@ -342,6 +369,14 @@ class VotingServiceProvider(object):
         self.err = res
         raise DecredError("unexpected response from 'getpurchaseinfo': %r" % (res,))
 
+    def getSignature(self, acct, msg, addr):
+        """
+        Sign msg with the private key belonging to addr.
+        """
+        privKey = acct.privKeyForAddress(addr.string())
+        sig = txscript.signCompact(privKey.key, msg, True)
+        return sig
+
     def updatePurchaseInfo(self):
         """
         Update purchase info if older than PURCHASE_INFO_LIFE.
@@ -361,6 +396,26 @@ class VotingServiceProvider(object):
             self.stats = PoolStats(res["data"])
             return self.stats
         raise DecredError("unexpected response from 'stats': %s" % repr(res))
+
+    def setVoteBitsV3(self, voteBits, acct):
+        """
+        Set the vote preference on the VotingServiceProvider.
+
+        Returns:
+            bool: True on success. DecredError raised on error.
+        """
+        txid = self.tickets[0]
+        data = {"VoteBits": voteBits}
+        res = tinyhttp.post(
+            self.apiPath("voting"),
+            data,
+            headers=self.headersV3(acct, txid),
+            urlEncode=True,
+        )
+        if resultIsSuccess(res):
+            self.purchaseInfo.voteBits = voteBits
+            return True
+        raise DecredError("unexpected response from 'voting': %s" % repr(res))
 
     def setVoteBits(self, voteBits):
         """
