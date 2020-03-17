@@ -25,7 +25,7 @@ class DBKeys:
     keyParams = "keyParams".encode("utf-8")
 
 
-class Wallet(object):
+class Wallet:
     """
     Wallet is a wallet. An application would use a Wallet to create and
     manager addresses and funds and to interact with various blockchains.
@@ -61,7 +61,7 @@ class Wallet(object):
         Args:
             seed (bytes-like): The wallet seed.
             pw   (bytes-like): The wallet password, UTF-8 encoded.
-            netParams (object): Network parameters.
+            netParams (module): Network parameters.
         """
         pwKey = crypto.SecretKey(pw)
         cryptoKey = rando.newKey()
@@ -86,7 +86,7 @@ class Wallet(object):
             path (str): Filepath to store wallet.
             password (str): User provided password. The password will be used to
                 both decrypt the wallet and unlock any accounts created.
-            netParams (object): Network parameters.
+            netParams (module): Network parameters.
 
         Returns:
             list(str): A mnemonic seed. Only retured when the caller does not

@@ -1858,7 +1858,7 @@ class PoolScreen(Screen):
         Cache the list of stake pools from decred.org, and pick one to display.
 
         Args:
-            pools (list(object)): The freshly-decoded-from-JSON stake pools.
+            pools (list(dict)): The freshly-decoded-from-JSON stake pools.
         """
         if not pools:
             return

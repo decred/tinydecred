@@ -295,7 +295,7 @@ class ConsoleLogger:
 
 def fetchSettingsFile(filepath):
     """
-    Fetches the JSON settings file, creating an empty json object if necessary
+    Fetches the JSON settings file, creating an empty JSON object if necessary.
     """
     if not os.path.isfile(filepath):
         with open(filepath, "w+") as file:
@@ -359,7 +359,7 @@ def appDataDir(appName):
 def readINI(path, keys):
     """
     Attempt to read the specified keys from the INI-formatted configuration
-    file. All sections will be searched. An object with discovered keys and
+    file. All sections will be searched. A dict with discovered keys and
     values will be returned. If a key is not discovered, it will not be
     present in the result.
 
@@ -392,7 +392,7 @@ def saveJSON(filepath, thing, **kwargs):
 
 def loadJSON(filepath):
     """
-    Load the JSON file into a Python object.
+    Load the JSON file into a Python dict or list.
     """
     with open(filepath, "r") as f:
         return json.loads(f.read())

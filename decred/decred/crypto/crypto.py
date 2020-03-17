@@ -264,7 +264,7 @@ class AddressSecpPubKey:
         return hash160(self.serialize().bytes())
 
 
-class AddressScriptHash(object):
+class AddressScriptHash:
     """
     AddressScriptHash is an Address for a pay-to-script-hash (P2SH) transaction.
     """
@@ -512,7 +512,7 @@ def newAddressPubKeyHash(pkHash, net, algo):
 
     Args:
         pkHash (ByteArray): The hash160 of the public key.
-        net (object): The network parameters.
+        net (module): The network parameters.
         algo (int): The signature curve.
 
     Returns:
@@ -537,7 +537,7 @@ def newAddressScriptHash(script, net):
 
     Args:
         script (ByteArray): the redeem script
-        net (object): the network parameters
+        net (module): the network parameters
 
     Returns:
         AddressScriptHash: An address object.
@@ -552,7 +552,7 @@ def newAddressScriptHashFromHash(scriptHash, net):
 
     Args:
         pkHash (ByteArray): The hash160 of the public key.
-        net (object): The network parameters.
+        net (module): The network parameters.
 
     Returns:
         AddressScriptHash: An address object.
@@ -664,7 +664,7 @@ class ExtendedKey:
         the coin-type extended keys from the root wallet key.
 
         Args:
-            chainParams (object): The network parameters.
+            chainParams (module): The network parameters.
         """
         self.privVer = chainParams.HDPrivateKeyID
         self.pubVer = chainParams.HDPublicKeyID
@@ -951,7 +951,7 @@ class ExtendedKey:
 
         Args:
             i (int): Child number.
-            net (object): Network parameters.
+            net (module): Network parameters.
 
         Returns:
             Address: Child address.
@@ -1068,7 +1068,7 @@ def defaultKDFParams():
     return d["func"], d["hash_name"], d["iterations"]
 
 
-class KDFParams(object):
+class KDFParams:
     """
     Parameters for the key derivation function, including the function used.
     """
@@ -1121,7 +1121,7 @@ class KDFParams(object):
         return ByteArray(KDFParams.blob(self))
 
 
-class SecretKey(object):
+class SecretKey:
     """
     SecretKey is a password-derived key that can be used for encryption and
     decryption.

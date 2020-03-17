@@ -1208,9 +1208,9 @@ def getStakeOutSubclass(pkScript):
     return getScriptClass(scriptVersion, pkScript[1:])
 
 
-class multiSigDetails(object):
+class MultiSigDetails:
     """
-    multiSigDetails houses details extracted from a standard multisig script.
+    MultiSigDetails houses details extracted from a standard multisig script.
     """
 
     def __init__(self, pubkeys, numPubKeys, requiredSigs, valid):
@@ -1221,7 +1221,7 @@ class multiSigDetails(object):
 
 
 def invalidMSDetails():
-    return multiSigDetails([], 0, [], False)
+    return MultiSigDetails([], 0, [], False)
 
 
 def extractMultisigScriptDetails(scriptVersion, script, extractPubKeys):
@@ -1280,7 +1280,7 @@ def extractMultisigScriptDetails(scriptVersion, script, extractPubKeys):
     # OP_CHECKMULTISIG per the check above.
     if len(tokenizer.script) - tokenizer.byteIndex() != 1:
         return invalidMSDetails()
-    return multiSigDetails(pubkeys, numPubkeys, requiredSigs, True)
+    return MultiSigDetails(pubkeys, numPubkeys, requiredSigs, True)
 
 
 def isMultisigScript(scriptVersion, script):
@@ -3480,7 +3480,7 @@ def stakePoolTicketFee(stakeDiff, relayFee, height, poolFee, subsidyCache, param
         height (int): Current block height.
         poolFee (int): The pools fee, as percent.
         subsidyCache (calc.SubsidyCache): A subsidy cache.
-        params (object): Network parameters.
+        params (module): Network parameters.
 
     Returns:
         int: The stake pool ticket fee.
@@ -3596,7 +3596,7 @@ def makeTicket(
     passed.
 
     Args:
-        params (object): Network parameters.
+        params (module): Network parameters.
         inputPool (ExtendedOutPoint): The pool input's extended outpoint.
         inputMain (ExtendedOutPoint): The wallet input's extended outpoint.
         addrVote (Address): The voting address.

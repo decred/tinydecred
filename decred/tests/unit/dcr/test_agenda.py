@@ -131,11 +131,9 @@ def test_eq():
     # AgendaChoices
     choices = AgendaChoices.parse(AGENDA_CHOICES_RAW)
     assert choices != object()
-    choices2 = AgendaChoices.parse(AGENDA_CHOICES_RAW)
-    assert choices == choices2
+    assert choices == choices
 
     # Agenda
     agenda = Agenda.parse(AGENDA_RAW)
     assert agenda != object()
-    agenda2 = Agenda.parse(AGENDA_RAW)
-    assert agenda == agenda2
+    assert agenda == agenda

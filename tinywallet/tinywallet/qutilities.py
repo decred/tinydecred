@@ -40,7 +40,7 @@ STRETCH = "stretch"
 PyObj = "PyQt_PyObject"
 
 
-class ThreadUtilities(object):
+class ThreadUtilities:
     """
     Utilities for management of SmartThread objects.
     """

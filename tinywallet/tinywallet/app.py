@@ -36,7 +36,7 @@ formatTraceback = helpers.formatTraceback
 currentWallet = "current.wallet"
 
 
-class TinySignals(object):
+class TinySignals:
     """
     Implements the Signals API as defined in tinydecred.api. TinySignals is used
     by the Wallet to broadcast notifications.

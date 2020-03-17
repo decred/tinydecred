@@ -26,15 +26,18 @@ def resultIsSuccess(res):
     a universal success check.
 
     Args:
-        res (object): The freshly-decoded-from-JSON response.
+        res (dict): The freshly-decoded-from-JSON response.
 
     Returns:
         bool: True if result fields indicate success.
     """
-    return isinstance(res, object) and "status" in res and res["status"] == "success"
+    try:
+        return res["status"] == "success"
+    except (KeyError, TypeError):
+        return False
 
 
-class PurchaseInfo(object):
+class PurchaseInfo:
     """
     The PurchaseInfo models the response from the 'getpurchaseinfo' endpoint.
     This information is required for validating the pool and creating tickets.
@@ -117,7 +120,7 @@ class PurchaseInfo(object):
         )
 
 
-class PoolStats(object):
+class PoolStats:
     """
     PoolStats models the response from the 'stats' endpoint.
     """
@@ -152,7 +155,7 @@ class PoolStats(object):
         self.version = stats.get("Version")
 
 
-class VotingServiceProvider(object):
+class VotingServiceProvider:
     """
     A VotingServiceProvider is a voting service provider, uniquely defined by
     its URL. The VotingServiceProvider class has methods for interacting with
@@ -255,7 +258,7 @@ class VotingServiceProvider(object):
         Make the API request headers.
 
         Returns:
-            object: The headers as a Python object.
+            dict: The headers as a Python dict.
         """
         return {"Authorization": "Bearer %s" % self.apiKey}
 

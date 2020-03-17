@@ -277,7 +277,7 @@ class TicketInfo:
         Parse the TicketInfo from the decoded API response.
 
         Args:
-            obj (object): The Python object decoded from the JSON API response.
+            obj (dict): The Python dict decoded from the JSON API response.
         """
         ba = lambda b: reversed(ByteArray(b))
         return TicketInfo(
@@ -627,7 +627,7 @@ class UTXO:
         Args:
             block (msgblock.BlockHeader): The block header.
             tx (dict): The dcrdata transaction.
-            params (object): The network parameters.
+            params (module): The network parameters.
         """
         self.height = block.height
         self.maturity = (
@@ -1240,8 +1240,8 @@ class Account:
         Set the current UTXO set to the supplied list.
 
         Args:
-            blockchainUTXOs (list(object)): A list of Python objects decoded from
-                dcrdata's JSON response from ...addr/utxo endpoint.
+            blockchainUTXOs (list(dict)): A list of Python dicts decoded
+                from dcrdata's JSON response from ...addr/utxo endpoint.
         """
         self.utxos = {u.key(): u for u in utxos}
         self.utxoDB.clear()

@@ -14,21 +14,20 @@ from decred.util import encode
 
 
 def test_result_is_success():
-    class test:
-        def __init__(
-            self, res, isSuccess,
-        ):
-            self.res = res
-            self.isSuccess = isSuccess
-
+    # (res, isSuccess)
     tests = [
-        test({"status": "success"}, True),
-        test({"status": "fail"}, False),
-        test({}, False),
-        test("abcd", False),
+        (dict(status="success"), True),
+        (dict(status="fail"), False),
+        (dict(), False),
+        ("success", False),
+        ("abcd", False),
+        ("", False),
+        (0, False),
+        (True, False),
+        (None, False),
     ]
-    for test in tests:
-        assert vsp.resultIsSuccess(test.res) is test.isSuccess
+    for res, isSuccess in tests:
+        assert vsp.resultIsSuccess(res) == isSuccess
 
 
 purchaseInfo = {
