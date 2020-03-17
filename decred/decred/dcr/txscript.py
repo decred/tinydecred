@@ -294,6 +294,34 @@ SStxVoteFractionFlag = 0x0040
 # 01000000 00000000 = Apply fees rule
 SStxRevFractionFlag = 0x4000
 
+# compactSigSize is the size of a compact signature.  It consists of a
+# compact signature recovery code byte followed by the R and S components
+# serialized as 32-byte big-endian values. 1+32*2 = 65.
+# for the R and S components. 1+32+32=65.
+compactSigSize = 65
+
+# compactSigMagicOffset is a value used when creating the compact signature
+# recovery code inherited from Bitcoin and has no meaning, but has been
+# retained for compatibility.  For historical purposes, it was originally
+# picked to avoid a binary representation that would allow compact
+# signatures to be mistaken for other components.
+compactSigMagicOffset = 27
+
+# compactSigCompPubKey is a value used when creating the compact signature
+# recovery code to indicate the original public key was compressed.
+compactSigCompPubKey = 4
+
+# pubKeyRecoveryCodeOddnessBit specifies the bit that indicates the oddess
+# of the Y coordinate of the random point calculated when creating a
+# signature.
+pubKeyRecoveryCodeOddnessBit = 1 << 0
+
+# pubKeyRecoveryCodeOverflowBit specifies the bit that indicates the X
+# coordinate of the random point calculated when creating a signature was
+# >= N, where N is the order of the group.
+pubKeyRecoveryCodeOverflowBit = 1 << 1
+
+
 # A couple of hashing functions from the crypto module.
 mac = crypto.mac
 hashH = crypto.hashH
@@ -2099,12 +2127,19 @@ def signRFC6979(privateKey, inHash):
     """
     N = Curve.N
     k = nonceRFC6979(privateKey, inHash, ByteArray(b""), ByteArray(b""))
+    recoveryCode = 0
 
     inv = crypto.modInv(k, N)
-    r = Curve.scalarBaseMult(k)[0] % N
+    kG = Curve.scalarBaseMult(k)
+    r = kG[0] % N
 
     if r == 0:
         raise DecredError("calculated R is zero")
+
+    if kG[1] & 1:
+        recoveryCode += 1
+    if kG[0] > N:
+        recoveryCode += 4
 
     e = hashToInt(inHash)
     s = privateKey.int() * r
@@ -2112,12 +2147,14 @@ def signRFC6979(privateKey, inHash):
     s *= inv
     s = s % N
 
-    if (N >> 1) > 1:
-        s = N - s
     if s == 0:
         raise DecredError("calculated S is zero")
 
-    return Signature(r, s)
+    if s > N / 2:
+        s = N - s
+        recoveryCode ^= 1
+
+    return Signature(r, s), recoveryCode
 
 
 def putVarInt(val):
@@ -2199,6 +2236,32 @@ def addData(data):
     return b
 
 
+def signCompact(key, inHash, isCompressedKey):
+    """
+    SignCompact produces a compact signature of the data in hash with the given
+    private key on the secp256k1 curve. The isCompressedKey parameter specifies
+    if the given signature should reference a compressed public key or not.
+
+    Compact signature format:
+    <1-byte compact sig recovery code><32-byte R><32-byte S>
+
+    The compact sig recovery code is the value 27 + public key recovery code + 4
+    if the compact signature was created with a compressed public key.
+    """
+    # Create the signature and associated pubkey recovery code and calculate
+    # the compact signature recovery code.
+    sig, recoveryCode = signRFC6979(key, inHash)
+    compactSigRecoveryCode = compactSigMagicOffset + recoveryCode
+    if isCompressedKey:
+        compactSigRecoveryCode += compactSigCompPubKey
+
+    # Output <compactSigRecoveryCode><32-byte R><32-byte S>.
+    b = ByteArray(compactSigRecoveryCode)
+    b += ByteArray(sig.r, length=32)
+    b += ByteArray(sig.s, length=32)
+    return b
+
+
 def signatureScript(tx, idx, subscript, hashType, privKey, compress):
     """
     SignatureScript creates an input signature script for tx to spend coins sent
@@ -2236,8 +2299,8 @@ def rawTxInSignature(tx, idx, subScript, hashType, key):
     versions.
     """
     sigHash = calcSignatureHash(subScript, hashType, tx, idx, None)
-    sig = signRFC6979(key, sigHash).serialize()
-    return sig + ByteArray(hashType)
+    sig, _ = signRFC6979(key, sigHash)
+    return sig.serialize() + ByteArray(hashType)
 
 
 def calcSignatureHash(script, hashType, tx, idx, cachedPrefix):
@@ -2715,6 +2778,35 @@ def extractPkScriptAddrs(version, pkScript, netParams):
     # Don't attempt to extract addresses or required signatures for nonstandard
     # transactions.
     return NonStandardTy, [], 0
+
+
+def addrFromSStxPkScrCommitment(pkScript, netParams):
+    """
+    AddrFromSStxPkScrCommitment extracts a P2SH or P2PKH address from a ticket
+    commitment pkScript.
+    """
+    if len(pkScript) < SStxPKHMinOutSize:
+        raise DecredError("short read of sstx commit pkscript")
+
+    # The MSB of the encoded amount specifies if the output is P2SH.  Since
+    # it is encoded with little endian, the MSB is in final byte in the encoded
+    # amount.
+    #
+    # This is a faster equivalent of:
+    #
+    # amtBytes := script[22:30]
+    # amtEncoded := binary.LittleEndian.Uint64(amtBytes)
+    # isP2SH := (amtEncoded & uint64(1<<63)) != 0
+    isP2SH = pkScript[29] & 0x80 != 0
+
+    # The 20 byte PKH or SH.
+    hashBytes = pkScript[2:22]
+
+    # Return the correct address type.
+    if isP2SH:
+        return crypto.newAddressScriptHashFromHash(hashBytes, netParams)
+
+    return crypto.newAddressPubKeyHash(hashBytes, netParams, crypto.STEcdsaSecp256k1)
 
 
 def sign(chainParams, tx, idx, subScript, hashType, keysource, sigType):

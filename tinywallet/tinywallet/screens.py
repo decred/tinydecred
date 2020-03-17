@@ -2173,7 +2173,7 @@ class AgendasScreen(Screen):
             def changeVote():
                 app.emitSignal(ui.WORKING_SIGNAL)
                 try:
-                    pools[0].setVoteBits(voteBits)
+                    pools[0].setVoteBitsV3(voteBits, acct)
                     app.appWindow.showSuccess("vote choices updated")
                     dropdown.lastIndex = idx
                 except Exception as e:
