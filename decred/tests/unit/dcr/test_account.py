@@ -537,6 +537,7 @@ class TestAccount:
         with pytest.raises(DecredError):
             acct.setPool(None)
         acct.setPool(vsp)
+        acct.setNewPool(vsp)
         # Add UTXOs
         utxos = [account.UTXO.parse(u) for u in self.dcrdataUTXOs]
         acct.resolveUTXOs(utxos)
