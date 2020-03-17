@@ -792,6 +792,7 @@ class Account:
 
     def __init__(
         self,
+        idx,
         pubKeyEncrypted,
         privKeyEncrypted,
         name,
@@ -815,6 +816,7 @@ class Account:
             signals (Signals): A signaller. Only used if db and blockchain are
                 specified.
         """
+        self.idx = idx
         self.pubKeyEncrypted = pubKeyEncrypted
         self.privKeyEncrypted = privKeyEncrypted
         self.name = name
@@ -867,6 +869,7 @@ class Account:
         """Satisfies the encode.Blobber API"""
         return (
             BuildyBytes(0)
+            .addData(encode.intToBytes(acct.idx))
             .addData(acct.pubKeyEncrypted)
             .addData(acct.privKeyEncrypted)
             .addData(acct.name.encode("utf-8"))
@@ -881,18 +884,19 @@ class Account:
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        unblob_check("Account", ver, len(d), {0: 7})
+        unblob_check("Account", ver, len(d), {0: 8})
 
         iFunc = encode.intFromBytes
 
-        pubEnc = ByteArray(d[0])
-        privEnc = ByteArray(d[1])
-        name = d[2].decode("utf-8")
-        netID = d[3].decode("utf-8")
-        acct = Account(pubEnc, privEnc, name, netID)
-        acct.cursorExt = iFunc(d[4], signed=True)
-        acct.cursorInt = iFunc(d[5])
-        acct.gapLimit = iFunc(d[6])
+        idx = iFunc(d[0])
+        pubEnc = ByteArray(d[1])
+        privEnc = ByteArray(d[2])
+        name = d[3].decode("utf-8")
+        netID = d[4].decode("utf-8")
+        acct = Account(idx, pubEnc, privEnc, name, netID)
+        acct.cursorExt = iFunc(d[5], signed=True)
+        acct.cursorInt = iFunc(d[6])
+        acct.gapLimit = iFunc(d[7])
         return acct
 
     def serialize(self):
@@ -1432,7 +1436,7 @@ class Account:
                 self.nextBranchAddress(self.extPub, extAddrs, self.addrExtDB)
             addr = extAddrs[idx]
         if self.blockchain:
-            self.blockchain.subscribeAddresses(addr)
+            self.blockchain.subscribeAddresses(addr, self.addressSignal)
         return addr
 
     def nextInternalAddress(self):
@@ -1955,14 +1959,13 @@ class Account:
         signals.balance(self.calcBalance())
         self.generateGapAddresses()
 
-        # If there is a chosen stake pool, sync the purchaseInfo.
-        # TODO: Save purchase info
+        # If there is a chosen stake pool, authorize the pool.
         stakePool = self.stakePool()
         if stakePool:
             try:
-                stakePool.getPurchaseInfo()
+                stakePool.authorize(self.votingAddress().string())
             except Exception as e:
-                log.error("error getting VSP purchase info: %s" % e)
+                log.error("error authorizing VSP: %s" % e)
 
         # First, look at addresses that have been generated but not seen. Run in
         # loop until the gap limit is reached.
@@ -1975,35 +1978,39 @@ class Account:
                     requestedTxs += 1
                     self.addTxid(addr, txid)
             addrs = self.generateGapAddresses()
-        log.debug("%d address transactions sets fetched" % requestedTxs)
+        log.debug(
+            f"{requestedTxs} address transactions fetched for account {self.name}"
+        )
 
         # start with a search for all known addresses
         addresses = self.allAddresses()
 
         # Until the server stops returning UTXOs, keep requesting more addresses
         # to check.
+        utxoCount = 0
         while True:
             # Update the account with known UTXOs.
             blockchainUTXOs = blockchain.UTXOs(addresses)
             if not blockchainUTXOs:
                 break
+            utxoCount += len(blockchainUTXOs)
             self.resolveUTXOs(blockchainUTXOs)
             addresses = self.generateGapAddresses()
             if not addresses:
                 break
+        log.debug(f"{utxoCount} utxos for account {self.name}")
 
-        # update the staking info and authorize the stake pool.
+        # Update the staking info.
         self.updateStakeStats()
-        pool = self.stakePool()
-        if pool:
-            pool.authorize(self.votingAddress().string())
 
         # Subscribe to block and address updates.
-        blockchain.addressReceiver = self.addressSignal
         blockchain.subscribeBlocks(self.blockSignal)
         watchAddresses = self.watchAddrs()
         if watchAddresses:
-            blockchain.subscribeAddresses(watchAddresses)
+            blockchain.subscribeAddresses(watchAddresses, self.addressSignal)
+            log.debug(
+                f"subscribed to {len(watchAddresses)} addresses for account {self.name}"
+            )
         # Signal the new balance.
         signals.balance(self.calcBalance())
 

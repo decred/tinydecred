@@ -507,7 +507,7 @@ def main():
     qApp = QtWidgets.QApplication(sys.argv)
     qApp.setStyleSheet(Q.QUTILITY_STYLE)
     qApp.setPalette(Q.lightThemePalette)
-    qApp.setWindowIcon(QtGui.QIcon(screens.pixmapFromSvg(DCR.LOGO, 64, 64)))
+    qApp.setWindowIcon(QtGui.QIcon(DCR.LOGO))
     qApp.setApplicationName("Tiny Decred")
     loadFonts()
 

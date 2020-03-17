@@ -10,7 +10,7 @@ import threading
 import time
 from urllib.parse import urlparse
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtGui, QtSvg, QtWidgets
 
 from decred import config
 from decred.dcr import calc, constants as DCR, nets
@@ -37,21 +37,6 @@ FADE_IN_ANIMATION = "fadeinanimation"
 formatTraceback = helpers.formatTraceback
 
 app = None
-
-
-def pixmapFromSvg(filename, w, h):
-    """
-    Create a QPixmap from the svg file in the icons directory.
-
-    Args:
-        filename (str): The filename without directory.
-        w (int): Pixel width of the resulting pixmap.
-        h (int): Pixel height of the resulting pixmap.
-
-    Returns:
-        QPixmap: A sized pixmap created from the scaled SVG file.
-    """
-    return QtGui.QIcon(os.path.join(UI_DIR, "icons", filename)).pixmap(w, h)
 
 
 def sprintDcr(atoms, comma=""):
@@ -155,21 +140,18 @@ class TinyDialog(QtWidgets.QFrame):
 
         # If enabled by a Screen instance, the user can navigate back to the
         # previous screen.
-        self.backIcon = ClickyLabel(self.backClicked)
-        self.backIcon.setPixmap(pixmapFromSvg("back.svg", 20, 20))
+        self.backIcon = SVGWidget("back", w=20, click=self.backClicked)
         menuLayout.addWidget(Q.pad(self.backIcon, 3, 3, 3, 3))
 
         # If enabled by a Screen instance, the user can navigate directly to
         # the home screen.
-        self.homeIcon = ClickyLabel(self.homeClicked)
-        self.homeIcon.setPixmap(pixmapFromSvg("home.svg", 20, 20))
+        self.homeIcon = SVGWidget("home", w=20, click=self.homeClicked)
         menuLayout.addWidget(Q.pad(self.homeIcon, 3, 3, 3, 3))
 
         # Separate the left and right sub-menus.
         menuLayout.addStretch(1)
 
-        self.closeIcon = ClickyLabel(self.closeClicked)
-        self.closeIcon.setPixmap(pixmapFromSvg("x.svg", 20, 20))
+        self.closeIcon = SVGWidget("x", w=20, click=self.closeClicked)
         menuLayout.addWidget(Q.pad(self.closeIcon, 3, 3, 3, 3))
 
         # Create a layout to hold Screens.
@@ -433,109 +415,138 @@ class AccountScreen(Screen):
     The standard home screen for a TinyWallet account.
     """
 
-    def __init__(self, acct):
+    def __init__(self, acctMgr, acct, assetScreen):
         """
         Args:
+            acctMgr (AccountManager): A Decred account manager.
             acct (Account): A Decred account.
+            assetScreen (AssetScreen): The Decred asset screen.
         """
         super().__init__()
         self.wallet = app.wallet
+        self.acctMgr = acctMgr
         self.account = acct
+        self.assetScreen = assetScreen
 
         # The TinyDialog won't allow popping of the bottom screen anyway.
         self.isPoppable = False
         self.canGoHome = False
         self.ticketStats = None
         self.balance = None
-        self.sendScreen = SendScreen(acct)
+        self.settingsScreen = AccountSettingsScreen(self.saveName)
         self.stakeScreen = StakingScreen(acct)
+        self.wgt.setFixedSize(
+            TinyDialog.maxWidth * 0.9,
+            TinyDialog.maxHeight * 0.9 - TinyDialog.topMenuHeight,
+        )
 
         # Update the home screen when the balance signal is received.
         app.registerSignal(ui.BALANCE_SIGNAL, self.balanceUpdated)
         app.registerSignal(ui.SYNC_SIGNAL, self.walletSynced)
 
-        layout = self.layout
-        layout.setAlignment(Q.ALIGN_LEFT)
-        layout.setSpacing(50)
+        # BALANCES
 
-        # Display the current account balance.
-        logo = QtWidgets.QLabel()
-        logo.setPixmap(pixmapFromSvg(DCR.LOGO, 40, 40))
+        logo = SVGWidget(DCR.LOGO, h=25)
 
-        self.totalBalance = b = ClickyLabel(self.balanceClicked, "0.00")
-        Q.setProperties(b, fontFamily="Roboto Bold", fontSize=36)
-        self.totalUnit = Q.makeLabel("DCR", 18, color="#777777")
-        self.totalUnit.setContentsMargins(0, 7, 0, 0)
+        self.totalBalance = lbl = ClickyLabel(self.balanceClicked, "0.00")
+        Q.setProperties(lbl, fontFamily="Roboto", fontSize=33)
+        lbl.setContentsMargins(5, 0, 3, 0)
+        unit = Q.makeLabel("DCR", 18, color="#777777")
+        unit.setContentsMargins(0, 7, 0, 0)
 
-        self.availBalance = ClickyLabel(self.balanceClicked, "0.00 spendable")
-        Q.setProperties(self.availBalance, fontSize=15)
+        self.nameLbl = Q.makeLabel(acct.name, 19, fontFamily="Roboto Medium")
+        self.nameLbl.setContentsMargins(0, 0, 10, 0)
 
-        self.statsLbl = Q.makeLabel("", 15)
+        acctBttn = app.getButton(TINY, "accounts")
+        acctBttn.clicked.connect(self.toAssetScreen)
 
-        tot, totLyt = Q.makeSeries(Q.HORIZONTAL, self.totalBalance, self.totalUnit,)
-
-        bals, balsLyt = Q.makeSeries(
-            Q.VERTICAL, tot, self.availBalance, self.statsLbl, align=Q.ALIGN_RIGHT,
+        top, _ = Q.makeRow(
+            logo, self.totalBalance, unit, Q.STRETCH, self.nameLbl, acctBttn
         )
+        self.layout.addWidget(top)
 
-        logoCol, logoLyt = Q.makeSeries(
-            Q.VERTICAL,
-            logo,
-            Q.makeLabel("Decred", fontSize=18, color="#777777"),
-            align=Q.ALIGN_LEFT,
-        )
+        self.availBalance = Q.makeLabel("", 17)
+        self.availBalance.setAlignment(Q.ALIGN_LEFT)
+        self.stakedBalance = Q.makeLabel("", 17)
+        self.stakedBalance.setAlignment(Q.ALIGN_RIGHT)
 
-        row, rowLyt = Q.makeSeries(Q.HORIZONTAL, logoCol, Q.STRETCH, bals,)
+        row, _ = Q.makeRow(self.availBalance, Q.STRETCH, self.stakedBalance)
+        self.layout.addWidget(row)
 
-        layout.addWidget(row)
+        self.layout.addStretch(1)
 
-        # Create a row to hold an address.
-        addrLbl = Q.makeLabel("Address", 14, color="#777777")
-        self.address = Q.makeLabel("", 18, fontFamily="RobotoMono-Bold")
-        self.address.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        # SEND DCR
 
-        # New Address button
-        newbtn = app.getButton(TINY, "new address")
-        newbtn.setMinimumWidth(110)
-        newbtn.clicked.connect(self.newAddressClicked)
-        header, headerLyt = Q.makeSeries(Q.HORIZONTAL, addrLbl, Q.STRETCH, newbtn,)
+        wgt, grid = Q.makeWidget(QtWidgets.QWidget, Q.GRID)
+        self.layout.addWidget(wgt)
+        self.addrField = QtWidgets.QLineEdit()
+        self.addrField.setFixedWidth(300)
+        self.valField = QtWidgets.QLineEdit()
+        self.valField.setValidator(QtGui.QDoubleValidator(0, 1e16, 8, wgt))
+        send = app.getButton(SMALL, "Send")
+        send.setIcon(SVGWidget("send", h=12).icon())
+        # spend.clicked.connect(self.spendClicked)
+        send.clicked.connect(self.sendClicked)
+        grid.addWidget(Q.makeLabel("Send to Address", 14, Q.ALIGN_LEFT), 0, 0)
+        grid.addWidget(Q.makeLabel("Amount", 14, Q.ALIGN_LEFT), 0, 1)
+        grid.addWidget(self.addrField, 1, 0)
+        grid.addWidget(self.valField, 1, 1)
+        grid.addWidget(send, 1, 2)
 
-        col, colLyt = Q.makeSeries(Q.VERTICAL, header, self.address,)
+        self.layout.addStretch(1)
+        self.layout.addWidget(HorizontalRule())
 
-        layout.addWidget(col)
+        # ADDRESS
 
-        # Option buttons.
-        opts, optsLyt = Q.makeWidget(QtWidgets.QWidget, Q.GRID)
-        layout.addWidget(opts, 1)
+        addrLbl = Q.makeLabel("Receive Decred to", 16)
+        addrLbl.setAlignment(Q.ALIGN_CENTER)
 
-        # Send DCR.
-        spend = app.getButton(SMALL, "Send DCR")
-        spend.setMinimumWidth(110)
-        spend.clicked.connect(self.spendClicked)
-        optsLyt.addWidget(spend, 0, 0, Q.ALIGN_LEFT)
+        newAddrBttn = app.getButton(TINY, "new address")
+        newAddrBttn.setIcon(SVGWidget("plus", h=9).icon())
+        newAddrBttn.clicked.connect(self.newAddressClicked)
 
-        self.spinner = Spinner(35)
-        optsLyt.addWidget(self.spinner, 0, 1, Q.ALIGN_RIGHT)
+        row, lyt = Q.makeRow(addrLbl, Q.STRETCH, newAddrBttn)
+        self.address = AddressDisplay("")
+        box, lyt = Q.makeWidget(QtWidgets.QWidget, Q.VERTICAL)
+        lyt.addWidget(self.address, 0, Q.ALIGN_TOP)
+        Q.addDropShadow(box)
+        lyt.setContentsMargins(5, 2, 5, 0)
+        box.setContentsMargins(5, 5, 5, 5)
 
-        # Open staking window. Button is initally hidden until sync is complete.
-        btn = app.getButton(SMALL, "Staking")
-        btn.setMinimumWidth(110)
-        btn.clicked.connect(self.openStaking)
-        optsLyt.addWidget(btn, 0, 1, Q.ALIGN_RIGHT)
+        left, _ = Q.makeColumn(Q.STRETCH, row, box)
+        left.setContentsMargins(5, 5, 5, 10)
+        left.setMaximumWidth(320)
 
-        # Navigate to the settings screen.
-        # settings = app.getButton(SMALL, "Settings")
-        # settings.setMinimumWidth(110)
-        # settings.clicked.connect(self.settingsClicked)
+        # OPTIONS
 
-        optsLyt.addWidget(QtWidgets.QWidget(), 0, 1, Q.ALIGN_RIGHT)
-        optsLyt.setColumnStretch(0, 1)
-        optsLyt.setColumnStretch(1, 1)
-        optsLyt.setSpacing(35)
+        right, optsLyt = Q.makeWidget(QtWidgets.QWidget, Q.VERTICAL)
+
+        # Settings
+        settings = app.getButton(SMALL, "  Settings ")
+        settings.setIcon(SVGWidget("gear", h=14).icon())
+        settings.clicked.connect(self.settingsClicked)
+        optsLyt.addWidget(settings, Q.ALIGN_LEFT)
+
+        # Open staking window..
+        stake = app.getButton(SMALL, "  Staking  ")
+        stake.setIcon(SVGWidget("check", w=15).icon())
+        stake.clicked.connect(self.openStaking)
+        optsLyt.addWidget(stake, Q.ALIGN_RIGHT)
+
+        row, _ = Q.makeRow(left, Q.STRETCH, right)
+        row.setContentsMargins(0, 10, 0, 0)
+        self.layout.addWidget(row)
+
+    def toAssetScreen(self, e=None):
+        """
+        Qt slot for "accounts" button clicked signal. Stacks the Decred asset
+        screen.
+        """
+        app.home(self.assetScreen)
 
     def newAddressClicked(self):
         """
-        Generate and display a new address. User password required.
+        Generate and display a new address.
         """
 
         def addr():
@@ -545,7 +556,10 @@ class AccountScreen(Screen):
 
     def setNewAddress(self, address):
         """
-        Callback for newAddressClicked. Sets the displayed address.
+        QThread callback for newAddressClicked. Sets the displayed address.
+
+        Args:
+            address (str): The new adddress.
         """
         if address:
             self.address.setText(address)
@@ -565,15 +579,22 @@ class AccountScreen(Screen):
     def balanceUpdated(self, bal):
         """
         A BALANCE_SIGNAL receiver that updates the displayed balance.
+
+        Args:
+            bal (account.Balance): A Decred account Balance.
         """
-        dcrs = bal.total * 1e-8 // 0.01 * 0.01
-        availStr = "%.8f" % (bal.available * 1e-8,)
-        self.totalBalance.setText("{0:,.2f}".format(dcrs))
-        self.totalBalance.setToolTip("%.8f" % dcrs)
-        self.availBalance.setText("%s spendable" % availStr.rstrip("0").rstrip("."))
-        staked = bal.staked / bal.total if bal.total > 0 else 0
-        self.statsLbl.setText("%s%% staked" % helpers.formatNumber(staked * 100))
         self.balance = bal
+        self.totalBalance.setText("{0:,.6g}".format(bal.total * 1e-8))
+
+        def dec4(flt):
+            return f"{flt * 1e-8:,.4f}"
+
+        stakedRatio = bal.staked / bal.total if bal.total > 0 else 0
+        self.availBalance.setText(f"{dec4(bal.available)} spendable")
+        self.stakedBalance.setText(
+            f"{dec4(bal.staked)} staked ({stakedRatio * 100:.2f}%)"
+        )
+        self.availBalance.setToolTip(f"{round(bal.available/1e8, 8):.8f}")
 
     def walletSynced(self):
         """
@@ -581,7 +602,6 @@ class AccountScreen(Screen):
         stats.
         """
         self.ticketStats = self.account.ticketStats()
-        self.spinner.setVisible(False)
 
     def spendClicked(self, e=None):
         """
@@ -597,7 +617,62 @@ class AccountScreen(Screen):
         app.appWindow.stack(self.stakeScreen)
 
     def settingsClicked(self, e):
-        log.debug("settings clicked")
+        """
+        Display the settings screen.
+        """
+        app.appWindow.stack(self.settingsScreen)
+
+    def sendClicked(self, e):
+        """
+        Qt slot for clicked signal from submit button. Send the amount specified
+        to the address specified.
+        """
+        val = float(self.valField.text())
+        address = self.addrField.text()
+        if not address:
+            app.appWindow.showError("address can't be empty")
+        if val <= 0:
+            app.appWindow.showError("value can't be <= 0")
+
+        log.debug("sending %f to %s" % (val, address))
+
+        def send():
+            try:
+                return self.account.sendToAddress(
+                    int(round(val * 1e8)), address
+                )  # raw transaction
+            except Exception as e:
+                log.error("failed to send: %s" % formatTraceback(e))
+            return False
+
+        def sent(res):
+            if res:
+                self.valField.setText("")
+                self.addrField.setText("")
+                app.home()
+                app.appWindow.showSuccess("sent")
+            else:
+                app.appWindow.showError("transaction error")
+
+        def confirmed():
+            withUnlockedAccount(self.account, send, sent)
+
+        app.confirm(
+            f"Are you sure you want to send {val:.8f} to {address}?", confirmed,
+        )
+
+    def saveName(self, newName):
+        """
+        Changes and saves the name of the account.
+
+        Args:
+            str: The new account name.
+        """
+        self.account.name = newName
+        self.acctMgr.saveAccount(self.account.idx)
+        self.nameLbl.setText(self.account.name)
+        self.assetScreen.doButtons()
+        app.home()
 
     def sync(self):
         """
@@ -700,20 +775,18 @@ class PasswordDialog(Screen):
         return self
 
 
-class ClickyLabel(QtWidgets.QLabel):
+class Clicker:
     """
-    Qt does not have a `clicked` signal on a QLabel, so one is implemented here.
+    Clicker add click functionality to any QWidget. Designed for multiple
+    inheritance.
     """
 
-    def __init__(self, callback, *a):
+    def __init__(self, callback):
         """
         Args:
-            callback (func): A callback function to be called when the label
-                is clicked.
-            *a: Any additional arguments are passed directly to the parent
-                QLabel constructor.
+            callback (function): A function to be called when the Widget is
+                clicked. Can be None.
         """
-        super().__init__(*a)
         self.mouseDown = False
         self.callback = callback
         self.setCursor(QtCore.Qt.PointingHandCursor)
@@ -723,7 +796,7 @@ class ClickyLabel(QtWidgets.QLabel):
             self.mouseDown = True
 
     def mouseReleaseEvent(self, e):
-        if e.button() == QtCore.Qt.LeftButton and self.mouseDown:
+        if e.button() == QtCore.Qt.LeftButton and self.mouseDown and self.callback:
             self.callback()
 
     def mouseMoveEvent(self, e):
@@ -739,6 +812,23 @@ class ClickyLabel(QtWidgets.QLabel):
         x, y = ePos.x(), ePos.y()
         if x < 0 or y < 0 or x > qSize.width() or y > qSize.height():
             self.mouseDown = False
+
+
+class ClickyLabel(Clicker, QtWidgets.QLabel):
+    """
+    A QLabel with a click callback.
+    """
+
+    def __init__(self, callback, *a):
+        """
+        Args:
+            callback (func): A callback function to be called when the label
+                is clicked.
+            *a: Any additional arguments are passed directly to the parent
+                QLabel constructor.
+        """
+        QtWidgets.QLabel.__init__(self, *a)
+        Clicker.__init__(self, callback)
 
 
 class InitializationScreen(Screen):
@@ -861,16 +951,14 @@ class AssetScreen(Screen):
         self.isPoppable = False
         self.canGoHome = False
         self.wgt.setFixedSize(
-            TinyDialog.maxWidth * 0.8,
-            TinyDialog.maxHeight * 0.8 - TinyDialog.topMenuHeight,
+            TinyDialog.maxWidth * 0.9,
+            TinyDialog.maxHeight * 0.9 - TinyDialog.topMenuHeight,
         )
         self.accountScreens = {}
 
-        logo = QtWidgets.QLabel()
-        logo.setPixmap(pixmapFromSvg(DCR.LOGO, 25, 25))
+        logo = SVGWidget(DCR.LOGO, h=25)
         lbl = Q.makeLabel("Decred", 25, fontFamily="Roboto Medium")
-        gear = QtWidgets.QLabel()
-        gear.setPixmap(pixmapFromSvg("gear.svg", 20, 20))
+        gear = SVGWidget("gear", h=20)
         # Gear icon will lead to an asset settings screen. Hide for now.
         gear.setVisible(False)
         wgt, _ = Q.makeSeries(Q.HORIZONTAL, logo, lbl, Q.STRETCH, gear,)
@@ -885,16 +973,48 @@ class AssetScreen(Screen):
         self.layout.addWidget(wgt)
         self.acctMgr = app.wallet.accountManager("dcr", app.blockchainSignals)
 
-        for i, acct in enumerate(self.acctMgr.listAccounts()):
-            selector = app.getButton(SMALL, acct.name)
+        self.newAcctScreen = NewAccountScreen(self.acctMgr, self.doButtons)
+        self.doButtons()
 
+    def doButtons(self, idx=None):
+        """
+        Create buttons for account selection.
+
+        Args:
+            idx (int): optional. An account index. If set, that account screen
+                will be displayed.
+        """
+        Q.clearLayout(self.accountsList)
+        cols = 3
+
+        def rowCol(i):
+            return i // cols, i % cols
+
+        def acctSelector(idx):
             def asel():
-                self.accountSelected(i)
+                self.accountSelected(idx)
 
-            selector.clicked.connect(asel)
-            row = i // 3
-            col = i % 3
+            return asel
+
+        for i, acct in enumerate(self.acctMgr.listAccounts()):
+            # Text needs to be added after setting layout direction.
+            selector = AccountSelector(acct)
+            selector.clicked.connect(acctSelector(i))
+            row, col = rowCol(i)
             self.accountsList.addWidget(selector, row, col, 1, Q.ALIGN_LEFT)
+
+        for j in range(min(cols, i + 1)):
+            self.accountsList.setColumnStretch(j, 1)
+
+        newAcctBttn = app.getButton(SMALL, "add new account")
+        newAcctBttn.setIcon(SVGWidget("plus", h=20).icon())
+        newAcctBttn.setIconSize(QtCore.QSize(10, 10))
+        newAcctBttn.clicked.connect(self.stackNew)
+        row, col = rowCol(i + 1)
+        self.accountsList.addWidget(newAcctBttn, row, col, 1, Q.ALIGN_LEFT)
+
+        if idx is not None:
+            self.accountSelected(idx)
 
     def accountSelected(self, idx):
         """
@@ -908,16 +1028,23 @@ class AssetScreen(Screen):
 
         if not acctScreen:
             acct = self.acctMgr.account(idx)
-            acctScreen = AccountScreen(acct)
+            acctScreen = AccountScreen(self.acctMgr, acct, self)
             self.accountScreens[idx] = acctScreen
 
         app.home(acctScreen)
         acctScreen.sync()
 
+    def stackNew(self, e=None):
+        """
+        Stack the account creation screen.
+        """
+        app.appWindow.stack(self.newAcctScreen)
 
-class SendScreen(Screen):
+
+class AccountSelector(QtWidgets.QPushButton):
     """
-    A screen that displays a form to send funds to an address.
+    AccountSelector is a button with a locked/unlocked icon that is used to open
+    a specific account.
     """
 
     def __init__(self, acct):
@@ -926,76 +1053,152 @@ class SendScreen(Screen):
             acct (Account): A Decred account.
         """
         super().__init__()
+        self.account = acct
+        dim = 11
+        self.lockedIcon = SVGWidget("locked", h=dim).grab()
+        self.unlockedIcon = SVGWidget("unlocked", h=dim).grab()
+        self.src = QtCore.QRectF(0, 0, dim, dim)
+        self.setProperty("button-style-class", Q.LIGHT_THEME)
+        self.setProperty("button-size-class", SMALL)
+        self.setText(acct.name)
+        self.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+
+    def paintEvent(self, e):
+        """
+        Paint the lock icon. This is an overloaded PyQt method.
+        """
+        super().paintEvent(e)
+        painter = QtGui.QPainter(self)
+        painter.setRenderHints(QtGui.QPainter.HighQualityAntialiasing)
+        rect = self.contentsRect()
+        dim = 11
+        pad = 4
+        x = rect.width() - dim - pad
+        y = (rect.height() / 2) - (dim / 2)
+        pic = self.unlockedIcon if self.account.isUnlocked() else self.lockedIcon
+        painter.drawPixmap(QtCore.QRectF(x, y, dim, dim), pic, self.src)
+
+
+class AccountSettingsScreen(Screen):
+    """
+    Account settings screen.
+    """
+
+    def __init__(self, saveName):
+        """
+        Args:
+            saveName (function): A callback function to be called after the user
+                submits a new account name.
+        """
+        super().__init__()
         self.canGoHome = True
         self.isPoppable = True
-        self.account = acct
-        layout = self.layout
-        layout.setSpacing(25)
-
-        layout.addWidget(Q.makeLabel("Sending Decred", 25, fontFamily="Roboto Medium"))
-
-        # A field to enter the value to send, in asset units (not atoms).
-        col, colLyt = Q.makeWidget(QtWidgets.QWidget, Q.VERTICAL)
-        layout.addWidget(col)
-        colLyt.addWidget(Q.makeLabel("how much?", 16, color="#777777"), 0, Q.ALIGN_LEFT)
-        self.valField = vf = QtWidgets.QLineEdit()
-        self.valField.setFixedWidth(175)
-        colLyt.addWidget(vf, 0, Q.ALIGN_LEFT)
-
-        # A file to enter an address to send funds to.
-        col, colLyt = Q.makeWidget(QtWidgets.QWidget, Q.VERTICAL)
-        layout.addWidget(col)
-        colLyt.addWidget(
-            Q.makeLabel("to address", 16, color="#777777"), 0, Q.ALIGN_LEFT
+        self.wgt.setFixedSize(
+            TinyDialog.maxWidth * 0.9,
+            TinyDialog.maxHeight * 0.9 - TinyDialog.topMenuHeight,
         )
-        self.addressField = af = QtWidgets.QLineEdit()
-        Q.setProperties(af, fontSize=14)
-        af.setFixedWidth(350)
-        colLyt.addWidget(af)
+        self.saveName = saveName
 
-        # The user must click the send button. No return button from QLineEdit.
-        send = app.getButton(SMALL, "send")
-        layout.addWidget(send, 0, Q.ALIGN_RIGHT)
-        send.setFixedWidth(125)
-        send.clicked.connect(self.sendClicked)
+        gear = SVGWidget("gear", h=20)
+        lbl = Q.makeLabel("Settings", 22)
+        wgt, _ = Q.makeRow(gear, lbl, Q.STRETCH)
+        self.layout.addWidget(wgt)
 
-    def sendClicked(self, e):
+        self.layout.addStretch(1)
+
+        # ACCOUNT NAME
+
+        wgt, grid = Q.makeWidget(QtWidgets.QWidget, Q.GRID)
+        self.layout.addWidget(wgt)
+        row = 0
+        grid.addWidget(Q.makeLabel("Change account name", 14, Q.ALIGN_LEFT), row, 0)
+        row += 1
+        self.nameField = QtWidgets.QLineEdit()
+        self.nameField.setFixedWidth(200)
+        grid.addWidget(self.nameField, row, 0)
+        bttn = app.getButton(SMALL, "submit")
+        bttn.setMaximumWidth(120)
+        bttn.clicked.connect(self.nameChangeClicked)
+        grid.addWidget(bttn, row, 1)
+
+        self.layout.addStretch(1)
+
+    def nameChangeClicked(self, e):
         """
-        Qt slot for clicked signal from submit button. Send the amount specified
-        to the address specified.
+        Qt slot for nameField.clicked signal.
         """
-        val = float(self.valField.text())
-        address = self.addressField.text()
-        log.debug("sending %f to %s" % (val, address))
+        newName = self.nameField.text()
+        if not newName:
+            app.appWindow.showError("empty name not allowed")
+            return
+        self.nameField.setText("")
+        self.saveName(newName)
 
-        def send():
-            try:
-                return self.account.sendToAddress(
-                    int(round(val * 1e8)), address
-                )  # raw transaction
-            except Exception as e:
-                log.error("failed to send: %s" % formatTraceback(e))
-            return False
 
-        def confirmed():
-            withUnlockedAccount(self.account, send, self.sent)
+class NewAccountScreen(Screen):
+    """
+    A screen that displays a form to create a new account.
+    """
 
-        app.confirm(
-            f"Are you sure you want to send {val:.8f} to {address}?", confirmed,
-        )
-
-    def sent(self, res):
+    def __init__(self, acctMgr, refresh):
         """
-        Receives the result of sending funds.
-
         Args:
-            res (bool): Success status of the send operation.
+            acctMgr (AccountManager): A Decred account manager.
+            refresh (function): A function to be called when a new account is
+                added.
         """
-        if res:
-            app.home()
-            app.appWindow.showSuccess("sent")
-        else:
-            app.appWindow.showError("transaction error")
+        super().__init__()
+        self.canGoHome = True
+        self.isPoppable = True
+        self.acctMgr = acctMgr
+        self.refresh = refresh
+        lbl = Q.makeLabel("Name your new account", 16)
+        self.layout.addWidget(lbl)
+        self.nameField = QtWidgets.QLineEdit()
+        self.nameField.setFixedWidth(200)
+        self.layout.addWidget(self.nameField)
+        bttn = app.getButton(SMALL, "create account")
+        bttn.clicked.connect(self.createAccount)
+        self.layout.addWidget(bttn)
+
+    def createAccount(self, e=None):
+        """
+        Qt slot for "create account" button's connect signal. Create a new
+        account.
+        """
+        name = self.nameField.text()
+        if not name:
+            app.appWindow.showError("must provide name")
+
+        def doneCreateAcct(acct):
+            if not acct:
+                return
+            self.refresh(acct.idx)
+
+        def runCreateAcct(cryptoKey):
+            try:
+                acct = self.acctMgr.addAccount(cryptoKey, name)
+                acct.unlock(cryptoKey)
+                return acct
+            except Exception as e:
+                log.error(
+                    "exception encountered while adding account: %s"
+                    % formatTraceback(e)
+                )
+
+        def createAcctPW(pw):
+            try:
+                cryptoKey = app.wallet.cryptoKey(pw)
+                app.waitThread(runCreateAcct, doneCreateAcct, cryptoKey)
+            except Exception as e:
+                log.warning(
+                    "exception encountered while decoding wallet key: %s"
+                    % formatTraceback(e)
+                )
+                app.appWindow.showError("error")
+
+        app.waiting()
+        app.getPassword(createAcctPW)
 
 
 class WaitingScreen(Screen):
@@ -1181,7 +1384,7 @@ class StakingScreen(Screen):
         self.lastPriceStamp = 0
         self.ticketPrice = Q.makeLabel("--.--", 24, fontFamily="Roboto Bold")
         unit = Q.makeLabel("DCR", 16)
-        priceWgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, self.ticketPrice, unit)
+        priceWgt, _ = Q.makeRow(lbl, self.ticketPrice, unit)
         self.layout.addWidget(priceWgt)
 
         # Current holdings is a single row that reads `Currently staking X
@@ -1209,6 +1412,8 @@ class StakingScreen(Screen):
 
         # A button to revoke expired and missed tickets.
         revokeBtn = app.getButton(TINY, "")
+        revokeBtn.clicked.connect(self.revokeTickets)
+        votingWgt, _ = Q.makeRow(agendasWgt, revokeBtn)
         self.revokeBtn = revokeBtn
         revokeBtn.clicked.connect(self.revokeTickets)
         votingWgt, _ = Q.makeSeries(Q.HORIZONTAL, agendasWgt, statsWgt, revokeBtn)
@@ -1222,7 +1427,7 @@ class StakingScreen(Screen):
         lbl = Q.makeLabel("You can afford ", 14)
         self.affordLbl = Q.makeLabel(" ", 17, fontFamily="Roboto Bold")
         lbl2 = Q.makeLabel("tickets", 14)
-        affordWgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, self.affordLbl, lbl2)
+        affordWgt, _ = Q.makeRow(lbl, self.affordLbl, lbl2)
         affordWgt.setContentsMargins(0, 0, 0, 30)
         self.layout.addWidget(affordWgt)
 
@@ -1240,7 +1445,7 @@ class StakingScreen(Screen):
         qty.returnPressed.connect(self.buyClicked)
         btn = app.getButton(SMALL, "Buy Now")
         btn.clicked.connect(self.buyClicked)
-        purchaseWgt, lyt = Q.makeSeries(Q.HORIZONTAL, lbl, qty, lbl2, Q.STRETCH, btn)
+        purchaseWgt, lyt = Q.makeRow(lbl, qty, lbl2, Q.STRETCH, btn)
         lyt.setContentsMargins(10, 10, 10, 10)
         Q.addDropShadow(purchaseWgt)
         self.layout.addWidget(purchaseWgt)
@@ -1250,7 +1455,7 @@ class StakingScreen(Screen):
         lbl2 = ClickyLabel(lambda: app.appWindow.stack(self.accountScreen), "change")
         Q.setProperties(lbl2, underline=True, fontSize=15)
         Q.addHoverColor(lbl2, "#f5ffff")
-        wgt, lyt = Q.makeSeries(Q.HORIZONTAL, self.currentPool, Q.STRETCH, lbl2)
+        wgt, lyt = Q.makeRow(self.currentPool, Q.STRETCH, lbl2)
         lyt.setContentsMargins(0, 10, 0, 0)
         self.layout.addWidget(wgt)
 
@@ -1770,14 +1975,14 @@ class PoolScreen(Screen):
         # row is a QLineEdit and a button that takes the pool URL. The second
         # row is a slightly larger QLineEdit for the API key.
         lbl = Q.makeLabel("Add a voting service provider", 16)
-        wgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, Q.STRETCH)
+        wgt, _ = Q.makeRow(lbl, Q.STRETCH)
         self.layout.addWidget(wgt)
         self.poolIp = edit = QtWidgets.QLineEdit()
         edit.setPlaceholderText("e.g. https://anothervsp.com")
         edit.returnPressed.connect(self.authPool)
         btn = app.getButton(SMALL, "Add")
         btn.clicked.connect(self.authPool)
-        wgt, _ = Q.makeSeries(Q.HORIZONTAL, self.poolIp, btn)
+        wgt, _ = Q.makeRow(self.poolIp, btn)
         wgt.setContentsMargins(0, 0, 0, 5)
         self.layout.addWidget(wgt)
         self.keyIp = edit = QtWidgets.QLineEdit()
@@ -1820,7 +2025,7 @@ class PoolScreen(Screen):
             usersLbl,
             self.users,
         )
-        poolWgt, lyt = Q.makeSeries(Q.VERTICAL, self.poolUrl, stats)
+        poolWgt, lyt = Q.makeColumn(self.poolUrl, stats)
         lyt.setContentsMargins(10, 10, 10, 10)
         lyt.setSpacing(10)
         Q.addDropShadow(poolWgt)
@@ -1833,7 +2038,7 @@ class PoolScreen(Screen):
         btn1.clicked.connect(self.randomizePool)
         btn2 = app.getButton(TINY, "see all")
         btn2.clicked.connect(self.showAll)
-        wgt, _ = Q.makeSeries(Q.HORIZONTAL, btn1, Q.STRETCH, btn2)
+        wgt, _ = Q.makeRow(btn1, Q.STRETCH, btn2)
         self.layout.addWidget(wgt)
 
         self.sync()
@@ -2121,13 +2326,14 @@ class AgendasScreen(Screen):
             app.appWindow.showError("unable to set agendas")
             return
         Q.clearLayout(self.agendasLyt, delete=True)
+        self.dropdowns.clear()
         for agenda in agendas:
             nameLbl = Q.makeLabel(agenda.id, 16)
             statusLbl = Q.makeLabel(agenda.status, 14)
             descriptionLbl = Q.makeLabel(agenda.description, 14)
             descriptionLbl.setMargin(10)
             choices = [choice.id for choice in agenda.choices]
-            nameWgt, _ = Q.makeSeries(Q.HORIZONTAL, nameLbl, Q.STRETCH, statusLbl)
+            nameWgt, _ = Q.makeRow(nameLbl, Q.STRETCH, statusLbl)
 
             # choicesDropdown is a dropdown menu that contains voting choices.
             choicesDropdown = Q.makeDropdown(choices)
@@ -2139,8 +2345,8 @@ class AgendasScreen(Screen):
             choicesDropdown.lastIndex = 0
             choicesDropdown.activated.connect(self.onChooseChoiceFunc(choicesDropdown))
 
-            choicesWgt, _ = Q.makeSeries(Q.HORIZONTAL, choicesDropdown)
-            wgt, lyt = Q.makeSeries(Q.VERTICAL, nameWgt, descriptionLbl, choicesWgt)
+            choicesWgt, _ = Q.makeRow(choicesDropdown)
+            wgt, lyt = Q.makeColumn(nameWgt, descriptionLbl, choicesWgt)
             wgt.setMinimumWidth(360)
             lyt.setContentsMargins(5, 5, 5, 5)
             Q.addDropShadow(wgt)
@@ -2309,7 +2515,7 @@ class PoolAccountScreen(Screen):
             ticketAddr = pool.purchaseInfo.ticketAddress
             urlLbl = Q.makeLabel(pool.url, 16)
             addrLbl = Q.makeLabel(ticketAddr, 14)
-            wgt, lyt = Q.makeSeries(Q.VERTICAL, urlLbl, addrLbl, align=Q.ALIGN_LEFT)
+            wgt, lyt = Q.makeColumn(urlLbl, addrLbl, align=Q.ALIGN_LEFT)
             wgt.setMinimumWidth(360)
             lyt.setContentsMargins(5, 5, 5, 5)
             Q.addDropShadow(wgt)
@@ -2356,7 +2562,7 @@ class ConfirmScreen(Screen):
         stop.clicked.connect(self.stopClicked)
         go = app.getButton(SMALL, "ok")
         go.clicked.connect(self.goClicked)
-        wgt, _ = Q.makeSeries(Q.HORIZONTAL, Q.STRETCH, stop, Q.STRETCH, go, Q.STRETCH)
+        wgt, _ = Q.makeRow(Q.STRETCH, stop, Q.STRETCH, go, Q.STRETCH)
         wgt.setContentsMargins(0, 20, 0, 0)
         self.layout.addWidget(wgt)
 
@@ -2434,6 +2640,80 @@ class Spinner(QtWidgets.QLabel):
         painter.setRenderHints(QtGui.QPainter.HighQualityAntialiasing)
         painter.setPen(self.getPen())
         painter.drawEllipse(*self.rect)
+
+
+class SVGWidget(Clicker, QtSvg.QSvgWidget):
+    """
+    A widget to display an SVG.
+    """
+
+    def __init__(self, path, w=None, h=None, click=None):
+        """
+        Create a QSvgWidget from the svg file in the icons directory. The svg will
+        display at its designated pixel size if no dimensions are specified. If
+        only one dimension is specified, the aspect ratio will be maintained for the
+        other dimension.
+
+        Args:
+            path (str): Full path for non-tinywallet files. Otherwise, the basename
+                of the file in the icons folder.
+            w (int): optional. Pixel width of the resulting pixmap.
+            h (int): optional. Pixel height of the resulting pixmap.
+            click (func): optional. A function to call when the widget is
+                clicked.
+
+        Returns:
+            QPixmap: A sized pixmap created from the scaled SVG file.
+        """
+        if not path.endswith(".svg"):
+            path = os.path.join(UI_DIR, "icons", path + ".svg")
+        QtSvg.QSvgWidget.__init__(self, path)
+        Clicker.__init__(self, click)
+        size = self.sizeHint()
+        x, y = size.width(), size.height()
+        if w and h:
+            pass
+        elif w:
+            h = w * y / x
+        elif h:
+            w = h * x / y
+        else:
+            w, h = x, y
+        self.w = w
+        self.h = h
+        self.setFixedSize(w, h)
+
+    def icon(self):
+        return QtGui.QIcon(self.grab())
+
+
+class HorizontalRule(QtWidgets.QFrame):
+    """
+    A plain horizontal line.
+    """
+
+    def __init__(self, color="#b2b2b2"):
+        """
+        Args:
+            color (str): A QCSS color string.
+        """
+        super().__init__()
+        self.setFrameShape(QtWidgets.QFrame.HLine)
+        self.setFixedHeight(1)
+        self.setStyleSheet(f"QFrame{{border: 2px solid {color};}}")
+
+
+class AddressDisplay(QtWidgets.QLabel):
+    """
+    A box to display an address.
+    """
+
+    def __init__(self, *a):
+        super().__init__(*a)
+        font = self.font()
+        font.setPixelSize(14)
+        self.setFont(font)
+        self.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
 
 
 def withUnlockedAccount(acct, f, cb):

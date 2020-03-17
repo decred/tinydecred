@@ -372,8 +372,6 @@ class TestDcrdataBlockchain:
         ddb.dcrdata.ps.sent = []
 
         # subscribeAddresses
-        with pytest.raises(DecredError):
-            ddb.subscribeAddresses([])
         ddb.subscribeAddresses(["new_one"], addrReceiver)
         assert ddb.dcrdata.ps.sent[0]["message"]["message"] == "address:new_one"
 
@@ -383,6 +381,7 @@ class TestDcrdataBlockchain:
         assert ddb.pubsubSignal(dict(event="ping")) is None
         assert ddb.pubsubSignal(dict(event="unknown")) is None
         # pubsubSignal address
+        ddb.subscribeAddresses(["the_address"], addrReceiver)
         sig = dict(
             event="address",
             message=dict(address="the_address", transaction="transaction"),

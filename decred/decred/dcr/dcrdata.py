@@ -409,10 +409,6 @@ class DcrdataBlockchain:
             db = database.KeyValueDatabase(db)
         self.db = db
         self.netParams = netParams
-        # The blockReceiver and addressReceiver will be set when the respective
-        # subscribe* method is called.
-        self.blockReceiver = None
-        self.addressReceiver = None
         self.datapath = datapath
         self.dcrdata = None
         self.txDB = db.child("tx", blobber=msgtx.MsgTx)
@@ -421,6 +417,8 @@ class DcrdataBlockchain:
         self.txBlockMap = db.child("blocklink")
         self.tipHeight = None
         self.subsidyCache = calc.SubsidyCache(netParams)
+        self.addrSubscribers = {}
+        self.blockSubscribers = []
         if not skipConnect:
             self.connect()
 
@@ -448,7 +446,7 @@ class DcrdataBlockchain:
             receiver (func(object)): A function or method that accepts the block
                 notifications.
         """
-        self.blockReceiver = receiver
+        self.blockSubscribers.append(receiver)
         self.dcrdata.subscribeBlocks()
 
     def getAgendasInfo(self):
@@ -460,7 +458,7 @@ class DcrdataBlockchain:
         """
         return agenda.AgendasInfo.parse(self.dcrdata.stake.vote.info())
 
-    def subscribeAddresses(self, addrs, receiver=None):
+    def subscribeAddresses(self, addrs, receiver):
         """
         Subscribe to notifications for the provided addresses.
 
@@ -470,10 +468,8 @@ class DcrdataBlockchain:
                 notifications.
         """
         log.debug("subscribing to addresses %s" % repr(addrs))
-        if receiver:
-            self.addressReceiver = receiver
-        elif self.addressReceiver is None:
-            raise DecredError("must set receiver to subscribe to addresses")
+        for addr in addrs:
+            self.addrSubscribers[addr] = receiver
         self.dcrdata.subscribeAddresses(addrs)
 
     def processNewUTXO(self, utxo):
@@ -840,11 +836,17 @@ class DcrdataBlockchain:
         try:
             if sigType == "address":
                 msg = sig["message"]
+                addr = msg["address"]
                 log.debug("signal received for %s" % msg["address"])
-                self.addressReceiver(msg["address"], msg["transaction"])
+                receiver = self.addrSubscribers.get(addr)
+                if not receiver:
+                    log.error("no receiver registered for address %s", addr)
+                    return
+                receiver(addr, msg["transaction"])
             elif sigType == "newblock":
                 self.tipHeight = sig["message"]["block"]["height"]
-                self.blockReceiver(sig)
+                for receiver in self.blockSubscribers:
+                    receiver(sig)
             elif sigType == "subscribeResp":
                 # should check for error.
                 pass
