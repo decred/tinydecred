@@ -1400,7 +1400,7 @@ class Account:
             try:
                 addr = branchKey.deriveChildAddress(idx, self.net)
             except crypto.CrazyKeyError:
-                return CrazyAddress
+                addr = CrazyAddress
             branchAddrs.append(addr)
             branchDB[idx] = addr
             return addr
