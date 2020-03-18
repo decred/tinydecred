@@ -318,13 +318,13 @@ def makeOutputs(pairs, chain):
     """
     makeOutputs creates a slice of transaction outputs from a pair of address
     strings to amounts.  This is used to create the outputs to include in newly
-    created transactions from a JSON object describing the output destinations
-    and amounts.
+    created transactions from a JSON-derived dict describing the output
+    destinations and amounts.
 
     Args:
         pairs (tuple(str, int)): Base58-encoded address strings and atoms to
             send to the address.
-        chain obj: Network parameters.
+        chain (module): Network parameters.
 
     Returns:
         list(msgtx.TxOut): Transaction outputs.

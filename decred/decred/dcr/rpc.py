@@ -41,7 +41,7 @@ def stringify(thing):
     return thing
 
 
-class Client(object):
+class Client:
     """
     The Client communicates with the blockchain RPC API.
     """
@@ -194,7 +194,7 @@ class Client(object):
 
         Args:
             inputs (list(UTXO)): The inputs to the transaction.
-            amounts (dict[str]int) JSON object with the destination addresses
+            amounts (dict[str]int) JSON-derived dict with the destination addresses
                 as keys and amounts as values in atoms.
             locktime (int): Optional. Default=None. Locktime value; a non-zero
                 value will also locktime-activate the inputs.
@@ -421,8 +421,8 @@ class Client(object):
         Returns information about manually added (persistent) peers.
 
         Args:
-            dns (bool): Specifies whether the returned data is a JSON object
-                including DNS and connection information, or just a list of
+            dns (bool): Specifies whether the returned data is a JSON-derived
+                dict including DNS and connection information, or just a list of
                 added peers.
             node (str): Optional. Default=None. Only return information about
                 this specific peer instead of all added peers.
@@ -557,7 +557,8 @@ class Client(object):
         through a block.
 
         Args:
-            blockHash (ByteArray or str): The block hash of the filter header being queried.
+            blockHash (ByteArray or str): The block hash of the filter header
+                being queried.
             filterType (str): The type of committed filter to return the
                 header commitment for.
 
@@ -718,7 +719,8 @@ class Client(object):
 
     def getNetworkHashPS(self, blocks=120, height=-1):
         """
-        Returns the estimated network hashes per second for the block heights provided by the parameters.
+        Returns the estimated network hashes per second for the block heights
+        provided by the parameters.
 
         Args:
             blocks (int) Optional. Default=120. The number of blocks, or -1 for
@@ -1006,8 +1008,9 @@ class Client(object):
 
         Args:
             msgTx (object): msgtx.MsgTx signed transaction.
-            allowHighFees (bool): Optional. Default=False. Whether or not to allow insanely high fees
-                (dcrd does not yet implement this parameter, so it has no effect).
+            allowHighFees (bool): Optional. Default=False. Whether or not to
+                allow insanely high fees (dcrd does not yet implement this
+                parameter, so it has no effect).
 
         Returns:
             ByteArray: The hash of the transaction.
@@ -1021,8 +1024,8 @@ class Client(object):
 
         Args:
             generate (bool): Use True to enable generation, False to disable it.
-            numCPUs (int): Optional. Default=-1. The number of processors (cores) to limit
-                generation to or -1 for default.
+            numCPUs (int): Optional. Default=-1. The number of processors
+                (cores) to limit generation to or -1 for default.
         """
         self.call("setgenerate", generate, numCPUs)
 
@@ -1054,10 +1057,10 @@ class Client(object):
         difficulty windows (units: DCR/kB).
 
         Args:
-            blocks (int): Optional. Default=0. The number of blocks, starting from the
-                chain tip and descending, to return fee information about.
-            windows (int): Optional. Default=0. The number of difficulty windows to return
-                ticket fee information about.
+            blocks (int): Optional. Default=0. The number of blocks, starting from
+                the chain tip and descending, to return fee information about.
+            windows (int): Optional. Default=0. The number of difficulty windows
+                to return ticket fee information about.
 
         Returns:
             TicketFeeInfoResult: The ticket fee info.
@@ -1083,8 +1086,10 @@ class Client(object):
         blocks (default: full PoS difficulty adjustment depth).
 
         Args:
-            start (int): Optional. Default=None. The start height to begin calculating the VWAP from.
-            end (int): Optional. Default=None. The end height to begin calculating the VWAP from.
+            start (int): Optional. Default=None. The start height to begin
+                calculating the VWAP from.
+            end (int): Optional. Default=None. The end height to begin
+                calculating the VWAP from.
 
         Returns:
             float: The volume weighted average price.
@@ -1153,7 +1158,8 @@ class Client(object):
         Get the dcrd and dcrdjsonrpcapi version info.
 
         Returns:
-            dict[str]VersionResult: dcrd's version info with keys "dcrd" and "dcrdjsonrpcapi".
+            dict[str]VersionResult: dcrd's version info with keys "dcrd" and
+                "dcrdjsonrpcapi".
         """
         return {k: VersionResult.parse(v) for k, v in self.call("version").items()}
 
@@ -1356,8 +1362,8 @@ class GetBlockVerboseResult:
             previousHash (ByteArray): The hash of the previous block.
             nextHash (ByteArray): The hash of the next block (only if there is one).
             txHash (list(ByteArray)): The transaction (only when verboseTx=false).
-            rawTx (list(RawTransactionResult)): The transactions as JSON objects
-                (only when verboseTx=true).
+            rawTx (list(RawTransactionResult)): The transactions as JSON-derived
+                dicts (only when verboseTx=true).
             sTxHash (list(ByteArray)): The block's sstx hashes that were included (only
                 when verboseTx=false).
             rawSTx (list(RawTransactionResult)): The block's raw sstx hashes
@@ -2030,7 +2036,7 @@ class GetNetworkInfoResult:
             networks (list(NetworksResult)): An array of objects describing
                 IPV4, IPV6 and Onion network interface states.
             relayFee (float): The minimum required transaction fee for the node.
-            localAddresses (list(LocalAddressesResult)): An array of objects.
+            localAddresses (list(LocalAddressesResult)): An array of objects
                 describing local addresses being listened on by the node.
             localServices (str): The services supported by the node, as
                 advertised in its version message.
@@ -2779,7 +2785,7 @@ class TxFeeInfoResult:
         )
 
 
-class GetBestBlockResult(object):
+class GetBestBlockResult:
     """
     Models data returned by the getBestBlock command.
     """
@@ -2808,7 +2814,7 @@ class GetBestBlockResult(object):
         return GetBestBlockResult(blockHash=blockHash, height=obj["height"])
 
 
-class GetBlockChainInfoResult(object):
+class GetBlockChainInfoResult:
     """
     Models data returned by the getBlockChainInfo command.
     """
@@ -2918,8 +2924,10 @@ class RawTransactionResult:
             vin (list(object)): The transaction inputs.
             vout (list(object)): The transaction outputs.
             tx (msgtx.MsgTx): msgtx.MsgTx transaction or None.
-            blockHash (ByteArray): The hash of the block the contains the transaction or None.
-            blockHeight (int): The height of the block that contains the transaction or None.
+            blockHash (ByteArray): The hash of the block the contains the
+                transaction or None.
+            blockHeight (int): The height of the block that contains the
+                transaction or None.
             blockIndex (int): The index within the array of transactions
                 contained by the block or None.
             confirmations (int): Number of confirmations of the block or None.

@@ -44,7 +44,7 @@ def checkBranchKeys(acctKey):
     acctKey.child(INTERNAL_BRANCH)
 
 
-class AccountManager(object):
+class AccountManager:
     """
     The AccountManager provides generation, organization, and other management
     of Accounts.
@@ -122,7 +122,7 @@ class AccountManager(object):
         Get the network parameters for the account.
 
         Returns:
-            object: The network parameters.
+            module: The network parameters.
         """
         return chains.NetworkParams[self.coinType][self.netName]
 
@@ -250,7 +250,7 @@ def createNewAccountManager(root, cryptoKey, coinType, netParams, db):
     Args:
         root (crypto.ExtendedKey): The wallet key.
         cryptoKey (crypto.SecretKey): The master encryption key.
-        netParams (object): Network parameters.
+        netParams (module): Network parameters.
 
     Returns:
         AccountManager: An initialized account manager.

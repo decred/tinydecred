@@ -154,7 +154,7 @@ def decodeBA(b, copy=False):
     raise TypeError("decodeBA: unknown type %s" % type(b))
 
 
-class ByteArray(object):
+class ByteArray:
     """
     ByteArray is a bytearray manager. It implements a subset of bytearray's
     bitwise operators and provides some convenience decodings on the fly, so

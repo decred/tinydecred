@@ -472,7 +472,7 @@ def minimizeAy(*args, grains=100, **kwargs):
     return result
 
 
-class SubsidyCache(object):
+class SubsidyCache:
     """
     SubsidyCache provides efficient access to consensus-critical subsidy
     calculations for blocks and votes, including the max potential subsidy for
@@ -678,7 +678,7 @@ def blksLeftStakeWindow(net, height):
     Return the number of blocks until the next stake difficulty change.
 
         Args:
-            net (object): The network parameters.
+            net (module): The network parameters.
             height (int): Block height to find remaining blocks from.
 
         Returns:
