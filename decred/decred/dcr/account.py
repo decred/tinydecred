@@ -620,18 +620,18 @@ class UTXO:
         if self.scriptPubKey:
             self.scriptClass = txscript.getScriptClass(0, self.scriptPubKey)
 
-    def confirm(self, block, tx, params):
+    def confirm(self, block, tx, netParams):
         """
         This output has been mined. Set the block details.
 
         Args:
             block (msgblock.BlockHeader): The block header.
             tx (dict): The dcrdata transaction.
-            params (module): The network parameters.
+            netParams (module): The network parameters.
         """
         self.height = block.height
         self.maturity = (
-            block.height + params.CoinbaseMaturity if tx.looksLikeCoinbase() else 0
+            block.height + netParams.CoinbaseMaturity if tx.looksLikeCoinbase() else 0
         )
         self.ts = block.timestamp
 
@@ -820,8 +820,7 @@ class Account:
         self.name = name
         self.coinID = BIPID
         self.netID = netID
-        # TODO: change self.net to self.netParams
-        self.net = nets.parse(netID)
+        self.netParams = nets.parse(netID)
         # For external addresses, the cursor can sit on the last seen address,
         # so start the lastSeen at the 0th external address. This is necessary
         # because the currentAddress method grabs the address at the current
@@ -1146,7 +1145,7 @@ class Account:
         ticketTxid = tx.txIn[idx].previousOutPoint.txid()
         if ticketTxid not in self.ticketDB:
             raise DecredError(f"spending tx for ticket not in database: {ticketTxid}")
-        tinfo = self.blockchain.ticketInfoForSpendingTx(tx.txid(), self.net)
+        tinfo = self.blockchain.ticketInfoForSpendingTx(tx.txid(), self.netParams)
 
         ticket = self.ticketDB[ticketTxid]
         ticket.tinfo = tinfo
@@ -1163,7 +1162,7 @@ class Account:
         """
         # Get current unspent tickets.
         mempoolTickets = {
-            k: UTXO.ticketFromTx(v, self.net)
+            k: UTXO.ticketFromTx(v, self.netParams)
             for k, v in self.mempool.items()
             if v.isTicket()
         }
@@ -1223,7 +1222,7 @@ class Account:
             # Create the ticket.
             tinfo = self.blockchain.ticketInfo(txid)
             block = self.blockchain.blockForTx(txid)
-            ticket = UTXO.ticketFromTx(tx, self.net, block=block, tinfo=tinfo)
+            ticket = UTXO.ticketFromTx(tx, self.netParams, block=block, tinfo=tinfo)
 
             # Set the transaction fee for the original purchase.
             _, tinfo.purchaseTxFee = TicketInfo.fees(tx)
@@ -1379,7 +1378,7 @@ class Account:
             utxo.height = blockHeight
             if tx.looksLikeCoinbase():
                 # This is a coinbase transaction, set the maturity height.
-                utxo.maturity = utxo.height + self.net.CoinbaseMaturity
+                utxo.maturity = utxo.height + self.netParams.CoinbaseMaturity
 
     def nextBranchAddress(self, branchKey, branchAddrs, branchDB):
         """
@@ -1398,7 +1397,7 @@ class Account:
         def nextAddr():
             idx = len(branchAddrs)
             try:
-                addr = branchKey.deriveChildAddress(idx, self.net)
+                addr = branchKey.deriveChildAddress(idx, self.netParams)
             except crypto.CrazyKeyError:
                 addr = CrazyAddress
             branchAddrs.append(addr)
@@ -1552,7 +1551,9 @@ class Account:
         Returns:
             crypto.ExtendedKey: The current account's decoded private key.
         """
-        return crypto.decodeExtendedKey(self.net, cryptoKey, self.privKeyEncrypted)
+        return crypto.decodeExtendedKey(
+            self.netParams, cryptoKey, self.privKeyEncrypted
+        )
 
     def publicExtendedKey(self, cryptoKey):
         """
@@ -1565,7 +1566,7 @@ class Account:
         Returns:
             crypto.ExtendedKey: The current account's decoded public key.
         """
-        return crypto.decodeExtendedKey(self.net, cryptoKey, self.pubKeyEncrypted)
+        return crypto.decodeExtendedKey(self.netParams, cryptoKey, self.pubKeyEncrypted)
 
     def branchAndIndex(self, addr):
         """
@@ -1715,7 +1716,7 @@ class Account:
             AddressSecpPubkey: The address object.
         """
         return crypto.AddressSecpPubKey(
-            self.votingKey().pub.serializeCompressed(), self.net
+            self.votingKey().pub.serializeCompressed(), self.netParams
         )
 
     def setPool(self, pool):
@@ -1824,7 +1825,9 @@ class Account:
                 matches += 1
         # scan the outputs for any new UTXOs
         for vout, txout in enumerate(tx.txOut):
-            _, addresses, _ = txscript.extractPkScriptAddrs(0, txout.pkScript, self.net)
+            _, addresses, _ = txscript.extractPkScriptAddrs(
+                0, txout.pkScript, self.netParams
+            )
             # convert the Address objects to strings.
             if addr in (a.string() for a in addresses):
                 utxo = self.blockchain.txVout(txid, vout)
@@ -1921,7 +1924,7 @@ class Account:
         txs = [self.blockchain.tx(txid) for txid in revocableTickets]
         for tx in txs:
             redeemHash = crypto.AddressScriptHash(
-                self.net.ScriptHashAddrID,
+                self.netParams.ScriptHashAddrID,
                 txscript.extractStakeScriptHash(tx.txOut[0].pkScript, opcode.OP_SSTX),
             )
             redeemScript = next(

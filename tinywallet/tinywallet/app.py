@@ -107,7 +107,10 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
         # The initialized DcrdataBlockchain will not be connected, as that is a
         # blocking operation. It will be called when the wallet is open.
         self.dcrdata = DcrdataBlockchain(
-            dcrdataDB, self.cfg.net, self.getNetSetting("dcrdata"), skipConnect=True,
+            dcrdataDB,
+            self.cfg.netParams,
+            self.getNetSetting("dcrdata"),
+            skipConnect=True,
         )
         chains.registerChain("dcr", self.dcrdata)
 
@@ -257,7 +260,7 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
         Returns:
             str: Absolute filepath of the directory for the selected network.
         """
-        return os.path.join(config.DATA_DIR, self.cfg.net.Name)
+        return os.path.join(config.DATA_DIR, self.cfg.netParams.Name)
 
     def loadSettings(self):
         """
@@ -304,7 +307,7 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
         Returns:
             mixed: Value of network setting for *keys.
         """
-        return self.cfg.get("networks", self.cfg.net.Name, *keys)
+        return self.cfg.get("networks", self.cfg.netParams.Name, *keys)
 
     def setNetSetting(self, k, v):
         """
@@ -314,7 +317,7 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
             k (str): Network setting key string.
             v (value): Network setting value.
         """
-        self.cfg.get("networks", self.cfg.net.Name)[k] = v
+        self.cfg.get("networks", self.cfg.netParams.Name)[k] = v
 
     def registerSignal(self, sig, cb, *a, **k):
         """
