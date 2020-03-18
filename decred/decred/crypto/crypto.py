@@ -186,8 +186,8 @@ class AddressSecpPubKey:
     def __init__(self, serializedPubkey, netParams):
         """
         Args:
-            serializedPubkey (curve.KoblitzCurve): A ByteArray corresponding
-                to the serialized compressed public key (33 bytes).
+            serializedPubkey (ByteArray): Corresponds to the serialized
+                compressed public key (33 bytes).
             netParams (module): The network parameters.
         """
         pubkey = Curve.parsePubKey(serializedPubkey)

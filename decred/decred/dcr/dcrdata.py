@@ -831,7 +831,7 @@ class DcrdataBlockchain:
         Process a notification from the block explorer.
 
         Arg:
-            sig (object or string): The block explorer's notification, decoded.
+            sig (dict or string): The block explorer's notification, decoded.
         """
         # log.debug("pubsub signal recieved: %s" % repr(sig))
         if sig == WS_DONE:
