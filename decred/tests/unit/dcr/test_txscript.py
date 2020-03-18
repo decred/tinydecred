@@ -3825,3 +3825,88 @@ def test_is_dust_output():
         assert (
             res == test["want"]
         ), f'wanted {test["want"]} but got {res} for test {test["name"]}'
+
+
+def test_add_data():
+    psf = parseShortForm
+    """
+    name (str): Short description of the test.
+    data (ByteArray): Data to add.
+    want (ByteArray): The added data preceeded with the correct opcode.
+    """
+    tests = [
+        # BIP0062: Pushing an empty byte sequence must use OP_0.
+        dict(name="push empty byte sequence", data=None, want=psf("0")),
+        dict(name="push 1 byte 0x00", data=psf("0x00"), want=psf("0")),
+        # BIP0062: Pushing a 1-byte sequence of byte 0x01 through 0x10 must use OP_n.
+        dict(name="push 1 byte 0x01", data=psf("0x01"), want=psf("1")),
+        dict(name="push 1 byte 0x02", data=psf("0x02"), want=psf("2")),
+        dict(name="push 1 byte 0x03", data=psf("0x03"), want=psf("3")),
+        dict(name="push 1 byte 0x04", data=psf("0x04"), want=psf("4")),
+        dict(name="push 1 byte 0x05", data=psf("0x05"), want=psf("5")),
+        dict(name="push 1 byte 0x06", data=psf("0x06"), want=psf("6")),
+        dict(name="push 1 byte 0x07", data=psf("0x07"), want=psf("7")),
+        dict(name="push 1 byte 0x08", data=psf("0x08"), want=psf("8")),
+        dict(name="push 1 byte 0x09", data=psf("0x09"), want=psf("9")),
+        dict(name="push 1 byte 0x0a", data=psf("0x0a"), want=psf("10")),
+        dict(name="push 1 byte 0x0b", data=psf("0x0b"), want=psf("11")),
+        dict(name="push 1 byte 0x0c", data=psf("0x0c"), want=psf("12")),
+        dict(name="push 1 byte 0x0d", data=psf("0x0d"), want=psf("13")),
+        dict(name="push 1 byte 0x0e", data=psf("0x0e"), want=psf("14")),
+        dict(name="push 1 byte 0x0f", data=psf("0x0f"), want=psf("15")),
+        dict(name="push 1 byte 0x10", data=psf("0x10"), want=psf("16")),
+        # BIP0062: Pushing the byte 0x81 must use OP_1NEGATE.
+        dict(name="push 1 byte 0x81", data=psf("0x81"), want=psf("1NEGATE")),
+        # BIP0062: Pushing any other byte sequence up to 75 bytes must
+        # use the normal data push (opcode byte n, with n the number of
+        # bytes, followed n bytes of data being pushed).
+        dict(name="push 1 byte 0x11", data=psf("0x11"), want=psf("DATA_1 0x11")),
+        dict(name="push 1 byte 0x80", data=psf("0x80"), want=psf("DATA_1 0x80")),
+        dict(name="push 1 byte 0x82", data=psf("0x82"), want=psf("DATA_1 0x82")),
+        dict(name="push 1 byte 0xff", data=psf("0xff"), want=psf("DATA_1 0xff")),
+        dict(
+            name="push data len 17",
+            data=psf("NULL_BYTES_17"),
+            want=psf("DATA_17 NULL_BYTES_17"),
+        ),
+        dict(
+            name="push data len 75",
+            data=psf("NULL_BYTES_75"),
+            want=psf("DATA_75 NULL_BYTES_75"),
+        ),
+        # BIP0062: Pushing 76 to 255 bytes must use OP_PUSHDATA1.
+        dict(
+            name="push data len 76",
+            data=psf("NULL_BYTES_76"),
+            want=psf("PUSHDATA1 0x4c NULL_BYTES_76"),
+        ),
+        dict(
+            name="push data len 255",
+            data=psf("NULL_BYTES_255"),
+            want=psf("PUSHDATA1 0xff NULL_BYTES_255"),
+        ),
+        # BIP0062: Pushing 256 to 520 bytes must use OP_PUSHDATA2.
+        dict(
+            name="push data len 256",
+            data=psf("NULL_BYTES_256"),
+            want=psf("PUSHDATA2 0x0001 NULL_BYTES_256"),
+        ),
+        dict(
+            name="push data len 65535",
+            data=psf("NULL_BYTES_65535"),
+            want=psf("PUSHDATA2 0xffff NULL_BYTES_65535"),
+        ),
+        # BIP0062: OP_PUSHDATA4 can never be used, as pushes over 520
+        # bytes are not allowed, and those below can be done using
+        # other operators, but addData does not check for this.
+        dict(
+            name="push data len 65536",
+            data=psf("NULL_BYTES_65536"),
+            want=psf("PUSHDATA4 0x00000100 NULL_BYTES_65536"),
+        ),
+    ]
+    for test in tests:
+        res = txscript.addData(test["data"])
+        assert (
+            res == test["want"]
+        ), f'wanted {test["want"].hex()} but got {res.hex()} for test {test["name"]}'
