@@ -803,6 +803,7 @@ class Account:
     ):
         """
         Args:
+            idx (int): The BIP-0044 account index.
             pubKeyEncrypted (ByteArray): The encrypted public key bytes.
             privKeyEncrypted (ByteArray): The encrypted private key bytes.
             name (str): Name for the account.
