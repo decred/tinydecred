@@ -1486,7 +1486,9 @@ class Account:
             list(str): Newly generated addresses.
         """
         if self.extPub is None:
-            log.warning("attempting to generate gap addresses on a closed account")
+            raise DecredError(
+                "attempting to generate gap addresses on a closed account"
+            )
         minExtLen = self.lastSeenExt + self.gapLimit + 1
         newAddrs = self.generateBranchGaps(
             self.extPub, self.externalAddresses, self.addrExtDB, minExtLen
@@ -1501,7 +1503,7 @@ class Account:
 
     def generateBranchGaps(self, key, addrs, db, reqLen):
         """
-        Generate gap addresses the specified branch.
+        Generate gap addresses for the specified branch.
 
         Args:
             key (crypto.ExtendedKey): The branch extended key.

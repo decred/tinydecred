@@ -440,8 +440,8 @@ class TestDcrdataBlockchain:
         http_get_post(txsURL, {})
         assert ddb.txsForAddr("the_address") == []
         # Some transactions for an address.
-        http_get_post(txsURL, {"transactions": "txs"})
-        assert ddb.txsForAddr("the_address") == "txs"
+        http_get_post(txsURL, {"transactions": ["tx1"]})
+        assert ddb.txsForAddr("the_address") == ["tx1"]
 
         # txVout success
         assert ddb.txVout(self.txs[2][0], 0).satoshis == 14773017964

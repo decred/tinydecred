@@ -458,7 +458,7 @@ class TestAccount:
         acct = self.newAccount(db)
         acct.unlock(self.cryptoKey)
         acct.generateGapAddresses()
-        for n in range(20):
+        for _ in range(20):
             acct.nextExternalAddress()
         satoshis = int(round(5 * 1e8))
         txHash = rando.newHash()
@@ -487,6 +487,7 @@ class TestAccount:
         assert acct.calcBalance(0).available == 0
         # Helper functions.
         assert acct.caresAboutTxid(txid)
+        assert not acct.caresAboutTxid("")
         acct.addUTXO(utxo)
         assert utxocount() == 1
         acct.spendUTXO(utxo)
@@ -533,10 +534,16 @@ class TestAccount:
             "addr", 1.0, ByteArray(b"scripthashscript"), ticketAddr, 1, 0, 2
         )
         vsp = VotingServiceProvider("https://myvsp.com", vspKey, nets.mainnet.Name, pi)
+        with pytest.raises(DecredError):
+            acct.setPool(None)
         acct.setPool(vsp)
+        acct.setNewPool(vsp)
         # Add UTXOs
         utxos = [account.UTXO.parse(u) for u in self.dcrdataUTXOs]
         acct.resolveUTXOs(utxos)
+        ticketStats = acct.ticketStats()
+        assert ticketStats.count == 0
+        assert ticketStats.value == 0
 
         # Check that the addresses txid and the vsp load from the database.
         acct.txs.clear()
@@ -556,7 +563,12 @@ class TestAccount:
         branch, idx = acct.branchAndIndex(zerothAddr)
         assert branch == account.EXTERNAL_BRANCH
         assert idx == 0
+        branch, idx = acct.branchAndIndex(acct.internalAddresses[0])
+        assert branch == account.INTERNAL_BRANCH
+        assert idx == 0
         checkKey = acct.privKey.child(account.EXTERNAL_BRANCH).child(0).key
+        with pytest.raises(DecredError):
+            acct.privKeyForAddress("")
         assert acct.privKeyForAddress(zerothAddr).key == checkKey
         ticketAddrs = acct.addTicketAddresses([])
         assert len(ticketAddrs) == 1
@@ -682,6 +694,15 @@ class TestAccount:
         acct.blockchain.revokeTicket = rev
         acct.revokeTickets()
         assert revoked
+
+    def test_readAddrs(self):
+        readAddrs = account.Account.readAddrs
+        # We can use dicts instead of database.Buckets because readAddrs
+        # only needs the "items" method.
+        assert readAddrs({}) == []
+        assert readAddrs({0: "zero", 1: "one"}) == ["zero", "one"]
+        with pytest.raises(DecredError):
+            readAddrs({0: "zero", 2: "two"})
 
     def test_unlock(self, monkeypatch):
         def mock_privateKey(self):
@@ -1046,6 +1067,26 @@ class TestAccount:
         # It was removed.
         assert txid not in tDB
 
+    def test_nextBranchAddress(self):
+        class FakeExtendedKey:
+            def deriveChildAddress(self, i, net):
+                raise crypto.CrazyKeyError
+
+        db = KeyValueDatabase(":memory:").child("tmp")
+        acct = self.newAccount(db)
+        with pytest.raises(DecredError):
+            acct.nextBranchAddress(FakeExtendedKey(), [], {})
+
+    def test_nextExternalInternalAddress(self):
+        class FakeBlockchain:
+            subscribeAddresses = lambda addr: None
+
+        db = KeyValueDatabase(":memory:").child("tmp")
+        acct = self.newAccount(db, FakeBlockchain)
+        acct.unlock(self.cryptoKey)
+        assert acct.nextExternalAddress() == "DseZQKiWhN3ceBwDJEgGhmwKD3fMbwF4ugf"
+        assert acct.nextInternalAddress() == "DskHpgbEb6hqkuHchHhtyojpehFToEtjQSo"
+
     def test_gap_handling(self):
         db = KeyValueDatabase(":memory:").child("tmp")
         internalAddrs = [
@@ -1076,6 +1117,8 @@ class TestAccount:
 
         account.DefaultGapLimit = gapLimit = 5
         acct = self.newAccount(db)
+        with pytest.raises(DecredError):
+            acct.generateGapAddresses()
         acct.unlock(self.cryptoKey)
         acct.generateGapAddresses()
         acct.gapLimit = gapLimit
@@ -1129,3 +1172,11 @@ class TestAccount:
             acct.nextInternalAddress()
         addrs = acct.internalAddresses
         assert addrs[len(addrs) - 1] == internalAddrs[5]
+
+    def test_publicExtendedKey(self):
+        db = KeyValueDatabase(":memory:").child("tmp")
+        acct = self.newAccount(db)
+        assert acct.publicExtendedKey(self.cryptoKey).string() == (
+            "dpubZFbjvDBkxBN5CAeqNXCkNAFizVcdMUPKJYp1vLXzkiq16yMFzREd"
+            "eQ1AzaGJ7uBBhZFBruG31MGZ5SkwevLK4PiLEFSEaZm143xgvBgkWhQ"
+        )
