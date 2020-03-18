@@ -1,6 +1,6 @@
 """
 Copyright (c) 2019, Brian Stafford
-Copyright (c) 2019, the Decred developers
+Copyright (c) 2019-2020, the Decred developers
 See LICENSE for details
 
 Configuration settings for TinyDecred.
@@ -77,16 +77,16 @@ class TinyConfig:
         args, unknown = parser.parse_known_args()
         if unknown:
             log.warning("ignoring unknown arguments:", repr(unknown))
-        self.net = None
+        self.netParams = None
         if netName == SIMNET or args.simnet:
-            self.net = nets.simnet
+            self.netParams = nets.simnet
         elif netName in (TESTNET, "testnet") or args.testnet:
-            self.net = nets.testnet
+            self.netParams = nets.testnet
         else:
             print("**********************************************************")
             print(" WARNING. WALLET FOR TESTING ONLY. NOT FOR USE ON MAINNET ")
             print("**********************************************************")
-            self.net = nets.mainnet
+            self.netParams = nets.mainnet
         self.normalize()
 
     def set(self, k, v):
@@ -129,9 +129,9 @@ class TinyConfig:
         netKey = "networks"
         if netKey not in file:
             file[netKey] = {}
-        if self.net.Name not in file[netKey]:
-            d = file[netKey][self.net.Name] = tinyNetConfig(self.net.Name)
-            d["name"] = self.net.Name
+        if self.netParams.Name not in file[netKey]:
+            d = file[netKey][self.netParams.Name] = tinyNetConfig(self.netParams.Name)
+            d["name"] = self.netParams.Name
 
     def save(self):
         """

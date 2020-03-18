@@ -838,7 +838,7 @@ class TestAccount:
             def __init__(self):
                 self.signals = Dummy()
                 self.blockchain = Dummy()
-                self.net = nets.testnet
+                self.netParams = nets.testnet
 
         db = KeyValueDatabase(":memory:").child("tmp")
 
@@ -867,7 +867,9 @@ class TestAccount:
             voteTxid: newTinfo("vote"),
             revocationTxid: newTinfo("revocation"),
         }
-        acct.blockchain.ticketInfoForSpendingTx = lambda txid, net: txidToTinfo[txid]
+        acct.blockchain.ticketInfoForSpendingTx = lambda txid, netParams: txidToTinfo[
+            txid
+        ]
 
         tDB[ticketVotedTxid] = utxo
         tDB[ticketRevokedTxid] = utxo
@@ -907,7 +909,7 @@ class TestAccount:
                 self.mempool = {}
                 self.txs = {}
                 self.utxos = {}
-                self.net = nets.testnet
+                self.netParams = nets.testnet
 
         db = KeyValueDatabase(":memory:").child("tmp")
 
@@ -1069,7 +1071,7 @@ class TestAccount:
 
     def test_nextBranchAddress(self):
         class FakeExtendedKey:
-            def deriveChildAddress(self, i, net):
+            def deriveChildAddress(self, i, netParams):
                 raise crypto.CrazyKeyError
 
         db = KeyValueDatabase(":memory:").child("tmp")

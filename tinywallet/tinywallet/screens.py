@@ -1,6 +1,6 @@
 """
 Copyright (c) 2019, Brian Stafford
-Copyright (c) 2019, the Decred developers
+Copyright (c) 2019-2020, the Decred developers
 See LICENSE for detail
 """
 
@@ -793,7 +793,7 @@ class InitializationScreen(Screen):
         def create():
             try:
                 app.dcrdata.connect()
-                words, wallet = Wallet.create(app.walletFilename(), pw, cfg.net)
+                words, wallet = Wallet.create(app.walletFilename(), pw, cfg.netParams)
                 return words, wallet
             except Exception as e:
                 log.error("failed to create wallet: %s" % formatTraceback(e))
@@ -1134,7 +1134,7 @@ class MnemonicRestorer(Screen):
             try:
                 app.dcrdata.connect()
                 wallet = Wallet.createFromMnemonic(
-                    words, app.walletFilename(), pw, cfg.net,
+                    words, app.walletFilename(), pw, cfg.netParams,
                 )
                 return wallet
             except Exception as e:
@@ -1494,7 +1494,7 @@ class LiveTicketsScreen(Screen):
         """
         utxo = self.liveTickets[item.text()[:8]]
         url = "https://{}.dcrdata.org/tx/{}".format(
-            nets.normalizeName(cfg.net.Name), utxo.txid
+            nets.normalizeName(cfg.netParams.Name), utxo.txid
         )
         helpers.openInBrowser(url)
 
@@ -1684,9 +1684,9 @@ class StakeStatsScreen(Screen):
         self.blkHeight.setText(str(tpinfo.height))
         self.networkTickets.setText(t(tpinfo.size, ", "))
         self.networkValue.setText("{:.2f} dcr".format(tpinfo.value))
-        blocksLeft = calc.blksLeftStakeWindow(cfg.net, tpinfo.height)
+        blocksLeft = calc.blksLeftStakeWindow(cfg.netParams, tpinfo.height)
         self.blocksLeft.setText(b(blocksLeft))
-        cache = calc.SubsidyCache(cfg.net)
+        cache = calc.SubsidyCache(cfg.netParams)
         self.stakebase.setText(r(cache.calcStakeVoteSubsidy(tpinfo.height), ", "))
 
         stakeDiff = blockchain.stakeDiff()
@@ -1842,11 +1842,11 @@ class PoolScreen(Screen):
         """
         Get the current master list of VSPs from decred.org.
         """
-        net = app.dcrdata.params
+        netParams = app.dcrdata.netParams
 
         def getvsp():
             try:
-                return VotingServiceProvider.providers(net)
+                return VotingServiceProvider.providers(netParams)
             except Exception as e:
                 log.error("error retrieving stake pools: %s" % e)
                 return False
@@ -1868,7 +1868,7 @@ class PoolScreen(Screen):
         # testing.
         # TODO: Have 3 tinydecred network constants retreivable through cfg
         #   instead of checking the network config's Name attribute.
-        if cfg.net.Name == "mainnet":
+        if cfg.netParams.Name == "mainnet":
             self.pools = [
                 p
                 for p in pools
@@ -1926,7 +1926,7 @@ class PoolScreen(Screen):
             err("invalid URL")
             return
         baseUrl = parsedURL.scheme + "://" + parsedURL.netloc
-        pool = VotingServiceProvider(baseUrl, apiKey, cfg.net.Name)
+        pool = VotingServiceProvider(baseUrl, apiKey, cfg.netParams.Name)
 
         def registerPool():
             try:

@@ -69,7 +69,7 @@ class AccountManager:
 
         # The Scrypt parameters used to encrypt the crypto keys.
         self.netName = netName
-        self.net = self.netParams()
+        self.netParams = chains.NetworkParams[self.coinType][self.netName]
 
         self.watchingOnly = False
 
@@ -117,15 +117,6 @@ class AccountManager:
         """
         return encode.ByteArray(AccountManager.blob(self))
 
-    def netParams(self):
-        """
-        Get the network parameters for the account.
-
-        Returns:
-            module: The network parameters.
-        """
-        return chains.NetworkParams[self.coinType][self.netName]
-
     def load(self, db, signals):
         """
         Set up the database and set the UI signals.
@@ -153,7 +144,7 @@ class AccountManager:
         Returns:
             ByteArray:
         """
-        return crypto.decodeExtendedKey(self.net, cryptoKey, self.coinKeyEnc)
+        return crypto.decodeExtendedKey(self.netParams, cryptoKey, self.coinKeyEnc)
 
     def dbForAcctIdx(self, idx):
         """

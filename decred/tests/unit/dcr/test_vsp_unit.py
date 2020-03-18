@@ -154,7 +154,7 @@ votingServiceProvider = {
 def assertVspIsEqual(pool):
     assert pool.url == votingServiceProvider["url"]
     assert pool.apiKey == votingServiceProvider["apiKey"]
-    assert pool.net.Name == votingServiceProvider["netName"]
+    assert pool.netParams.Name == votingServiceProvider["netName"]
     assertPiIsEqual(pool.purchaseInfo)
 
 

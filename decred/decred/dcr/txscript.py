@@ -1,6 +1,6 @@
 """
 Copyright (c) 2019, Brian Stafford
-Copyright (c) 2019, The Decred developers
+Copyright (c) 2019-2020, The Decred developers
 See LICENSE for details
 
 Based on dcrd txscript.
@@ -1939,7 +1939,7 @@ def payToSStxChange(addr):
     return payToStakeSHScript(addr, opcode.OP_SSTXCHANGE)
 
 
-def decodeAddress(addr, net):
+def decodeAddress(addr, netParams):
     """
     DecodeAddress decodes the string encoding of an address and returns the
     Address if it is a valid encoding for a known address type and is for the
@@ -1948,23 +1948,23 @@ def decodeAddress(addr, net):
     # Switch on decoded length to determine the type.
     decoded, netID = crypto.b58CheckDecode(addr)
 
-    if netID == net.PubKeyAddrID:
-        return crypto.newAddressPubKey(decoded, net)
-    elif netID == net.PubKeyHashAddrID:
-        return crypto.newAddressPubKeyHash(decoded, net, crypto.STEcdsaSecp256k1)
-    elif netID == net.PKHEdwardsAddrID:
-        # return NewAddressPubKeyHash(decoded, net, STEd25519)
+    if netID == netParams.PubKeyAddrID:
+        return crypto.newAddressPubKey(decoded, netParams)
+    elif netID == netParams.PubKeyHashAddrID:
+        return crypto.newAddressPubKeyHash(decoded, netParams, crypto.STEcdsaSecp256k1)
+    elif netID == netParams.PKHEdwardsAddrID:
+        # return NewAddressPubKeyHash(decoded, netParams, STEd25519)
         raise NotImplementedError("Edwards signatures not implemented")
-    elif netID == net.PKHSchnorrAddrID:
-        # return NewAddressPubKeyHash(decoded, net, STSchnorrSecp256k1)
+    elif netID == netParams.PKHSchnorrAddrID:
+        # return NewAddressPubKeyHash(decoded, netParams, STSchnorrSecp256k1)
         raise NotImplementedError("Schnorr signatures not implemented")
-    elif netID == net.ScriptHashAddrID:
-        return crypto.newAddressScriptHashFromHash(decoded, net)
+    elif netID == netParams.ScriptHashAddrID:
+        return crypto.newAddressScriptHashFromHash(decoded, netParams)
     raise NotImplementedError("unknown network ID %s" % netID)
 
 
-def makePayToAddrScript(addrStr, chain):
-    addr = decodeAddress(addrStr, chain)
+def makePayToAddrScript(addrStr, netParams):
+    addr = decodeAddress(addrStr, netParams)
     return payToAddrScript(addr)
 
 
@@ -2486,7 +2486,7 @@ def calcSignatureHash(script, hashType, tx, idx, cachedPrefix):
     return h
 
 
-def signP2PKHMsgTx(msgtx, prevOutputs, keysource, params):
+def signP2PKHMsgTx(msgtx, prevOutputs, keysource, netParams):
     """
     signP2PKHMsgTx sets the SignatureScript for every item in msgtx.TxIn.
     It must be called every time a msgtx is changed.
@@ -2500,7 +2500,7 @@ def signP2PKHMsgTx(msgtx, prevOutputs, keysource, params):
     for i, output in enumerate(prevOutputs):
         # Errors don't matter here, as we only consider the
         # case where len(addrs) == 1.
-        _, addrs, _ = extractPkScriptAddrs(0, output.pkScript, params)
+        _, addrs, _ = extractPkScriptAddrs(0, output.pkScript, netParams)
         if len(addrs) != 1:
             continue
         apkh = addrs[0]
@@ -2606,22 +2606,22 @@ def sigHashWitnessSerializeSize(txIns, signScript):
     )
 
 
-def pubKeyHashToAddrs(pkHash, params):
+def pubKeyHashToAddrs(pkHash, netParams):
     """
     pubKeyHashToAddrs is a convenience function to attempt to convert the
     passed hash to a pay-to-pubkey-hash address housed within an address
     list.  It is used to consolidate common code.
     """
-    return [crypto.newAddressPubKeyHash(pkHash, params, crypto.STEcdsaSecp256k1)]
+    return [crypto.newAddressPubKeyHash(pkHash, netParams, crypto.STEcdsaSecp256k1)]
 
 
-def scriptHashToAddrs(scriptHash, params):
+def scriptHashToAddrs(scriptHash, netParams):
     """
     scriptHashToAddrs is a convenience function to attempt to convert the passed
     hash to a pay-to-script-hash address housed within an address list.  It is
     used to consolidate common code.
     """
-    return [crypto.newAddressScriptHashFromHash(scriptHash, params)]
+    return [crypto.newAddressScriptHashFromHash(scriptHash, netParams)]
 
 
 def extractPkScriptAddrs(version, pkScript, netParams):
@@ -2732,9 +2732,9 @@ def extractPkScriptAddrs(version, pkScript, netParams):
     return NonStandardTy, [], 0
 
 
-def sign(chainParams, tx, idx, subScript, hashType, keysource, sigType):
+def sign(netParams, tx, idx, subScript, hashType, keysource, sigType):
     scriptClass, addresses, nrequired = extractPkScriptAddrs(
-        DefaultScriptVersion, subScript, chainParams
+        DefaultScriptVersion, subScript, netParams
     )
 
     subClass = scriptClass
@@ -3118,7 +3118,7 @@ def mergeMultiSig(tx, idx, addresses, nRequired, pkScript, sigScript, prevScript
 
 
 def signTxOutput(
-    chainParams, tx, idx, pkScript, hashType, keysource, previousScript, sigType
+    netParams, tx, idx, pkScript, hashType, keysource, previousScript, sigType
 ):
     """
     signTxOutput signs output idx of the given tx to resolve the script given in
@@ -3135,7 +3135,7 @@ def signTxOutput(
     """
 
     sigScript, scriptClass, addresses, nrequired = sign(
-        chainParams, tx, idx, pkScript, hashType, keysource, sigType
+        netParams, tx, idx, pkScript, hashType, keysource, sigType
     )
 
     isStakeType = (
@@ -3151,7 +3151,7 @@ def signTxOutput(
         raise NotImplementedError("ScriptHashTy signing unimplemented")
         # # TODO keep the sub addressed and pass down to merge.
         # realSigScript, _, _, _ = sign(
-        #     privKey, chainParams, tx, idx, sigScript, hashType, sigType)
+        #     privKey, netParams, tx, idx, sigScript, hashType, sigType)
 
         # Append the p2sh script as the last push in the script.
         # script = ByteArray(b'')
@@ -3163,7 +3163,7 @@ def signTxOutput(
 
     # Merge scripts. with any previous data, if any.
     mergedScript = mergeScripts(
-        chainParams,
+        netParams,
         tx,
         idx,
         pkScript,
@@ -3483,7 +3483,7 @@ def estimateSerializeSizeFromScriptSizes(inputSizes, outputSizes, changeScriptSi
     )
 
 
-def stakePoolTicketFee(stakeDiff, relayFee, height, poolFee, subsidyCache, params):
+def stakePoolTicketFee(stakeDiff, relayFee, height, poolFee, subsidyCache, netParams):
     """
     stakePoolTicketFee determines the stake pool ticket fee for a given ticket
     from the passed percentage. Pool fee as a percentage is truncated from 0.01%
@@ -3495,7 +3495,7 @@ def stakePoolTicketFee(stakeDiff, relayFee, height, poolFee, subsidyCache, param
         height (int): Current block height.
         poolFee (int): The pools fee, as percent.
         subsidyCache (calc.SubsidyCache): A subsidy cache.
-        params (module): Network parameters.
+        netParams (module): The network parameters.
 
     Returns:
         int: The stake pool ticket fee.
@@ -3514,10 +3514,10 @@ def stakePoolTicketFee(stakeDiff, relayFee, height, poolFee, subsidyCache, param
     # compensation in gradual subsidy decay. Recall that
     # the average time to claiming 50% of the tickets as
     # votes is the approximately the same as the ticket
-    # pool size (params.TicketPoolSize), so take the
+    # pool size (netParams.TicketPoolSize), so take the
     # ceiling of the ticket pool size divided by the
     # reduction interval.
-    adjs = int(math.ceil(params.TicketPoolSize / params.SubsidyReductionInterval))
+    adjs = int(math.ceil(netParams.TicketPoolSize / netParams.SubsidyReductionInterval))
     subsidy = subsidyCache.calcStakeVoteSubsidy(height)
     for i in range(adjs):
         subsidy *= 100
@@ -3596,7 +3596,7 @@ def sstxNullOutputAmounts(amounts, changeAmounts, amountTicket):
 
 
 def makeTicket(
-    params,
+    netParams,
     inputPool,
     inputMain,
     addrVote,
@@ -3611,7 +3611,7 @@ def makeTicket(
     passed.
 
     Args:
-        params (module): Network parameters.
+        netParams (module): The network parameters.
         inputPool (ExtendedOutPoint): The pool input's extended outpoint.
         inputMain (ExtendedOutPoint): The wallet input's extended outpoint.
         addrVote (Address): The voting address.
@@ -3653,7 +3653,7 @@ def makeTicket(
 
     # Zero value P2PKH addr.
     zeroed = ByteArray(b"", length=20)
-    addrZeroed = crypto.newAddressPubKeyHash(zeroed, params, crypto.STEcdsaSecp256k1)
+    addrZeroed = crypto.newAddressPubKeyHash(zeroed, netParams, crypto.STEcdsaSecp256k1)
 
     # 2. Make an extra commitment to the pool.
     pkScript = generateSStxAddrPush(addrPool, amountsCommitted[0], limits)

@@ -314,7 +314,7 @@ class TicketPoolInfo:
         )
 
 
-def makeOutputs(pairs, chain):
+def makeOutputs(pairs, netParams):
     """
     makeOutputs creates a slice of transaction outputs from a pair of address
     strings to amounts.  This is used to create the outputs to include in newly
@@ -324,7 +324,7 @@ def makeOutputs(pairs, chain):
     Args:
         pairs (tuple(str, int)): Base58-encoded address strings and atoms to
             send to the address.
-        chain (module): Network parameters.
+        netParams (module): Network parameters.
 
     Returns:
         list(msgtx.TxOut): Transaction outputs.
@@ -336,7 +336,7 @@ def makeOutputs(pairs, chain):
             raise DecredError(f"Decred amount #{idx} is not an integer")
         if amt < 0:
             raise DecredError(f"Decred amount #{idx} is negative")
-        pkScript = txscript.makePayToAddrScript(addrStr, chain)
+        pkScript = txscript.makePayToAddrScript(addrStr, netParams)
         outputs.append(msgtx.TxOut(value=amt, pkScript=pkScript))
     return outputs
 
@@ -392,13 +392,13 @@ class DcrdataBlockchain:
     DcrdataBlockchain implements the Blockchain API from tinydecred.api.
     """
 
-    def __init__(self, db, params, datapath, skipConnect=False):
+    def __init__(self, db, netParams, datapath, skipConnect=False):
         """
         Args:
             db (database.Bucket | database.KeyValueDatabase | filepath):
                 the database or a filepath. If a filepath, a new database
                 will be created.
-            params obj: blockchain network parameters.
+            netParams module: the network parameters.
             datapath str: a URI for a dcrdata server.
             skipConnect bool: skip initial connection to dcrdata.
         """
@@ -408,7 +408,7 @@ class DcrdataBlockchain:
             self.ownsDB = True
             db = database.KeyValueDatabase(db)
         self.db = db
-        self.params = params
+        self.netParams = netParams
         # The blockReceiver and addressReceiver will be set when the respective
         # subscribe* method is called.
         self.blockReceiver = None
@@ -420,7 +420,7 @@ class DcrdataBlockchain:
         self.headerDB = db.child("header", blobber=msgblock.BlockHeader)
         self.txBlockMap = db.child("blocklink")
         self.tipHeight = None
-        self.subsidyCache = calc.SubsidyCache(params)
+        self.subsidyCache = calc.SubsidyCache(netParams)
         if not skipConnect:
             self.connect()
 
@@ -491,7 +491,7 @@ class DcrdataBlockchain:
         tx = self.tx(utxo.txid)
         if tx.looksLikeCoinbase():
             # This is a coinbase or stakebase transaction. Set the maturity.
-            utxo.maturity = utxo.height + self.params.CoinbaseMaturity
+            utxo.maturity = utxo.height + self.netParams.CoinbaseMaturity
         if utxo.isTicket():
             # Mempool tickets will be returned from the utxo endpoint, but
             # the tinfo endpoint is an error until mined.
@@ -640,12 +640,12 @@ class DcrdataBlockchain:
 
     def ticketForTx(self, txid, netParams):
         """
-        Retrieve the ticket with txid on net. If tinfo data is not found the
-        ticket will be given "mempool" status.
+        Retrieve the ticket with txid on netParams. If tinfo data is not found
+        the ticket will be given "mempool" status.
 
         Args:
             txid (str): The ticket's transaction ID.
-            netparams (obj): The network parameters.
+            netparams (module): The network parameters.
 
         Returns:
             UTXO: The ticket.
@@ -657,13 +657,13 @@ class DcrdataBlockchain:
         tinfo = self.ticketInfo(txid)
         return account.UTXO.ticketFromTx(tx, netParams, block=block, tinfo=tinfo)
 
-    def ticketInfoForSpendingTx(self, txid, net):
+    def ticketInfoForSpendingTx(self, txid, netParams):
         """
         Get ticket info for the ticket that txid votes or revokes.
 
         Args:
             txid (str): The txid of the spending tx.
-            net (obj): Network parameters.
+            netParams (module): Network parameters.
 
         Returns:
             TicketInfo: The ticket info for the ticket spent by txid.
@@ -677,7 +677,7 @@ class DcrdataBlockchain:
         lotteryBlock = self.tinyBlockForTx(tx.txid())
 
         return account.TicketInfo.fromSpendingTx(
-            ticket, tx, purchaseBlock, lotteryBlock, net
+            ticket, tx, purchaseBlock, lotteryBlock, netParams
         )
 
     def blockHeader(self, hexHash):
@@ -808,7 +808,7 @@ class DcrdataBlockchain:
             MsgTx: The newly created transaction on success, `False` on failure.
         """
         self.updateTip()
-        outputs = makeOutputs([(address, value)], self.params)
+        outputs = makeOutputs([(address, value)], self.netParams)
         return self.sendOutputs(outputs, keysource, utxosource, feeRate)
 
     def broadcast(self, txHex):
@@ -831,7 +831,7 @@ class DcrdataBlockchain:
         Process a notification from the block explorer.
 
         Arg:
-            sig (obj or string): The block explorer's notification, decoded.
+            sig (object or string): The block explorer's notification, decoded.
         """
         # log.debug("pubsub signal recieved: %s" % repr(sig))
         if sig == WS_DONE:
@@ -861,7 +861,7 @@ class DcrdataBlockchain:
         """
         Get a pubkey script for a change output.
         """
-        return txscript.makePayToAddrScript(changeAddress, self.params)
+        return txscript.makePayToAddrScript(changeAddress, self.netParams)
 
     def approveUTXO(self, utxo):
         # If the UTXO appears unconfirmed, see if it can be confirmed.
@@ -880,7 +880,7 @@ class DcrdataBlockchain:
             # No block found is not an error.
             if not block:
                 block = self.blockForTx(utxo.txid)
-            utxo.confirm(block, tx, self.params)
+            utxo.confirm(block, tx, self.netParams)
             return True
         except Exception:
             pass
@@ -1006,10 +1006,10 @@ class DcrdataBlockchain:
                 pkScript = scripts[i]
                 sigScript = txin.signatureScript
                 scriptClass, addrs, numAddrs = txscript.extractPkScriptAddrs(
-                    0, pkScript, self.params
+                    0, pkScript, self.netParams
                 )
                 script = txscript.signTxOutput(
-                    self.params,
+                    self.netParams,
                     newTx,
                     i,
                     pkScript,
@@ -1105,7 +1105,7 @@ class DcrdataBlockchain:
         if not req.poolAddress:
             raise DecredError("no pool address specified. solo voting not supported")
 
-        poolAddress = txscript.decodeAddress(req.poolAddress, self.params)
+        poolAddress = txscript.decodeAddress(req.poolAddress, self.netParams)
 
         # Check the passed address from the request.
         if not req.votingAddress:
@@ -1114,7 +1114,7 @@ class DcrdataBlockchain:
         # decode the string addresses. This is the P2SH multi-sig script
         # address, not the wallets voting address, which is only one of the two
         # pubkeys included in the redeem P2SH script.
-        votingAddress = txscript.decodeAddress(req.votingAddress, self.params)
+        votingAddress = txscript.decodeAddress(req.votingAddress, self.netParams)
 
         # The stake submission pkScript is tagged by an OP_SSTX.
         if isinstance(votingAddress, crypto.AddressScriptHash):
@@ -1167,7 +1167,7 @@ class DcrdataBlockchain:
             self.tipHeight,
             req.poolFees,
             self.subsidyCache,
-            self.params,
+            self.netParams,
         )
 
         # Fetch the single use split address to break tickets into, to
@@ -1176,7 +1176,7 @@ class DcrdataBlockchain:
 
         # TODO: Don't reuse addresses
         # TODO: Consider wrapping. see dcrwallet implementation.
-        splitPkScript = txscript.makePayToAddrScript(splitTxAddr, self.params)
+        splitPkScript = txscript.makePayToAddrScript(splitTxAddr, self.netParams)
 
         # Create the split transaction by using txToOutputs. This varies
         # based upon whether or not the user is using a stake pool or not.
@@ -1232,11 +1232,11 @@ class DcrdataBlockchain:
                 pkScript=txOut.pkScript,
             )
 
-            addrSubsidy = txscript.decodeAddress(keysource.internal(), self.params)
+            addrSubsidy = txscript.decodeAddress(keysource.internal(), self.netParams)
 
             # Generate the ticket msgTx and sign it.
             ticket = txscript.makeTicket(
-                self.params,
+                self.netParams,
                 eopPool,
                 eop,
                 votingAddress,
@@ -1267,7 +1267,7 @@ class DcrdataBlockchain:
             # Set the expiry.
             ticket.expiry = req.expiry
 
-            txscript.signP2PKHMsgTx(ticket, forSigning, keysource, self.params)
+            txscript.signP2PKHMsgTx(ticket, forSigning, keysource, self.netParams)
 
             # dcrwallet actually runs the pk scripts through the script
             # Engine as another validation step. Engine not implemented in
@@ -1316,7 +1316,7 @@ class DcrdataBlockchain:
         revocation = txscript.makeRevocation(tx, self.relayFee())
 
         signedScript = txscript.signTxOutput(
-            self.params,
+            self.netParams,
             revocation,
             0,
             redeemScript,

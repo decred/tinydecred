@@ -1,5 +1,6 @@
 """
 Copyright (c) 2019, Brian Stafford
+Copyright (c) 2020, The Decred developers
 See LICENSE for details
 
 Some network math.
@@ -482,17 +483,22 @@ class SubsidyCache:
     It makes use of caching to avoid repeated calculations.
     """
 
-    # cache houses the cached subsidies keyed by reduction interval.
-    #
-    # cachedIntervals contains an ordered list of all cached intervals.  It is
-    # used to efficiently track sparsely cached intervals with O(log N)
-    # discovery of a prior cached interval.
-    def __init__(self, params):
-        self.cache = {0: params.BaseSubsidy}
-        self.cachedIntervals = [0]
+    def __init__(self, netParams):
+        """
+        Args:
+            netParams (module): The network parameters.
+        """
+        # netParams stores the subsidy parameters to use during subsidy
+        # calculation.
+        self.netParams = netParams
 
-        # params stores the subsidy parameters to use during subsidy calculation.
-        self.params = params
+        # cache houses the cached subsidies keyed by reduction interval.
+        self.cache = {0: netParams.BaseSubsidy}
+
+        # cachedIntervals contains an ordered list of all cached intervals.
+        # It is used to efficiently track sparsely cached intervals with
+        # O(log N) discovery of a prior cached interval.
+        self.cachedIntervals = [0]
 
         # These fields house values calculated from the parameters in order to
         # avoid repeated calculation.
@@ -501,11 +507,11 @@ class SubsidyCache:
         # be consider valid by consensus.
         #
         # totalProportions is the sum of the PoW, PoS, and Treasury proportions.
-        self.minVotesRequired = (params.TicketsPerBlock // 2) + 1
+        self.minVotesRequired = (netParams.TicketsPerBlock // 2) + 1
         self.totalProportions = (
-            params.WorkRewardProportion
-            + params.StakeRewardProportion
-            + params.BlockTaxProportion
+            netParams.WorkRewardProportion
+            + netParams.StakeRewardProportion
+            + netParams.BlockTaxProportion
         )
 
     def calcBlockSubsidy(self, height):
@@ -520,12 +526,12 @@ class SubsidyCache:
         if height <= 0:
             return 0
         elif height == 1:
-            return self.params.BlockOneSubsidy
+            return self.netParams.BlockOneSubsidy
 
         # Calculate the reduction interval associated with the requested height and
         # attempt to look it up in cache.  When it's not in the cache, look up the
         # latest cached interval and subsidy.
-        reqInterval = height // self.params.SubsidyReductionInterval
+        reqInterval = height // self.netParams.SubsidyReductionInterval
         if reqInterval in self.cache:
             return self.cache[reqInterval]
 
@@ -553,8 +559,8 @@ class SubsidyCache:
 
         # Finally, calculate the subsidy by applying the appropriate number of
         # reductions per the starting and requested interval.
-        reductionMultiplier = self.params.MulSubsidy
-        reductionDivisor = self.params.DivSubsidy
+        reductionMultiplier = self.netParams.MulSubsidy
+        reductionDivisor = self.netParams.DivSubsidy
         subsidy = lastCachedSubsidy
         neededIntervals = reqInterval - lastCachedInterval
         for i in range(neededIntervals):
@@ -581,18 +587,18 @@ class SubsidyCache:
     def calcWorkSubsidy(self, height, voters):
         # The first block has special subsidy rules.
         if height == 1:
-            return self.params.BlockOneSubsidy
+            return self.netParams.BlockOneSubsidy
 
         # The subsidy is zero if there are not enough voters once voting begins.  A
         # block without enough voters will fail to validate anyway.
-        stakeValidationHeight = self.params.StakeValidationHeight
+        stakeValidationHeight = self.netParams.StakeValidationHeight
         if height >= stakeValidationHeight and voters < self.minVotesRequired:
             return 0
 
         # Calculate the full block subsidy and reduce it according to the PoW
         # proportion.
         subsidy = self.calcBlockSubsidy(height)
-        subsidy *= self.params.WorkRewardProportion
+        subsidy *= self.netParams.WorkRewardProportion
         subsidy = subsidy // self.totalProportions
 
         # Ignore any potential subsidy reductions due to the number of votes prior
@@ -601,7 +607,7 @@ class SubsidyCache:
             return subsidy
 
         # Adjust for the number of voters.
-        return (voters * subsidy) // self.params.TicketsPerBlock
+        return (voters * subsidy) // self.netParams.TicketsPerBlock
 
     def calcStakeVoteSubsidy(self, height):
         """
@@ -622,7 +628,7 @@ class SubsidyCache:
         # accounts for the fact that vote subsidy are, unfortunately, based on the
         # height that is being voted on as opposed to the block in which they are
         # included.
-        if height < self.params.StakeValidationHeight - 1:
+        if height < self.netParams.StakeValidationHeight - 1:
             return 0
 
         # Calculate the full block subsidy and reduce it according to the stake
@@ -630,8 +636,8 @@ class SubsidyCache:
         # at the amount per vote.
         subsidy = self.calcBlockSubsidy(height)
         proportions = self.totalProportions
-        subsidy *= self.params.StakeRewardProportion
-        subsidy = subsidy // (proportions * self.params.TicketsPerBlock)
+        subsidy *= self.netParams.StakeRewardProportion
+        subsidy = subsidy // (proportions * self.netParams.TicketsPerBlock)
 
         return subsidy
 
@@ -654,14 +660,14 @@ class SubsidyCache:
 
         # The subsidy is zero if there are not enough voters once voting begins.  A
         # block without enough voters will fail to validate anyway.
-        stakeValidationHeight = self.params.StakeValidationHeight
+        stakeValidationHeight = self.netParams.StakeValidationHeight
         if height >= stakeValidationHeight and voters < self.minVotesRequired:
             return 0
 
         # Calculate the full block subsidy and reduce it according to the treasury
         # proportion.
         subsidy = self.calcBlockSubsidy(height)
-        subsidy *= self.params.BlockTaxProportion
+        subsidy *= self.netParams.BlockTaxProportion
         subsidy = subsidy // self.totalProportions
 
         # Ignore any potential subsidy reductions due to the number of votes prior
@@ -670,7 +676,7 @@ class SubsidyCache:
             return subsidy
 
         # Adjust for the number of voters.
-        return (voters * subsidy) // self.params.TicketsPerBlock
+        return (voters * subsidy) // self.netParams.TicketsPerBlock
 
 
 def blksLeftStakeWindow(net, height):

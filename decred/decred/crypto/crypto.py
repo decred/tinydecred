@@ -180,16 +180,20 @@ class AddressPubKeyHash:
 class AddressSecpPubKey:
     """
     AddressSecpPubKey represents an address, which is a pubkey hash and its
-    base-58 encoding. Argument serializedPubkey should be a ByteArray
-    corresponding to the serialized compressed public key (33 bytes).
+    base-58 encoding.
     """
 
-    def __init__(self, serializedPubkey, net):
+    def __init__(self, serializedPubkey, netParams):
+        """
+        Args:
+            serializedPubkey (curve.KoblitzCurve): A ByteArray corresponding
+                to the serialized compressed public key (33 bytes).
+            netParams (module): The network parameters.
+        """
         pubkey = Curve.parsePubKey(serializedPubkey)
-        # Set the format of the pubkey.  This probably should be returned
-        # from dcrec, but do it here to avoid API churn.  We already know the
-        # pubkey is valid since it parsed above, so it's safe to simply examine
-        # the leading byte to get the format.
+        # Set the format of the pubkey.  We already know the pubkey is valid
+        # since it parsed above, so it's safe to simply examine the leading
+        # byte to get the format.
         fmt = serializedPubkey[0]
         if fmt in (0x02, 0x03):
             pkFormat = PKFCompressed
@@ -198,8 +202,8 @@ class AddressSecpPubKey:
         else:
             raise NotImplementedError("unknown pubkey format %d", fmt)
         self.pubkeyFormat = pkFormat
-        self.netID = self.pubkeyID = net.PubKeyAddrID
-        self.pubkeyHashID = net.PubKeyHashAddrID
+        self.netID = self.pubkeyID = netParams.PubKeyAddrID
+        self.pubkeyHashID = netParams.PubKeyHashAddrID
         self.pubkey = pubkey
 
     def serialize(self):
@@ -475,12 +479,15 @@ def b58CheckDecode(s):
     return payload, version
 
 
-def newAddressPubKey(decoded, net):
+def newAddressPubKey(decoded, netParams):
     """
-    newAddressPubKey returns a new Address. decoded must be 33 bytes. This
-    constructor takes the decoded pubkey such as would be decoded from a base58
-    string. The first byte indicates the signature suite. For compressed
-    secp256k1 pubkeys, use AddressSecpPubKey directly.
+    newAddressPubKey returns a new Address.
+
+    Args:
+        decoded (bytes): A 33 bytes decoded pubkey such as would be decoded
+            from a base58 string. The first byte indicates the signature suite.
+            For compressed secp256k1 pubkeys, use AddressSecpPubKey directly.
+        netParams (module): The network parameters.
     """
     if len(decoded) != 33:
         raise NotImplementedError(f"unable to decode pubkey of length {len(decoded)}")
@@ -494,72 +501,72 @@ def newAddressPubKey(decoded, net):
 
     if suite == STEcdsaSecp256k1:
         b = ByteArray(toAppend) + decoded[1:]
-        return AddressSecpPubKey(b, net)
+        return AddressSecpPubKey(b, netParams)
     elif suite == STEd25519:  # nocover
-        # return NewAddressEdwardsPubKey(decoded, net)
+        # return NewAddressEdwardsPubKey(decoded, netParams)
         raise NotImplementedError("Edwards signatures not implemented")
     elif suite == STSchnorrSecp256k1:  # nocover
         # return NewAddressSecSchnorrPubKey(
-        #     append([]byte{toAppend}, decoded[1:]...), net)
+        #     append([]byte{toAppend}, decoded[1:]...), netParams)
         raise NotImplementedError("Schnorr signatures not implemented")
     else:
         raise NotImplementedError("unknown address type %d" % suite)
 
 
-def newAddressPubKeyHash(pkHash, net, algo):
+def newAddressPubKeyHash(pkHash, netParams, algo):
     """
     newAddressPubKeyHash returns a new AddressPubkeyHash.
 
     Args:
         pkHash (ByteArray): The hash160 of the public key.
-        net (module): The network parameters.
+        netParams (module): The network parameters.
         algo (int): The signature curve.
 
     Returns:
         Address: An address object.
     """
     if algo == STEcdsaSecp256k1:
-        netID = net.PubKeyHashAddrID
+        netID = netParams.PubKeyHashAddrID
         return AddressPubKeyHash(netID, pkHash)
     elif algo == STEd25519:  # nocover
-        # netID = net.PKHEdwardsAddrID
+        # netID = netParams.PKHEdwardsAddrID
         raise NotImplementedError("Edwards not implemented")
     elif algo == STSchnorrSecp256k1:  # nocover
-        # netID = net.PKHSchnorrAddrID
+        # netID = netParams.PKHSchnorrAddrID
         raise NotImplementedError("Schnorr not implemented")
     else:
         raise NotImplementedError("unknown ECDSA algorithm")
 
 
-def newAddressScriptHash(script, net):
+def newAddressScriptHash(script, netParams):
     """
     newAddressScriptHash returns a new AddressScriptHash from a redeem script.
 
     Args:
         script (ByteArray): the redeem script
-        net (module): the network parameters
+        netParams (module): the network parameters
 
     Returns:
         AddressScriptHash: An address object.
     """
-    return newAddressScriptHashFromHash(hash160(script.b), net)
+    return newAddressScriptHashFromHash(hash160(script.b), netParams)
 
 
-def newAddressScriptHashFromHash(scriptHash, net):
+def newAddressScriptHashFromHash(scriptHash, netParams):
     """
     newAddressScriptHashFromHash returns a new AddressScriptHash from an already
     hash160'd script.
 
     Args:
         pkHash (ByteArray): The hash160 of the public key.
-        net (module): The network parameters.
+        netParams (module): The network parameters.
 
     Returns:
         AddressScriptHash: An address object.
     """
     if len(scriptHash) != RIPEMD160_SIZE:
         raise DecredError("incorrect script hash length")
-    return AddressScriptHash(net.ScriptHashAddrID, scriptHash)
+    return AddressScriptHash(netParams.ScriptHashAddrID, scriptHash)
 
 
 class ExtendedKey:
@@ -658,29 +665,28 @@ class ExtendedKey:
             isPrivate=True,
         )
 
-    def setNetwork(self, chainParams):
+    def setNetwork(self, netParams):
         """
         Sets the privVer and pubVer fields. This should be used when deriving
         the coin-type extended keys from the root wallet key.
 
         Args:
-            chainParams (module): The network parameters.
+            netParams (module): The network parameters.
         """
-        self.privVer = chainParams.HDPrivateKeyID
-        self.pubVer = chainParams.HDPublicKeyID
+        self.privVer = netParams.HDPrivateKeyID
+        self.pubVer = netParams.HDPublicKeyID
 
-    def deriveCoinTypeKey(self, chainParams):
+    def deriveCoinTypeKey(self, netParams):
         """
         First two hardened child derivations in accordance with BIP0044.
 
         Args:
-            coinType (int): The BIP0044 coin type. For a full list, see
-                https://github.com/satoshilabs/slips/blob/master/slip-0044.md
+            netParams (module): The network parameters.
 
         Returns:
             ExtendedKey: The coin-type key.
         """
-        coinType = chainParams.SLIP0044CoinType
+        coinType = netParams.SLIP0044CoinType
         if coinType > MAX_COIN_TYPE:
             raise ParameterRangeError(
                 "coinType too high. %i > %i" % (coinType, MAX_COIN_TYPE)
@@ -690,8 +696,8 @@ class ExtendedKey:
 
         # Derive the purpose key as a child of the master node.
         coinKey = purpose.child(coinType + HARDENED_KEY_START)
-        coinKey.privVer = chainParams.HDPrivateKeyID
-        coinKey.pubVer = chainParams.HDPublicKeyID
+        coinKey.privVer = netParams.HDPrivateKeyID
+        coinKey.pubVer = netParams.HDPublicKeyID
         return coinKey
 
     def child(self, i):
@@ -945,20 +951,22 @@ class ExtendedKey:
         """
         return b58encode(self.serialize().bytes()).decode()
 
-    def deriveChildAddress(self, i, net):
+    def deriveChildAddress(self, i, netParams):
         """
         The base-58 encoded address for the i'th child.
 
         Args:
             i (int): Child number.
-            net (module): Network parameters.
+            netParams (module): Network parameters.
 
         Returns:
             Address: Child address.
         """
         child = self.child(i)
         return newAddressPubKeyHash(
-            hash160(child.publicKey().serializeCompressed().b), net, STEcdsaSecp256k1
+            hash160(child.publicKey().serializeCompressed().b),
+            netParams,
+            STEcdsaSecp256k1,
         ).string()
 
     def privateKey(self):
@@ -980,11 +988,12 @@ class ExtendedKey:
         return Curve.parsePubKey(self.pubKey)
 
 
-def decodeExtendedKey(net, cryptoKey, key):
+def decodeExtendedKey(netParams, cryptoKey, key):
     """
     Decode an base58 ExtendedKey using the passphrase and network parameters.
 
     Args:
+        netParams (module): The network parameters.
         cryptoKey (ByteAray): The encryption key.
         key (str): Base-58 encoded extended key.
 
@@ -1008,8 +1017,8 @@ def decodeExtendedKey(net, cryptoKey, key):
         raise DecredError("wrong checksum")
 
     # Ensure the version encoded in the payload matches the provided network.
-    privVersion = net.HDPrivateKeyID
-    pubVersion = net.HDPublicKeyID
+    privVersion = netParams.HDPrivateKeyID
+    pubVersion = netParams.HDPublicKeyID
     version = payload[:4]
     if version not in (privVersion, pubVersion):
         raise DecredError(f"Unknown versions {privVersion} {pubVersion} {version}")

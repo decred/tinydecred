@@ -177,7 +177,7 @@ class VotingServiceProvider:
         # a call to VotingServiceProvider.authorize before using the
         # VotingServiceProvider.
         self.apiKey = apiKey
-        self.net = nets.parse(netName)
+        self.netParams = nets.parse(netName)
         self.purchaseInfo = purchaseInfo
         self.stats = None
         self.err = None
@@ -190,7 +190,7 @@ class VotingServiceProvider:
             encode.BuildyBytes(0)
             .addData(vsp.url.encode("utf-8"))
             .addData(vsp.apiKey.encode("utf-8"))
-            .addData(vsp.net.Name.encode("utf-8"))
+            .addData(vsp.netParams.Name.encode("utf-8"))
             .addData(encode.filterNone(pi))
             .b
         )
@@ -227,18 +227,18 @@ class VotingServiceProvider:
         return ByteArray(VotingServiceProvider.blob(self))
 
     @staticmethod
-    def providers(net):
+    def providers(netParams):
         """
         A static method to get the current Decred VSP list.
 
         Args:
-            net (string): The network name.
+            netParams (module): The network parameters.
 
         Returns:
             list(object): The vsp list.
         """
         vsps = tinyhttp.get("https://api.decred.org/?c=gsd")
-        network = nets.normalizeName(net.Name)
+        network = nets.normalizeName(netParams.Name)
         return [vsp for vsp in vsps.values() if vsp["Network"] == network]
 
     def apiPath(self, command):
@@ -274,7 +274,7 @@ class VotingServiceProvider:
         """
         pi = self.purchaseInfo
         redeemScript = pi.script
-        scriptAddr = crypto.newAddressScriptHash(redeemScript, self.net)
+        scriptAddr = crypto.newAddressScriptHash(redeemScript, self.netParams)
         if scriptAddr.string() != pi.ticketAddress:
             raise DecredError(
                 "ticket address mismatch. %s != %s"
@@ -282,12 +282,12 @@ class VotingServiceProvider:
             )
         # extract addresses
         scriptType, addrs, numSigs = txscript.extractPkScriptAddrs(
-            0, redeemScript, self.net
+            0, redeemScript, self.netParams
         )
         if numSigs != 1:
             raise DecredError("expected 2 required signatures, found 2")
         found = False
-        signAddr = txscript.decodeAddress(addr, self.net)
+        signAddr = txscript.decodeAddress(addr, self.netParams)
         for addr in addrs:
             if addr.string() == signAddr.string():
                 found = True
