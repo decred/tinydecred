@@ -900,6 +900,28 @@ class Account:
         acct.gapLimit = iFunc(d[7])
         return acct
 
+    @staticmethod
+    def txsExistForKey(pubX, blockchain):
+        """
+        Returns True if any transactions are found within the default gap limit.
+
+        Args:
+            blockchain (Blockchain): A Blockchain.
+            pubX (crypto.ExtendedKey): An extended public account key.
+            netParams (module): The network parameters.
+        """
+        extPub = pubX.child(EXTERNAL_BRANCH)
+        intPub = pubX.child(INTERNAL_BRANCH)
+        addrs = [
+            extPub.deriveChildAddress(idx, blockchain.params)
+            for idx in range(DefaultGapLimit)
+        ]
+        addrs += [
+            intPub.deriveChildAddress(idx, blockchain.params)
+            for idx in range(DefaultGapLimit)
+        ]
+        return blockchain.addrsHaveTxs(addrs)
+
     def serialize(self):
         """
         Serialize the Account.
@@ -1752,7 +1774,7 @@ class Account:
         bc = self.blockchain
         addr = pool.purchaseInfo.ticketAddress
         checkTxids = []
-        for txid in bc.txsForAddr(addr):
+        for txid in bc.txidsForAddr(addr):
             self.addTxid(addr, txid)
             checkTxids.append(txid)
         for utxo in bc.UTXOs([addr]):
@@ -1975,7 +1997,7 @@ class Account:
 
         while addrs:
             for addr in addrs:
-                for txid in blockchain.txsForAddr(addr):
+                for txid in blockchain.txidsForAddr(addr):
                     requestedTxs += 1
                     self.addTxid(addr, txid)
             addrs = self.generateGapAddresses()

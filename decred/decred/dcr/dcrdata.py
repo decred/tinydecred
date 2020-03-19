@@ -33,6 +33,11 @@ POST_HEADERS = {
 }
 WS_DONE = object()
 
+# These two come from dcrdata, and are potentially subject to change, though
+# unlikely.
+MaxInsightAddrsTxns = 250
+AddrsPerRequest = 25
+
 
 class DcrdataError(DecredError):
     pass
@@ -110,7 +115,8 @@ InsightPaths = [
     "/tx/send",
     "/insight/api/addr/{address}/utxo",
     "/insight/api/addr/{address}",
-    "insight/api/tx/send",
+    "/insight/api/tx/send",
+    "/insight/api/addrs/{addresses}/txs",
 ]
 
 
@@ -503,17 +509,16 @@ class DcrdataBlockchain:
         """
         utxos = []
         addrCount = len(addrs)
-        addrsPerRequest = 20  # dcrdata allows 25
         get = lambda addrs: self.dcrdata.insight.api.addr.utxo(",".join(addrs))
-        for i in range(addrCount // addrsPerRequest + 1):
-            start = i * addrsPerRequest
-            end = start + addrsPerRequest
+        for i in range(addrCount // AddrsPerRequest + 1):
+            start = i * AddrsPerRequest
+            end = start + AddrsPerRequest
             if start < addrCount:
                 ads = addrs[start:end]
                 utxos += [self.processNewUTXO(u) for u in get(ads)]
         return utxos
 
-    def txsForAddr(self, addr):
+    def txidsForAddr(self, addr):
         """
         Get the transaction IDs for the provided address.
 
@@ -524,6 +529,31 @@ class DcrdataBlockchain:
         if "transactions" not in addrInfo:
             return []
         return addrInfo["transactions"]
+
+    def addrsHaveTxs(self, addrs):
+        """
+        Return True if there are any transactions for the list of addresses.
+        Used as part of the account discovery process.
+
+        Args:
+            addrs list(string): The list of addresses to check.
+        """
+
+        def gettxs(addrs):
+            # 'from' is reserved, so I'll pass it like this.
+            return self.dcrdata.insight.api.addrs.txs(
+                ",".join(addrs), **{"from": 0, "to": 1}
+            ).get("items")
+
+        addrCount = len(addrs)
+        for i in range(addrCount // AddrsPerRequest + 1):
+            start = i * AddrsPerRequest
+            end = start + AddrsPerRequest
+            if start < addrCount:
+                ads = addrs[start:end]
+                if gettxs(ads):
+                    return True
+        return False
 
     def txVout(self, txid, vout):
         """

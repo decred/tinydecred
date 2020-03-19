@@ -14,10 +14,11 @@ from decred.util import chains, encode, helpers
 
 EXTERNAL_BRANCH = 0
 INTERNAL_BRANCH = 1
+ACCOUNT_GAP_LIMIT = 10
 
 DEFAULT_ACCOUNT_NAME = "default"
 
-log = helpers.getLogger("TCRYP")
+log = helpers.getLogger("ACCTS")
 
 
 def checkBranchKeys(acctKey):
@@ -242,6 +243,33 @@ class AccountManager:
         acct = self.accounts[idx]
         acct.unlock(cryptoKey)
         return acct
+
+    def discover(self, cryptoKey):
+        """
+        Discover accounts up to the account gap limit. If an account is
+        discovered, all accounts up to and including the discovered account's
+        index will be created.
+
+        Args:
+            cryptoKey (ByteArray): The master encoding key.
+        """
+        coinExtKey = self.coinKey(cryptoKey)
+        blockchain = chains.chain(self.coinType)
+        lastSeenIdx = len(self.acctDB) - 1
+        idx = lastSeenIdx + 1
+        acctConstructor = chains.AccountConstructors[self.coinType]
+        while True:
+            acctKeyPriv = coinExtKey.deriveAccountKey(idx)
+            acctKeyPub = acctKeyPriv.neuter()
+            if acctConstructor.txsExistForKey(acctKeyPub, blockchain):
+                # Add accounts up to the newly seen index.
+                log.info(f"account discovered at index {idx}")
+                while len(self.accounts) <= idx:
+                    self.addAccount(cryptoKey, f"Account {len(self.accounts)}")
+                lastSeenIdx = idx
+            idx += 1
+            if idx - lastSeenIdx > ACCOUNT_GAP_LIMIT:
+                break
 
 
 def createNewAccountManager(root, cryptoKey, coinType, netParams, db):

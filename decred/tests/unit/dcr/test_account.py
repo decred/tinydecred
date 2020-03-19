@@ -20,6 +20,10 @@ LOGGER_ID = "test_account"
 
 ticketScript = ByteArray("baa914f5618dfc002becfe840da65f6a49457f41d4f21787")
 
+testSeed = ByteArray(
+    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+).b
+
 dcrdataTinfo = json.loads(
     """
 {
@@ -437,9 +441,6 @@ class TestAccount:
 
     def newAccount(self, db, blockchain=None):
         # Create an account key
-        testSeed = ByteArray(
-            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-        ).b
         xk = crypto.ExtendedKey.new(testSeed)
         dcrKey = xk.deriveCoinTypeKey(nets.mainnet)
         acctKey = dcrKey.deriveAccountKey(0)
@@ -508,7 +509,7 @@ class TestAccount:
 
         # Create a faux blockchain for the account.
         class Blockchain:
-            txsForAddr = lambda addr: []
+            txidsForAddr = lambda addr: []
             UTXOs = lambda addrs: []
             tipHeight = 5
 
@@ -641,10 +642,10 @@ class TestAccount:
         utxo = account.UTXO(addr, ByteArray(b"txid"), 0, satoshis=newVal)
 
         def t4a(*a):
-            acct.blockchain.txsForAddr = lambda *a: []
+            acct.blockchain.txidsForAddr = lambda *a: []
             return [newTx.id()]
 
-        acct.blockchain.txsForAddr = t4a
+        acct.blockchain.txidsForAddr = t4a
 
         def utxos4a(*a):
             acct.blockchain.UTXOs = lambda *a: []
@@ -1117,6 +1118,7 @@ class TestAccount:
             "DsWp4nShu8WxefgoPej1rNv4gfwy5AoULfV",
         ]
 
+        ogGapLimit = account.DefaultGapLimit
         account.DefaultGapLimit = gapLimit = 5
         acct = self.newAccount(db)
         with pytest.raises(DecredError):
@@ -1175,6 +1177,8 @@ class TestAccount:
         addrs = acct.internalAddresses
         assert addrs[len(addrs) - 1] == internalAddrs[5]
 
+        account.DefaultGapLimit = ogGapLimit
+
     def test_publicExtendedKey(self):
         db = KeyValueDatabase(":memory:").child("tmp")
         acct = self.newAccount(db)
@@ -1182,3 +1186,15 @@ class TestAccount:
             "dpubZFbjvDBkxBN5CAeqNXCkNAFizVcdMUPKJYp1vLXzkiq16yMFzREd"
             "eQ1AzaGJ7uBBhZFBruG31MGZ5SkwevLK4PiLEFSEaZm143xgvBgkWhQ"
         )
+
+    def test_txsExistForKey(self):
+        has = True
+
+        class Blockchain:
+            params = nets.mainnet
+            addrsHaveTxs = lambda a: has
+
+        xk = crypto.ExtendedKey.new(testSeed)
+        assert account.Account.txsExistForKey(xk, Blockchain)
+        has = False
+        assert not account.Account.txsExistForKey(xk, Blockchain)

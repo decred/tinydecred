@@ -28,7 +28,8 @@ from decred.util.encode import ByteArray
 
 
 BASE_URL = "https://example.org/"
-
+API_URL = BASE_URL + "api"
+INSIGHT_URL = BASE_URL + "insight/api"
 
 AGENDA_CHOICES_RAW = dict(
     id="choices_id",
@@ -151,7 +152,7 @@ def preload_api_list(http_get_post):
         api_list = json.loads(f.read())
 
     # Queue the list of API calls.
-    http_get_post(f"{BASE_URL}api/list", api_list)
+    http_get_post(f"{API_URL}/list", api_list)
 
 
 class TestDcrdataClient:
@@ -159,14 +160,14 @@ class TestDcrdataClient:
         preload_api_list(http_get_post)
         ddc = DcrdataClient(BASE_URL)
 
-        assert len(ddc.listEntries) == 84
+        assert len(ddc.listEntries) == 85
         assert len(ddc.subscribedAddresses) == 0
         assert ddc.endpointList()[0] == ddc.listEntries[0][1]
 
         # This prints to stdout.
         ddc.endpointGuide()
         out, err = capsys.readouterr()
-        assert len(out.splitlines()) == 84
+        assert len(out.splitlines()) == 85
 
     def test_subscriptions(self, http_get_post):
         preload_api_list(http_get_post)
@@ -323,21 +324,21 @@ class TestDcrdataBlockchain:
 
     def test_misc(self, http_get_post):
         preload_api_list(http_get_post)
-        http_get_post(f"{BASE_URL}api/block/best", dict(height=1))
+        http_get_post(f"{API_URL}/block/best", dict(height=1))
         ddb = DcrdataBlockchain(":memory:", testnet, BASE_URL)
         assert ddb.tipHeight == 1
 
         # getAgendasInfo
-        http_get_post(f"{BASE_URL}api/stake/vote/info", AGENDAS_INFO_RAW)
+        http_get_post(f"{API_URL}/stake/vote/info", AGENDAS_INFO_RAW)
         agsinfo = ddb.getAgendasInfo()
         assert isinstance(agsinfo, agenda.AgendasInfo)
 
         # ticketPoolInfo
-        http_get_post(f"{BASE_URL}api/stake/pool", self.stakePool)
+        http_get_post(f"{API_URL}/stake/pool", self.stakePool)
         assert ddb.ticketPoolInfo().height == self.stakePool["height"]
 
         # nextStakeDiff
-        http_get_post(f"{BASE_URL}api/stake/diff", {"estimates": {"expected": 1}})
+        http_get_post(f"{API_URL}/stake/diff", {"estimates": {"expected": 1}})
         assert ddb.nextStakeDiff() == 1e8
 
     def test_subscriptions(self, http_get_post):
@@ -348,7 +349,7 @@ class TestDcrdataBlockchain:
 
         # Successful creation.
         preload_api_list(http_get_post)
-        http_get_post(f"{BASE_URL}api/block/best", dict(height=1))
+        http_get_post(f"{API_URL}/block/best", dict(height=1))
         ddb = DcrdataBlockchain(":memory:", testnet, BASE_URL)
 
         # Set the mock WebsocketClient.
@@ -395,7 +396,7 @@ class TestDcrdataBlockchain:
 
     def test_utxos(self, http_get_post):
         preload_api_list(http_get_post)
-        http_get_post(f"{BASE_URL}api/block/best", dict(height=1))
+        http_get_post(f"{API_URL}/block/best", dict(height=1))
         ddb = DcrdataBlockchain(":memory:", testnet, BASE_URL)
 
         # txVout error
@@ -404,9 +405,9 @@ class TestDcrdataBlockchain:
 
         # processNewUTXO
         # Preload tx and tinfo.
-        txURL = f"{BASE_URL}api/tx/hex/{self.txs[1][0]}"
+        txURL = f"{API_URL}/tx/hex/{self.txs[1][0]}"
         http_get_post(txURL, self.txs[1][1])
-        tinfoURL = f"{BASE_URL}api/tx/{self.utxos[1]['txid']}/tinfo"
+        tinfoURL = f"{API_URL}/tx/{self.utxos[1]['txid']}/tinfo"
         http_get_post(tinfoURL, self.tinfo)
         utxo = ddb.processNewUTXO(self.utxos[1])
         assert utxo.tinfo.purchaseBlock.hash == reversed(
@@ -419,7 +420,7 @@ class TestDcrdataBlockchain:
         # Precompute the UTXO data.
         addrs = [utxo["address"] for utxo in self.utxos]
         addrStr = ",".join(addrs)
-        utxoURL = f"{BASE_URL}insight/api/addr/{addrStr}/utxo"
+        utxoURL = f"{INSIGHT_URL}/addr/{addrStr}/utxo"
 
         # Preload the UTXOs but not the txs.
         http_get_post(utxoURL, self.utxos)
@@ -429,18 +430,18 @@ class TestDcrdataBlockchain:
         # Preload both the UTXOs and the txs.
         http_get_post(utxoURL, self.utxos)
         for txid, tx in self.txs:
-            txURL = f"{BASE_URL}api/tx/hex/{txid}"
+            txURL = f"{API_URL}/tx/hex/{txid}"
             http_get_post(txURL, tx)
         assert len(ddb.UTXOs(addrs)) == 3
 
-        # txsForAddr
-        txsURL = f"{BASE_URL}insight/api/addr/the_address"
+        # txidsForAddr
+        txsURL = f"{INSIGHT_URL}/addr/the_address"
         # No transactions for an address.
         http_get_post(txsURL, {})
-        assert ddb.txsForAddr("the_address") == []
+        assert ddb.txidsForAddr("the_address") == []
         # Some transactions for an address.
         http_get_post(txsURL, {"transactions": ["tx1"]})
-        assert ddb.txsForAddr("the_address") == ["tx1"]
+        assert ddb.txidsForAddr("the_address") == ["tx1"]
 
         # txVout success
         assert ddb.txVout(self.txs[2][0], 0).satoshis == 14773017964
@@ -459,16 +460,16 @@ class TestDcrdataBlockchain:
         utxo = account.UTXO.parse(self.utxos[2])
         assert ddb.confirmUTXO(utxo) is False
         # Confirmation.
-        txURL = f"{BASE_URL}api/tx/{self.txs[2][0]}"
+        txURL = f"{API_URL}/tx/{self.txs[2][0]}"
         decodedTx = {"block": {"blockhash": self.blockHash}}
         http_get_post(txURL, decodedTx)
-        headerURL = f"{BASE_URL}api/block/hash/{self.blockHash}/header/raw"
+        headerURL = f"{API_URL}/block/hash/{self.blockHash}/header/raw"
         http_get_post(headerURL, self.blockHeader)
         assert ddb.confirmUTXO(utxo) is True
 
     def test_blocks(self, http_get_post):
         preload_api_list(http_get_post)
-        http_get_post(f"{BASE_URL}api/block/best", dict(height=1))
+        http_get_post(f"{API_URL}/block/best", dict(height=1))
         ddb = DcrdataBlockchain(":memory:", testnet, BASE_URL)
 
         # blockHeader
@@ -479,7 +480,7 @@ class TestDcrdataBlockchain:
         with pytest.raises(DecredError):
             ddb.blockHeaderByHeight(self.blockHeight).id()
         # Preload the block header.
-        headerURL = f"{BASE_URL}api/block/{self.blockHeight}/header/raw"
+        headerURL = f"{API_URL}/block/{self.blockHeight}/header/raw"
         http_get_post(headerURL, self.blockHeader)
         assert ddb.blockHeaderByHeight(self.blockHeight).id() == self.blockHash
         # Exercise the database code.
@@ -487,22 +488,22 @@ class TestDcrdataBlockchain:
 
         # blockForTx
         # Preload the first broken decoded tx.
-        txURL = f"{BASE_URL}api/tx/{self.txs[2][0]}"
+        txURL = f"{API_URL}/tx/{self.txs[2][0]}"
         decodedTx = {"block": {}}
         http_get_post(txURL, decodedTx)
         assert ddb.blockForTx(self.txs[2][0]) is None
         # Preload the second broken decoded tx.
-        txURL = f"{BASE_URL}api/tx/{self.txs[2][0]}"
+        txURL = f"{API_URL}/tx/{self.txs[2][0]}"
         decodedTx = {"block": {"blockhash": ""}}
         http_get_post(txURL, decodedTx)
         assert ddb.blockForTx(self.txs[2][0]) is None
         # Preload the right decoded tx.
-        txURL = f"{BASE_URL}api/tx/{self.txs[2][0]}"
+        txURL = f"{API_URL}/tx/{self.txs[2][0]}"
         decodedTx = {"block": {"blockhash": self.blockHash}}
         http_get_post(txURL, decodedTx)
         assert ddb.blockForTx(self.txs[2][0]).height == self.blockHeight
         # Preload the block header.
-        headerURL = f"{BASE_URL}api/block/hash/{self.blockHash}/header/raw"
+        headerURL = f"{API_URL}/block/hash/{self.blockHash}/header/raw"
         http_get_post(headerURL, self.blockHeader)
         assert ddb.blockForTx(self.txs[2][0]).hash() == reversed(
             ByteArray(self.blockHash)
@@ -514,21 +515,21 @@ class TestDcrdataBlockchain:
 
     def test_for_tx(self, http_get_post):
         preload_api_list(http_get_post)
-        http_get_post(f"{BASE_URL}api/block/best", dict(height=1))
+        http_get_post(f"{API_URL}/block/best", dict(height=1))
         ddb = DcrdataBlockchain(":memory:", testnet, BASE_URL)
 
         # tinyBlockForTx
         # Preload the broken decoded tx.
-        txURL = f"{BASE_URL}api/tx/{self.txs[2][0]}"
+        txURL = f"{API_URL}/tx/{self.txs[2][0]}"
         decodedTx = {"block": {}}
         http_get_post(txURL, decodedTx)
         assert ddb.tinyBlockForTx(self.txs[2][0]) is None
         # Preload the right decoded tx.
-        txURL = f"{BASE_URL}api/tx/{self.txs[2][0]}"
+        txURL = f"{API_URL}/tx/{self.txs[2][0]}"
         decodedTx = {"block": {"blockhash": self.blockHash}}
         http_get_post(txURL, decodedTx)
         # Preload the block header.
-        headerURL = f"{BASE_URL}api/block/hash/{self.blockHash}/header/raw"
+        headerURL = f"{API_URL}/block/hash/{self.blockHash}/header/raw"
         http_get_post(headerURL, self.blockHeader)
         assert ddb.tinyBlockForTx(self.txs[2][0]).hash == reversed(
             ByteArray(self.blockHash)
@@ -536,31 +537,31 @@ class TestDcrdataBlockchain:
 
         # ticketForTx
         # Preload the non-ticket tx.
-        txURL = f"{BASE_URL}api/tx/hex/{self.txs[2][0]}"
+        txURL = f"{API_URL}/tx/hex/{self.txs[2][0]}"
         http_get_post(txURL, self.txs[2][1])
         with pytest.raises(DecredError):
             ddb.ticketForTx(self.txs[2][0], nets.mainnet)
         # Preload the ticket decoded tx.
         blockHash = self.tinfo["purchase_block"]["hash"]
-        txURL = f"{BASE_URL}api/tx/{self.txs[1][0]}"
+        txURL = f"{API_URL}/tx/{self.txs[1][0]}"
         decodedTx = {"block": {"blockhash": blockHash}}
         http_get_post(txURL, decodedTx)
         # Preload tx and tinfo.
-        txURL = f"{BASE_URL}api/tx/hex/{self.txs[1][0]}"
+        txURL = f"{API_URL}/tx/hex/{self.txs[1][0]}"
         http_get_post(txURL, self.txs[1][1])
-        tinfoURL = f"{BASE_URL}api/tx/{self.utxos[1]['txid']}/tinfo"
+        tinfoURL = f"{API_URL}/tx/{self.utxos[1]['txid']}/tinfo"
         http_get_post(tinfoURL, self.tinfo)
         # Preload the block header.
-        headerURL = f"{BASE_URL}api/block/hash/{blockHash}/header/raw"
+        headerURL = f"{API_URL}/block/hash/{blockHash}/header/raw"
         http_get_post(headerURL, self.blockHeader)
         assert ddb.ticketForTx(self.txs[1][0], nets.mainnet).txid == self.txs[1][0]
 
         # ticketInfoForSpendingTx
         # Preload the txs.
         for txid, tx in self.txs:
-            txURL = f"{BASE_URL}api/tx/hex/{txid}"
+            txURL = f"{API_URL}/tx/hex/{txid}"
             http_get_post(txURL, tx)
-        txURL = f"{BASE_URL}api/tx/{self.txs[3][0]}"
+        txURL = f"{API_URL}/tx/{self.txs[3][0]}"
         blockHash = "00000000000000002847702f35b9227d27191d1858a7eccb94858c8f58f1066b"
         decodedTx = {"block": {"blockhash": blockHash}}
         http_get_post(txURL, decodedTx)
@@ -574,9 +575,22 @@ class TestDcrdataBlockchain:
                 "b1e0002000000000000000000000000000000000000000007000000"
             ),
         }
-        headerURL = f"{BASE_URL}api/block/hash/{blockHash}/header/raw"
+        headerURL = f"{API_URL}/block/hash/{blockHash}/header/raw"
         http_get_post(headerURL, blockHeader)
         assert (
             ddb.ticketInfoForSpendingTx(self.txs[2][0], nets.mainnet).maturityHeight
             == self.blockHeight - 1
         )
+
+    def test_addrsHaveTxs(self, http_get_post):
+        preload_api_list(http_get_post)
+        http_get_post(f"{API_URL}/block/best", dict(height=1))
+        addr = "someaddr"
+        res = dict(items=[1])
+        http_get_post(f"{INSIGHT_URL}/addrs/{addr}/txs?from=0&to=1", res)
+        ddb = DcrdataBlockchain(":memory:", testnet, BASE_URL)
+        assert ddb.addrsHaveTxs([addr])
+
+        res["items"] = []
+        http_get_post(f"{INSIGHT_URL}/addrs/{addr}/txs?from=0&to=1", res)
+        assert not ddb.addrsHaveTxs([addr])
