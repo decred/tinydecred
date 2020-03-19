@@ -13,7 +13,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from decred.util import helpers
 
 
-log = helpers.getLogger("QUTIL")  # , logLvl=0)
+log = helpers.getLogger("QUTIL")
 
 # Some colors,
 QT_WHITE = QtGui.QColor("white")

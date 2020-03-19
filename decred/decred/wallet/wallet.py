@@ -11,7 +11,7 @@ from decred.util.database import KeyValueDatabase
 from . import accounts
 
 
-log = helpers.getLogger("WLLT")  # , logLvl=0)
+log = helpers.getLogger("WLLT")
 
 CHECKPHRASE = "tinydecred".encode("utf-8")
 

@@ -11,12 +11,12 @@ import sys
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
-from decred import config
 from decred.dcr import constants as DCR
 from decred.dcr.dcrdata import DcrdataBlockchain
 from decred.util import chains, database, helpers
 from decred.wallet.wallet import Wallet
-from tinywallet import qutilities as Q, screens, ui
+from tinywallet import config, qutilities as Q, screens, ui
+from tinywallet.config import DB
 
 
 # the directory of the tinywallet package
@@ -32,8 +32,6 @@ LARGE = ui.LARGE
 WALLET_FILE_NAME = "wallet.db"
 
 formatTraceback = helpers.formatTraceback
-
-currentWallet = "current.wallet"
 
 
 class TinySignals:
@@ -99,17 +97,22 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
             spentTickets=lambda: self.emitSignal(ui.SPENT_TICKETS_SIGNAL),
         )
 
+        self.netDirectory = os.path.join(config.DATA_DIR, self.cfg.netParams.Name)
+
+        helpers.mkdir(self.netDirectory)
+        self.appDB = database.KeyValueDatabase(
+            os.path.join(self.netDirectory, "app.db")
+        )
+        self.settings = self.appDB.child("settings")
         self.loadSettings()
 
-        dcrdataDB = database.KeyValueDatabase(
-            os.path.join(self.netDirectory(), "dcr.db")
-        )
+        dcrdataDB = database.KeyValueDatabase(os.path.join(self.netDirectory, "dcr.db"))
         # The initialized DcrdataBlockchain will not be connected, as that is a
         # blocking operation. It will be called when the wallet is open.
         self.dcrdata = DcrdataBlockchain(
             dcrdataDB,
             self.cfg.netParams,
-            self.getNetSetting("dcrdata"),
+            self.settings[DB.dcrdata].decode(),
             skipConnect=True,
         )
         chains.registerChain("dcr", self.dcrdata)
@@ -153,7 +156,10 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
         logDir = os.path.join(config.DATA_DIR, "logs")
         helpers.mkdir(logDir)
         logFilePath = os.path.join(logDir, "tinydecred.log")
-        log = helpers.prepareLogger("APP", logFilePath, logLvl=0)
+        helpers.prepareLogging(
+            logFilePath, logLvl=self.cfg.logLevel, lvlMap=self.cfg.moduleLevels
+        )
+        log = helpers.getLogger("APP")
         log.info("configuration file at %s" % config.CONFIG_PATH)
         log.info("data directory at %s" % config.DATA_DIR)
         return log
@@ -232,7 +238,7 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
         self.appWindow.stack(self.pwDialog.withCallback(f, *args, **kwargs))
 
     def walletFilename(self):
-        return self.getNetSetting(currentWallet)
+        return self.settings[DB.wallet].decode()
 
     def sysTrayActivated(self, trigger):
         """
@@ -253,71 +259,20 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
         self.appWindow.close()
         self.appWindow.hide()
 
-    def netDirectory(self):
-        """
-        The application's network directory.
-
-        Returns:
-            str: Absolute filepath of the directory for the selected network.
-        """
-        return os.path.join(config.DATA_DIR, self.cfg.netParams.Name)
-
     def loadSettings(self):
         """
         Load settings from the TinyConfig.
         """
-        settings = self.settings = self.cfg.get("settings")
-        if not settings:
-            self.settings = settings = {}
-            self.cfg.set("settings", self.settings)
-        for k, v in (("theme", Q.LIGHT_THEME),):
-            if k not in settings:
-                settings[k] = v
-        netSettings = self.getNetSetting()
-        # if currentWallet not in netSettings:
-        netSettings[currentWallet] = os.path.join(self.netDirectory(), WALLET_FILE_NAME)
-        helpers.mkdir(self.netDirectory())
-        self.cfg.save()
-
-    def saveSettings(self):
-        """
-        Save the current settings.
-        """
-        self.cfg.save()
-
-    def getSetting(self, *keys):
-        """
-        Get the setting using recursive keys.
-
-        Args:
-            *keys (tuple): Key strings.
-
-        Returns:
-            mixed: Value of setting for *keys.
-        """
-        return self.cfg.get("settings", *keys)
-
-    def getNetSetting(self, *keys):
-        """
-        Get the network-specific setting using recursive keys.
-
-        Args:
-            *keys (tuple): Key strings.
-
-        Returns:
-            mixed: Value of network setting for *keys.
-        """
-        return self.cfg.get("networks", self.cfg.netParams.Name, *keys)
-
-    def setNetSetting(self, k, v):
-        """
-        Set the network setting for the currently loaded network.
-
-        Args:
-            k (str): Network setting key string.
-            v (value): Network setting value.
-        """
-        self.cfg.get("networks", self.cfg.netParams.Name)[k] = v
+        if DB.theme not in self.settings:
+            self.settings[DB.theme] = Q.LIGHT_THEME.encode()
+        if DB.wallet not in self.settings:
+            self.settings[DB.wallet] = os.path.join(
+                self.netDirectory, WALLET_FILE_NAME
+            ).encode()
+        if DB.dcrdata not in self.settings:
+            self.settings[DB.dcrdata] = config.NetworkDefaults[self.cfg.netParams.Name][
+                "dcrdata"
+            ].encode()
 
     def registerSignal(self, sig, cb, *a, **k):
         """
@@ -351,7 +306,7 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
         """
         sr = self.signalRegistry
         if sig not in sr:
-            # self.log.warning("attempted to call un-registered signal %s" % sig)
+            self.log.warning("attempted to call un-registered signal %s" % sig)
             return
         for s in sr[sig]:
             sa, sk = s[1], s[3]
@@ -417,7 +372,7 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
         """
         button = QtWidgets.QPushButton(text, self.appWindow)
         button.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
-        if self.settings["theme"] == Q.LIGHT_THEME:
+        if self.settings[DB.theme].decode() == Q.LIGHT_THEME:
             button.setProperty("button-style-class", Q.LIGHT_THEME)
         if size == TINY:
             button.setProperty("button-size-class", TINY)

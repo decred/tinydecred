@@ -12,17 +12,17 @@ from urllib.parse import urlparse
 
 from PyQt5 import QtCore, QtGui, QtSvg, QtWidgets
 
-from decred import config
 from decred.dcr import calc, constants as DCR, nets
 from decred.dcr.vsp import VotingServiceProvider
 from decred.util import chains, helpers
 from decred.wallet.wallet import Wallet
+from tinywallet.config import DB
 
-from . import qutilities as Q, ui
+from . import config, qutilities as Q, ui
 
 
 UI_DIR = os.path.dirname(os.path.realpath(__file__))
-log = helpers.getLogger("APPUI")  # , logLvl=0)
+log = helpers.getLogger("APPUI")
 cfg = config.load()
 
 # Some commonly used ui constants.
@@ -674,7 +674,7 @@ class AccountScreen(Screen):
         self.assetScreen.doButtons()
         app.home()
 
-    def sync(self):
+    def stackAndSync(self):
         """
         Start syncing the account.
         """
@@ -684,6 +684,9 @@ class AccountScreen(Screen):
             app.emitSignal(ui.SYNC_SIGNAL)
 
         def sync(x):
+            if not self.account.isUnlocked():
+                return
+            app.home(self)
             app.emitSignal(ui.WORKING_SIGNAL)
             app.makeThread(self.account.sync, done)
 
@@ -896,7 +899,6 @@ class InitializationScreen(Screen):
         """
         if ret:
             words, wallet = ret
-            app.saveSettings()
             app.setWallet(wallet)
             app.showMnemonics(words)
         else:
@@ -955,12 +957,13 @@ class AssetScreen(Screen):
             TinyDialog.maxHeight * 0.9 - TinyDialog.topMenuHeight,
         )
         self.accountScreens = {}
+        self.settingsScreen = AssetSettingsScreen()
 
         logo = SVGWidget(DCR.LOGO, h=25)
         lbl = Q.makeLabel("Decred", 25, fontFamily="Roboto Medium")
-        gear = SVGWidget("gear", h=20)
+        gear = SVGWidget("gear", h=20, click=self.gearClicked)
         # Gear icon will lead to an asset settings screen. Hide for now.
-        gear.setVisible(False)
+        # gear.setVisible(False)
         wgt, _ = Q.makeSeries(Q.HORIZONTAL, logo, lbl, Q.STRETCH, gear,)
         self.layout.addWidget(wgt)
 
@@ -1031,14 +1034,86 @@ class AssetScreen(Screen):
             acctScreen = AccountScreen(self.acctMgr, acct, self)
             self.accountScreens[idx] = acctScreen
 
-        app.home(acctScreen)
-        acctScreen.sync()
+        acctScreen.stackAndSync()
 
     def stackNew(self, e=None):
         """
         Stack the account creation screen.
         """
         app.appWindow.stack(self.newAcctScreen)
+
+    def gearClicked(self, e=None):
+        """
+        Qt slot for a clicked signal on the gear icon.
+        """
+        app.appWindow.stack(self.settingsScreen)
+
+
+class AssetSettingsScreen(Screen):
+    """A screen to adjust asset-specific settings."""
+
+    def __init__(self):
+        super().__init__()
+        self.canGoHome = True
+        self.isPoppable = True
+
+        self.blockchain = chains.chain("dcr")
+
+        self.wgt.setFixedSize(
+            TinyDialog.maxWidth * 0.9,
+            TinyDialog.maxHeight * 0.9 - TinyDialog.topMenuHeight,
+        )
+
+        gear = SVGWidget("gear", h=20)
+        lbl = Q.makeLabel("Decred Settings", 22)
+        wgt, _ = Q.makeRow(gear, lbl, Q.STRETCH)
+        self.layout.addWidget(wgt)
+
+        self.layout.addStretch(1)
+
+        wgt, grid = Q.makeWidget(QtWidgets.QWidget, Q.GRID)
+        self.layout.addWidget(wgt)
+        grid.setColumnStretch(0, 1)
+        row = 0
+        grid.addWidget(Q.makeLabel("Dcrdata URL", 14, Q.ALIGN_LEFT), row, 0)
+        row += 1
+        self.dcrdataField = QtWidgets.QLineEdit(app.settings[DB.dcrdata].decode())
+        grid.addWidget(self.dcrdataField, row, 0)
+        bttn = app.getButton(SMALL, "change")
+        bttn.clicked.connect(self.dcrdataChangeClicked)
+        grid.addWidget(bttn, row, 1)
+
+        self.layout.addStretch(1)
+
+    def dcrdataChangeClicked(self, e=None):
+        """
+        Qt slot connected to dcrdata URL submission button clicked signal.
+        Changes the dcrdata server.
+        """
+
+        url = self.dcrdataField.text()
+        parsedURL = urlparse(url)
+        if not parsedURL.scheme or not parsedURL.netloc:
+            app.appWindow.showError("invalid URL")
+            return
+
+        def runChangeDcrdata():
+            try:
+                self.blockchain.changeServer(url)
+                app.settings[DB.dcrdata] = url.encode()
+                return True
+            except Exception as e:
+                app.appWindow.showError("change failed")
+                log.error(f"error changing dcrdata: {e}")
+
+        def doneChangeDcrdata(res):
+            if not res:
+                return
+            app.appWindow.pop(self)
+            log.info(f"dcrdata URL changed to {url}")
+            app.appWindow.showSuccess("dcrdata changed")
+
+        app.waitThread(runChangeDcrdata, doneChangeDcrdata)
 
 
 class AccountSelector(QtWidgets.QPushButton):
@@ -1100,7 +1175,7 @@ class AccountSettingsScreen(Screen):
         self.saveName = saveName
 
         gear = SVGWidget("gear", h=20)
-        lbl = Q.makeLabel("Settings", 22)
+        lbl = Q.makeLabel("Account Settings", 22)
         wgt, _ = Q.makeRow(gear, lbl, Q.STRETCH)
         self.layout.addWidget(wgt)
 
@@ -2737,6 +2812,7 @@ def withUnlockedAccount(acct, f, cb):
 
     def withpw(pw):
         try:
+            app.waiting()
             cryptoKey = app.wallet.cryptoKey(pw)
             acct.unlock(cryptoKey)
             app.waitThread(f, done)
@@ -2747,7 +2823,6 @@ def withUnlockedAccount(acct, f, cb):
             )
             app.appWindow.showError("error")
 
-    app.waiting()
     app.getPassword(withpw)
 
 
