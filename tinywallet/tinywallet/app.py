@@ -261,7 +261,7 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
 
     def loadSettings(self):
         """
-        Load settings from the TinyConfig.
+        Load settings from the settings table.
         """
         if DB.theme not in self.settings:
             self.settings[DB.theme] = Q.LIGHT_THEME.encode()

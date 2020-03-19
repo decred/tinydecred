@@ -118,26 +118,6 @@ def mktime(year, month=None, day=None):
     return calendar.timegm(time.strptime(str(year), "%Y"))
 
 
-def recursiveUpdate(target, source):
-    """
-    Recursively update the target dictionary with the source dictionary, leaving
-    unfound keys in place. This is different than dict.update, which removes
-    target keys not in the source.
-
-    :param dict target: The dictionary to be updated
-    :param dict source: The dictionary to be integrated
-    :return: target dict is returned as a convenience. This function updates the
-        target dict in place.
-    :rtype: dict
-    """
-    for k, v in source.items():
-        if isinstance(v, dict):
-            target[k] = recursiveUpdate(target.get(k, {}), v)
-        else:
-            target[k] = v
-    return target
-
-
 class Benchmarker:
     """
     A class for basic execution timing.
@@ -266,7 +246,7 @@ def prepareLogging(filepath=None, logLvl=logging.INFO, lvlMap=None):
     """
     # Set log level for existing loggers.
     LogSettings.defaultLevel = logLvl
-    recursiveUpdate(LogSettings.moduleLevels, lvlMap if lvlMap else {})
+    LogSettings.moduleLevels.update(lvlMap if lvlMap else {})
     for name, logger in LogSettings.loggers.items():
         if name in LogSettings.moduleLevels:
             logger.setLevel(LogSettings.moduleLevels[name])
