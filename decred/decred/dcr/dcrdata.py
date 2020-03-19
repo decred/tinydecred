@@ -10,7 +10,7 @@ import atexit
 import calendar
 import json
 import time
-from urllib.parse import urlencode, urlparse
+from urllib.parse import urlencode, urljoin, urlsplit, urlunsplit
 
 from decred import DecredError
 from decred.crypto import crypto
@@ -47,7 +47,7 @@ class DcrdataPath:
     """
     DcrdataPath represents some point along a URL. It may just be a node that
     is not an endpoint, or it may be an endpoint, in which case its `get`
-    method will be a valid api call. If it is a node of a longer URL,
+    method will be a valid API call. If it is a node of a longer URL,
     the following nodes are available as attributes. e.g. if this is node A
     along the URL base/A/B, then node B is available as client.A.B.
     """
@@ -78,10 +78,10 @@ class DcrdataPath:
             if len(argList) != argLen:
                 continue
             if args:
-                uri = template % args
+                url = template % args
                 if len(kwargs):
-                    uri += "?" + urlencode(kwargs)
-                return uri
+                    url += "?" + urlencode(kwargs)
+                return url
             if all([x in kwargs for x in argList]):
                 return template % tuple(kwargs[x] for x in argList)
         raise DcrdataError(
@@ -101,13 +101,22 @@ class DcrdataPath:
         return tinyhttp.post(self.getCallsignPath(), data, headers=POST_HEADERS)
 
 
-def getSocketURIs(uri):
-    uri = urlparse(uri)
-    prot = "wss" if uri.scheme == "https" else "ws"
-    fmt = "{}://{}/{}"
-    ws = fmt.format(prot, uri.netloc, "ws")
-    ps = fmt.format(prot, uri.netloc, "ps")
-    return ws, ps
+def getSocketURLs(url):
+    """
+    Turn a HTTP/HTTPS URL into a WS/WSS one.
+
+    Args:
+        url (string): the URL to be adapted.
+
+    Returns:
+        string, string: the WebSocket and PubSub URLs.
+    """
+    url = urlsplit(url)
+    scheme = "wss" if url.scheme == "https" else "ws"
+    return (
+        urlunsplit((scheme, url.netloc, "/ws", "", "")),
+        urlunsplit((scheme, url.netloc, "/ps", "", "")),
+    )
 
 
 # TODO: get the full list here.
@@ -122,20 +131,26 @@ InsightPaths = [
 
 class DcrdataClient:
     """
-    DcrdataClient represents the base node. The only argument to the constructor
-    is the path to a DCRData server, e.g. http://explorer.dcrdata.org.
+    DcrdataClient represents the base node.
     """
 
     timeFmt = "%Y-%m-%d %H:%M:%S"
     rfc3339Z = "%Y-%m-%dT%H:%M:%SZ"
 
-    def __init__(self, baseURI, emitter=None):
+    def __init__(self, url, emitter=None):
         """
         Build the DcrdataPath tree.
+
+        Args:
+            url (string): the URL to a DCRData server, e.g.
+                http://explorer.dcrdata.org/.
         """
-        self.baseURI = baseURI.rstrip("/").rstrip("/api")
-        self.baseApi = self.baseURI + "/api"
-        _, self.psURI = getSocketURIs(self.baseURI)
+        url = urlsplit(url)
+        # Remove any path.
+        self.baseURL = urlunsplit((url.scheme, url.netloc, "/", "", ""))
+        # Add the "/api" path.
+        self.baseApi = urlunsplit((url.scheme, url.netloc, "/api/", "", ""))
+        _, self.psURL = getSocketURLs(self.baseURL)
         self.ps = None
         self.subscribedAddresses = []
         self.emitter = emitter
@@ -144,7 +159,8 @@ class DcrdataClient:
         self.listEntries = []
         # /list returns a json list of enpoints with parameters in template format,
         # base/A/{param}/B
-        endpoints = tinyhttp.get(self.baseApi + "/list", headers=GET_HEADERS)
+        listURL = urljoin(self.baseApi, "list")
+        endpoints = tinyhttp.get(listURL, headers=GET_HEADERS)
         endpoints += InsightPaths
 
         def getParam(part):
@@ -158,7 +174,7 @@ class DcrdataClient:
             if path in pathlog or path == "":
                 continue
             pathlog.append(path)
-            baseURI = self.baseURI if "insight" in path else self.baseApi
+            baseURL = self.baseURL if "insight" in path else self.baseApi
             params = []
             pathSequence = []
             templateParts = []
@@ -174,7 +190,7 @@ class DcrdataClient:
             pathPointer = root
             for pathPart in pathSequence:
                 pathPointer = pathPointer.getSubpath(pathPart)
-            pathPointer.addCallsign(params, "/".join([baseURI] + templateParts))
+            pathPointer.addCallsign(params, baseURL + "/".join(templateParts))
             if len(pathSequence) == 1:
                 continue
             self.listEntries.append(
@@ -221,7 +237,7 @@ class DcrdataClient:
                 log.error(f"pubsub error: {error}")
 
             self.ps = ws.Client(
-                url=self.psURI,
+                url=self.psURL,
                 on_message=on_message,
                 on_close=on_close,
                 on_error=on_error,
@@ -405,7 +421,7 @@ class DcrdataBlockchain:
                 the database or a filepath. If a filepath, a new database
                 will be created.
             netParams module: the network parameters.
-            datapath str: a URI for a dcrdata server.
+            datapath str: a URL for a dcrdata server.
             skipConnect bool: skip initial connection to dcrdata.
         """
         # Allow string arguments for database.
@@ -654,7 +670,7 @@ class DcrdataBlockchain:
             except Exception as e:
                 log.warning(
                     "unable to retrieve tx data from dcrdata at %s: %s"
-                    % (self.dcrdata.baseURI, e)
+                    % (self.dcrdata.baseURL, e)
                 )
         raise DecredError("failed to retrieve transaction")
 

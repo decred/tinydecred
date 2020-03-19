@@ -140,7 +140,7 @@ def test_pool_stats():
 
 now = int(time.time())
 votingServiceProvider = {
-    "url": "https://www.dcrstakedinner.com",
+    "url": "https://www.dcrstakedinner.com/",
     "apiKey": (
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1Nzc0MzM0NDIsIm"
         "lzcyI6Imh0dHBzOi8vd3d3LmRjcnN0YWtlZGlubmVyLmNvbSIsImxvZ2dlZEluQ"

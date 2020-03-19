@@ -2,6 +2,7 @@
 Copyright (c) 2020, the Decred developers
 See LICENSE for details
 """
+
 import threading
 
 import websocket

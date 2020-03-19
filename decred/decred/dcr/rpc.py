@@ -106,10 +106,10 @@ class Client:
 
     nextRequestID = 0
 
-    def __init__(self, host, user, pw, cert=None):
+    def __init__(self, url, user, pw, cert=None):
         """
         Args:
-            host (str): The RPC address.
+            url (str): The RPC address.
             user (str): The rpcuser set in the dcrd configuration.
             pw (str): The rpcpass set in the dcrd configuration.
             cert (str): Optional. The location of the server's TLS.
@@ -120,7 +120,7 @@ class Client:
             "content-type": "application/json",
             "Authorization": "Basic " + (authString),
         }
-        self.host = host
+        self.url = url
         self.cert = cert
         self.sslContext = None
         if cert:
@@ -155,7 +155,7 @@ class Client:
         """
         req = self.jsonRequest(method, params)
         rawRes = tinyhttp.post(
-            self.host, req.dict(), headers=self.headers, context=self.sslContext
+            self.url, req.dict(), headers=self.headers, context=self.sslContext
         )
         resp = Response(rawRes)
         if resp.error:
@@ -308,8 +308,8 @@ class Client:
 
     def debugLevel(self, levelSpec):
         """
-        Dynamically changes the debug logging level. The levelspec can either a
-        debug level or of the form:
+        Dynamically changes the debug logging level. The levelspec can be
+        either a debug level or of the form:
         <subsystem>=<level>,<subsystem2>=<level2>,...
         The valid debug levels are trace, debug, info, warn, error, and critical.
         The valid subsystems are AMGR, ADXR, BCDB, BMGR, DCRD, CHAN, DISC, PEER,
@@ -317,12 +317,11 @@ class Client:
         list of the available subsystems.
 
         Args:
-            levelSpec (str): The debug level(s) to use or the
-                keyword 'show'
+            levelSpec (str): The debug level(s) to use or the keyword 'show'.
 
         Returns:
-            str: The string 'Done.' if levelspec != 'show', else the list of
-                subsystems.
+            str: The list of subsystems if levelSpec == 'show',
+                else the string 'Done.'.
         """
         return self.call("debuglevel", levelSpec)
 

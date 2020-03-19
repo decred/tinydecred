@@ -72,14 +72,14 @@ def test_dcrdatapath(http_get_post):
     with pytest.raises(DcrdataError):
         ddp.no_such_path()
 
-    # Empty URI, needed for post.
+    # Empty URL, needed for post.
     with pytest.raises(DcrdataError):
         ddp.getCallsignPath()
     ddp.addCallsign([], "")
     csp = ddp.getCallsignPath()
     assert csp == ""
 
-    # Non-empty URI.
+    # Non-empty URL.
     with pytest.raises(DcrdataError):
         ddp.getCallsignPath("address")
     ddp.addCallsign(["address"], "/%s")
