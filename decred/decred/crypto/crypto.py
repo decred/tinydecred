@@ -441,7 +441,7 @@ def hashH(b):
 
 def privKeyFromBytes(pk):
     """
-    PrivKeyFromBytes creates a PrivateKey for the secp256k1 curve based on
+    privKeyFromBytes creates a PrivateKey for the secp256k1 curve based on
     the provided byte-encoding.
 
     Args:

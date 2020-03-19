@@ -3990,3 +3990,38 @@ def test_put_var_int():
         assert (
             res == test["want"]
         ), f'wanted {test["want"].hex()} but got {res.hex()} for test {test["name"]}'
+
+
+def test_verify_sig():
+    key = parseShortForm(
+        "0xea 0xf0 0x2c 0xa3 0x48 0xc5 0x24 0xe6 "
+        "0x39 0x26 0x55 0xba 0x4d 0x29 0x60 0x3c "
+        "0xd1 0xa7 0x34 0x7d 0x9d 0x65 0xcf 0xe9 "
+        "0x3c 0xe1 0xeb 0xff 0xdc 0xa2 0x26 0x94 "
+    )
+
+    priv = crypto.privKeyFromBytes(key)
+    assert priv.key == key
+    pub = priv.pub
+    inHash = parseShortForm("0x00 0x01 0x02 0x03 0x04 0x05 0x06 0x07 0x08 0x09")
+    sig = txscript.signRFC6979(priv.key, inHash)
+    """
+    pub (PublicKey): The public key.
+    inHash (byte-like): The thing being signed.
+    r (int): The R-parameter of the ECDSA signature.
+    s (int): The S-parameter of the ECDSA signature.
+    """
+    tests = [
+        dict(name="ok", r=sig.r, s=sig.s, want=True,),
+        dict(name="r <= zero", r=0, s=sig.s, want=False,),
+        dict(name="s <= zero", r=sig.r, s=0, want=False,),
+        dict(name="r >= N", r=Curve.curve.N, s=sig.s, want=False,),
+        dict(name="s >= N", r=sig.r, s=Curve.curve.N, want=False,),
+        dict(name="invalid signature", r=sig.s, s=sig.r, want=False,),
+    ]
+
+    for test in tests:
+        res = txscript.verifySig(pub, inHash, test["r"], test["s"])
+        assert (
+            res == test["want"]
+        ), f'wanted {test["want"]} but got {res} for test {test["name"]}'
