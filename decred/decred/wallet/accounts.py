@@ -172,7 +172,7 @@ class AccountManager:
         idx = len(self.acctDB)
         coinExtKey = self.coinKey(cryptoKey)
         db = self.dbForAcctIdx(idx)
-        account = createAccount(
+        acct = createAccount(
             cryptoKey,
             coinExtKey,
             self.coinType,
@@ -182,9 +182,20 @@ class AccountManager:
             db,
             self.signals,
         )
-        self.acctDB[idx] = account
-        self.accounts[idx] = account
-        return account
+        blockchain = chains.chain(self.coinType)
+        acct.load(self.dbForAcctIdx(idx), blockchain, self.signals)
+        self.acctDB[idx] = acct
+        self.accounts[idx] = acct
+        return acct
+
+    def saveAccount(self, idx):
+        """
+        Save the account at the specified index.
+
+        Args:
+            idx: The account index.
+        """
+        self.acctDB[idx] = self.accounts[idx]
 
     def account(self, idx):
         """
@@ -260,11 +271,11 @@ def createNewAccountManager(root, cryptoKey, coinType, netParams, db):
 
 
 def createAccount(
-    cryptoKey, coinExtKey, coinType, acct, netName, acctName, db, signals
+    cryptoKey, coinExtKey, coinType, acctIdx, netName, acctName, db, signals
 ):
     # Create the zeroth account.
     # Derive the account key for the first account according to BIP0044.
-    acctKeyPriv = coinExtKey.deriveAccountKey(acct)
+    acctKeyPriv = coinExtKey.deriveAccountKey(acctIdx)
 
     # Ensure the branch keys can be derived for the provided seed according
     # to BIP0044.
@@ -275,7 +286,14 @@ def createAccount(
     constructor = chains.AccountConstructors[coinType]
     blockchain = chains.chain(coinType)
     account = constructor(
-        pubKeyEncrypted, privKeyEncrypted, acctName, netName, db, blockchain, signals
+        acctIdx,
+        pubKeyEncrypted,
+        privKeyEncrypted,
+        acctName,
+        netName,
+        db,
+        blockchain,
+        signals,
     )
     # Open the account.
     account.unlock(cryptoKey)

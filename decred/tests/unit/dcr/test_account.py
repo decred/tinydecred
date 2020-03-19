@@ -447,7 +447,7 @@ class TestAccount:
         privKeyEncrypted = crypto.encrypt(self.cryptoKey, acctKey.serialize())
         pubKeyEncrypted = crypto.encrypt(self.cryptoKey, acctKeyPub.serialize())
         return account.Account(
-            pubKeyEncrypted, privKeyEncrypted, "acctName", "mainnet", db, blockchain
+            0, pubKeyEncrypted, privKeyEncrypted, "acctName", "mainnet", db, blockchain
         )
 
     def test_main(self):
@@ -651,7 +651,7 @@ class TestAccount:
             return [utxo]
 
         acct.blockchain.UTXOs = utxos4a
-        acct.blockchain.subscribeAddresses = lambda addrs: None
+        acct.blockchain.subscribeAddresses = lambda addrs, receiver: None
         acct.blockchain.subscribeBlocks = lambda a: None
         acct.sync()
         assert Signals.b.available == newVal
@@ -1081,7 +1081,7 @@ class TestAccount:
 
     def test_nextExternalInternalAddress(self):
         class FakeBlockchain:
-            subscribeAddresses = lambda addr: None
+            subscribeAddresses = lambda addr, receiver: None
 
         db = KeyValueDatabase(":memory:").child("tmp")
         acct = self.newAccount(db, FakeBlockchain)

@@ -5,11 +5,35 @@
    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
    xmlns:svg="http://www.w3.org/2000/svg"
    xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    id="svg30"
    version="1.1"
    width="100"
-   viewBox="0 0 100 100"
-   height="100">
+   viewBox="0 0 100 82"
+   height="82"
+   sodipodi:docname="logo.svg"
+   inkscape:version="0.92.4 (unknown)">
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="1920"
+     inkscape:window-height="1027"
+     id="namedview1554"
+     showgrid="false"
+     inkscape:zoom="8.6165106"
+     inkscape:cx="50.211864"
+     inkscape:cy="39.618644"
+     inkscape:window-x="1920"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg30" />
   <metadata
      id="metadata36">
     <rdf:RDF>
@@ -59,15 +83,17 @@
        offset="1" />
   </linearGradient>
   <g
-     transform="matrix(1.5855142,0,0,1.5855142,4.1061062,-68.641993)"
+     transform="matrix(1.8315997,0,0,1.8315997,-2.4857798,-98.215696)"
      id="g845">
     <path
        d="M 13.585922,65.131 2.6807051,54.225779 H 14.458343 l 17.448345,17.44835 h -11.77764 a 8.7241763,8.7241763 0 1 0 0,17.448351 h 4.362091 l 8.724178,8.724177 H 20.129048 A 17.448352,17.448352 0 0 1 2.6807051,80.398302 c 0,-7.075864 3.4896685,-12.779985 10.9052169,-15.267302 z"
        id="path12"
-       style="fill:url(#b);stroke-width:2.23706388" />
+       style="fill:url(#b);stroke-width:2.23706388"
+       inkscape:connector-curvature="0" />
     <path
        d="M 44.120535,86.941434 55.025753,97.846657 H 43.248116 L 25.799768,80.398302 h 11.777637 a 8.7241765,8.7241765 0 0 0 0,-17.448348 h -4.362088 l -8.724178,-8.724175 h 13.086266 a 17.448352,17.448352 0 0 1 17.448348,17.44835 c 0,7.07586 -3.489669,12.779986 -10.905218,15.267305 z"
        id="path14"
-       style="fill:url(#a);stroke-width:2.23706388" />
+       style="fill:url(#a);stroke-width:2.23706388"
+       inkscape:connector-curvature="0" />
   </g>
 </svg>

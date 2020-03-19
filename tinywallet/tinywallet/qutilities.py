@@ -433,6 +433,28 @@ def makeSeries(layoutDirection, *widgets, align=None, widget=QtWidgets.QWidget):
     return wgt, lyt
 
 
+def makeRow(*wgts, **kwargs):
+    """
+    Creates a widget with a horizontal layout and adds the supplied widgets.
+
+    Args:
+        *wgts *list(QWidget): The widgets for the row.
+        **kwargs: keyword arguments are passed directly to makeSeries.
+    """
+    return makeSeries(HORIZONTAL, *wgts, **kwargs)
+
+
+def makeColumn(*wgts, **kwargs):
+    """
+    Creates a widget with a vertical layout and adds the supplied widgets.
+
+    Args:
+        *wgts *list(QWidget): The widgets for the column.
+        **kwargs: keyword arguments are passed directly to makeSeries.
+    """
+    return makeSeries(VERTICAL, *wgts, **kwargs)
+
+
 def addHoverColor(widget, color):
     """
     Adds a background color on hover to the element
@@ -463,10 +485,10 @@ def addDropShadow(wgt):
     Add a white background and a drop shadow for the given widget.
     """
     effect = QtWidgets.QGraphicsDropShadowEffect()
-    effect.setBlurRadius(7)
+    effect.setBlurRadius(5)
     effect.setXOffset(0)
-    effect.setYOffset(1)
-    effect.setColor(QtGui.QColor("#777777"))
+    effect.setYOffset(0)
+    effect.setColor(QtGui.QColor("#a1a1a1"))
     setBackgroundColor(wgt, "white")
     wgt.setGraphicsEffect(effect)
 
@@ -614,12 +636,10 @@ darkThemePalette.hoverColor = QtGui.QColor("#5d5d5d")
 QUTILITY_STYLE = """
 QPushButton[button-style-class=light]{
     background-color:white;
-    border-radius:3px;
-    border-color:#aaaaaa;
+    border-color:#a1a1a1;
     border-width:1px;
     border-style:solid;
     color:#333333;
-    font-weight:500;
 }
 QPushButton[button-style-class=light]:hover{
     background-color:#efefef;
@@ -635,17 +655,16 @@ QPushButton[button-style-class=dark]{
     border-width:1px;
     border-style:solid;
     color:#222222;
-    font-weight:600;
 }
 QPushButton[button-style-class=dark]:hover{
     background-color:#a3ffa7;
 }
 QPushButton[button-size-class=tiny]{
-    padding: 3px 6px;
+    padding: 2px 4px;
     font-size:14px;
 }
 QPushButton[button-size-class=small]{
-    padding: 6px 10px;
+    padding: 4px 6px;
     font-size:16px;
 }
 QPushButton[button-size-class=medium]{
@@ -686,11 +705,10 @@ QComboBox::down-arrow {
     top:3px;
 }
 QLineEdit {
-    padding: 7px;
+    padding: 4px 6px;
     font-size: 14px;
-    line-height: 34px;
-    border: 1px solid #aaaaaa;
-    border-radius: 2px;
+    line-height: 22px;
+    border: 1px solid #a1a1a1;
 }
 QLineEdit:focus {
     border: 1px solid #333333;
