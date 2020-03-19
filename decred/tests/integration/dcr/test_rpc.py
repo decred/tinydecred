@@ -60,7 +60,7 @@ message = "this decred is tiny"
 nonsense = "asdf"
 
 
-def test_rpc(config):
+def test_Client(config):
     if config is None:
         pytest.skip("did not locate a dcrd config file")
     rpcClient = rpc.Client(
@@ -481,3 +481,26 @@ def test_rpc(config):
     version = rpcClient.version()
     assert isinstance(version["dcrd"], rpc.VersionResult)
     assert isinstance(version["dcrdjsonrpcapi"], rpc.VersionResult)
+
+
+def test_WebsocketClient(config):
+    """
+    Inherited Client functionality is already tested by test_Client, so just
+    exercise the WebsocketClient-only paths.
+    """
+    if config is None:
+        pytest.skip("did not locate a dcrd config file")
+    wsClient = rpc.WebsocketClient(
+        "https://" + config["rpclisten"],
+        config["rpcuser"],
+        config["rpcpass"],
+        config["rpccert"],
+    )
+
+    existsAddress = wsClient.existsAddress(mainnetAddress)
+    assert existsAddress
+
+    bestBlock = wsClient.getBestBlock()
+    assert isinstance(bestBlock, rpc.GetBestBlockResult)
+
+    wsClient.close()
