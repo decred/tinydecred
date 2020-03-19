@@ -104,7 +104,7 @@ class Client:
     The Client communicates with the blockchain RPC API.
     """
 
-    reqID = 0
+    nextRequestID = 0
 
     def __init__(self, host, user, pw, cert=None):
         """
@@ -138,20 +138,20 @@ class Client:
         Returns:
             Request: The request.
         """
-        reqID = self.reqID
-        self.reqID = reqID + 1
+        reqID = self.nextRequestID
+        self.nextRequestID = reqID + 1
         return Request(reqID, method, params)
 
     def call(self, method, *params):
         """
-        Call the specified remote method with the a list of parameters.
+        Call the specified remote method with the specified list of parameters.
 
         Args:
             method (str): The JSON-RPC method.
             params (list): JSON-serializable parameters.
 
         Returns:
-            dict: The response's result .
+            dict: The response's result.
         """
         req = self.jsonRequest(method, params)
         rawRes = tinyhttp.post(
@@ -3408,7 +3408,7 @@ class WebsocketClient(Client):
         )
 
     def close(self):
-        """Close the webscket connection."""
+        """Close the websocket connection."""
         if self.ws:
             self.ws.close()
             self.ws = None
