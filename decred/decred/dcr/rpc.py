@@ -10,6 +10,7 @@ import ssl
 import types
 from urllib.parse import urlparse
 
+from decred import DecredError
 from decred.util import tinyhttp, ws
 from decred.util.encode import ByteArray
 from decred.util.helpers import coinify, getLogger

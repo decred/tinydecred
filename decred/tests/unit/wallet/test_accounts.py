@@ -61,7 +61,7 @@ def test_account_manager(prepareLogger):
     assert acctMgr.listAccounts() == [acct, tempAcct]
     acctMgr.accounts[3] = tempAcct
     del acctMgr.accounts[1]
-    with pytest.raises(AssertionError):
+    with pytest.raises(DecredError):
         acctMgr.listAccounts()
     del acctMgr.accounts[3]
 
