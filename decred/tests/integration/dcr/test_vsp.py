@@ -1,45 +1,33 @@
 """
-Copyright (c) 2019, the Decred developers
+Copyright (c) 2019-2020, the Decred developers
 See LICENSE for details
 """
-
-import unittest
 
 from decred.dcr import vsp
 from decred.dcr.nets import testnet
 
 
-class TestVSPLive(unittest.TestCase):
-    def setUp(self):
-        self.poolURL = "https://teststakepool.decred.org"
-        self.apiKey = ""
-        # signing address is needed to validate server-reported redeem script.
-        self.signingAddress = ""
-        if not self.apiKey or not self.signingAddress:
-            print(" no stake pool credentials provided. skipping stake pool test")
-            raise unittest.SkipTest
+VSP_URL = "https://dcrstakedinner.com"
+API_KEY = (
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1Nzc0MzM0NDIsIm"
+    "lzcyI6Imh0dHBzOi8vd3d3LmRjcnN0YWtlZGlubmVyLmNvbSIsImxvZ2dlZEluQ"
+    "XMiOjQ2fQ.PEb000_TjQuBYxjRdh-VOaXMdV2GUw3_ZyIyp_tfpFE"
+)
+# Signing address is needed to validate server-reported redeem script.
+SIGNING_ADDRESS = "TkKmVKG7u7PwhQaYr7wgMqBwHneJ2cN4e5YpMVUsWSopx81NFXEzK"
 
-    def stakePool(self):
-        stakePool = vsp.VotingServiceProvider(self.poolURL, self.apiKey, testnet.Name)
-        stakePool.authorize(self.signingAddress)
-        return stakePool
 
-    def test_get_purchase_info(self):
-        stakePool = self.stakePool()
-        stakePool.getPurchaseInfo()
-
-    def test_get_stats(self):
-        stakePool = self.stakePool()
-        stakePool.getStats()
-
-    def test_voting(self):
-        stakePool = self.stakePool()
-        pi = stakePool.getPurchaseInfo()
-        if pi.voteBits & (1 << 1) != 0:
-            nextVote = 1 | (1 << 2)
-        else:
-            nextVote = 1 | (1 << 1)
-        print("changing vote from %d to %d" % (pi.voteBits, nextVote))
-        stakePool.setVoteBits(nextVote)
-        pi = stakePool.getPurchaseInfo()
-        self.assertEqual(pi.voteBits, nextVote)
+def test_vsp_live():
+    the_vsp = vsp.VotingServiceProvider(VSP_URL, API_KEY, testnet.Name)
+    the_vsp.authorize(SIGNING_ADDRESS)
+    the_vsp.getStats()
+    purc_info = the_vsp.getPurchaseInfo()
+    # Test voting.
+    if purc_info.voteBits & (1 << 1) != 0:
+        nextVote = 1 | (1 << 2)
+    else:
+        nextVote = 1 | (1 << 1)
+    # print(f"changing vote from {purc_info.voteBits}to {nextVote}")
+    the_vsp.setVoteBits(nextVote)
+    purc_info = the_vsp.getPurchaseInfo()
+    assert purc_info.voteBits == nextVote
