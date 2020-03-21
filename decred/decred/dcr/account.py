@@ -6,7 +6,7 @@ See LICENSE for details
 
 from decred import DecredError
 from decred.crypto import crypto, opcode
-from decred.dcr import dcraddr
+from decred.dcr import addrlib
 from decred.util import encode, helpers
 from decred.util.encode import BuildyBytes, ByteArray, unblobCheck
 
@@ -67,7 +67,7 @@ def deriveChildAddress(branchXPub, i, netParams):
         Address: Child address.
     """
     child = branchXPub.child(i)
-    return dcraddr.newAddressPubKeyHash(
+    return addrlib.AddressPubKeyHash(
         crypto.hash160(child.publicKey().serializeCompressed().b),
         netParams,
         crypto.STEcdsaSecp256k1,
@@ -575,7 +575,7 @@ class UTXO:
         rawaddr = txscript.extractStakeScriptHash(
             txout.pkScript, opcode.OP_SSTX
         ).bytes()
-        addr = dcraddr.AddressScriptHash(netParams.ScriptHashAddrID, rawaddr).string()
+        addr = addrlib.AddressScriptHash(rawaddr, netParams).string()
         ticket = UTXO(
             address=addr,
             txHash=tx.cachedHash(),
@@ -1738,7 +1738,7 @@ class Account:
         Returns:
             AddressSecpPubkey: The address object.
         """
-        return dcraddr.AddressSecpPubKey(
+        return addrlib.AddressSecpPubKey(
             self.votingKey().pub.serializeCompressed(), self.netParams
         )
 
@@ -1946,9 +1946,9 @@ class Account:
         )
         txs = [self.blockchain.tx(txid) for txid in revocableTickets]
         for tx in txs:
-            redeemHash = dcraddr.AddressScriptHash(
-                self.netParams.ScriptHashAddrID,
+            redeemHash = addrlib.AddressScriptHash(
                 txscript.extractStakeScriptHash(tx.txOut[0].pkScript, opcode.OP_SSTX),
+                self.netParams,
             )
             redeemScript = next(
                 (

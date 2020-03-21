@@ -7,7 +7,7 @@ import pytest
 
 from decred import DecredError
 from decred.crypto import crypto, rando
-from decred.dcr import nets, account
+from decred.dcr import account, nets
 from decred.util import chains, database, encode
 from decred.wallet import accounts
 

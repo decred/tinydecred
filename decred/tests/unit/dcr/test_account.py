@@ -9,7 +9,7 @@ import pytest
 
 from decred import DecredError
 from decred.crypto import crypto, opcode, rando
-from decred.dcr import account, nets, txscript, dcraddr
+from decred.dcr import account, addrlib, nets, txscript
 from decred.dcr.vsp import PurchaseInfo, VotingServiceProvider
 from decred.dcr.wire import msgblock, msgtx
 from decred.util.database import KeyValueDatabase
@@ -604,7 +604,7 @@ class TestAccount:
         newVal = int(5e8)
         expVal = acct.calcBalance().available + newVal
         addr = acct.externalAddresses[1]
-        a = txscript.decodeAddress(addr, nets.mainnet)
+        a = addrlib.decodeAddress(addr, nets.mainnet)
         script = txscript.payToAddrScript(a)
         newTx = msgtx.MsgTx.new()
         op = msgtx.TxOut(newVal, script)
@@ -620,7 +620,7 @@ class TestAccount:
         acct.stakePool().authorize = lambda a: True
         newVal = int(3e8)
         addr = acct.externalAddresses[2]
-        a = txscript.decodeAddress(addr, nets.mainnet)
+        a = addrlib.decodeAddress(addr, nets.mainnet)
         script = txscript.payToAddrScript(a)
         newTx = msgtx.MsgTx.new()
         op = msgtx.TxOut(newVal, script)
@@ -666,9 +666,8 @@ class TestAccount:
         op = msgtx.TxOut(ticket.satoshis, ticket.scriptPubKey)
         ticketTx.addTxOut(op)
         ticket.tinfo.status = "missed"
-        redeemHash = dcraddr.AddressScriptHash(
-            nets.mainnet.ScriptHashAddrID,
-            txscript.extractStakeScriptHash(ticketScript, opcode.OP_SSTX),
+        redeemHash = addrlib.AddressScriptHash(
+            txscript.extractStakeScriptHash(ticketScript, opcode.OP_SSTX), nets.mainnet,
         )
         acct.stakePool().purchaseInfo.ticketAddress = redeemHash.string()
         revoked = False
