@@ -49,6 +49,12 @@ KVRows = "SELECT k, v FROM {tablename};"
 
 KVValues = "SELECT v FROM {tablename};"
 
+KVOrderedRange = "SELECT k, v FROM {tablename} WHERE k >= ? AND k < ? ORDER BY k;"
+
+KVLast = "SELECT k, v FROM {tablename} ORDER BY k DESC LIMIT 1;"
+
+KVFirst = "SELECT k, v FROM {tablename} ORDER BY k LIMIT 1;"
+
 
 class KeyValueDatabase:
     """
@@ -105,6 +111,7 @@ class Bucket:
         datatypes=("BLOB", "BLOB"),
         unique=True,
         blobber=None,
+        keyBlobber=None,
         table=True,
     ):
         """
@@ -127,8 +134,15 @@ class Bucket:
         if not table:
             return
         self.lock = threading.Lock()
-        self.encoder = blobber.blob if blobber else lambda v: v
-        self.decoder = blobber.unblob if blobber else lambda v: v
+
+        def noblobber(v):
+            return v
+
+        self.encoder = blobber.blob if blobber else noblobber
+        self.decoder = blobber.unblob if blobber else noblobber
+        self.keyEncoder = keyBlobber.blob if keyBlobber else noblobber
+        self.keyDecoder = keyBlobber.unblob if keyBlobber else noblobber
+        self.datatypes = datatypes
         createQuery = KVTable.format(
             tablename=name, keytype=datatypes[0], valuetype=datatypes[1]
         )
@@ -141,31 +155,18 @@ class Bucket:
         cursor.execute(indexQuery)
         conn.commit()
 
-        self.getQuery = KVGet.format(
-            tablename=name
-        )  # = "SELECT v FROM {tablename} WHERE k = ?;"
-        self.setQuery = KVSet.format(
-            tablename=name
-        )  # = "REPLACE INTO {tablename}(k, v) VALUES(?, ?);"
-        self.existsQuery = KVExists.format(
-            tablename=name
-        )  # = "SELECT EXISTS(SELECT * FROM {tablename} WHERE k = ?);"
-        self.deleteQuery = KVDelete.format(
-            tablename=name
-        )  # = "DELETE FROM {tablename} WHERE k = ?;"
-        self.deleteAllQuery = KVDeleteAll.format(
-            tablename=name
-        )  # = "DELETE FROM {tablename};"
-        self.countQuery = KVCount.format(
-            tablename=name
-        )  # = "SELECT COUNT(*) FROM {tablename};"
-        self.keysQuery = KVKeys.format(tablename=name)  # = "SELECT k FROM {tablename}"
-        self.rowsQuery = KVRows.format(
-            tablename=name
-        )  # = "SELECT k, v FROM {tablename}"
-        self.valuesQuery = KVValues.format(
-            tablename=name
-        )  # = "SELECT k, v FROM {tablename}"
+        self.getQuery = KVGet.format(tablename=name)
+        self.setQuery = KVSet.format(tablename=name)
+        self.existsQuery = KVExists.format(tablename=name)
+        self.deleteQuery = KVDelete.format(tablename=name)
+        self.deleteAllQuery = KVDeleteAll.format(tablename=name)
+        self.countQuery = KVCount.format(tablename=name)
+        self.keysQuery = KVKeys.format(tablename=name)
+        self.rowsQuery = KVRows.format(tablename=name)
+        self.valuesQuery = KVValues.format(tablename=name)
+        self.rangeQuery = KVOrderedRange.format(tablename=name)
+        self.lastQuery = KVLast.format(tablename=name)
+        self.firstQuery = KVFirst.format(tablename=name)
 
     def child(self, name, **k):
         """
@@ -186,25 +187,31 @@ class Bucket:
         """dict-like assignment"""
         self.conn.lock()
         try:
-            self.conn.cursor().execute(self.setQuery, (k, self.encoder(v)))
+            self.conn.cursor().execute(
+                self.setQuery, (self.keyEncoder(k), self.encoder(v))
+            )
             self.conn.commit()
         finally:
             self.conn.unlock()
 
     def __getitem__(self, k):
         """dict-like retrieval"""
+        decoder = self.decoder
         cursor = self.conn.cursor()
-        cursor.execute(self.getQuery, (k,))
+        if isinstance(k, slice):
+            cursor.execute(self.rangeQuery, (k.start if k.start else 0, k.stop))
+            return [(k, decoder(v)) for k, v in cursor.fetchall()]
+        cursor.execute(self.getQuery, (self.keyEncoder(k),))
         row = cursor.fetchone()
         if row is None:
             raise NO_VALUE_EXCEPTION
-        return self.decoder(row[0])
+        return decoder(row[0])
 
     def __delitem__(self, k):
         """dict-like deletion"""
         self.conn.lock()
         try:
-            self.conn.cursor().execute(self.deleteQuery, (k,))
+            self.conn.cursor().execute(self.deleteQuery, (self.keyEncoder(k),))
             self.conn.commit()
         finally:
             self.conn.unlock()
@@ -212,7 +219,7 @@ class Bucket:
     def __contains__(self, k):
         """dict-like key check using the `in` operator"""
         cursor = self.conn.cursor()
-        cursor.execute(self.existsQuery, (k,))
+        cursor.execute(self.existsQuery, (self.keyEncoder(k),))
         row = cursor.fetchone()
         if row is None:  # nocover
             return False
@@ -241,7 +248,8 @@ class Bucket:
         """
         cursor = self.conn.cursor()
         cursor.execute(self.keysQuery)
-        return (k for k, in cursor.fetchall())
+        decode = self.keyDecoder
+        return (decode(k) for k, in cursor.fetchall())
 
     def items(self):
         """
@@ -254,8 +262,9 @@ class Bucket:
         cursor.execute(self.rowsQuery)
         row = cursor.fetchone()
         decoder = self.decoder
+        keyDecoder = self.keyDecoder
         while row:
-            yield row[0], decoder(row[1])
+            yield keyDecoder(row[0]), decoder(row[1])
             row = cursor.fetchone()
 
     def values(self):
@@ -272,6 +281,32 @@ class Bucket:
         while row:
             yield decoder(row[0])
             row = cursor.fetchone()
+
+    def _getTuple(self, query):
+        cursor = self.conn.cursor()
+        cursor.execute(query)
+        row = cursor.fetchone()
+        if row is None:
+            raise NO_VALUE_EXCEPTION
+        return self.keyDecoder(row[0]), self.decoder(row[1])
+
+    def last(self):
+        """
+        Get the highest key in the table. Also returns the value.
+
+        Returns:
+            tuple: Key and value.
+        """
+        return self._getTuple(self.lastQuery)
+
+    def first(self):
+        """
+        Get the lowest key in the table. Also returns the value.
+
+        Returns:
+            tuple: Key and value.
+        """
+        return self._getTuple(self.firstQuery)
 
     def clear(self):
         """
@@ -293,8 +328,9 @@ class Bucket:
         """
         self.conn.lock()
         enc = self.encoder
+        kEnc = self.keyEncoder
         # Use a generator to encode the values without copying the list.
-        pairs = ((k, enc(v)) for k, v in pairs)
+        pairs = ((kEnc(k), enc(v)) for k, v in pairs)
         try:
             self.conn.cursor().executemany(self.setQuery, pairs)
             self.conn.commit()

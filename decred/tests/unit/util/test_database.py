@@ -54,6 +54,9 @@ def test_database(prepareLogger, randBytes):
         assert intdb.name == "test$inttest"
         intdb[5] = b"asdf"
         assert intdb[5] == b"asdf"
+        intdb[6] = b"jkl;"
+        assert intdb.first() == (5, b"asdf")
+        assert intdb.last() == (6, b"jkl;")
 
         # check uniqueness of keys:
         k = testPairs[0][0]
@@ -80,6 +83,16 @@ def test_database(prepareLogger, randBytes):
         k = testPairs[0][0]
         kidDB[k] = b"some new bytes"
         assert len([key for key in kidDB if key == k]) == 1
+
+        # slice notation
+        sliceDB = db.child("slice", datatypes=("INTEGER", "TEXT"))
+        n = 5
+        for i in range(n):
+            sliceDB[i] = str(i)
+        nums = sliceDB[:n]
+        assert len(nums) == 5
+        assert all(i == int(s) for i, s in nums)
+        assert sliceDB.last()[0] == 4
 
     finally:
         master.close()

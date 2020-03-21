@@ -3,12 +3,8 @@ Copyright (c) 2019-2020, the Decred developers
 See LICENSE for details
 """
 
-import configparser
-import os
-import platform
 from urllib.parse import urlunsplit
 
-from appdirs import AppDirs
 from base58 import b58decode
 import pytest
 
@@ -20,89 +16,6 @@ from decred.dcr.wire import wire
 from decred.dcr.wire.msgblock import BlockHeader
 from decred.dcr.wire.msgtx import MsgTx, OutPoint, TxIn, TxOut
 from decred.util.encode import ByteArray
-
-
-@pytest.fixture
-def config():
-    dcrdCfgDir = appDataDir("dcrd")
-    cfgPath = os.path.join(dcrdCfgDir, "dcrd.conf")
-    if not os.path.isfile(cfgPath):
-        return None
-    cfg = readINI(cfgPath, ["rpcuser", "rpcpass", "rpccert"])
-    assert "rpcuser" in cfg
-    assert "rpcpass" in cfg
-    if "rpccert" not in cfg:
-        cfg["rpccert"] = os.path.join(dcrdCfgDir, "rpc.cert")
-    if "rpclisten" not in cfg:
-        cfg["rpclisten"] = "localhost:9109"
-    return cfg
-
-
-def appDataDir(appName):
-    """
-    appDataDir returns an operating system specific directory to be used for
-    storing application data for an application.
-    """
-    if appName == "" or appName == ".":
-        return "."
-
-    # The caller really shouldn't prepend the appName with a period, but
-    # if they do, handle it gracefully by stripping it.
-    appName = appName.lstrip()
-    appNameUpper = appName.capitalize()
-    appNameLower = appName.lower()
-
-    # Get the OS specific home directory.
-    homeDir = os.path.expanduser("~")
-
-    # Fall back to standard HOME environment variable that works
-    # for most POSIX OSes.
-    if homeDir == "":
-        homeDir = os.getenv("HOME")
-
-    opSys = platform.system()
-    if opSys == "Windows":
-        # Windows XP and before didn't have a LOCALAPPDATA, so fallback
-        # to regular APPDATA when LOCALAPPDATA is not set.
-        return AppDirs(appNameUpper, "").user_data_dir
-
-    elif opSys == "Darwin":
-        if homeDir != "":
-            return os.path.join(homeDir, "Library", "Application Support", appNameUpper)
-
-    else:
-        if homeDir != "":
-            return os.path.join(homeDir, "." + appNameLower)
-
-    # Fall back to the current directory if all else fails.
-    return "."
-
-
-def readINI(path, keys):
-    """
-    Attempt to read the specified keys from the INI-formatted configuration
-    file. All sections will be searched. A dict with discovered keys and
-    values will be returned. If a key is not discovered, it will not be
-    present in the result.
-
-    Args:
-        path (str): The path to the INI configuration file.
-        keys (list(str)): Keys to search for.
-
-    Returns:
-        dict: Discovered keys and values.
-    """
-    config = configparser.ConfigParser()
-    # Need to add a section header since configparser doesn't handle sectionless
-    # INI format.
-    with open(path) as f:
-        config.read_string("[tinydecred]\n" + f.read())  # This line does the trick.
-    res = {}
-    for section in config.sections():
-        for k in config[section]:
-            if k in keys:
-                res[k] = config[section][k]
-    return res
 
 
 mainnetAddress = "Dcur2mcGjmENx4DhNqDctW5wJCVyT3Qeqkx"
@@ -221,14 +134,14 @@ message = "this decred is tiny"
 nonsense = "asdf"
 
 
-def test_Client(config):
-    if config is None:
+def test_Client(dcrdConfig):
+    if dcrdConfig is None:
         pytest.skip("did not locate a dcrd config file")
     rpcClient = rpc.Client(
-        urlunsplit(("https", config["rpclisten"], "/", "", "")),
-        config["rpcuser"],
-        config["rpcpass"],
-        config["rpccert"],
+        urlunsplit(("https", dcrdConfig["rpclisten"], "/", "", "")),
+        dcrdConfig["rpcuser"],
+        dcrdConfig["rpcpass"],
+        dcrdConfig["rpccert"],
     )
 
     stringify = rpc.stringify
@@ -640,19 +553,32 @@ def test_Client(config):
     assert isinstance(version["dcrdjsonrpcapi"], rpc.VersionResult)
 
 
-def test_WebsocketClient(config):
+@pytest.fixture(scope="module")
+def wsClient(dcrdConfig):
+    if dcrdConfig is None:
+        return "no configuration found"
+    try:
+        wsClient = rpc.WebsocketClient(
+            "https://" + dcrdConfig["rpclisten"],
+            dcrdConfig["rpcuser"],
+            dcrdConfig["rpcpass"],
+            dcrdConfig["rpccert"],
+        )
+    except Exception as e:
+        return e
+    yield wsClient
+    wsClient.close()
+
+
+def test_WebsocketClient(wsClient):
     """
     Inherited Client functionality is already tested by test_Client, so just
     exercise the WebsocketClient-only paths.
     """
-    if config is None:
-        pytest.skip("did not locate a dcrd config file")
-    wsClient = rpc.WebsocketClient(
-        "https://" + config["rpclisten"],
-        config["rpcuser"],
-        config["rpcpass"],
-        config["rpccert"],
-    )
+    if not isinstance(wsClient, rpc.WebsocketClient):
+        pytest.skip(f"skipping websocket test: {wsClient}")
+
+    rba = lambda b: reversed(ByteArray(b))
 
     existsAddress = wsClient.existsAddress(mainnetAddress)
     assert existsAddress
@@ -660,4 +586,14 @@ def test_WebsocketClient(config):
     bestBlock = wsClient.getBestBlock()
     assert isinstance(bestBlock, rpc.GetBestBlockResult)
 
-    wsClient.close()
+    # Load a transaction filter and rescan.
+    addr = "DcrEkP7ZcY16nvvdNqAzWbWS1UCgMobVWuA"
+    txHash = rba("7c0d6c41d507fd926060370d06c88a6012679f8d5b2778a3e9bcf3337b102131")
+    blockHash = rba("00000000000000000239bed2f57ce40f4cfcbf34bdaff983959e159c7bb9b9cd")
+    wsClient.loadTxFilter(True, [addr], [])
+    blocks = wsClient.rescan([blockHash])
+    assert len(blocks) == 1
+    block = blocks[0]
+    assert block.hash == blockHash
+    assert len(block.txs) == 1
+    assert block.txs[0].cachedHash() == txHash
