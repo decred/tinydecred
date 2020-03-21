@@ -14,7 +14,7 @@ import pytest
 
 from decred import DecredError
 from decred.crypto import crypto, opcode
-from decred.dcr import account, rpc, txscript
+from decred.dcr import account, rpc, txscript, dcraddr
 from decred.dcr.nets import mainnet
 from decred.dcr.wire import wire
 from decred.dcr.wire.msgblock import BlockHeader
@@ -436,14 +436,14 @@ def test_Client(config):
         getRawTransaction.txOut[0].pkScript, opcode.OP_SSTX
     )
     if rawaddr:
-        addressWithTickets = crypto.AddressScriptHash(
+        addressWithTickets = dcraddr.AddressScriptHash(
             mainnet.ScriptHashAddrID, rawaddr
         ).string()
     else:
         rawaddr = txscript.extractStakePubKeyHash(
             getRawTransaction.txOut[0].pkScript, opcode.OP_SSTX
         )
-        addressWithTickets = crypto.AddressPubKeyHash(
+        addressWithTickets = dcraddr.AddressPubKeyHash(
             mainnet.PubKeyHashAddrID, rawaddr
         ).string()
 
@@ -515,7 +515,7 @@ def test_Client(config):
     amount = {cookedAddress2: amt + 1}
 
     zeroed = ByteArray(b"", length=20)
-    changeAddr = crypto.newAddressPubKeyHash(
+    changeAddr = dcraddr.newAddressPubKeyHash(
         zeroed, mainnet, crypto.STEcdsaSecp256k1
     ).string()
     # only the first argument for couts is a non-zero value
@@ -526,10 +526,10 @@ def test_Client(config):
     op = OutPoint(txHash=revocableTicket.hash(), idx=0, tree=wire.TxTreeStake)
     inputPool = txscript.ExtendedOutPoint(op=op, amt=1, pkScript=script,)
     inputMain = txscript.ExtendedOutPoint(op=op, amt=amt, pkScript=script,)
-    ticketAddr = crypto.newAddressScriptHashFromHash(
+    ticketAddr = dcraddr.newAddressScriptHashFromHash(
         ByteArray(b58decode(cookedAddress2)[2:-4]), mainnet
     )
-    mainAddr = crypto.newAddressScriptHashFromHash(
+    mainAddr = dcraddr.newAddressScriptHashFromHash(
         ByteArray(b58decode(mainnetAddress)[2:-4]), mainnet
     )
 

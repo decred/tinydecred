@@ -9,7 +9,7 @@ import pytest
 
 from decred import DecredError
 from decred.crypto import crypto, opcode, rando
-from decred.dcr import account, nets, txscript
+from decred.dcr import account, nets, txscript, dcraddr
 from decred.dcr.vsp import PurchaseInfo, VotingServiceProvider
 from decred.dcr.wire import msgblock, msgtx
 from decred.util.database import KeyValueDatabase
@@ -666,7 +666,7 @@ class TestAccount:
         op = msgtx.TxOut(ticket.satoshis, ticket.scriptPubKey)
         ticketTx.addTxOut(op)
         ticket.tinfo.status = "missed"
-        redeemHash = crypto.AddressScriptHash(
+        redeemHash = dcraddr.AddressScriptHash(
             nets.mainnet.ScriptHashAddrID,
             txscript.extractStakeScriptHash(ticketScript, opcode.OP_SSTX),
         )
@@ -1058,7 +1058,7 @@ class TestAccount:
 
     def test_nextBranchAddress(self):
         class FakeExtendedKey:
-            def deriveChildAddress(self, i, netParams):
+            def child(self, i):
                 raise crypto.CrazyKeyError
 
         db = KeyValueDatabase(":memory:").child("tmp")

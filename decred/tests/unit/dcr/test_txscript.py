@@ -13,7 +13,7 @@ import pytest
 from decred import DecredError
 from decred.crypto import crypto, opcode, rando
 from decred.crypto.secp256k1 import curve as Curve
-from decred.dcr import txscript
+from decred.dcr import txscript, dcraddr
 from decred.dcr.calc import SubsidyCache
 from decred.dcr.nets import mainnet, testnet
 from decred.dcr.wire import msgtx, wire
@@ -1921,7 +1921,7 @@ class TestTxScript(unittest.TestCase):
                             "test for signature suite %d not implemented" % suite
                         )
 
-                    address = crypto.newAddressPubKeyHash(
+                    address = dcraddr.newAddressPubKeyHash(
                         crypto.hash160(pkBytes.bytes()), testingParams, suite
                     )
 
@@ -1999,7 +1999,7 @@ class TestTxScript(unittest.TestCase):
                             "test for signature suite %d not implemented" % suite
                         )
 
-                    address = crypto.newAddressPubKeyHash(
+                    address = dcraddr.newAddressPubKeyHash(
                         crypto.hash160(pkBytes.bytes()), testingParams, suite
                     )
 
@@ -2075,7 +2075,7 @@ class TestTxScript(unittest.TestCase):
                             "test for signature suite %d not implemented" % suite
                         )
 
-                    address = crypto.newAddressPubKeyHash(
+                    address = dcraddr.newAddressPubKeyHash(
                         crypto.hash160(pkBytes.bytes()), testingParams, suite
                     )
 
@@ -2170,13 +2170,13 @@ class TestTxScript(unittest.TestCase):
                             "test for signature suite %d not implemented" % suite
                         )
 
-                    address = crypto.AddressSecpPubKey(pkBytes.bytes(), testingParams)
+                    address = dcraddr.AddressSecpPubKey(pkBytes.bytes(), testingParams)
 
-                    address2 = crypto.AddressSecpPubKey(pkBytes2.bytes(), testingParams)
+                    address2 = dcraddr.AddressSecpPubKey(pkBytes2.bytes(), testingParams)
 
                     pkScript = txscript.multiSigScript([address, address2], 2)
 
-                    scriptAddr = crypto.newAddressScriptHash(pkScript, testingParams)
+                    scriptAddr = dcraddr.newAddressScriptHash(pkScript, testingParams)
 
                     scriptPkScript = txscript.payToAddrScript(scriptAddr)
 
@@ -2225,7 +2225,7 @@ class TestTxScript(unittest.TestCase):
 
         privKey = Curve.generateKey()
         pkHash = crypto.hash160(privKey.pub.serializeCompressed().b)
-        addr = crypto.AddressPubKeyHash(mainnet.PubKeyHashAddrID, pkHash)
+        addr = dcraddr.AddressPubKeyHash(mainnet.PubKeyHashAddrID, pkHash)
 
         class keysource:
             @staticmethod
@@ -2268,10 +2268,10 @@ class TestTxScript(unittest.TestCase):
                 self.f = f
                 self.net = net
 
-        addrPKH = crypto.newAddressPubKeyHash
-        addrSH = crypto.newAddressScriptHash
-        addrSHH = crypto.newAddressScriptHashFromHash
-        addrPK = crypto.AddressSecpPubKey
+        addrPKH = dcraddr.newAddressPubKeyHash
+        addrSH = dcraddr.newAddressScriptHash
+        addrSHH = dcraddr.newAddressScriptHashFromHash
+        addrPK = dcraddr.AddressSecpPubKey
 
         tests = []
         # Positive P2PKH tests.
@@ -2607,15 +2607,15 @@ class TestTxScript(unittest.TestCase):
                 self.assertEqual(test.encoded, encoded)
 
                 # Perform type-specific calculations.
-                if isinstance(decoded, crypto.AddressPubKeyHash):
+                if isinstance(decoded, dcraddr.AddressPubKeyHash):
                     d = ByteArray(b58decode(encoded))
                     saddr = d[2 : 2 + crypto.RIPEMD160_SIZE]
 
-                elif isinstance(decoded, crypto.AddressScriptHash):
+                elif isinstance(decoded, dcraddr.AddressScriptHash):
                     d = ByteArray(b58decode(encoded))
                     saddr = d[2 : 2 + crypto.RIPEMD160_SIZE]
 
-                elif isinstance(decoded, crypto.AddressSecpPubKey):
+                elif isinstance(decoded, dcraddr.AddressSecpPubKey):
                     # Ignore the error here since the script
                     # address is checked below.
                     try:
@@ -2623,13 +2623,13 @@ class TestTxScript(unittest.TestCase):
                     except ValueError:
                         saddr = test.saddr
 
-                elif isinstance(decoded, crypto.AddressEdwardsPubKey):
+                elif isinstance(decoded, dcraddr.AddressEdwardsPubKey):
                     # Ignore the error here since the script
                     # address is checked below.
                     # saddr = ByteArray(decoded.String())
                     self.fail("Edwards sigs unsupported")
 
-                elif isinstance(decoded, crypto.AddressSecSchnorrPubKey):
+                elif isinstance(decoded, dcraddr.AddressSecSchnorrPubKey):
                     # Ignore the error here since the script
                     # address is checked below.
                     # saddr = ByteArray(decoded.String())
@@ -2639,10 +2639,10 @@ class TestTxScript(unittest.TestCase):
                 # P2SH addresses.
                 self.assertEqual(saddr, decoded.scriptAddress(), test.name)
 
-                if isinstance(decoded, crypto.AddressPubKeyHash):
+                if isinstance(decoded, dcraddr.AddressPubKeyHash):
                     self.assertEqual(decoded.pkHash, saddr)
 
-                if isinstance(decoded, crypto.AddressScriptHash):
+                if isinstance(decoded, dcraddr.AddressScriptHash):
                     self.assertEqual(decoded.hash160(), saddr)
 
             if not test.valid:
@@ -2674,7 +2674,7 @@ class TestTxScript(unittest.TestCase):
         scriptVersion = 0
 
         def pkAddr(b):
-            addr = crypto.AddressSecpPubKey(b, mainnet)
+            addr = dcraddr.AddressSecpPubKey(b, mainnet)
             # force the format to compressed, as per golang tests.
             addr.pubkeyFormat = crypto.PKFCompressed
             return addr
@@ -2682,7 +2682,7 @@ class TestTxScript(unittest.TestCase):
         """
         name (str): Short description of the test.
         script (ByteArray): The script to test.
-        addrs (list(crypto.AddressSecpPubKey)): Expected returned addresses.
+        addrs (list(dcraddr.AddressSecpPubKey)): Expected returned addresses.
         reqSigs (int): Expected returned required signatures.
         scriptClass (int): expected returned signature class.
         exception (Exception): The expected exception if present.
@@ -2756,7 +2756,7 @@ class TestTxScript(unittest.TestCase):
                 name="standard p2pkh",
                 script=ByteArray("76a914ad06dd6ddee55cbca9a9e3713bd7587509a3056488ac"),
                 addrs=[
-                    crypto.newAddressPubKeyHash(
+                    dcraddr.newAddressPubKeyHash(
                         ByteArray("ad06dd6ddee55cbca9a9e3713bd7587509a30564"),
                         mainnet,
                         crypto.STEcdsaSecp256k1,
@@ -2769,7 +2769,7 @@ class TestTxScript(unittest.TestCase):
                 name="standard p2sh",
                 script=ByteArray("a91463bcc565f9e68ee0189dd5cc67f1b0e5f02f45cb87"),
                 addrs=[
-                    crypto.newAddressScriptHashFromHash(
+                    dcraddr.newAddressScriptHashFromHash(
                         ByteArray("63bcc565f9e68ee0189dd5cc67f1b0e5f02f45cb"), mainnet
                     )
                 ],
@@ -2971,7 +2971,7 @@ class TestTxScript(unittest.TestCase):
         the correct scripts for the various types of addresses.
         """
         # 1MirQ9bwyQcGVJPwKUgapu5ouK2E2Ey4gX
-        p2pkhMain = crypto.newAddressPubKeyHash(
+        p2pkhMain = dcraddr.newAddressPubKeyHash(
             ByteArray("e34cce70c86373273efcc54ce7d2a491bb4a0e84"),
             mainnet,
             crypto.STEcdsaSecp256k1,
@@ -2979,24 +2979,24 @@ class TestTxScript(unittest.TestCase):
 
         # Taken from transaction:
         # b0539a45de13b3e0403909b8bd1a555b8cbe45fd4e3f3fda76f3a5f52835c29d
-        p2shMain = crypto.newAddressScriptHashFromHash(
+        p2shMain = dcraddr.newAddressScriptHashFromHash(
             ByteArray("e8c300c87986efa84c37c0519929019ef86eb5b4"), mainnet
         )
 
         # # disabled until Schnorr signatures implemented
         # # mainnet p2pk 13CG6SJ3yHUXo4Cr2RY4THLLJrNFuG3gUg
-        # p2pkCompressedMain = crypto.newAddressPubKey(ByteArray(
+        # p2pkCompressedMain = dcraddr.newAddressPubKey(ByteArray(
         #     "02192d74d0cb94344c9569c2e77901573d8d7903c3ebec3a957724895dca52c6b4"),
         #     mainnet)
 
-        p2pkCompressed2Main = crypto.AddressSecpPubKey(
+        p2pkCompressed2Main = dcraddr.AddressSecpPubKey(
             ByteArray(
                 "03b0bd634234abbb1ba1e986e884185c61cf43e001f9137f23c2c409273eb16e65"
             ),
             mainnet,
         )
 
-        p2pkUncompressedMain = crypto.AddressSecpPubKey(
+        p2pkUncompressedMain = dcraddr.AddressSecpPubKey(
             ByteArray(
                 "0411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5"
                 "cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3"
@@ -3007,7 +3007,7 @@ class TestTxScript(unittest.TestCase):
         # dcrd/tscript/standard_test.go
         p2pkUncompressedMain.pubkeyFormat = crypto.PKFCompressed
 
-        class BogusAddress(crypto.AddressPubKeyHash):
+        class BogusAddress(dcraddr.AddressPubKeyHash):
             pass
 
         bogusAddress = (
@@ -3537,16 +3537,16 @@ def test_merge_scripts():
     privKey1 = root.child(0).privateKey().key
     privKey2 = root.child(1).privateKey().key
     privKey3 = root.child(2).privateKey().key
-    pub1 = crypto.AddressSecpPubKey(
+    pub1 = dcraddr.AddressSecpPubKey(
         root.child(0).publicKey().serializeCompressed(), testnet
     )
-    pub2 = crypto.AddressSecpPubKey(
+    pub2 = dcraddr.AddressSecpPubKey(
         root.child(1).publicKey().serializeCompressed(), testnet
     )
-    pub3 = crypto.AddressSecpPubKey(
+    pub3 = dcraddr.AddressSecpPubKey(
         root.child(2).publicKey().serializeCompressed(), testnet
     )
-    pub4 = crypto.AddressSecpPubKey(
+    pub4 = dcraddr.AddressSecpPubKey(
         root.child(3).publicKey().serializeCompressed(), testnet
     )
     # P2PKH is a valid pay to public key hash script.

@@ -14,6 +14,7 @@ from urllib.parse import urlencode, urljoin, urlsplit, urlunsplit
 
 from decred import DecredError
 from decred.crypto import crypto
+from decred.dcr import dcraddr
 from decred.util import database, tinyhttp, ws
 from decred.util.encode import ByteArray
 from decred.util.helpers import formatTraceback, getLogger
@@ -1202,10 +1203,10 @@ class DcrdataBlockchain:
         votingAddress = txscript.decodeAddress(req.votingAddress, self.netParams)
 
         # The stake submission pkScript is tagged by an OP_SSTX.
-        if isinstance(votingAddress, crypto.AddressScriptHash):
+        if isinstance(votingAddress, dcraddr.AddressScriptHash):
             stakeSubmissionPkScriptSize = txscript.P2SHPkScriptSize + 1
         elif (
-            isinstance(votingAddress, crypto.AddressPubKeyHash)
+            isinstance(votingAddress, dcraddr.AddressPubKeyHash)
             and votingAddress.sigType == crypto.STEcdsaSecp256k1
         ):
             stakeSubmissionPkScriptSize = txscript.P2PKHPkScriptSize + 1

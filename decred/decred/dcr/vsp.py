@@ -10,7 +10,7 @@ import time
 from urllib.parse import urlsplit, urlunsplit
 
 from decred import DecredError
-from decred.crypto import crypto
+from decred.dcr import dcraddr
 from decred.util import encode, tinyhttp
 from decred.util.encode import ByteArray, unblobCheck
 
@@ -269,7 +269,7 @@ class VotingServiceProvider:
         """
         pi = self.purchaseInfo
         redeemScript = pi.script
-        scriptAddr = crypto.newAddressScriptHash(redeemScript, self.netParams)
+        scriptAddr = dcraddr.newAddressScriptHash(redeemScript, self.netParams)
         if scriptAddr.string() != pi.ticketAddress:
             raise DecredError(
                 "ticket address mismatch. %s != %s"

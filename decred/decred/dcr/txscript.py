@@ -11,6 +11,7 @@ import math
 from decred import DecredError
 from decred.crypto import crypto, opcode
 from decred.crypto.secp256k1.curve import curve as Curve
+from decred.dcr import dcraddr
 from decred.util import helpers
 from decred.util.encode import ByteArray
 
@@ -1698,7 +1699,7 @@ def payToAddrScript(addr):
     PayToAddrScript creates a new script to pay a transaction output to a the
     specified address.
     """
-    if isinstance(addr, crypto.AddressPubKeyHash):
+    if isinstance(addr, dcraddr.AddressPubKeyHash):
         if addr.sigType == crypto.STEcdsaSecp256k1:
             return payToPubKeyHashScript(addr.scriptAddress())
         elif addr.sigType == crypto.STEd25519:
@@ -1709,17 +1710,17 @@ def payToAddrScript(addr):
             raise NotImplementedError("Schnorr signatures not implemented")
         raise NotImplementedError("unknown signature type %d" % addr.sigType)
 
-    elif isinstance(addr, crypto.AddressScriptHash):
+    elif isinstance(addr, dcraddr.AddressScriptHash):
         return payToScriptHashScript(addr.scriptAddress())
 
-    elif isinstance(addr, crypto.AddressSecpPubKey):
+    elif isinstance(addr, dcraddr.AddressSecpPubKey):
         return payToPubKeyScript(addr.scriptAddress())
 
-    elif isinstance(addr, crypto.AddressEdwardsPubKey):
+    elif isinstance(addr, dcraddr.AddressEdwardsPubKey):
         # return payToEdwardsPubKeyScript(addr.ScriptAddress())
         raise NotImplementedError("Edwards signatures not implemented")
 
-    elif isinstance(addr, crypto.AddressSecSchnorrPubKey):
+    elif isinstance(addr, dcraddr.AddressSecSchnorrPubKey):
         # return payToSchnorrPubKeyScript(addr.ScriptAddress())
         raise NotImplementedError("Schnorr signatures not implemented")
 
@@ -1812,13 +1813,13 @@ def payToSStx(addr):
     # Only pay to pubkey hash and pay to script hash are
     # supported.
     scriptType = PubKeyHashTy
-    if isinstance(addr, crypto.AddressPubKeyHash):
+    if isinstance(addr, dcraddr.AddressPubKeyHash):
         if addr.sigType != crypto.STEcdsaSecp256k1:
             raise NotImplementedError(
                 "unable to generate payment script for "
                 "unsupported digital signature algorithm"
             )
-    elif isinstance(addr, crypto.AddressScriptHash):
+    elif isinstance(addr, dcraddr.AddressScriptHash):
         scriptType = ScriptHashTy
     else:
         raise NotImplementedError(
@@ -1883,13 +1884,13 @@ def generateSStxAddrPush(addr, amount, limits):
     # Only pay to pubkey hash and pay to script hash are
     # supported.
     scriptType = PubKeyHashTy
-    if isinstance(addr, crypto.AddressPubKeyHash):
+    if isinstance(addr, dcraddr.AddressPubKeyHash):
         if addr.sigType != crypto.STEcdsaSecp256k1:
             raise NotImplementedError(
                 "unable to generate payment script for "
                 "unsupported digital signature algorithm"
             )
-    elif isinstance(addr, crypto.AddressScriptHash):
+    elif isinstance(addr, dcraddr.AddressScriptHash):
         scriptType = ScriptHashTy
     else:
         raise NotImplementedError(
@@ -1920,13 +1921,13 @@ def payToSStxChange(addr):
     # Only pay to pubkey hash and pay to script hash are
     # supported.
     scriptType = PubKeyHashTy
-    if isinstance(addr, crypto.AddressPubKeyHash):
+    if isinstance(addr, dcraddr.AddressPubKeyHash):
         if addr.sigType != crypto.STEcdsaSecp256k1:
             raise NotImplementedError(
                 "unable to generate payment script for "
                 "unsupported digital signature algorithm"
             )
-    elif isinstance(addr, crypto.AddressScriptHash):
+    elif isinstance(addr, dcraddr.AddressScriptHash):
         scriptType = ScriptHashTy
     else:
         raise NotImplementedError(
@@ -1949,9 +1950,9 @@ def decodeAddress(addr, netParams):
     decoded, netID = crypto.b58CheckDecode(addr)
 
     if netID == netParams.PubKeyAddrID:
-        return crypto.newAddressPubKey(decoded, netParams)
+        return dcraddr.newAddressPubKey(decoded, netParams)
     elif netID == netParams.PubKeyHashAddrID:
-        return crypto.newAddressPubKeyHash(decoded, netParams, crypto.STEcdsaSecp256k1)
+        return dcraddr.newAddressPubKeyHash(decoded, netParams, crypto.STEcdsaSecp256k1)
     elif netID == netParams.PKHEdwardsAddrID:
         # return NewAddressPubKeyHash(decoded, netParams, STEd25519)
         raise NotImplementedError("Edwards signatures not implemented")
@@ -1959,7 +1960,7 @@ def decodeAddress(addr, netParams):
         # return NewAddressPubKeyHash(decoded, netParams, STSchnorrSecp256k1)
         raise NotImplementedError("Schnorr signatures not implemented")
     elif netID == netParams.ScriptHashAddrID:
-        return crypto.newAddressScriptHashFromHash(decoded, netParams)
+        return dcraddr.newAddressScriptHashFromHash(decoded, netParams)
     raise NotImplementedError("unknown network ID %s" % netID)
 
 
@@ -2530,7 +2531,7 @@ def signP2PKHMsgTx(msgtx, prevOutputs, keysource, netParams):
         if len(addrs) != 1:
             continue
         apkh = addrs[0]
-        if not isinstance(apkh, crypto.AddressPubKeyHash):
+        if not isinstance(apkh, dcraddr.AddressPubKeyHash):
             raise DecredError("previous output address is not P2PKH")
 
         privKey = keysource.priv(apkh.string())
@@ -2638,7 +2639,7 @@ def pubKeyHashToAddrs(pkHash, netParams):
     passed hash to a pay-to-pubkey-hash address housed within an address
     list.  It is used to consolidate common code.
     """
-    return [crypto.newAddressPubKeyHash(pkHash, netParams, crypto.STEcdsaSecp256k1)]
+    return [dcraddr.newAddressPubKeyHash(pkHash, netParams, crypto.STEcdsaSecp256k1)]
 
 
 def scriptHashToAddrs(scriptHash, netParams):
@@ -2647,7 +2648,7 @@ def scriptHashToAddrs(scriptHash, netParams):
     hash to a pay-to-script-hash address housed within an address list.  It is
     used to consolidate common code.
     """
-    return [crypto.newAddressScriptHashFromHash(scriptHash, netParams)]
+    return [dcraddr.newAddressScriptHashFromHash(scriptHash, netParams)]
 
 
 def extractPkScriptAddrs(version, pkScript, netParams):
@@ -2677,14 +2678,14 @@ def extractPkScriptAddrs(version, pkScript, netParams):
     # Check for pay-to-alt-pubkey-hash script.
     data, sigType = extractPubKeyHashAltDetails(pkScript)
     if data:
-        addrs = [crypto.newAddressPubKeyHash(data, netParams, sigType)]
+        addrs = [dcraddr.newAddressPubKeyHash(data, netParams, sigType)]
         return PubkeyHashAltTy, addrs, 1
 
     # Check for pay-to-pubkey script.
     data = extractPubKey(pkScript)
     if data:
         pk = Curve.parsePubKey(data)
-        addrs = [crypto.AddressSecpPubKey(pk.serializeCompressed(), netParams)]
+        addrs = [dcraddr.AddressSecpPubKey(pk.serializeCompressed(), netParams)]
         return PubKeyTy, addrs, 1
 
     # Check for pay-to-alt-pubkey script.
@@ -2693,11 +2694,11 @@ def extractPkScriptAddrs(version, pkScript, netParams):
         raise NotImplementedError("only secp256k1 signatures are currently supported")
         # addrs = []
         # if sigType == dcrec.STEd25519:
-        #     addr = crypto.NewAddressEdwardsPubKey(pk, netParams)
+        #     addr = dcraddr.NewAddressEdwardsPubKey(pk, netParams)
         #     addrs.append(addr)
 
         # elif sigType == crypto.STSchnorrSecp256k1:
-        #     addr = crypto.NewAddressSecSchnorrPubKey(pk, netParams)
+        #     addr = dcraddr.NewAddressSecSchnorrPubKey(pk, netParams)
         #     addrs.append(addr)
 
         # return PubkeyAltTy, addrs, 1
@@ -2709,7 +2710,7 @@ def extractPkScriptAddrs(version, pkScript, netParams):
         addrs = []
         for encodedPK in details.pubKeys:
             pk = Curve.parsePubKey(encodedPK)
-            addrs.append(crypto.AddressSecpPubKey(pk.serializeCompressed(), netParams))
+            addrs.append(dcraddr.AddressSecpPubKey(pk.serializeCompressed(), netParams))
         return MultiSigTy, addrs, details.requiredSigs
 
     # Check for stake submission script.  Only stake-submission-tagged
@@ -3679,7 +3680,7 @@ def makeTicket(
 
     # Zero value P2PKH addr.
     zeroed = ByteArray(b"", length=20)
-    addrZeroed = crypto.newAddressPubKeyHash(zeroed, netParams, crypto.STEcdsaSecp256k1)
+    addrZeroed = dcraddr.newAddressPubKeyHash(zeroed, netParams, crypto.STEcdsaSecp256k1)
 
     # 2. Make an extra commitment to the pool.
     pkScript = generateSStxAddrPush(addrPool, amountsCommitted[0], limits)
