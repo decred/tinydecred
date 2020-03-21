@@ -8,7 +8,7 @@ accounts module
     mostly be through the AccountManager.
 """
 
-from decred import DecredError, unblob_check
+from decred import DecredError
 from decred.crypto import crypto
 from decred.util import chains, encode, helpers
 
@@ -97,7 +97,7 @@ class AccountManager:
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        unblob_check("AccountManager", ver, len(d), {0: 4})
+        encode.unblobCheck("AccountManager", ver, len(d), {0: 4})
 
         am = AccountManager(
             coinType=encode.intFromBytes(d[0]),

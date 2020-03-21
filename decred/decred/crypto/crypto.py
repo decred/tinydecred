@@ -13,9 +13,9 @@ from base58 import b58decode, b58encode
 from blake256.blake256 import blake_hash
 import nacl.secret
 
-from decred import DecredError, unblob_check
+from decred import DecredError
 from decred.util import encode
-from decred.util.encode import ByteArray
+from decred.util.encode import ByteArray, unblobCheck
 
 from . import rando
 from .secp256k1.curve import PrivateKey, PublicKey, curve as Curve
@@ -1107,7 +1107,7 @@ class KDFParams:
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        unblob_check("KDFParams", ver, len(d), {0: 5})
+        unblobCheck("KDFParams", ver, len(d), {0: 5})
 
         params = KDFParams(salt=ByteArray(d[2]), digest=ByteArray(d[3]))
 

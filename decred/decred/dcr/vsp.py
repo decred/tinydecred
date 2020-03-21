@@ -9,10 +9,10 @@ DcrdataClient.endpointList() for available endpoints.
 import time
 from urllib.parse import urlsplit, urlunsplit
 
-from decred import DecredError, unblob_check
+from decred import DecredError
 from decred.crypto import crypto
 from decred.util import encode, tinyhttp
-from decred.util.encode import ByteArray
+from decred.util.encode import ByteArray, unblobCheck
 
 from . import constants, nets, txscript
 
@@ -103,7 +103,7 @@ class PurchaseInfo:
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        unblob_check("PurchaseInfo", ver, len(d), {0: 7})
+        unblobCheck("PurchaseInfo", ver, len(d), {0: 7})
 
         iFunc = encode.intFromBytes
 
@@ -199,7 +199,7 @@ class VotingServiceProvider:
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        unblob_check("VotingServiceProvider", ver, len(d), {0: 4})
+        unblobCheck("VotingServiceProvider", ver, len(d), {0: 4})
 
         piB = encode.extractNone(d[3])
         pi = PurchaseInfo.unblob(piB) if piB else None

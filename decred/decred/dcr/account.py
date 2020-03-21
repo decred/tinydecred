@@ -4,10 +4,10 @@ Copyright (c) 2020, the Decred developers
 See LICENSE for details
 """
 
-from decred import DecredError, unblob_check
+from decred import DecredError
 from decred.crypto import crypto, opcode
 from decred.util import encode, helpers
-from decred.util.encode import BuildyBytes, ByteArray
+from decred.util.encode import BuildyBytes, ByteArray, unblobCheck
 
 from . import nets, txscript
 from .vsp import VotingServiceProvider
@@ -162,7 +162,7 @@ class TinyBlock:
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        unblob_check("TinyBlock", ver, len(d), {0: 2})
+        unblobCheck("TinyBlock", ver, len(d), {0: 2})
         return TinyBlock(d[0], encode.intFromBytes(d[1]))
 
     def serialize(self):
@@ -296,7 +296,7 @@ class TicketInfo:
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        unblob_check("TicketInfo", ver, len(d), {0: 7, 1: 11})
+        unblobCheck("TicketInfo", ver, len(d), {0: 7, 1: 11})
 
         iFunc = encode.intFromBytes
         f = encode.extractNone
@@ -478,7 +478,7 @@ class UTXO:
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        unblob_check("UTXO", ver, len(d), {0: 9})
+        unblobCheck("UTXO", ver, len(d), {0: 9})
 
         iFunc = encode.intFromBytes
         f = encode.extractNone
@@ -746,7 +746,7 @@ class Balance:
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, pushes = encode.decodeBlob(b)
-        unblob_check("Balance", ver, len(pushes), {0: 3})
+        unblobCheck("Balance", ver, len(pushes), {0: 3})
         i = encode.intFromBytes
         return Balance(i(pushes[0]), i(pushes[1]), i(pushes[2]))
 
@@ -861,7 +861,7 @@ class Account:
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        unblob_check("Account", ver, len(d), {0: 8})
+        unblobCheck("Account", ver, len(d), {0: 8})
 
         iFunc = encode.intFromBytes
 
