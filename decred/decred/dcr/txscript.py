@@ -1918,6 +1918,12 @@ def payToSStxChange(addr):
     payToSStxChange creates a new script to pay a transaction output to a
     public key hash, but tags the output with OP_SSTXCHANGE. For use in constructing
     valid SStxs.
+
+    Args:
+        addr (object): An address. crypto.AddressPubKeyHash or crypto.AddressScriptHash.
+
+    Returns:
+        ByteArray: The PayToSStxChange script.
     """
     # Only pay to pubkey hash and pay to script hash are
     # supported.
