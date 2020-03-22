@@ -4,6 +4,7 @@ Copyright (c) 2019-2020, The Decred developers
 See LICENSE for details
 """
 
+from decred import DecredError
 from decred.crypto import crypto, mnemonic, rando
 from decred.util import chains, encode, helpers
 from decred.util.database import KeyValueDatabase
@@ -94,7 +95,7 @@ class Wallet:
             Wallet: An initialized wallet with a single Decred account.
         """
         if len(password) == 0:
-            raise AssertionError("empty password not allowed")
+            raise DecredError("empty password not allowed")
         seed = rando.newKeyRaw()
         wallet = Wallet(path)
         wallet.initialize(seed, password.encode(), netParams)
@@ -140,7 +141,7 @@ class Wallet:
         pwKey = crypto.SecretKey.rekey(password.encode(), self.keyParams)
         checkPhrase = pwKey.decrypt(self.masterDB[DBKeys.checkKey])
         if checkPhrase != CHECKPHRASE:
-            raise AssertionError("wrong password")
+            raise DecredError("wrong password")
         return pwKey.decrypt(self.masterDB[DBKeys.cryptoKey])
 
     def accountManager(self, coinType, signals):

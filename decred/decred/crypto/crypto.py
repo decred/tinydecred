@@ -15,7 +15,7 @@ import nacl.secret
 
 from decred import DecredError
 from decred.util import encode
-from decred.util.encode import ByteArray
+from decred.util.encode import ByteArray, unblobCheck
 
 from . import rando
 from .secp256k1.curve import PrivateKey, PublicKey, curve as Curve
@@ -1107,10 +1107,7 @@ class KDFParams:
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        if ver != 0:
-            raise AssertionError("invalid version %d" % ver)
-        if len(d) != 5:
-            raise AssertionError("wrong push count. expected 5, got %d" % len(d))
+        unblobCheck("KDFParams", ver, len(d), {0: 5})
 
         params = KDFParams(salt=ByteArray(d[2]), digest=ByteArray(d[3]))
 
@@ -1235,7 +1232,7 @@ def encrypt(key, thing):
     encrypted = box.encrypt(bytes(thing))
 
     if len(encrypted) != len(thing) + box.NONCE_SIZE + box.MACBYTES:
-        raise AssertionError("wrong encrypted length %d" % len(encrypted))
+        raise DecredError("wrong encrypted length %d" % len(encrypted))
 
     return ByteArray(encrypted)
 

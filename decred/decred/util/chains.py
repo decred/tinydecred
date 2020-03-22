@@ -1,8 +1,9 @@
 """
-Copyright (c) 2019, The Decred developers
+Copyright (c) 2019-2020, The Decred developers
 See LICENSE for details
 """
 
+from decred import DecredError
 from decred.dcr import account as dcracct, nets as dcrnets
 
 
@@ -62,10 +63,10 @@ def parseCoinType(coinType):
     if isinstance(coinType, str):
         ticker = coinType.lower()
         if ticker not in SymbolIDs:
-            raise AssertionError("ticker symbol %d not found" % ticker)
+            raise DecredError("ticker symbol %d not found" % ticker)
         coinType = SymbolIDs[ticker]
     if not isinstance(coinType, int):
-        raise AssertionError("unsupported type for coinType %s" % type(coinType))
+        raise DecredError("unsupported type for coinType %s" % type(coinType))
     return coinType
 
 

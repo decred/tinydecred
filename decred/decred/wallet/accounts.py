@@ -7,6 +7,7 @@ accounts module
     Mostly account handling, interaction with this package's functions will
     mostly be through the AccountManager.
 """
+
 from decred import DecredError
 from decred.crypto import crypto
 from decred.util import chains, encode, helpers
@@ -96,10 +97,7 @@ class AccountManager:
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        if ver != 0:
-            raise NotImplementedError("unsupported AccountManager version %d" % ver)
-        if len(d) != 4:
-            raise DecredError("expected 4 pushes for AccountManager, got %d" % len(d))
+        encode.unblobCheck("AccountManager", ver, len(d), {0: 4})
 
         am = AccountManager(
             coinType=encode.intFromBytes(d[0]),
@@ -221,7 +219,7 @@ class AccountManager:
 
         sortedAccts = sorted(self.accounts.items(), key=lambda pair: pair[0])
         if len(sortedAccts) != sortedAccts[-1][0] + 1:
-            raise AssertionError(
+            raise DecredError(
                 "account index mismatch. expected last index {} got {}".format(
                     len(sortedAccts) - 1, sortedAccts[-1][0]
                 )

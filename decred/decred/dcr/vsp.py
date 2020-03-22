@@ -12,7 +12,7 @@ from urllib.parse import urlsplit, urlunsplit
 from decred import DecredError
 from decred.crypto import crypto
 from decred.util import encode, tinyhttp
-from decred.util.encode import ByteArray
+from decred.util.encode import ByteArray, unblobCheck
 
 from . import constants, nets, txscript
 
@@ -103,12 +103,7 @@ class PurchaseInfo:
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        if ver != 0:
-            raise AssertionError("invalid PurchaseInfo version %d" % ver)
-        if len(d) != 7:
-            raise AssertionError(
-                "wrong number of pushes for PurchaseInfo. expected 7, got %d" % len(d)
-            )
+        unblobCheck("PurchaseInfo", ver, len(d), {0: 7})
 
         iFunc = encode.intFromBytes
 
@@ -204,13 +199,7 @@ class VotingServiceProvider:
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        if ver != 0:
-            raise AssertionError("invalid version for VotingServiceProvider %d" % ver)
-        if len(d) != 4:
-            raise AssertionError(
-                "wrong number of pushes for VotingServiceProvider. wanted 4, got %d"
-                % len(d)
-            )
+        unblobCheck("VotingServiceProvider", ver, len(d), {0: 4})
 
         piB = encode.extractNone(d[3])
         pi = PurchaseInfo.unblob(piB) if piB else None

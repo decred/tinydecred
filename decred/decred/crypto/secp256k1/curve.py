@@ -1,6 +1,6 @@
 """
 Copyright (c) 2019, Brian Stafford
-Copyright (c) 2019, The Decred developers
+Copyright (c) 2019-2020, The Decred developers
 See LICENSE for details
 
 module curve
@@ -111,7 +111,7 @@ class PublicKey:
         b = ByteArray(fmt)
         b += ByteArray(self.x, length=COORDINATE_LEN)
         if len(b) != PUBKEY_COMPRESSED_LEN:
-            raise AssertionError("invalid compressed pubkey length %d", len(b))
+            raise DecredError("invalid compressed pubkey length %d", len(b))
         return b
 
     def serializeUncompressed(self):

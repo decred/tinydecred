@@ -74,13 +74,13 @@ def test_purchase_info_blobbing():
     # bad version
     bCopy = encode.ByteArray(b, copy=True)
     bCopy[0] = 255
-    with pytest.raises(AssertionError):
+    with pytest.raises(NotImplementedError):
         vsp.PurchaseInfo.unblob(bCopy.bytes())
 
     # too long
     bCopy = encode.ByteArray(b, copy=True)
     bCopy += b"\x00"
-    with pytest.raises(AssertionError):
+    with pytest.raises(DecredError):
         vsp.PurchaseInfo.unblob(bCopy.bytes())
 
 
@@ -180,13 +180,13 @@ def test_vsp_blobbing():
     # bad version
     bCopy = encode.ByteArray(b, copy=True)
     bCopy[0] = 255
-    with pytest.raises(AssertionError):
+    with pytest.raises(NotImplementedError):
         vsp.VotingServiceProvider.unblob(bCopy.bytes())
 
     # too long
     bCopy = encode.ByteArray(b, copy=True)
     bCopy += b"\x00"
-    with pytest.raises(AssertionError):
+    with pytest.raises(DecredError):
         vsp.VotingServiceProvider.unblob(bCopy.bytes())
 
 

@@ -68,18 +68,6 @@ def newCoinbaseTx():
     return tx
 
 
-def test_unblob_check():
-    data = {0: 1}
-    # Unsupported version.
-    with pytest.raises(NotImplementedError):
-        account.unblob_check("test", 1, 0, data)
-    # Unexpected pushes.
-    with pytest.raises(DecredError):
-        account.unblob_check("test", 0, 2, data)
-    # No errors.
-    assert account.unblob_check("test", 0, 1, data) is None
-
-
 def test_TinyBlock(prepareLogger):
     blockHash = rando.newHashRaw()
     height = 55
