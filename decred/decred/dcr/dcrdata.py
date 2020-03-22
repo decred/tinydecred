@@ -435,6 +435,42 @@ class DcrdataBlockchain:
         self.dcrdata = DcrdataClient(self.datapath, emitter=self.pubsubSignal)
         self.updateTip()
 
+    def changeServer(self, url):
+        """
+        Attempt to change the current DcrdataClient to the provided URL. The
+        client is only changed when all of the following are true.
+
+            1. The connection is successfully created.
+            2. Block and address subscribers are resubscribed.
+            3. The tip is successfully updated.
+
+        If a failure is encountered at any step, the old client is kept.
+
+        Args:
+            url (str): The new dcrdata URL.
+        """
+        oldClient = self.dcrdata
+        self.dcrdata = DcrdataClient(url, emitter=self.pubsubSignal)
+        try:
+            if self.blockSubscribers:
+                self.dcrdata.subscribeBlocks()
+            if self.addrSubscribers:
+                addrGroups = {}
+                for addr, receiver in self.addrSubscribers.items():
+                    rid = id(receiver)
+                    if rid not in addrGroups:
+                        addrGroups[rid] = dict(receiver=receiver, addrs=[])
+                    addrGroups[rid]["addrs"].append(addr)
+                for group in addrGroups.values():
+                    self.subscribeAddresses(group["addrs"], group["receiver"])
+                self.updateTip()
+            self.datapath = url
+            oldClient.close()
+
+        except Exception as e:
+            self.dcrdata = oldClient
+            raise e
+
     def close(self):
         """
         close any underlying connections.
@@ -453,7 +489,8 @@ class DcrdataBlockchain:
                 notifications.
         """
         self.blockSubscribers.append(receiver)
-        self.dcrdata.subscribeBlocks()
+        if len(self.blockSubscribers) == 1:
+            self.dcrdata.subscribeBlocks()
 
     def getAgendasInfo(self):
         """

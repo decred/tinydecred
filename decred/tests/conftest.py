@@ -40,5 +40,4 @@ def randBytes():
 
 @pytest.fixture(scope="module")
 def prepareLogger(request):
-    logger_id = getattr(request.module, "LOGGER_ID")
-    helpers.prepareLogger(logger_id)
+    helpers.prepareLogging()

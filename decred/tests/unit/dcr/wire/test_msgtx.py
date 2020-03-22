@@ -13,9 +13,6 @@ from decred.dcr.wire import msgtx, wire
 from decred.util.encode import ByteArray
 
 
-LOGGER_ID = "TestMsgTx"
-
-
 # fmt: off
 
 def multiTxPrefix():

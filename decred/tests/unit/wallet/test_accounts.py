@@ -12,9 +12,6 @@ from decred.util import chains, database, encode
 from decred.wallet import accounts
 
 
-LOGGER_ID = "test_accounts"
-
-
 testSeed = encode.ByteArray(
     "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 ).b

@@ -118,26 +118,6 @@ def mktime(year, month=None, day=None):
     return calendar.timegm(time.strptime(str(year), "%Y"))
 
 
-def recursiveUpdate(target, source):
-    """
-    Recursively update the target dictionary with the source dictionary, leaving
-    unfound keys in place. This is different than dict.update, which removes
-    target keys not in the source.
-
-    :param dict target: The dictionary to be updated
-    :param dict source: The dictionary to be integrated
-    :return: target dict is returned as a convenience. This function updates the
-        target dict in place.
-    :rtype: dict
-    """
-    for k, v in source.items():
-        if isinstance(v, dict):
-            target[k] = recursiveUpdate(target.get(k, {}), v)
-        else:
-            target[k] = v
-    return target
-
-
 class Benchmarker:
     """
     A class for basic execution timing.
@@ -236,14 +216,43 @@ def formatNumber(number, billions="B", spacer=" ", isMoney=False):
     return ("%.2e%s" % (flt, spacer)).replace("e-0", "e-")
 
 
-rootLogger = logging.getLogger("")
-rootLogger.setLevel(logging.NOTSET)
+class LogSettings:
+    """Used to track a few logging-related settings"""
+
+    root = logging.getLogger("")
+    defaultLevel = logging.INFO
+    moduleLevels = {}
+    loggers = {}
 
 
-def prepareLogger(name, filepath=None, logLvl=logging.INFO):
+LogSettings.root.setLevel(logging.NOTSET)
+
+
+def prepareLogging(filepath=None, logLvl=logging.INFO, lvlMap=None):
     """
-    Set logger settings appropriately
+    Prepare for using getLogger. Logs to stdout. If filepath is provided, log
+    outputs will be saved to a rotating log file at the specified location. Any
+    loggers, both future loggers and those already created, will have their
+    levels set according to the new logLvl and lvlMap.
+
+    Args:
+        filepath (str or pathlib.Path): optional. The base name for the rotating
+            log file.
+        logLvl (int): optional. default logging.INFO. The default logging level
+            used for all new loggers without entries in the lvlMap.
+        lvlMap: (dict): optional. If provided, the name->level mapping will be
+            added to the stored level dict, which is referenced when loggers are
+            created using getLogger.
     """
+    # Set log level for existing loggers.
+    LogSettings.defaultLevel = logLvl
+    LogSettings.moduleLevels.update(lvlMap if lvlMap else {})
+    for name, logger in LogSettings.loggers.items():
+        if name in LogSettings.moduleLevels:
+            logger.setLevel(LogSettings.moduleLevels[name])
+        else:
+            logger.setLevel(LogSettings.defaultLevel)
+
     log_formatter = logging.Formatter(
         "%(asctime)s %(module)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s"
     )
@@ -257,23 +266,25 @@ def prepareLogger(name, filepath=None, logLvl=logging.INFO):
             delay=0,
         )
         fileHandler.setFormatter(log_formatter)
-        # fileHandler.setLevel(logLvl)
-        rootLogger.addHandler(fileHandler)
-    if sys.executable and os.path.split(sys.executable)[1] == "pythonw.exe":
-        # disabling stdout printing for pythonw
-        pass
-    else:
-        # skip adding the stdout handler for pythonw in windows
+        LogSettings.root.addHandler(fileHandler)
+    if not sys.executable.endswith("pythonw.exe"):
+        # Skip adding the stdout handler for pythonw in windows.
         printHandler = logging.StreamHandler()
         printHandler.setFormatter(log_formatter)
-        # printHandler.setLevel(1)
-        rootLogger.addHandler(printHandler)
-    return getLogger(name, logLvl)
+        LogSettings.root.addHandler(printHandler)
 
 
-def getLogger(name, logLvl=logging.INFO):
-    l = rootLogger.getChild(name)
-    l.setLevel(logLvl)
+def getLogger(name):
+    """
+    Gets a named logger. If the name has a log level registered with
+    prepareLogger, that level will be used, otherwise the default is used.
+
+    Args:
+        name (str): The logger name.
+    """
+    l = LogSettings.root.getChild(name)
+    l.setLevel(LogSettings.moduleLevels.get(name, LogSettings.defaultLevel))
+    LogSettings.loggers[name] = l
     return l
 
 

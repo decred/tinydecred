@@ -14,7 +14,7 @@ from decred.util.encode import ByteArray
 class TestWire(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        helpers.prepareLogger("TestWire")
+        helpers.prepareLogging()
         # fmt: off
         cls.data = (
             (0xFC,               [0xFC]),

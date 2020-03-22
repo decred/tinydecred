@@ -24,6 +24,7 @@ from decred.dcr.dcrdata import (
 )
 from decred.dcr.nets import testnet
 from decred.dcr.wire import msgtx
+from decred.util import ws
 from decred.util.encode import ByteArray
 
 
@@ -131,7 +132,7 @@ def test_checkoutput():
 
 
 class MockWebSocketClient:
-    def __init__(self):
+    def __init__(self, *a, **k):
         self.sent = []
 
     def send(self, msg):
@@ -145,14 +146,14 @@ class MockWebSocketClient:
         pass
 
 
-def preload_api_list(http_get_post):
+def preload_api_list(http_get_post, baseURL=API_URL):
     # Load the list of API calls.
     data_file = Path(__file__).resolve().parent / "test-data" / "dcrdata.json"
     with open(data_file) as f:
         api_list = json.loads(f.read())
 
     # Queue the list of API calls.
-    http_get_post(f"{API_URL}/list", api_list)
+    http_get_post(f"{baseURL}/list", api_list)
 
 
 class TestDcrdataClient:
@@ -594,3 +595,16 @@ class TestDcrdataBlockchain:
         res["items"] = []
         http_get_post(f"{INSIGHT_URL}/addrs/{addr}/txs?from=0&to=1", res)
         assert not ddb.addrsHaveTxs([addr])
+
+    def test_changeServer(self, http_get_post, monkeypatch):
+        monkeypatch.setattr(ws, "Client", MockWebSocketClient)
+        preload_api_list(http_get_post)
+        http_get_post(f"{API_URL}/block/best", dict(height=1))
+        ddb = DcrdataBlockchain(":memory:", testnet, BASE_URL)
+        ddb.subscribeBlocks(lambda sig: True)
+        ddb.subscribeAddresses(["addr_1", "addr_2"], lambda a, tx: True)
+
+        preload_api_list(http_get_post, baseURL="thisurl/api")
+        http_get_post(f"thisurl/api/block/best", dict(height=1))
+        ddb.changeServer("thisurl")
+        assert ddb.dcrdata.baseURI == "thisurl"

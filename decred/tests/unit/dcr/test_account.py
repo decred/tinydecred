@@ -16,8 +16,6 @@ from decred.util.database import KeyValueDatabase
 from decred.util.encode import ByteArray
 
 
-LOGGER_ID = "test_account"
-
 ticketScript = ByteArray("baa914f5618dfc002becfe840da65f6a49457f41d4f21787")
 
 testSeed = ByteArray(

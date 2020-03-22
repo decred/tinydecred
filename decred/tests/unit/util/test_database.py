@@ -12,9 +12,6 @@ from decred.util import database
 from decred.util.encode import ByteArray
 
 
-LOGGER_ID = "TestDB"
-
-
 class TBlobber:
     def __init__(self, b):
         self.b = b
