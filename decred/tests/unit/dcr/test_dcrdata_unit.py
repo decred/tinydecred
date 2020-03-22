@@ -604,7 +604,7 @@ class TestDcrdataBlockchain:
         ddb.subscribeBlocks(lambda sig: True)
         ddb.subscribeAddresses(["addr_1", "addr_2"], lambda a, tx: True)
 
-        preload_api_list(http_get_post, baseURL="thisurl/api")
-        http_get_post(f"thisurl/api/block/best", dict(height=1))
-        ddb.changeServer("thisurl")
-        assert ddb.dcrdata.baseURI == "thisurl"
+        preload_api_list(http_get_post, baseURL="https://thisurl.org/api")
+        http_get_post(f"https://thisurl.org/api/block/best", dict(height=1))
+        ddb.changeServer("https://thisurl.org/")
+        assert ddb.dcrdata.baseURL == "https://thisurl.org/"
