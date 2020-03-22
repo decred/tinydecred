@@ -3398,7 +3398,7 @@ class WebsocketClient(Client):
         """Connect to the websocket server."""
 
         self.ws = ws.Client(
-            url=websocketURI(self.host),
+            url=websocketURI(self.url),
             header=[f"{k}: {v}" for k, v in self.headers.items()],
             on_message=self.on_message,
             on_close=self.on_close,
