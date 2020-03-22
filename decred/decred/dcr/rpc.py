@@ -4,16 +4,22 @@ See LICENSE for details
 """
 
 import base64
+import json
+import queue
 import ssl
 import types
+from urllib.parse import urlparse
 
-from decred.util import tinyhttp
+from decred.util import tinyhttp, ws
 from decred.util.encode import ByteArray
-from decred.util.helpers import coinify
+from decred.util.helpers import coinify, getLogger
 
 from . import agenda, txscript
 from .wire.msgblock import BlockHeader
 from .wire.msgtx import MsgTx, TxOut, TxTreeStake
+
+
+log = getLogger("RPC")
 
 
 def stringify(thing):
@@ -41,10 +47,64 @@ def stringify(thing):
     return thing
 
 
+class Response:
+    """Parses a JSON-RPC 2.0 response."""
+
+    def __init__(self, jsonRep):
+        """
+        Args:
+            jsonRep (str or dict): The raw result from the server.
+        """
+        msg = json.loads(jsonRep) if isinstance(jsonRep, str) else jsonRep
+        self.id = msg.get("id")
+        self.result = msg.get("result")
+        self.error = msg.get("error")
+
+
+class Request:
+    """A JSON-RPC 2.0 request."""
+
+    def __init__(self, reqID, method, params):
+        """
+        Args:
+            reqID (int): The request ID.
+            method (str): The JSON-RPC method.
+            params (list): JSON-serializable parameters.
+        """
+        self.id = reqID
+        self.method = method
+        self.params = params
+
+    def dict(self):
+        """
+        Dump the Request as a Python dictionary.
+
+        Returns:
+            dict: The Request encoded as a Python dictionary.
+        """
+        return {
+            "jsonrpc": "2.0",
+            "id": self.id,
+            "method": self.method,
+            "params": self.params,
+        }
+
+    def json(self):
+        """
+        Dump the request as a JSON-formatted string.
+
+        Returns:
+            str: The Request encoded as a JSON string.
+        """
+        return json.dumps(self.dict())
+
+
 class Client:
     """
     The Client communicates with the blockchain RPC API.
     """
+
+    nextRequestID = 0
 
     def __init__(self, host, user, pw, cert=None):
         """
@@ -61,26 +121,46 @@ class Client:
             "Authorization": "Basic " + (authString),
         }
         self.host = host
+        self.cert = cert
         self.sslContext = None
         if cert:
             self.sslContext = ssl.SSLContext()
             self.sslContext.load_verify_locations(cert)
 
+    def jsonRequest(self, method, params):
+        """
+        Create a Request with a unique ID.
+
+        Args:
+            method (str): The JSON-RPC method.
+            params (list): JSON-serializable parameters.
+
+        Returns:
+            Request: The request.
+        """
+        reqID = self.nextRequestID
+        self.nextRequestID = reqID + 1
+        return Request(reqID, method, params)
+
     def call(self, method, *params):
         """
-        Call the specified remote method with the a list of parameters.
+        Call the specified remote method with the specified list of parameters.
+
+        Args:
+            method (str): The JSON-RPC method.
+            params (list): JSON-serializable parameters.
+
+        Returns:
+            dict: The response's result.
         """
-        data = {"jsonrpc": "2.0", "id": 0, "method": method, "params": params}
-        res = tinyhttp.post(
-            self.host, data, headers=self.headers, context=self.sslContext
+        req = self.jsonRequest(method, params)
+        rawRes = tinyhttp.post(
+            self.host, req.dict(), headers=self.headers, context=self.sslContext
         )
-        if not isinstance(res, dict):
-            raise AssertionError(
-                "rpc.Client call result of unexpected type %s" % type(res)
-            )
-        if "error" in res and res["error"]:
-            raise Exception("%s error: %r" % (method, res["error"]))
-        return res["result"]
+        resp = Response(rawRes)
+        if resp.error:
+            raise Exception(f"{method} error: {resp.error}")
+        return resp.result
 
     def addNode(self, addr, subCmd):
         """
@@ -222,7 +302,7 @@ class Client:
             vOuts,
             amounts,
             *([locktime] if locktime else []),
-            *([expiry] if expiry and locktime else [])
+            *([expiry] if expiry and locktime else []),
         )
         return MsgTx.deserialize(ByteArray(res))
 
@@ -3286,3 +3366,85 @@ class VersionResult:
             prerelease=obj["prerelease"],
             buildMetadata=obj["buildmetadata"],
         )
+
+
+def websocketURI(host):
+    """
+    Parse the dcrd websocket URI from the HTTP URI.
+
+    Args:
+        host (str): The host.
+
+    Returns:
+        str: The websocket URI.
+    """
+    uri = urlparse(host)
+    prot = "wss" if uri.scheme in ("https", "wss") else "ws"
+    return f"{prot}://{uri.netloc}/ws"
+
+
+class WebsocketClient(Client):
+    """
+    A dcrd RPC client that communicates over websocket.
+    """
+
+    requestTimeout = 10  # seconds
+
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self.waiters = {}
+        self.connect()
+
+    def connect(self):
+        """Connect to the websocket server."""
+
+        self.ws = ws.Client(
+            url=websocketURI(self.host),
+            header=[f"{k}: {v}" for k, v in self.headers.items()],
+            on_message=self.on_message,
+            on_close=self.on_close,
+            on_error=self.on_error,
+            certPath=self.cert,
+        )
+
+    def close(self):
+        """Close the websocket connection."""
+        if self.ws:
+            self.ws.close()
+            self.ws = None
+
+    def call(self, method, *params):
+        """
+        Call the specified method with the list of parameters. Overloaded
+        Client method that routes through the ws.Client instead of http.
+        """
+        req = self.jsonRequest(method, params)
+        q = queue.Queue(1)
+        self.waiters[req.id] = q
+        self.ws.send(req.json())
+        resp = q.get(timeout=self.requestTimeout)
+        if resp.error:
+            raise Exception(f"{method} error: {resp.error}")
+        return resp.result
+
+    def on_message(self, msg):
+        """Called by ws.Client when a message is received."""
+        try:
+            resp = Response(msg)
+            q = self.waiters[resp.id]
+            if not q:
+                log.error(f"unknown message received from dcrd: {msg}")
+                return
+            del self.waiters[resp.id]
+            q.put(resp)
+
+        except Exception as e:
+            log.error(f"error processing websocket message: {e}")
+
+    def on_close(self, ws):
+        """Called by ws.Client when the websocket disconnects."""
+        log.debug("websocket closing")
+
+    def on_error(self, error):
+        """Called by ws.Client when an error is encountered."""
+        log.error(f"websocket error: {error}")

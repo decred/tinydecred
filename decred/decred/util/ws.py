@@ -14,7 +14,7 @@ class Client(websocket.WebSocketApp):
     related tasks.
     """
 
-    def __init__(self, url, *a, **k):
+    def __init__(self, url, *a, certPath=None, **k):
         """
         Args:
             url str: The websocket server URL.
@@ -61,7 +61,11 @@ class Client(websocket.WebSocketApp):
 
         super().__init__(cleanURL, on_open=on_open, on_close=on_close, *a, **k)
 
-        self.thread = threading.Thread(None, self.run_forever)
+        sslopt = {"ca_certs": certPath} if certPath else None
+
+        self.thread = threading.Thread(
+            None, self.run_forever, kwargs={"sslopt": sslopt}
+        )
         self.thread.start()
         initEvent.wait()
 
