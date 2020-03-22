@@ -1092,7 +1092,7 @@ class AssetSettingsScreen(Screen):
         """
 
         url = self.dcrdataField.text()
-        parsedURL = urlparse(url)
+        parsedURL = urlsplit(url)
         if not parsedURL.scheme or not parsedURL.netloc:
             app.appWindow.showError("invalid URL")
             return
