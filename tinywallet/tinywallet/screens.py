@@ -8,7 +8,7 @@ import os
 import random
 import threading
 import time
-from urllib.parse import urlparse
+from urllib.parse import urlsplit, urlunsplit
 
 from PyQt5 import QtCore, QtGui, QtSvg, QtWidgets
 
@@ -1092,7 +1092,7 @@ class AssetSettingsScreen(Screen):
         """
 
         url = self.dcrdataField.text()
-        parsedURL = urlparse(url)
+        parsedURL = urlsplit(url)
         if not parsedURL.scheme or not parsedURL.netloc:
             app.appWindow.showError("invalid URL")
             return
@@ -1772,10 +1772,9 @@ class LiveTicketsScreen(Screen):
         """
         Open clicked tickets in dcrdata in the user's browser.
         """
+        hostname = nets.normalizeName(cfg.netParams.Name)
         utxo = self.liveTickets[item.text()[:8]]
-        url = "https://{}.dcrdata.org/tx/{}".format(
-            nets.normalizeName(cfg.netParams.Name), utxo.txid
-        )
+        url = urlunsplit(("https", f"{hostname}.dcrdata.org", f"/{utxo.txid}", "", ""))
         helpers.openInBrowser(url)
 
     def addItems(self, liveTickets):
@@ -2201,12 +2200,13 @@ class PoolScreen(Screen):
         if not apiKey:
             err("empty API key")
             return
-        parsedURL = urlparse(url)
-        if not parsedURL.scheme or not parsedURL.netloc:
+        url = urlsplit(url)
+        if not url.scheme or not url.netloc:
             err("invalid URL")
             return
-        baseUrl = parsedURL.scheme + "://" + parsedURL.netloc
-        pool = VotingServiceProvider(baseUrl, apiKey, cfg.netParams.Name)
+        # Remove any path.
+        url = urlunsplit((url.scheme, url.netloc, "/", "", ""))
+        pool = VotingServiceProvider(url, apiKey, cfg.netParams.Name)
 
         def registerPool():
             try:
@@ -2241,7 +2241,7 @@ class PoolScreen(Screen):
     def poolClicked(self):
         """
         Callback from the clicked signal on the try-this-pool widget. Sets the
-        url in the QLineEdit.
+        URL in the QLineEdit.
         """
         self.poolIp.setText(self.poolUrl.text())
 

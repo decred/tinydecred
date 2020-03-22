@@ -6,6 +6,7 @@ See LICENSE for details
 from queue import Queue
 import threading
 import time
+from urllib.parse import urlunsplit
 
 import pytest
 import websocket
@@ -16,7 +17,7 @@ from decred.util import ws
 
 HOST = "localhost"
 PORT = 53791
-URL = f"http://{HOST}:{PORT}"
+URL = urlunsplit(("http", f"{HOST}:{PORT}", "/", "", ""))
 QUIT = "QUIT"
 HELLO = "HELLO"
 YO = "YO"

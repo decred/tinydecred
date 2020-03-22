@@ -7,6 +7,7 @@ DcrdataClient.endpointList() for available endpoints.
 """
 
 import time
+from urllib.parse import urlsplit, urlunsplit
 
 from decred import DecredError
 from decred.crypto import crypto
@@ -18,6 +19,8 @@ from . import constants, nets, txscript
 
 # The duration purchase info is good for.
 PURCHASE_INFO_LIFE = constants.HOUR
+
+API_URL = "https://api.decred.org/?c=gsd"
 
 
 def resultIsSuccess(res):
@@ -172,7 +175,9 @@ class VotingServiceProvider:
             purchaseInfo (PurchaseInfo): optional. The current purchaseInfo for
                 this vsp.
         """
-        self.url = url
+        url = urlsplit(url)
+        # Remove any path.
+        self.url = urlunsplit((url.scheme, url.netloc, "/", "", ""))
         # The network parameters are not JSON-serialized, so must be set during
         # a call to VotingServiceProvider.authorize before using the
         # VotingServiceProvider.
@@ -237,7 +242,7 @@ class VotingServiceProvider:
         Returns:
             list(object): The vsp list.
         """
-        vsps = tinyhttp.get("https://api.decred.org/?c=gsd")
+        vsps = tinyhttp.get(API_URL)
         network = nets.normalizeName(netParams.Name)
         return [vsp for vsp in vsps.values() if vsp["Network"] == network]
 
@@ -251,7 +256,8 @@ class VotingServiceProvider:
         Returns:
             string: The full URL.
         """
-        return "%s/api/v2/%s" % (self.url, command)
+        url = urlsplit(self.url)
+        return urlunsplit((url.scheme, url.netloc, f"/api/v2/{command}", "", ""))
 
     def headers(self):
         """
