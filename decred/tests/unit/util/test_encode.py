@@ -135,7 +135,7 @@ def test_extractPushes():
     assert extractPushes(ByteArray([0x01, 0x00])) == [ByteArray([0x00])]
 
 
-def test_unblob_check():
+def test_unblobCheck():
     data = {0: 1}
     # Unsupported version.
     with pytest.raises(NotImplementedError):
