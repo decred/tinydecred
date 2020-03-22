@@ -27,7 +27,6 @@ def test_vsp_live():
         nextVote = 1 | (1 << 2)
     else:
         nextVote = 1 | (1 << 1)
-    # print(f"changing vote from {purc_info.voteBits}to {nextVote}")
     the_vsp.setVoteBits(nextVote)
     purc_info = the_vsp.getPurchaseInfo()
     assert purc_info.voteBits == nextVote
