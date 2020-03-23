@@ -5,6 +5,8 @@ See LICENSE for details
 
 import unittest
 
+import pytest
+
 from decred import DecredError
 from decred.crypto import crypto, rando
 from decred.dcr.nets import mainnet
@@ -17,19 +19,6 @@ testSeed = ByteArray(
 
 
 class TestCrypto(unittest.TestCase):
-    def test_encryption(self):
-        """
-        Test encryption and decryption.
-        """
-        a = crypto.SecretKey("abc".encode())
-        aEnc = a.encrypt(
-            b"dprv3n8wmhMhC7p7QuzHn4fYgq2d87hQYAxWH3RJ6pYFrd7LAV71RcBQ"
-            b"WrFFmSG3yYWVKrJCbYTBGiniTvKcuuQmi1hA8duKaGM8paYRQNsD1P6"
-        )
-        b = crypto.SecretKey.rekey("abc".encode(), a.params())
-        aUnenc = b.decrypt(aEnc)
-        self.assertTrue(a, aUnenc)
-
     def test_addr_secp_pubkey(self):
         data = [
             (
@@ -120,25 +109,6 @@ class TestCrypto(unittest.TestCase):
             addr = crypto.newAddressScriptHashFromHash(ByteArray(scriptHash), mainnet)
             self.assertEqual(addr.string(), addrStr)
 
-    def test_kdf_params(self):
-        salt = rando.newHash()
-        auth = ByteArray(32)
-        kdf = crypto.KDFParams(salt, auth)
-        b = kdf.serialize()
-        reKDF = crypto.KDFParams.unblob(b.b)
-        self.assertEqual(kdf.kdfFunc, reKDF.kdfFunc)
-        self.assertEqual(kdf.hashName, reKDF.hashName)
-        self.assertEqual(kdf.salt, reKDF.salt)
-        self.assertEqual(kdf.auth, reKDF.auth)
-        self.assertEqual(kdf.iterations, reKDF.iterations)
-
-    def test_secret_key(self):
-        sk = crypto.SecretKey("pass".encode())
-        test = b"testphrase"
-        enc = sk.encrypt(test)
-        dec = sk.decrypt(enc)
-        self.assertEqual(test, dec)
-
     def test_extended_key(self):
         """
         Test extended key derivation.
@@ -207,3 +177,46 @@ class TestCrypto(unittest.TestCase):
         kpriv2 = crypto.ExtendedKey.new(testSeed)
         kpriv2.key.zero()
         self.assertRaises(DecredError, kpriv2.serialize)
+
+
+def test_kdf_params():
+    salt = rando.newHash()
+    auth = rando.newHash()
+    kdf = crypto.KDFParams(salt, auth)
+    b = kdf.serialize()
+    reKDF = crypto.KDFParams.unblob(b.b)
+    assert kdf.kdfFunc == reKDF.kdfFunc
+    assert kdf.hashName == reKDF.hashName
+    assert kdf.salt == reKDF.salt
+    assert kdf.auth == reKDF.auth
+    assert kdf.iterations == reKDF.iterations
+
+
+def test_encryption():
+    """
+    Test encryption and decryption.
+    """
+    pw = "abc".encode()
+    encryptionKey = crypto.SecretKey(pw)
+    msg = (
+        b"dprv3n8wmhMhC7p7QuzHn4fYgq2d87hQYAxWH3RJ6pYFrd7LAV71RcBQ"
+        b"WrFFmSG3yYWVKrJCbYTBGiniTvKcuuQmi1hA8duKaGM8paYRQNsD1P6"
+    )
+    msgEnc = encryptionKey.encrypt(msg)
+    reKey = crypto.SecretKey.rekey(pw, encryptionKey.params())
+    msgUnenc = reKey.decrypt(msgEnc)
+    assert msg == msgUnenc
+
+    with pytest.raises(DecredError):
+        crypto.SecretKey.rekey("badpw".encode(), encryptionKey.params())
+
+    kp = encryptionKey.params()
+    ogFunc = kp.kdfFunc
+    kp.kdfFunc = "some_other_func"
+    with pytest.raises(DecredError):
+        crypto.SecretKey.rekey(pw, kp)
+    kp.kdfFunc = ogFunc
+
+    kp.auth = ByteArray(length=32)
+    with pytest.raises(DecredError):
+        crypto.SecretKey.rekey(pw, kp)
