@@ -398,6 +398,7 @@ def decodeAddress(addr, netParams):
     network.
 
     Args:
+        addr (str): Base-58 encoded address.
         netParams (module): The network parameters.
     """
     # Switch on decoded length to determine the type.
@@ -439,7 +440,7 @@ def decodeAddressPubKey(decoded, netParams):
     if suite == STEcdsaSecp256k1:
         b = ByteArray(toAppend) + decoded[1:]
         return AddressSecpPubKey(b, netParams)
-        # return NewAddressEdwardsPubKey(decoded, netParams)
+    elif suite == STEd25519:  # nocover
         raise NotImplementedError("Edwards signatures not implemented")
     elif suite == STSchnorrSecp256k1:  # nocover
         raise NotImplementedError("Schnorr signatures not implemented")
