@@ -76,7 +76,7 @@ class CmdArgs:
         args, unknown = parser.parse_known_args()
         if unknown:
             sys.exit(f"unknown arguments:{unknown}")
-        self.netParams = None
+        self.netParams = nets.mainnet
         if args.simnet:
             self.netParams = nets.simnet
         elif args.testnet:
@@ -85,7 +85,6 @@ class CmdArgs:
             print("**********************************************************")
             print(" WARNING. WALLET FOR TESTING ONLY. NOT FOR USE ON MAINNET ")
             print("**********************************************************")
-            sys.exit(1)
         if args.loglevel:
             try:
                 if "," in args.loglevel or ":" in args.loglevel:
