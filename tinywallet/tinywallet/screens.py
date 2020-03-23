@@ -6,9 +6,11 @@ See LICENSE for detail
 
 import os
 import random
+import shutil
 import threading
 import time
 from urllib.parse import urlsplit, urlunsplit
+import webbrowser
 
 from PyQt5 import QtCore, QtGui, QtSvg, QtWidgets
 
@@ -37,6 +39,16 @@ FADE_IN_ANIMATION = "fadeinanimation"
 formatTraceback = helpers.formatTraceback
 
 app = None
+
+
+def openInBrowser(url):
+    """
+    Open url in the users browser
+
+    Args:
+        url (string): the url to open.
+    """
+    webbrowser.open(url, new=2)
 
 
 def sprintDcr(atoms, comma=""):
@@ -931,7 +943,7 @@ class InitializationScreen(Screen):
             return
 
         destination = app.walletFilename()
-        helpers.moveFile(walletPath, destination)
+        shutil.move(walletPath, destination)
         app.initialize()
 
     def restoreClicked(self):
@@ -1775,7 +1787,7 @@ class LiveTicketsScreen(Screen):
         hostname = nets.normalizeName(cfg.netParams.Name)
         utxo = self.liveTickets[item.text()[:8]]
         url = urlunsplit(("https", f"{hostname}.dcrdata.org", f"/{utxo.txid}", "", ""))
-        helpers.openInBrowser(url)
+        openInBrowser(url)
 
     def addItems(self, liveTickets):
         """
@@ -2229,14 +2241,14 @@ class PoolScreen(Screen):
         Connected to the "see all" button clicked signal. Open the fu
         decred.org VSP list in the browser.
         """
-        helpers.openInBrowser("https://decred.org/vsp/")
+        openInBrowser("https://decred.org/vsp/")
 
     def linkClicked(self):
         """
         Callback from the clicked signal on the pool URL QLabel. Opens the
         pool's homepage in the users browser.
         """
-        helpers.openInBrowser(self.poolUrl.text())
+        openInBrowser(self.poolUrl.text())
 
     def poolClicked(self):
         """

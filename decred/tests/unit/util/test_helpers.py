@@ -4,8 +4,36 @@ See LICENSE for details
 """
 
 import logging
+import os
 
+from decred import DecredError
 from decred.util import helpers
+
+
+def test_formatTraceback():
+    # Cannot actually raise an error because pytest intercepts it.
+    assert helpers.formatTraceback(DecredError("errmsg")) == "errmsg\nNone"
+
+
+def test_mkdir(tmp_path):
+    fpath = tmp_path / "test_file"
+    f = open(fpath, "w")
+    f.close()
+    assert not helpers.mkdir(fpath)
+    dpath = tmp_path / "test_dir"
+    assert helpers.mkdir(dpath)
+    assert os.path.isdir(dpath)
+    assert helpers.mkdir(dpath)
+
+
+def test_mktime():
+    assert helpers.mktime(1970) == 0
+    assert helpers.mktime(1970, month=None, day=1) == 0
+    assert helpers.mktime(1970, month=1) == 0
+    assert helpers.mktime(1970, month=1, day=1) == 0
+    assert helpers.mktime(1970, month=2) == 2678400
+    assert helpers.mktime(1970, month=2, day=1) == 2678400
+    assert helpers.mktime(1970, month=2, day=2) == 2764800
 
 
 def test_prepareLogging(tmp_path):

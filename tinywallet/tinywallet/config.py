@@ -9,6 +9,7 @@ Configuration settings for TinyDecred.
 import argparse
 import logging
 import os
+import sys
 
 from appdirs import AppDirs
 
@@ -67,7 +68,6 @@ class CmdArgs:
     def __init__(self):
         self.logLevel = logging.INFO
         self.moduleLevels = {}
-        self.netParams = nets.mainnet
         parser = argparse.ArgumentParser()
         parser.add_argument("--loglevel")
         netGroup = parser.add_mutually_exclusive_group()
@@ -75,7 +75,7 @@ class CmdArgs:
         netGroup.add_argument("--testnet", action="store_true", help="use testnet")
         args, unknown = parser.parse_known_args()
         if unknown:
-            exit(f"unknown arguments:{unknown}")
+            sys.exit(f"unknown arguments:{unknown}")
         self.netParams = None
         if args.simnet:
             self.netParams = nets.simnet
@@ -85,6 +85,7 @@ class CmdArgs:
             print("**********************************************************")
             print(" WARNING. WALLET FOR TESTING ONLY. NOT FOR USE ON MAINNET ")
             print("**********************************************************")
+            sys.exit(1)
         if args.loglevel:
             try:
                 if "," in args.loglevel or ":" in args.loglevel:
@@ -92,8 +93,8 @@ class CmdArgs:
                     self.moduleLevels = {k: logLvl(v) for k, v in pairs}
                 else:
                     self.logLevel = logLvl(args.loglevel)
-            except:
-                exit(f"malformed loglevel specifier: {args.loglevel}")
+            except Exception:
+                sys.exit(f"malformed loglevel specifier: {args.loglevel}")
 
 
 class DB:
