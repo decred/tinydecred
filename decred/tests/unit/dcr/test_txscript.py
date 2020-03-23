@@ -4176,7 +4176,7 @@ def test_bits_2_octets():
             want=parseShortForm("NULL_BYTES_5"),
         ),
         dict(
-            name="one less than the length of N",
+            name="same length as N",
             bits=ByteArray([*bytes((Curve.curve.N.bit_length() // 8) - 1), 0x01]),
             rolen=5,
             want=parseShortForm("NULL_BYTES_4 0x01"),

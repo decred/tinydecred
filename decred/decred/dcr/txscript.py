@@ -1974,6 +1974,7 @@ def int2octets(v, rolen):
     endian notation padded with zeros. Overflow is discarded.
 
     https://tools.ietf.org/html/rfc6979#section-2.3.3
+
     Args:
         v (int): Integer value to convert.
         rolen (int): Number of octects, or bytes, to return.
@@ -2003,6 +2004,7 @@ def bits2octets(bits, rolen):
     discarded.
 
     https://tools.ietf.org/html/rfc6979#section-2.3.4
+
     Args:
         bits (ByteArray): Bytes to convert.
         rolen (int): Number of digits to allow.
