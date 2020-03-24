@@ -1225,8 +1225,8 @@ class SecretKey:
         b = ByteArray(
             hashlib.pbkdf2_hmac(kp.hashName, bytes(pw), bytes(kp.salt), kp.iterations)
         )
-        # Get the authentication message and key and compare create the code
-        # to compare with the included key parameters.
+        # Get the authentication message and key create the MAC tag to compare
+        # with the included key parameters.
         authKey = b[32:].bytes()
         authMsg = kp.baseParams().bytes()
         auth = hashlib.blake2b(authMsg, digest_size=32, key=authKey).digest()
