@@ -14,6 +14,7 @@ from urllib.parse import urlencode, urljoin, urlsplit, urlunsplit
 
 from decred import DecredError
 from decred.crypto import crypto
+from decred.dcr import addrlib
 from decred.util import database, tinyhttp, ws
 from decred.util.encode import ByteArray
 from decred.util.helpers import formatTraceback, getLogger
@@ -1190,7 +1191,7 @@ class DcrdataBlockchain:
         if not req.poolAddress:
             raise DecredError("no pool address specified. solo voting not supported")
 
-        poolAddress = txscript.decodeAddress(req.poolAddress, self.netParams)
+        poolAddress = addrlib.decodeAddress(req.poolAddress, self.netParams)
 
         # Check the passed address from the request.
         if not req.votingAddress:
@@ -1199,13 +1200,13 @@ class DcrdataBlockchain:
         # decode the string addresses. This is the P2SH multi-sig script
         # address, not the wallets voting address, which is only one of the two
         # pubkeys included in the redeem P2SH script.
-        votingAddress = txscript.decodeAddress(req.votingAddress, self.netParams)
+        votingAddress = addrlib.decodeAddress(req.votingAddress, self.netParams)
 
         # The stake submission pkScript is tagged by an OP_SSTX.
-        if isinstance(votingAddress, crypto.AddressScriptHash):
+        if isinstance(votingAddress, addrlib.AddressScriptHash):
             stakeSubmissionPkScriptSize = txscript.P2SHPkScriptSize + 1
         elif (
-            isinstance(votingAddress, crypto.AddressPubKeyHash)
+            isinstance(votingAddress, addrlib.AddressPubKeyHash)
             and votingAddress.sigType == crypto.STEcdsaSecp256k1
         ):
             stakeSubmissionPkScriptSize = txscript.P2PKHPkScriptSize + 1
@@ -1317,7 +1318,7 @@ class DcrdataBlockchain:
                 pkScript=txOut.pkScript,
             )
 
-            addrSubsidy = txscript.decodeAddress(keysource.internal(), self.netParams)
+            addrSubsidy = addrlib.decodeAddress(keysource.internal(), self.netParams)
 
             # Generate the ticket msgTx and sign it.
             ticket = txscript.makeTicket(

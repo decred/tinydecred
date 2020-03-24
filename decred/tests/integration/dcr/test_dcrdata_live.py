@@ -7,7 +7,7 @@ import time
 
 from decred.crypto import crypto, rando
 from decred.crypto.secp256k1 import curve as Curve
-from decred.dcr import account, dcrdata, txscript
+from decred.dcr import account, addrlib, dcrdata, txscript
 from decred.dcr.nets import mainnet, testnet
 from decred.dcr.wire import msgtx
 from decred.util.encode import ByteArray
@@ -70,7 +70,7 @@ class TestDcrdata:
             def internal():
                 privKey = Curve.generateKey()
                 pkHash = crypto.hash160(privKey.pub.serializeCompressed().b)
-                addr = crypto.AddressPubKeyHash(testnet.PubKeyHashAddrID, pkHash)
+                addr = addrlib.AddressPubKeyHash(pkHash, testnet)
                 addrs.append(addr)
                 keys[addr.string()] = privKey
                 return addr.string()
@@ -94,7 +94,7 @@ class TestDcrdata:
                     atoms = int(nextVal * 1e8)
                     privKey = Curve.generateKey()
                     pkHash = crypto.hash160(privKey.pub.serializeCompressed().b)
-                    addr = crypto.AddressPubKeyHash(testnet.PubKeyHashAddrID, pkHash)
+                    addr = addrlib.AddressPubKeyHash(pkHash, testnet)
                     addrs.append(addr)
                     addrString = addr.string()
                     keys[addrString] = privKey
@@ -120,9 +120,9 @@ class TestDcrdata:
 
             poolPriv = Curve.generateKey()
             pkHash = crypto.hash160(poolPriv.pub.serializeCompressed().b)
-            poolAddr = crypto.AddressPubKeyHash(testnet.PubKeyHashAddrID, pkHash)
+            poolAddr = addrlib.AddressPubKeyHash(pkHash, testnet)
             scriptHash = crypto.hash160("some script. doesn't matter".encode())
-            scriptAddr = crypto.AddressScriptHash(testnet.ScriptHashAddrID, scriptHash)
+            scriptAddr = addrlib.AddressScriptHash(scriptHash, testnet)
             ticketPrice = blockchain.stakeDiff()
 
             request = account.TicketRequest(

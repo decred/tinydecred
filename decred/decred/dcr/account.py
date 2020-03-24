@@ -6,6 +6,7 @@ See LICENSE for details
 
 from decred import DecredError
 from decred.crypto import crypto, opcode
+from decred.dcr import addrlib
 from decred.util import encode, helpers
 from decred.util.encode import BuildyBytes, ByteArray, unblobCheck
 
@@ -52,6 +53,25 @@ def filterCrazyAddress(addrs):
         list(str): The filtered addresses.
     """
     return [a for a in addrs if a != CrazyAddress]
+
+
+def deriveChildAddress(branchXPub, i, netParams):
+    """
+    The base-58 encoded address for the i'th child.
+
+    Args:
+        i (int): Child number.
+        netParams (module): Network parameters.
+
+    Returns:
+        Address: Child address.
+    """
+    child = branchXPub.child(i)
+    return addrlib.AddressPubKeyHash(
+        crypto.hash160(child.publicKey().serializeCompressed().b),
+        netParams,
+        crypto.STEcdsaSecp256k1,
+    ).string()
 
 
 class KeySource:
@@ -555,7 +575,7 @@ class UTXO:
         rawaddr = txscript.extractStakeScriptHash(
             txout.pkScript, opcode.OP_SSTX
         ).bytes()
-        addr = crypto.AddressScriptHash(netParams.ScriptHashAddrID, rawaddr).string()
+        addr = addrlib.AddressScriptHash(rawaddr, netParams).string()
         ticket = UTXO(
             address=addr,
             txHash=tx.cachedHash(),
@@ -889,11 +909,11 @@ class Account:
         extPub = pubX.child(EXTERNAL_BRANCH)
         intPub = pubX.child(INTERNAL_BRANCH)
         addrs = [
-            extPub.deriveChildAddress(idx, blockchain.params)
+            deriveChildAddress(extPub, idx, blockchain.params)
             for idx in range(DefaultGapLimit)
         ]
         addrs += [
-            intPub.deriveChildAddress(idx, blockchain.params)
+            deriveChildAddress(intPub, idx, blockchain.params)
             for idx in range(DefaultGapLimit)
         ]
         return blockchain.addrsHaveTxs(addrs)
@@ -1400,7 +1420,7 @@ class Account:
         def nextAddr():
             idx = len(branchAddrs)
             try:
-                addr = branchKey.deriveChildAddress(idx, self.netParams)
+                addr = deriveChildAddress(branchKey, idx, self.netParams)
             except crypto.CrazyKeyError:
                 addr = CrazyAddress
             branchAddrs.append(addr)
@@ -1718,7 +1738,7 @@ class Account:
         Returns:
             AddressSecpPubkey: The address object.
         """
-        return crypto.AddressSecpPubKey(
+        return addrlib.AddressSecpPubKey(
             self.votingKey().pub.serializeCompressed(), self.netParams
         )
 
@@ -1926,9 +1946,9 @@ class Account:
         )
         txs = [self.blockchain.tx(txid) for txid in revocableTickets]
         for tx in txs:
-            redeemHash = crypto.AddressScriptHash(
-                self.netParams.ScriptHashAddrID,
+            redeemHash = addrlib.AddressScriptHash(
                 txscript.extractStakeScriptHash(tx.txOut[0].pkScript, opcode.OP_SSTX),
+                self.netParams,
             )
             redeemScript = next(
                 (

@@ -9,6 +9,7 @@ import pytest
 
 from decred import DecredError
 from decred.crypto import crypto, rando
+from decred.dcr import addrlib
 from decred.dcr.nets import mainnet
 from decred.util.encode import ByteArray
 
@@ -48,7 +49,7 @@ class TestCrypto(unittest.TestCase):
             ),
         ]
         for hexKey, addrStr, hash160 in data:
-            addr = crypto.AddressSecpPubKey(ByteArray(hexKey), mainnet)
+            addr = addrlib.AddressSecpPubKey(ByteArray(hexKey), mainnet)
             self.assertEqual(addr.string(), addrStr)
             self.assertEqual(addr.hash160().hex(), hash160)
 
@@ -77,7 +78,7 @@ class TestCrypto(unittest.TestCase):
         ]
         for pubkeyHash, addrStr in pairs:
             pubkeyHashBA = ByteArray(pubkeyHash)
-            addr = crypto.AddressPubKeyHash(mainnet.PubKeyHashAddrID, pubkeyHashBA)
+            addr = addrlib.AddressPubKeyHash(pubkeyHashBA, mainnet)
             self.assertEqual(addr.string(), addrStr)
             self.assertEqual(addr.scriptAddress(), pubkeyHashBA)
             self.assertEqual(addr.hash160(), pubkeyHashBA)
@@ -106,7 +107,7 @@ class TestCrypto(unittest.TestCase):
             ),
         ]
         for scriptHash, addrStr in pairs:
-            addr = crypto.newAddressScriptHashFromHash(ByteArray(scriptHash), mainnet)
+            addr = addrlib.AddressScriptHash(ByteArray(scriptHash), mainnet)
             self.assertEqual(addr.string(), addrStr)
 
     def test_extended_key(self):

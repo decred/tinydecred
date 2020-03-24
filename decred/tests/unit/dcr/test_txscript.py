@@ -7,13 +7,12 @@ import json
 import os
 import unittest
 
-from base58 import b58decode
 import pytest
 
 from decred import DecredError
 from decred.crypto import crypto, opcode, rando
 from decred.crypto.secp256k1 import curve as Curve
-from decred.dcr import txscript
+from decred.dcr import addrlib, txscript
 from decred.dcr.calc import SubsidyCache
 from decred.dcr.nets import mainnet, testnet
 from decred.dcr.wire import msgtx, wire
@@ -873,7 +872,7 @@ class TestTxScript(unittest.TestCase):
             )
         )
         for t in tests:
-            addr = txscript.decodeAddress(t.addrStr, t.net)
+            addr = addrlib.decodeAddress(t.addrStr, t.net)
             s = txscript.generateSStxAddrPush(addr, t.amount, t.limits)
             self.assertEqual(s, t.expected)
 
@@ -1921,7 +1920,7 @@ class TestTxScript(unittest.TestCase):
                             "test for signature suite %d not implemented" % suite
                         )
 
-                    address = crypto.newAddressPubKeyHash(
+                    address = addrlib.AddressPubKeyHash(
                         crypto.hash160(pkBytes.bytes()), testingParams, suite
                     )
 
@@ -1999,7 +1998,7 @@ class TestTxScript(unittest.TestCase):
                             "test for signature suite %d not implemented" % suite
                         )
 
-                    address = crypto.newAddressPubKeyHash(
+                    address = addrlib.AddressPubKeyHash(
                         crypto.hash160(pkBytes.bytes()), testingParams, suite
                     )
 
@@ -2075,12 +2074,12 @@ class TestTxScript(unittest.TestCase):
                             "test for signature suite %d not implemented" % suite
                         )
 
-                    address = crypto.newAddressPubKeyHash(
+                    address = addrlib.AddressPubKeyHash(
                         crypto.hash160(pkBytes.bytes()), testingParams, suite
                     )
 
                     pkScript = txscript.payToSSRtxPKHDirect(
-                        txscript.decodeAddress(
+                        addrlib.decodeAddress(
                             address.string(), testingParams
                         ).scriptAddress()
                     )
@@ -2170,13 +2169,17 @@ class TestTxScript(unittest.TestCase):
                             "test for signature suite %d not implemented" % suite
                         )
 
-                    address = crypto.AddressSecpPubKey(pkBytes.bytes(), testingParams)
+                    address = addrlib.AddressSecpPubKey(pkBytes.bytes(), testingParams)
 
-                    address2 = crypto.AddressSecpPubKey(pkBytes2.bytes(), testingParams)
+                    address2 = addrlib.AddressSecpPubKey(
+                        pkBytes2.bytes(), testingParams
+                    )
 
                     pkScript = txscript.multiSigScript([address, address2], 2)
 
-                    scriptAddr = crypto.newAddressScriptHash(pkScript, testingParams)
+                    scriptAddr = addrlib.AddressScriptHash.fromScript(
+                        pkScript, testingParams
+                    )
 
                     scriptPkScript = txscript.payToAddrScript(scriptAddr)
 
@@ -2225,7 +2228,7 @@ class TestTxScript(unittest.TestCase):
 
         privKey = Curve.generateKey()
         pkHash = crypto.hash160(privKey.pub.serializeCompressed().b)
-        addr = crypto.AddressPubKeyHash(mainnet.PubKeyHashAddrID, pkHash)
+        addr = addrlib.AddressPubKeyHash(pkHash, mainnet)
 
         class keysource:
             @staticmethod
@@ -2246,435 +2249,11 @@ class TestTxScript(unittest.TestCase):
                 crypto.STEcdsaSecp256k1,
             )
 
-    def test_addresses(self):
-        class test:
-            def __init__(
-                self,
-                name="",
-                addr="",
-                saddr="",
-                encoded="",
-                valid=False,
-                scriptAddress=None,
-                f=None,
-                net=None,
-            ):
-                self.name = name
-                self.addr = addr
-                self.saddr = saddr
-                self.encoded = encoded
-                self.valid = valid
-                self.scriptAddress = scriptAddress
-                self.f = f
-                self.net = net
-
-        addrPKH = crypto.newAddressPubKeyHash
-        addrSH = crypto.newAddressScriptHash
-        addrSHH = crypto.newAddressScriptHashFromHash
-        addrPK = crypto.AddressSecpPubKey
-
-        tests = []
-        # Positive P2PKH tests.
-        tests.append(
-            test(
-                name="mainnet p2pkh",
-                addr="DsUZxxoHJSty8DCfwfartwTYbuhmVct7tJu",
-                encoded="DsUZxxoHJSty8DCfwfartwTYbuhmVct7tJu",
-                valid=True,
-                scriptAddress=ByteArray("2789d58cfa0957d206f025c2af056fc8a77cebb0"),
-                f=lambda: addrPKH(
-                    ByteArray("2789d58cfa0957d206f025c2af056fc8a77cebb0"),
-                    mainnet,
-                    crypto.STEcdsaSecp256k1,
-                ),
-                net=mainnet,
-            )
-        )
-        tests.append(
-            test(
-                name="mainnet p2pkh 2",
-                addr="DsU7xcg53nxaKLLcAUSKyRndjG78Z2VZnX9",
-                encoded="DsU7xcg53nxaKLLcAUSKyRndjG78Z2VZnX9",
-                valid=True,
-                scriptAddress=ByteArray("229ebac30efd6a69eec9c1a48e048b7c975c25f2"),
-                f=lambda: addrPKH(
-                    ByteArray("229ebac30efd6a69eec9c1a48e048b7c975c25f2"),
-                    mainnet,
-                    crypto.STEcdsaSecp256k1,
-                ),
-                net=mainnet,
-            )
-        )
-        tests.append(
-            test(
-                name="testnet p2pkh",
-                addr="Tso2MVTUeVrjHTBFedFhiyM7yVTbieqp91h",
-                encoded="Tso2MVTUeVrjHTBFedFhiyM7yVTbieqp91h",
-                valid=True,
-                scriptAddress=ByteArray("f15da1cb8d1bcb162c6ab446c95757a6e791c916"),
-                f=lambda: addrPKH(
-                    ByteArray("f15da1cb8d1bcb162c6ab446c95757a6e791c916"),
-                    testnet,
-                    crypto.STEcdsaSecp256k1,
-                ),
-                net=testnet,
-            )
-        )
-
-        # Negative P2PKH tests.
-        tests.append(
-            test(
-                name="p2pkh wrong hash length",
-                addr="",
-                valid=False,
-                f=lambda: addrPKH(
-                    ByteArray("000ef030107fd26e0b6bf40512bca2ceb1dd80adaa"),
-                    mainnet,
-                    crypto.STEcdsaSecp256k1,
-                ),
-            )
-        )
-        tests.append(
-            test(
-                name="p2pkh bad checksum",
-                addr="TsmWaPM77WSyA3aiQ2Q1KnwGDVWvEkhip23",
-                valid=False,
-                net=testnet,
-            )
-        )
-
-        # Positive P2SH tests.
-        tests.append(
-            test(
-                # Taken from transactions:
-                # output:
-                #   3c9018e8d5615c306d72397f8f5eef44308c98fb576a88e030c25456b4f3a7ac
-                # input:
-                #   837dea37ddc8b1e3ce646f1a656e79bbd8cc7f558ac56a169626d649ebe2a3ba.
-                name="mainnet p2sh",
-                addr="DcuQKx8BES9wU7C6Q5VmLBjw436r27hayjS",
-                encoded="DcuQKx8BES9wU7C6Q5VmLBjw436r27hayjS",
-                valid=True,
-                scriptAddress=ByteArray("f0b4e85100aee1a996f22915eb3c3f764d53779a"),
-                f=lambda: addrSH(
-                    ByteArray(
-                        "512103aa43f0a6c15730d886cc1f0342046d2"
-                        "0175483d90d7ccb657f90c489111d794c51ae"
-                    ),
-                    mainnet,
-                ),
-                net=mainnet,
-            )
-        )
-        tests.append(
-            test(
-                # Taken from transactions:
-                # output:
-                #   b0539a45de13b3e0403909b8bd1a555b8cbe45fd4e3f3fda76f3a5f52835c29d
-                # input: (not yet redeemed at time test was written)
-                name="mainnet p2sh 2",
-                addr="DcqgK4N4Ccucu2Sq4VDAdu4wH4LASLhzLVp",
-                encoded="DcqgK4N4Ccucu2Sq4VDAdu4wH4LASLhzLVp",
-                valid=True,
-                scriptAddress=ByteArray("c7da5095683436f4435fc4e7163dcafda1a2d007"),
-                f=lambda: addrSHH(
-                    ByteArray("c7da5095683436f4435fc4e7163dcafda1a2d007"), mainnet,
-                ),
-                net=mainnet,
-            )
-        )
-        tests.append(
-            test(
-                # Taken from bitcoind base58_keys_valid.
-                name="testnet p2sh",
-                addr="TccWLgcquqvwrfBocq5mcK5kBiyw8MvyvCi",
-                encoded="TccWLgcquqvwrfBocq5mcK5kBiyw8MvyvCi",
-                valid=True,
-                scriptAddress=ByteArray("36c1ca10a8a6a4b5d4204ac970853979903aa284"),
-                f=lambda: addrSHH(
-                    ByteArray("36c1ca10a8a6a4b5d4204ac970853979903aa284"), testnet,
-                ),
-                net=testnet,
-            )
-        )
-
-        # Negative P2SH tests.
-        tests.append(
-            test(
-                name="p2sh wrong hash length",
-                addr="",
-                valid=False,
-                f=lambda: addrSHH(
-                    ByteArray("00f815b036d9bbbce5e9f2a00abd1bf3dc91e95510"), mainnet,
-                ),
-                net=mainnet,
-            )
-        )
-
-        # Positive P2PK tests.
-        tests.append(
-            test(
-                name="mainnet p2pk compressed (0x02)",
-                addr="DsT4FDqBKYG1Xr8aGrT1rKP3kiv6TZ5K5th",
-                encoded="DsT4FDqBKYG1Xr8aGrT1rKP3kiv6TZ5K5th",
-                valid=True,
-                scriptAddress=ByteArray(
-                    "028f53838b7639563f27c94845549a41e5146bcd52e7fef0ea6da143a02b0fe2ed"
-                ),
-                f=lambda: addrPK(
-                    ByteArray(
-                        "028f53838b7639563f27c94845549a41e5146bcd52e7fef0ea6da143a02b0fe2ed"
-                    ),
-                    mainnet,
-                ),
-                net=mainnet,
-            )
-        )
-        tests.append(
-            test(
-                name="mainnet p2pk compressed (0x03)",
-                addr="DsfiE2y23CGwKNxSGjbfPGeEW4xw1tamZdc",
-                encoded="DsfiE2y23CGwKNxSGjbfPGeEW4xw1tamZdc",
-                valid=True,
-                scriptAddress=ByteArray(
-                    "03e925aafc1edd44e7c7f1ea4fb7d265dc672f204c3d0c81930389c10b81fb75de"
-                ),
-                f=lambda: addrPK(
-                    ByteArray(
-                        "03e925aafc1edd44e7c7f1ea4fb7d265dc672f204c3d0c81930389c10b81fb75de"
-                    ),
-                    mainnet,
-                ),
-                net=mainnet,
-            )
-        )
-        tests.append(
-            test(
-                name="mainnet p2pk uncompressed (0x04)",
-                addr="DkM3EyZ546GghVSkvzb6J47PvGDyntqiDtFgipQhNj78Xm2mUYRpf",
-                encoded="DsfFjaADsV8c5oHWx85ZqfxCZy74K8RFuhK",
-                valid=True,
-                saddr="0264c44653d6567eff5753c5d24a682ddc2b2cadfe1b0c6433b16374dace6778f0",
-                scriptAddress=ByteArray(
-                    "0464c44653d6567eff5753c5d24a682ddc2b2cadfe1b0c6433b16374dace6778f"
-                    "0b87ca4279b565d2130ce59f75bfbb2b88da794143d7cfd3e80808a1fa3203904"
-                ),
-                f=lambda: addrPK(
-                    ByteArray(
-                        "0464c44653d6567eff5753c5d24a682ddc2b2cadfe1b0c6433b16374dace6778f"
-                        "0b87ca4279b565d2130ce59f75bfbb2b88da794143d7cfd3e80808a1fa3203904"
-                    ),
-                    mainnet,
-                ),
-                net=mainnet,
-            )
-        )
-        tests.append(
-            test(
-                name="testnet p2pk compressed (0x02)",
-                addr="Tso9sQD3ALqRsmEkAm7KvPrkGbeG2Vun7Kv",
-                encoded="Tso9sQD3ALqRsmEkAm7KvPrkGbeG2Vun7Kv",
-                valid=True,
-                scriptAddress=ByteArray(
-                    "026a40c403e74670c4de7656a09caa2353d4b383a9ce66eef51e1220eacf4be06e"
-                ),
-                f=lambda: addrPK(
-                    ByteArray(
-                        "026a40c403e74670c4de7656a09caa2353d4b383a9ce66eef51e1220eacf4be06e"
-                    ),
-                    testnet,
-                ),
-                net=testnet,
-            )
-        )
-        tests.append(
-            test(
-                name="testnet p2pk compressed (0x03)",
-                addr="TsWZ1EzypJfMwBKAEDYKuyHRGctqGAxMje2",
-                encoded="TsWZ1EzypJfMwBKAEDYKuyHRGctqGAxMje2",
-                valid=True,
-                scriptAddress=ByteArray(
-                    "030844ee70d8384d5250e9bb3a6a73d4b5bec770e8b31d6a0ae9fb739009d91af5"
-                ),
-                f=lambda: addrPK(
-                    ByteArray(
-                        "030844ee70d8384d5250e9bb3a6a73d4b5bec770e8b31d6a0ae9fb739009d91af5"
-                    ),
-                    testnet,
-                ),
-                net=testnet,
-            )
-        )
-        tests.append(
-            test(
-                name="testnet p2pk uncompressed (0x04)",
-                addr="TkKmMiY5iDh4U3KkSopYgkU1AzhAcQZiSoVhYhFymZHGMi9LM9Fdt",
-                encoded="Tso9sQD3ALqRsmEkAm7KvPrkGbeG2Vun7Kv",
-                valid=True,
-                saddr="026a40c403e74670c4de7656a09caa2353d4b383a9ce66eef51e1220eacf4be06e",
-                scriptAddress=ByteArray(
-                    "046a40c403e74670c4de7656a09caa2353d4b383a9ce66eef51e1220eacf4be06"
-                    "ed548c8c16fb5eb9007cb94220b3bb89491d5a1fd2d77867fca64217acecf2244"
-                ),
-                f=lambda: addrPK(
-                    ByteArray(
-                        "046a40c403e74670c4de7656a09caa2353d4b383a9ce66eef51e1220eacf4be06"
-                        "ed548c8c16fb5eb9007cb94220b3bb89491d5a1fd2d77867fca64217acecf2244"
-                    ),
-                    testnet,
-                ),
-                net=testnet,
-            )
-        )
-
-        # Negative P2PK tests.
-        tests.append(
-            test(
-                name="mainnet p2pk hybrid (0x06)",
-                addr="",
-                valid=False,
-                f=lambda: addrPK(
-                    ByteArray(
-                        "0664c44653d6567eff5753c5d24a682ddc2b2cadfe1b0c6433b16374dace6778f"
-                        "0b87ca4279b565d2130ce59f75bfbb2b88da794143d7cfd3e80808a1fa3203904"
-                    ),
-                    mainnet,
-                ),
-                net=mainnet,
-            )
-        )
-        tests.append(
-            test(
-                name="mainnet p2pk hybrid (0x07)",
-                addr="",
-                valid=False,
-                f=lambda: addrPK(
-                    ByteArray(
-                        "07348d8aeb4253ca52456fe5da94ab1263bfee16bb8192497f666389ca964f847"
-                        "98375129d7958843b14258b905dc94faed324dd8a9d67ffac8cc0a85be84bac5d"
-                    ),
-                    mainnet,
-                ),
-                net=mainnet,
-            )
-        )
-        tests.append(
-            test(
-                name="testnet p2pk hybrid (0x06)",
-                addr="",
-                valid=False,
-                f=lambda: addrPK(
-                    ByteArray(
-                        "066a40c403e74670c4de7656a09caa2353d4b383a9ce66eef51e1220eacf4be06"
-                        "ed548c8c16fb5eb9007cb94220b3bb89491d5a1fd2d77867fca64217acecf2244"
-                    ),
-                    testnet,
-                ),
-                net=testnet,
-            )
-        )
-        tests.append(
-            test(
-                name="testnet p2pk hybrid (0x07)",
-                addr="",
-                valid=False,
-                f=lambda: addrPK(
-                    ByteArray(
-                        "07edd40747de905a9becb14987a1a26c1adbd617c45e1583c142a635bfda9493d"
-                        "fa1c6d36735974965fe7b861e7f6fcc087dc7fe47380fa8bde0d9c322d53c0e89"
-                    ),
-                    testnet,
-                ),
-                net=testnet,
-            )
-        )
-
-        for test in tests:
-            # Decode addr and compare error against valid.
-            err = None
-            try:
-                decoded = txscript.decodeAddress(test.addr, test.net)
-            except DecredError as e:
-                err = e
-            self.assertEqual(err is None, test.valid, "%s error: %s" % (test.name, err))
-
-            if err is None:
-                # Ensure the stringer returns the same address as the original.
-                self.assertEqual(test.addr, decoded.string(), test.name)
-
-                # Encode again and compare against the original.
-                encoded = decoded.address()
-                self.assertEqual(test.encoded, encoded)
-
-                # Perform type-specific calculations.
-                if isinstance(decoded, crypto.AddressPubKeyHash):
-                    d = ByteArray(b58decode(encoded))
-                    saddr = d[2 : 2 + crypto.RIPEMD160_SIZE]
-
-                elif isinstance(decoded, crypto.AddressScriptHash):
-                    d = ByteArray(b58decode(encoded))
-                    saddr = d[2 : 2 + crypto.RIPEMD160_SIZE]
-
-                elif isinstance(decoded, crypto.AddressSecpPubKey):
-                    # Ignore the error here since the script
-                    # address is checked below.
-                    try:
-                        saddr = ByteArray(decoded.string())
-                    except ValueError:
-                        saddr = test.saddr
-
-                elif isinstance(decoded, crypto.AddressEdwardsPubKey):
-                    # Ignore the error here since the script
-                    # address is checked below.
-                    # saddr = ByteArray(decoded.String())
-                    self.fail("Edwards sigs unsupported")
-
-                elif isinstance(decoded, crypto.AddressSecSchnorrPubKey):
-                    # Ignore the error here since the script
-                    # address is checked below.
-                    # saddr = ByteArray(decoded.String())
-                    self.fail("Schnorr sigs unsupported")
-
-                # Check script address, as well as the Hash160 method for P2PKH and
-                # P2SH addresses.
-                self.assertEqual(saddr, decoded.scriptAddress(), test.name)
-
-                if isinstance(decoded, crypto.AddressPubKeyHash):
-                    self.assertEqual(decoded.pkHash, saddr)
-
-                if isinstance(decoded, crypto.AddressScriptHash):
-                    self.assertEqual(decoded.hash160(), saddr)
-
-            if not test.valid:
-                # If address is invalid, but a creation function exists,
-                # verify that it returns a nil addr and non-nil error.
-                if test.f is not None:
-                    try:
-                        test.f()
-                        self.fail(
-                            "%s: address is invalid but creating new address succeeded"
-                            % test.name
-                        )
-                    except DecredError:
-                        pass
-                continue
-
-            # Valid test, compare address created with f against expected result.
-            try:
-                addr = test.f()
-            except DecredError as e:
-                self.fail(
-                    "%s: address is valid but creating new address failed with error %s",
-                    test.name,
-                    e,
-                )
-            self.assertEqual(addr.scriptAddress(), test.scriptAddress, test.name)
-
     def test_extract_script_addrs(self):
         scriptVersion = 0
 
         def pkAddr(b):
-            addr = crypto.AddressSecpPubKey(b, mainnet)
+            addr = addrlib.AddressSecpPubKey(b, mainnet)
             # force the format to compressed, as per golang tests.
             addr.pubkeyFormat = crypto.PKFCompressed
             return addr
@@ -2682,7 +2261,7 @@ class TestTxScript(unittest.TestCase):
         """
         name (str): Short description of the test.
         script (ByteArray): The script to test.
-        addrs (list(crypto.AddressSecpPubKey)): Expected returned addresses.
+        addrs (list(addrlib.AddressSecpPubKey)): Expected returned addresses.
         reqSigs (int): Expected returned required signatures.
         scriptClass (int): expected returned signature class.
         exception (Exception): The expected exception if present.
@@ -2756,7 +2335,7 @@ class TestTxScript(unittest.TestCase):
                 name="standard p2pkh",
                 script=ByteArray("76a914ad06dd6ddee55cbca9a9e3713bd7587509a3056488ac"),
                 addrs=[
-                    crypto.newAddressPubKeyHash(
+                    addrlib.AddressPubKeyHash(
                         ByteArray("ad06dd6ddee55cbca9a9e3713bd7587509a30564"),
                         mainnet,
                         crypto.STEcdsaSecp256k1,
@@ -2769,7 +2348,7 @@ class TestTxScript(unittest.TestCase):
                 name="standard p2sh",
                 script=ByteArray("a91463bcc565f9e68ee0189dd5cc67f1b0e5f02f45cb87"),
                 addrs=[
-                    crypto.newAddressScriptHashFromHash(
+                    addrlib.AddressScriptHash(
                         ByteArray("63bcc565f9e68ee0189dd5cc67f1b0e5f02f45cb"), mainnet
                     )
                 ],
@@ -2971,7 +2550,7 @@ class TestTxScript(unittest.TestCase):
         the correct scripts for the various types of addresses.
         """
         # 1MirQ9bwyQcGVJPwKUgapu5ouK2E2Ey4gX
-        p2pkhMain = crypto.newAddressPubKeyHash(
+        p2pkhMain = addrlib.AddressPubKeyHash(
             ByteArray("e34cce70c86373273efcc54ce7d2a491bb4a0e84"),
             mainnet,
             crypto.STEcdsaSecp256k1,
@@ -2979,24 +2558,18 @@ class TestTxScript(unittest.TestCase):
 
         # Taken from transaction:
         # b0539a45de13b3e0403909b8bd1a555b8cbe45fd4e3f3fda76f3a5f52835c29d
-        p2shMain = crypto.newAddressScriptHashFromHash(
+        p2shMain = addrlib.AddressScriptHash(
             ByteArray("e8c300c87986efa84c37c0519929019ef86eb5b4"), mainnet
         )
 
-        # # disabled until Schnorr signatures implemented
-        # # mainnet p2pk 13CG6SJ3yHUXo4Cr2RY4THLLJrNFuG3gUg
-        # p2pkCompressedMain = crypto.newAddressPubKey(ByteArray(
-        #     "02192d74d0cb94344c9569c2e77901573d8d7903c3ebec3a957724895dca52c6b4"),
-        #     mainnet)
-
-        p2pkCompressed2Main = crypto.AddressSecpPubKey(
+        p2pkCompressed2Main = addrlib.AddressSecpPubKey(
             ByteArray(
                 "03b0bd634234abbb1ba1e986e884185c61cf43e001f9137f23c2c409273eb16e65"
             ),
             mainnet,
         )
 
-        p2pkUncompressedMain = crypto.AddressSecpPubKey(
+        p2pkUncompressedMain = addrlib.AddressSecpPubKey(
             ByteArray(
                 "0411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5"
                 "cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3"
@@ -3007,7 +2580,7 @@ class TestTxScript(unittest.TestCase):
         # dcrd/tscript/standard_test.go
         p2pkUncompressedMain.pubkeyFormat = crypto.PKFCompressed
 
-        class BogusAddress(crypto.AddressPubKeyHash):
+        class BogusAddress(addrlib.AddressPubKeyHash):
             pass
 
         bogusAddress = (
@@ -3537,16 +3110,16 @@ def test_merge_scripts():
     privKey1 = root.child(0).privateKey().key
     privKey2 = root.child(1).privateKey().key
     privKey3 = root.child(2).privateKey().key
-    pub1 = crypto.AddressSecpPubKey(
+    pub1 = addrlib.AddressSecpPubKey(
         root.child(0).publicKey().serializeCompressed(), testnet
     )
-    pub2 = crypto.AddressSecpPubKey(
+    pub2 = addrlib.AddressSecpPubKey(
         root.child(1).publicKey().serializeCompressed(), testnet
     )
-    pub3 = crypto.AddressSecpPubKey(
+    pub3 = addrlib.AddressSecpPubKey(
         root.child(2).publicKey().serializeCompressed(), testnet
     )
-    pub4 = crypto.AddressSecpPubKey(
+    pub4 = addrlib.AddressSecpPubKey(
         root.child(3).publicKey().serializeCompressed(), testnet
     )
     # P2PKH is a valid pay to public key hash script.
