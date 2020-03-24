@@ -62,7 +62,7 @@ class AccountManager:
             netName (string): Network name. "mainnet", "testnet", etc.
             db (database.Bucket): optional. The database bucket. If specified,
                 the db will be loaded.
-            signals (api.Signals): optional. The UI callbacks. Should be
+            signals (Signal): optional. The UI callbacks. Should be
                 included if db is specified.
         """
         # The crypto keys are used to decrypt the other keys.
@@ -122,7 +122,7 @@ class AccountManager:
 
         Args:
             db (database.Bucket): The database bucket.
-            signals (api.Signals): The UI signals.
+            signals (Signal): The UI signals.
         """
         blobber = chains.AccountConstructors[self.coinType]
         self.acctDB = db.child("accts", datatypes=("INTEGER", "BLOB"), blobber=blobber)

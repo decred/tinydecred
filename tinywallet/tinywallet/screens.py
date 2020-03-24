@@ -14,7 +14,7 @@ import webbrowser
 
 from PyQt5 import QtCore, QtGui, QtSvg, QtWidgets
 
-from decred.dcr import calc, constants as DCR, nets
+from decred.dcr import constants as DCR, nets, txscript
 from decred.dcr.vsp import VotingServiceProvider
 from decred.util import chains, helpers
 from decred.wallet.wallet import Wallet
@@ -78,6 +78,22 @@ def sprintAmount(thing):
     return lambda n, comma="": "{} {}{}{}".format(
         n, thing, "" if n == 1 else "s", comma
     )
+
+
+def blksLeftStakeWindow(height, netParams):
+    """
+    Return the number of blocks until the next stake difficulty change.
+
+        Args:
+            height (int): Block height to find remaining blocks from.
+            netParams (module): The network parameters.
+
+        Returns:
+            int: The number of blocks left in the current window.
+    """
+    window = netParams.StakeDiffWindowSize
+    # Add one to height, to account for the genesis block.
+    return window - (height + 1) % window
 
 
 class TinyDialog(QtWidgets.QFrame):
@@ -1975,9 +1991,9 @@ class StakeStatsScreen(Screen):
         self.blkHeight.setText(str(tpinfo.height))
         self.networkTickets.setText(t(tpinfo.size, ", "))
         self.networkValue.setText("{:.2f} dcr".format(tpinfo.value))
-        blocksLeft = calc.blksLeftStakeWindow(cfg.netParams, tpinfo.height)
+        blocksLeft = blksLeftStakeWindow(tpinfo.height, cfg.netParams)
         self.blocksLeft.setText(b(blocksLeft))
-        cache = calc.SubsidyCache(cfg.netParams)
+        cache = txscript.SubsidyCache(cfg.netParams)
         self.stakebase.setText(r(cache.calcStakeVoteSubsidy(tpinfo.height), ", "))
 
         stakeDiff = blockchain.stakeDiff()

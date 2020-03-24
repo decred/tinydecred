@@ -6,6 +6,7 @@ See LICENSE for details
 Based on dcrd txscript.
 """
 
+import bisect
 import math
 
 from decred import DecredError
@@ -3486,7 +3487,213 @@ def estimateSerializeSizeFromScriptSizes(inputSizes, outputSizes, changeScriptSi
     )
 
 
-def stakePoolTicketFee(stakeDiff, relayFee, height, poolFee, subsidyCache, netParams):
+class SubsidyCache:
+    """
+    SubsidyCache provides efficient access to consensus-critical subsidy
+    calculations for blocks and votes, including the max potential subsidy for
+    given block heights, the proportional proof-of-work subsidy, the proportional
+    proof of stake per-vote subsidy, and the proportional treasury subsidy.
+
+    It makes use of caching to avoid repeated calculations.
+    """
+
+    def __init__(self, netParams):
+        """
+        Args:
+            netParams (module): The network parameters.
+        """
+        # netParams stores the subsidy parameters to use during subsidy
+        # calculation.
+        self.netParams = netParams
+
+        # cache houses the cached subsidies keyed by reduction interval.
+        self.cache = {0: netParams.BaseSubsidy}
+
+        # cachedIntervals contains an ordered list of all cached intervals.
+        # It is used to efficiently track sparsely cached intervals with
+        # O(log N) discovery of a prior cached interval.
+        self.cachedIntervals = [0]
+
+        # These fields house values calculated from the parameters in order to
+        # avoid repeated calculation.
+        #
+        # minVotesRequired is the minimum number of votes required for a block to
+        # be consider valid by consensus.
+        #
+        # totalProportions is the sum of the PoW, PoS, and Treasury proportions.
+        self.minVotesRequired = (netParams.TicketsPerBlock // 2) + 1
+        self.totalProportions = (
+            netParams.WorkRewardProportion
+            + netParams.StakeRewardProportion
+            + netParams.BlockTaxProportion
+        )
+
+    def calcBlockSubsidy(self, height):
+        """
+        calcBlockSubsidy returns the max potential subsidy for a block at the
+        provided height.  This value is reduced over time based on the height and
+        then split proportionally between PoW, PoS, and the Treasury.
+        """
+        # Negative block heights are invalid and produce no subsidy.
+        # Block 0 is the genesis block and produces no subsidy.
+        # Block 1 subsidy is special as it is used for initial token distribution.
+        if height <= 0:
+            return 0
+        elif height == 1:
+            return self.netParams.BlockOneSubsidy
+
+        # Calculate the reduction interval associated with the requested height and
+        # attempt to look it up in cache.  When it's not in the cache, look up the
+        # latest cached interval and subsidy.
+        reqInterval = height // self.netParams.SubsidyReductionInterval
+        if reqInterval in self.cache:
+            return self.cache[reqInterval]
+
+        lastCachedInterval = self.cachedIntervals[len(self.cachedIntervals) - 1]
+        lastCachedSubsidy = self.cache[lastCachedInterval]
+
+        # When the requested interval is after the latest cached interval, avoid
+        # additional work by either determining if the subsidy is already exhausted
+        # at that interval or using the interval as a starting point to calculate
+        # and store the subsidy for the requested interval.
+        #
+        # Otherwise, the requested interval is prior to the final cached interval,
+        # so use a binary search to find the latest cached interval prior to the
+        # requested one and use it as a starting point to calculate and store the
+        # subsidy for the requested interval.
+        if reqInterval > lastCachedInterval:
+            # Return zero for all intervals after the subsidy reaches zero.  This
+            # enforces an upper bound on the number of entries in the cache.
+            if lastCachedSubsidy == 0:
+                return 0
+        else:
+            cachedIdx = bisect.bisect_left(self.cachedIntervals, reqInterval)
+            lastCachedInterval = self.cachedIntervals[cachedIdx - 1]
+            lastCachedSubsidy = self.cache[lastCachedInterval]
+
+        # Finally, calculate the subsidy by applying the appropriate number of
+        # reductions per the starting and requested interval.
+        reductionMultiplier = self.netParams.MulSubsidy
+        reductionDivisor = self.netParams.DivSubsidy
+        subsidy = lastCachedSubsidy
+        neededIntervals = reqInterval - lastCachedInterval
+        for i in range(neededIntervals):
+            subsidy *= reductionMultiplier
+            subsidy = subsidy // reductionDivisor
+
+            # Stop once no further reduction is possible.  This ensures a bounded
+            # computation for large requested intervals and that all future
+            # requests for intervals at or after the final reduction interval
+            # return 0 without recalculating.
+            if subsidy == 0:
+                reqInterval = lastCachedInterval + i + 1
+                break
+
+        # Update the cache for the requested interval or the interval in which the
+        # subsidy became zero when applicable.  The cached intervals are stored in
+        # a map for O(1) lookup and also tracked via a sorted array to support the
+        # binary searches for efficient sparse interval query support.
+        self.cache[reqInterval] = subsidy
+
+        bisect.insort_left(self.cachedIntervals, reqInterval)
+        return subsidy
+
+    def calcWorkSubsidy(self, height, voters):
+        # The first block has special subsidy rules.
+        if height == 1:
+            return self.netParams.BlockOneSubsidy
+
+        # The subsidy is zero if there are not enough voters once voting begins.  A
+        # block without enough voters will fail to validate anyway.
+        stakeValidationHeight = self.netParams.StakeValidationHeight
+        if height >= stakeValidationHeight and voters < self.minVotesRequired:
+            return 0
+
+        # Calculate the full block subsidy and reduce it according to the PoW
+        # proportion.
+        subsidy = self.calcBlockSubsidy(height)
+        subsidy *= self.netParams.WorkRewardProportion
+        subsidy = subsidy // self.totalProportions
+
+        # Ignore any potential subsidy reductions due to the number of votes prior
+        # to the point voting begins.
+        if height < stakeValidationHeight:
+            return subsidy
+
+        # Adjust for the number of voters.
+        return (voters * subsidy) // self.netParams.TicketsPerBlock
+
+    def calcStakeVoteSubsidy(self, height):
+        """
+        CalcStakeVoteSubsidy returns the subsidy for a single stake vote for a block.
+        It is calculated as a proportion of the total subsidy and max potential
+        number of votes per block.
+
+        Unlike the Proof-of-Work and Treasury subsidies, the subsidy that votes
+        receive is not reduced when a block contains less than the maximum number of
+        votes.  Consequently, this does not accept the number of votes.  However, it
+        is important to note that blocks that do not receive the minimum required
+        number of votes for a block to be valid by consensus won't actually produce
+        any vote subsidy either since they are invalid.
+
+        This function is safe for concurrent access.
+        """
+        # Votes have no subsidy prior to the point voting begins.  The minus one
+        # accounts for the fact that vote subsidy are, unfortunately, based on the
+        # height that is being voted on as opposed to the block in which they are
+        # included.
+        if height < self.netParams.StakeValidationHeight - 1:
+            return 0
+
+        # Calculate the full block subsidy and reduce it according to the stake
+        # proportion.  Then divide it by the number of votes per block to arrive
+        # at the amount per vote.
+        subsidy = self.calcBlockSubsidy(height)
+        proportions = self.totalProportions
+        subsidy *= self.netParams.StakeRewardProportion
+        subsidy = subsidy // (proportions * self.netParams.TicketsPerBlock)
+
+        return subsidy
+
+    def calcTreasurySubsidy(self, height, voters):
+        """
+        calcTreasurySubsidy returns the subsidy required to go to the treasury for
+        a block.  It is calculated as a proportion of the total subsidy and further
+        reduced proportionally depending on the number of votes once the height at
+        which voting begins has been reached.
+
+        Note that passing a number of voters fewer than the minimum required for a
+        block to be valid by consensus along with a height greater than or equal to
+        the height at which voting begins will return zero.
+
+        This function is safe for concurrent access.
+        """
+        # The first two blocks have special subsidy rules.
+        if height <= 1:
+            return 0
+
+        # The subsidy is zero if there are not enough voters once voting begins.  A
+        # block without enough voters will fail to validate anyway.
+        stakeValidationHeight = self.netParams.StakeValidationHeight
+        if height >= stakeValidationHeight and voters < self.minVotesRequired:
+            return 0
+
+        # Calculate the full block subsidy and reduce it according to the treasury
+        # proportion.
+        subsidy = self.calcBlockSubsidy(height)
+        subsidy *= self.netParams.BlockTaxProportion
+        subsidy = subsidy // self.totalProportions
+
+        # Ignore any potential subsidy reductions due to the number of votes prior
+        # to the point voting begins.
+        if height < stakeValidationHeight:
+            return subsidy
+
+        # Adjust for the number of voters.
+        return (voters * subsidy) // self.netParams.TicketsPerBlock
+
+
+def stakePoolTicketFee(stakeDiff, relayFee, height, poolFee, netParams):
     """
     stakePoolTicketFee determines the stake pool ticket fee for a given ticket
     from the passed percentage. Pool fee as a percentage is truncated from 0.01%
@@ -3497,7 +3704,6 @@ def stakePoolTicketFee(stakeDiff, relayFee, height, poolFee, subsidyCache, netPa
         relayFee (int): Transaction fees.
         height (int): Current block height.
         poolFee (int): The pools fee, as percent.
-        subsidyCache (calc.SubsidyCache): A subsidy cache.
         netParams (module): The network parameters.
 
     Returns:
@@ -3521,7 +3727,7 @@ def stakePoolTicketFee(stakeDiff, relayFee, height, poolFee, subsidyCache, netPa
     # ceiling of the ticket pool size divided by the
     # reduction interval.
     adjs = int(math.ceil(netParams.TicketPoolSize / netParams.SubsidyReductionInterval))
-    subsidy = subsidyCache.calcStakeVoteSubsidy(height)
+    subsidy = SubsidyCache(netParams).calcStakeVoteSubsidy(height)
     for i in range(adjs):
         subsidy *= 100
         subsidy = subsidy // 101

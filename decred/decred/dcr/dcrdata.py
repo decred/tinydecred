@@ -18,9 +18,8 @@ from decred.dcr import addrlib
 from decred.util import database, tinyhttp, ws
 from decred.util.encode import ByteArray
 from decred.util.helpers import formatTraceback, getLogger
-from decred.wallet import api
 
-from . import account, agenda, calc, txscript
+from . import account, agenda, txscript
 from .wire import msgblock, msgtx, wire
 
 
@@ -41,6 +40,14 @@ AddrsPerRequest = 25
 
 
 class DcrdataError(DecredError):
+    pass
+
+
+class InsufficientFundsError(DecredError):
+    """
+    Available account balance too low for requested funds.
+    """
+
     pass
 
 
@@ -439,7 +446,6 @@ class DcrdataBlockchain:
         self.headerDB = db.child("header", blobber=msgblock.BlockHeader)
         self.txBlockMap = db.child("blocklink")
         self.tipHeight = None
-        self.subsidyCache = calc.SubsidyCache(netParams)
         self.addrSubscribers = {}
         self.blockSubscribers = []
         if not skipConnect:
@@ -1021,7 +1027,7 @@ class DcrdataBlockchain:
         while True:
             utxos, enough = utxosource(targetAmount + targetFee, self.approveUTXO)
             if not enough:
-                raise api.InsufficientFundsError("insufficient funds")
+                raise InsufficientFundsError("insufficient funds")
             for utxo in utxos:
                 tx = self.tx(utxo.txid)
                 # header = self.blockHeaderByHeight(utxo["height"])
@@ -1248,12 +1254,7 @@ class DcrdataBlockchain:
         # If we need to calculate the amount for a pool fee percentage,
         # do so now.
         poolFeeAmt = txscript.stakePoolTicketFee(
-            ticketPrice,
-            ticketFee,
-            self.tipHeight,
-            req.poolFees,
-            self.subsidyCache,
-            self.netParams,
+            ticketPrice, ticketFee, self.tipHeight, req.poolFees, self.netParams,
         )
 
         # Fetch the single use split address to break tickets into, to
