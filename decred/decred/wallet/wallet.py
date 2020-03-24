@@ -14,15 +14,12 @@ from . import accounts
 
 log = helpers.getLogger("WLLT")
 
-CHECKPHRASE = "tinydecred".encode("utf-8")
-
 BipIDs = chains.BipIDs
 
 
 class DBKeys:
     cryptoKey = "cryptoKey".encode("utf-8")
     root = "root".encode("utf-8")
-    checkKey = "checkKey".encode("utf-8")
     keyParams = "keyParams".encode("utf-8")
 
 
@@ -69,7 +66,6 @@ class Wallet:
         root = crypto.ExtendedKey.new(seed)
         self.masterDB[DBKeys.cryptoKey] = pwKey.encrypt(cryptoKey)
         self.masterDB[DBKeys.root] = root.serialize()
-        self.masterDB[DBKeys.checkKey] = pwKey.encrypt(CHECKPHRASE)
         self.masterDB[DBKeys.keyParams] = crypto.ByteArray(pwKey.params().serialize())
         db = self.coinDB.child(str(BipIDs.decred), table=False)
         acctManager = accounts.createNewAccountManager(
@@ -139,9 +135,6 @@ class Wallet:
         if not self.keyParams:
             self.keyParams = crypto.KDFParams.unblob(self.masterDB[DBKeys.keyParams].b)
         pwKey = crypto.SecretKey.rekey(password.encode(), self.keyParams)
-        checkPhrase = pwKey.decrypt(self.masterDB[DBKeys.checkKey])
-        if checkPhrase != CHECKPHRASE:
-            raise DecredError("wrong password")
         return pwKey.decrypt(self.masterDB[DBKeys.cryptoKey])
 
     def accountManager(self, coinType, signals):

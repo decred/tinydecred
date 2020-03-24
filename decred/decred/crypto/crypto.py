@@ -1059,7 +1059,7 @@ def decodeExtendedKey(netParams, cryptoKey, key):
 
 DEFAULT_KDF_PARAMS = {
     "func": "pbkdf2_hmac",
-    "hash_name": "sha256",
+    "hash_name": "sha512",
     "iterations": 100000,
 }
 
@@ -1080,28 +1080,25 @@ def defaultKDFParams():
 class KDFParams:
     """
     Parameters for the key derivation function, including the function used.
+    As of now, the KDF parameters must yield a 64-byte key.
+
+    Args:
+        salt (ByteArray): A salt.
+        auth (ByteArray): An authentication hash.
     """
 
-    def __init__(self, salt, digest):
+    def __init__(self, salt, auth=b""):
         self.salt = salt
-        self.digest = digest
         func, hn, its = defaultKDFParams()
         self.kdfFunc = func
         self.hashName = hn
         self.iterations = its
+        self.auth = auth
 
     @staticmethod
     def blob(params):
         """Satisfies the encode.Blobber API"""
-        return (
-            encode.BuildyBytes(0)
-            .addData(params.kdfFunc.encode("utf-8"))
-            .addData(params.hashName.encode("utf-8"))
-            .addData(params.salt)
-            .addData(params.digest)
-            .addData(params.iterations)
-            .b
-        )
+        return params.baseParams().addData(params.auth).b
 
     @staticmethod
     def unblob(b):
@@ -1109,13 +1106,28 @@ class KDFParams:
         ver, d = encode.decodeBlob(b)
         unblobCheck("KDFParams", ver, len(d), {0: 5})
 
-        params = KDFParams(salt=ByteArray(d[2]), digest=ByteArray(d[3]))
+        params = KDFParams(salt=ByteArray(d[2]), auth=ByteArray(d[4]))
 
         params.kdfFunc = d[0].decode("utf-8")
         params.hashName = d[1].decode("utf-8")
-        params.iterations = encode.intFromBytes(d[4])
+        params.iterations = encode.intFromBytes(d[3])
 
         return params
+
+    def baseParams(self):
+        """
+        Serializes all the parameters except the authentication code.
+
+        Returns:
+            BuildyBytes: The serialized parameters.
+        """
+        return (
+            encode.BuildyBytes(0)
+            .addData(self.kdfFunc.encode("utf-8"))
+            .addData(self.hashName.encode("utf-8"))
+            .addData(self.salt)
+            .addData(self.iterations)
+        )
 
     def serialize(self):
         """
@@ -1133,20 +1145,30 @@ class SecretKey:
     decryption.
     """
 
-    def __init__(self, pw):
+    def __init__(self, pw=None):
         """
         Args:
             pw (byte-like): A password that deterministically generates the key.
         """
         super().__init__()
+        if not pw:
+            self.key = None
+            self.keyParams = None
+            return
+        # If a password was provided, create a new set of key parameters and an
+        # authentication code.
         salt = rando.newKey()
-        b = lambda v: ByteArray(v).bytes()
         _, hashName, iterations = defaultKDFParams()
-        self.key = ByteArray(
-            hashlib.pbkdf2_hmac(hashName, b(pw), salt.bytes(), iterations)
+        b = ByteArray(
+            hashlib.pbkdf2_hmac(hashName, bytes(pw), salt.bytes(), iterations)
         )
-        digest = ByteArray(hashlib.sha256(self.key.b).digest())
-        self.keyParams = KDFParams(salt, digest)
+        self.key = b[:32]
+        self.keyParams = KDFParams(salt)
+        authKey = b[32:].bytes()
+        authMsg = self.keyParams.baseParams().bytes()
+        self.keyParams.auth = ByteArray(
+            hashlib.blake2b(authMsg, digest_size=32, key=authKey).digest()
+        )
 
     def params(self):
         """
@@ -1183,32 +1205,36 @@ class SecretKey:
         return ByteArray(decrypt(self.key, thing))
 
     @staticmethod
-    def rekey(password, kp):
+    def rekey(pw, kp):
         """
         Regenerate a key using its origin key parameters, as returned by
         `params`.
 
         Args:
-            password (bytes-like): The key password.
+            pw (bytes-like): The key password.
             kp (KDFParams): The key parameters from the original generation
                 of the key being regenerated.
 
         Returns:
             SecretKey: The regenerated key.
         """
-        sk = SecretKey(b"")
-        sk.keyParams = kp
+        sk = SecretKey()
         func = kp.kdfFunc
         if func != "pbkdf2_hmac":
             raise DecredError("unknown key derivation function")
-        sk.key = ByteArray(
-            hashlib.pbkdf2_hmac(
-                kp.hashName, bytes(password), bytes(kp.salt), kp.iterations
-            )
+        b = ByteArray(
+            hashlib.pbkdf2_hmac(kp.hashName, bytes(pw), bytes(kp.salt), kp.iterations)
         )
-        checkDigest = ByteArray(hashlib.sha256(sk.key.b).digest())
-        if checkDigest != kp.digest:
-            raise DecredError("rekey digest check failed")
+        # Get the authentication message and key create the MAC tag to compare
+        # with the included key parameters.
+        authKey = b[32:].bytes()
+        authMsg = kp.baseParams().bytes()
+        auth = hashlib.blake2b(authMsg, digest_size=32, key=authKey).digest()
+        if auth != kp.auth:
+            raise DecredError("rekey auth check failed")
+
+        sk.key = b[:32]
+        sk.keyParams = kp
         return sk
 
 
@@ -1231,7 +1257,7 @@ def encrypt(key, thing):
     # nonce alongside it.
     encrypted = box.encrypt(bytes(thing))
 
-    if len(encrypted) != len(thing) + box.NONCE_SIZE + box.MACBYTES:
+    if len(encrypted) != len(thing) + box.NONCE_SIZE + box.MACBYTES:  # nocover
         raise DecredError("wrong encrypted length %d" % len(encrypted))
 
     return ByteArray(encrypted)
