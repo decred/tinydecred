@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 from decred import DecredError
 from decred.util import tinyhttp, ws
 from decred.util.encode import ByteArray
-from decred.util.helpers import coinify, getLogger
+from decred.util.helpers import getLogger
 
 from . import agenda, txscript
 from .wire.msgblock import BlockHeader
@@ -21,6 +21,19 @@ from .wire.msgtx import MsgTx, TxOut, TxTreeStake
 
 
 log = getLogger("RPC")
+
+
+def coinify(atoms):
+    """
+    Convert the smallest unit of a coin into its coin value.
+
+    Args:
+        atoms (int): 1e8 division of a coin.
+
+    Returns:
+        float: The coin value.
+    """
+    return round(atoms / 1e8, 8)
 
 
 def stringify(thing):
@@ -160,7 +173,7 @@ class Client:
         )
         resp = Response(rawRes)
         if resp.error:
-            raise Exception(f"{method} error: {resp.error}")
+            raise DecredError(f"{method} error: {resp.error}")
         return resp.result
 
     def addNode(self, addr, subCmd):
@@ -3424,7 +3437,7 @@ class WebsocketClient(Client):
         self.ws.send(req.json())
         resp = q.get(timeout=self.requestTimeout)
         if resp.error:
-            raise Exception(f"{method} error: {resp.error}")
+            raise DecredError(f"{method} error: {resp.error}")
         return resp.result
 
     def on_message(self, msg):

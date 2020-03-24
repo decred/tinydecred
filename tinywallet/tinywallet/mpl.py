@@ -73,7 +73,9 @@ def getMonthTicks(start, end, increment, offset=0):
     """
     xLabels = []
     xTicks = []
-    y, m, d = helpers.yearmonthday(start)
+    y, m, d = tuple(
+        int(x) for x in time.strftime("%Y %m %d", time.gmtime(start)).split()
+    )
 
     def normalize(y, m):
         if m > 12:
