@@ -151,7 +151,7 @@ class AddressPubKeyHash(Address):
         Returns:
             str: The encoded address.
         """
-        return encodeAddress(self.netID, self.pkHash)
+        return encodeAddress(self.pkHash, self.netID)
 
     def address(self):
         """
@@ -264,7 +264,7 @@ class AddressSecpPubKey(Address):
         Returns:
             str: base-58 encoded p2pkh address.
         """
-        return encodeAddress(self.pubkeyHashID, hash160(self.serialize().bytes()))
+        return encodeAddress(hash160(self.serialize().bytes()), self.pubkeyHashID)
 
     def scriptAddress(self):
         """
@@ -329,7 +329,7 @@ class AddressScriptHash(Address):
         Returns:
             str: The encoded address.
         """
-        return encodeAddress(self.netID, self.scriptHash)
+        return encodeAddress(self.scriptHash, self.netID)
 
     def address(self):
         """
@@ -374,13 +374,13 @@ class AddressSecSchnorrPubKey(Address):
         raise NotImplementedError("AddressSecSchnorrPubKey implemented")
 
 
-def encodeAddress(netID, k):
+def encodeAddress(k, netID):
     """
     Base-58 encode the number, with the netID prepended byte-wise.
 
     Args:
-        netID (byte-like): The addresses network encoding ID.
         k (ByteArray): The pubkey or pubkey-hash or script-hash.
+        netID (byte-like): The addresses network encoding ID.
 
     Returns:
         string: Base-58 encoded address.
@@ -440,9 +440,9 @@ def decodeAddressPubKey(decoded, netParams):
     if suite == STEcdsaSecp256k1:
         b = ByteArray(toAppend) + decoded[1:]
         return AddressSecpPubKey(b, netParams)
-    elif suite == STEd25519:  # nocover
+    elif suite == STEd25519:
         raise NotImplementedError("Edwards signatures not implemented")
-    elif suite == STSchnorrSecp256k1:  # nocover
+    elif suite == STSchnorrSecp256k1:
         raise NotImplementedError("Schnorr signatures not implemented")
     else:
         raise NotImplementedError(f"unknown address type {suite}")
