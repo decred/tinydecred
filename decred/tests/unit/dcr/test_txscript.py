@@ -4103,3 +4103,94 @@ def test_nonce_RFC6979():
         assert (
             res == test["want"]
         ), f'wanted {test["want"]} but got {res} for test {test["name"]}'
+
+
+def test_int_2_octets():
+    """
+    name (str): Short description of the test.
+    v (int): Integer value to convert.
+    rolen (int): Number of digits to allow.
+    want (ByteArray): Number in "octets" or bytes.
+    """
+    tests = [
+        dict(
+            name="left padded",
+            v=1 << 8,
+            rolen=5,
+            want=parseShortForm("NULL_BYTES_3 0x0100"),
+        ),
+        dict(
+            name="overflows",
+            v=(1 << (8 * 5)) + (1 << (8 * 4)),
+            rolen=5,
+            want=parseShortForm("0x0100000000"),
+        ),
+        dict(
+            name="same length",
+            v=(1 << (8 * 5)) - 1,
+            rolen=5,
+            want=parseShortForm("0xffffffffff"),
+        ),
+    ]
+
+    for test in tests:
+        res = txscript.int2octets(test["v"], test["rolen"])
+        assert (
+            res == test["want"]
+        ), f'wanted {test["want"].hex()} but got {res.hex()} for test {test["name"]}'
+
+
+def test_bits_2_octets():
+    """
+    name (str): Short description of the test.
+    bits (bytes-like): bits to convert.
+    rolen (int): Number of digits to allow.
+    want (ByteArray): Number in "octets" or bytes.
+    """
+    tests = [
+        dict(
+            name="zero", bits=ByteArray(0), rolen=5, want=parseShortForm("NULL_BYTES_5")
+        ),
+        dict(
+            name="one",
+            bits=ByteArray(1),
+            rolen=5,
+            want=parseShortForm("NULL_BYTES_4 0x01"),
+        ),
+        dict(
+            name="N",
+            bits=ByteArray(Curve.curve.N),
+            rolen=5,
+            want=parseShortForm("NULL_BYTES_5"),
+        ),
+        dict(
+            name="N + 1",
+            bits=ByteArray(Curve.curve.N + 1),
+            rolen=5,
+            want=parseShortForm("NULL_BYTES_4 0x01"),
+        ),
+        dict(
+            name="longer than the length of N is bitshifted right",
+            bits=ByteArray([*bytes(Curve.curve.N.bit_length() // 8), 0x01]),
+            rolen=5,
+            want=parseShortForm("NULL_BYTES_5"),
+        ),
+        dict(
+            name="same length as N",
+            bits=ByteArray([*bytes((Curve.curve.N.bit_length() // 8) - 1), 0x01]),
+            rolen=5,
+            want=parseShortForm("NULL_BYTES_4 0x01"),
+        ),
+        dict(
+            name="N - 1",
+            bits=ByteArray(Curve.curve.N - 1),
+            rolen=5,
+            want=ByteArray(Curve.curve.N - 1)[-5:],
+        ),
+    ]
+
+    for test in tests:
+        res = txscript.bits2octets(test["bits"], test["rolen"])
+        assert (
+            res == test["want"]
+        ), f'wanted {test["want"].hex()} but got {res.hex()} for test {test["name"]}'
