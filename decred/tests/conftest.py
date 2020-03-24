@@ -7,7 +7,7 @@ import random
 
 import pytest
 
-from decred.util import helpers
+from decred.util import chains, helpers
 
 
 @pytest.fixture
@@ -41,3 +41,8 @@ def randBytes():
 @pytest.fixture(scope="module")
 def prepareLogger(request):
     helpers.prepareLogging()
+
+
+@pytest.fixture(scope="class")
+def registerChain(request):
+    chains.registerChain("dcr", None)

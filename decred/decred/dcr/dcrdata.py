@@ -446,6 +446,7 @@ class DcrdataBlockchain:
         self.headerDB = db.child("header", blobber=msgblock.BlockHeader)
         self.txBlockMap = db.child("blocklink")
         self.tipHeight = None
+        self.subsidyCache = txscript.SubsidyCache(netParams)
         self.addrSubscribers = {}
         self.blockSubscribers = []
         if not skipConnect:
@@ -1254,7 +1255,12 @@ class DcrdataBlockchain:
         # If we need to calculate the amount for a pool fee percentage,
         # do so now.
         poolFeeAmt = txscript.stakePoolTicketFee(
-            ticketPrice, ticketFee, self.tipHeight, req.poolFees, self.netParams,
+            ticketPrice,
+            ticketFee,
+            self.tipHeight,
+            req.poolFees,
+            self.subsidyCache,
+            self.netParams,
         )
 
         # Fetch the single use split address to break tickets into, to

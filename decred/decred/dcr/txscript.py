@@ -3693,7 +3693,7 @@ class SubsidyCache:
         return (voters * subsidy) // self.netParams.TicketsPerBlock
 
 
-def stakePoolTicketFee(stakeDiff, relayFee, height, poolFee, netParams):
+def stakePoolTicketFee(stakeDiff, relayFee, height, poolFee, subsidyCache, netParams):
     """
     stakePoolTicketFee determines the stake pool ticket fee for a given ticket
     from the passed percentage. Pool fee as a percentage is truncated from 0.01%
@@ -3704,6 +3704,7 @@ def stakePoolTicketFee(stakeDiff, relayFee, height, poolFee, netParams):
         relayFee (int): Transaction fees.
         height (int): Current block height.
         poolFee (int): The pools fee, as percent.
+        subsidyCache (calc.SubsidyCache): A subsidy cache.
         netParams (module): The network parameters.
 
     Returns:
@@ -3727,7 +3728,7 @@ def stakePoolTicketFee(stakeDiff, relayFee, height, poolFee, netParams):
     # ceiling of the ticket pool size divided by the
     # reduction interval.
     adjs = int(math.ceil(netParams.TicketPoolSize / netParams.SubsidyReductionInterval))
-    subsidy = SubsidyCache(netParams).calcStakeVoteSubsidy(height)
+    subsidy = subsidyCache.calcStakeVoteSubsidy(height)
     for i in range(adjs):
         subsidy *= 100
         subsidy = subsidy // 101
