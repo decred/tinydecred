@@ -13,7 +13,6 @@ from decred.dcr.dcrdata import DcrdataBlockchain
 from decred.util import chains, database, encode, helpers
 from decred.util.helpers import mkdir
 
-
 from . import accounts
 
 
