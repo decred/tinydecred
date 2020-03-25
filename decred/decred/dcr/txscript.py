@@ -1791,6 +1791,16 @@ def payToStakeSHScript(addr, stakeCode):
 
 
 def multiSigScript(addrs, nRequired):
+    """
+    Create a multisig script for nRequired of addrs.
+
+    Args:
+        addrs (AddressSecpPubKey): Addresses that make up the script.
+        nRequired (int): The number of signatures required to spend.
+
+    Returns:
+        ByteArray: A multisig script.
+    """
     if len(addrs) < nRequired:
         raise DecredError(
             "unable to generate multisig script with {} required signatures when there are only {} public keys available".format(
