@@ -12,7 +12,7 @@ from decred.util import helpers
 
 def test_formatTraceback():
     # Cannot actually raise an error because pytest intercepts it.
-    assert helpers.formatTraceback(DecredError("errmsg")) == "errmsg\nNone"
+    assert helpers.formatTraceback(DecredError("errmsg")) == "errmsg\nTraceback:\nNone"
 
 
 def test_mkdir(tmp_path):

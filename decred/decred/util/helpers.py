@@ -21,10 +21,10 @@ def formatTraceback(err):
         err (BaseException): The error the traceback is extracted from.
 
     Returns:
-        str: The __str__() of the traceback, followed by the standard formatting
+        str: The __str__() of the error, followed by the standard formatting
             of the traceback on the following lines.
     """
-    return f"{err}\n{traceback.print_tb(err.__traceback__)}"
+    return f"{err}\nTraceback:\n{traceback.print_tb(err.__traceback__)}"
 
 
 def mkdir(path):
