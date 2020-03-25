@@ -65,7 +65,7 @@ def test_request_urlencoded(urlopen):
 
 def test_request_urlopen_error(monkeypatch):
     def urlopen_error(req, context=None):
-        raise DecredError()
+        raise DecredError("test error")
 
     monkeypatch.setattr(urlrequest, "urlopen", urlopen_error)
     with pytest.raises(DecredError):
