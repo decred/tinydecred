@@ -14,7 +14,7 @@ import webbrowser
 
 from PyQt5 import QtCore, QtGui, QtSvg, QtWidgets
 
-from decred.dcr import constants as DCR, nets, txscript
+from decred.dcr import constants as DCR, nets
 from decred.dcr.vsp import VotingServiceProvider
 from decred.util import chains, helpers
 from decred.wallet.wallet import Wallet
@@ -1993,7 +1993,7 @@ class StakeStatsScreen(Screen):
         self.networkValue.setText("{:.2f} dcr".format(tpinfo.value))
         blocksLeft = blksLeftStakeWindow(tpinfo.height, cfg.netParams)
         self.blocksLeft.setText(b(blocksLeft))
-        cache = txscript.SubsidyCache(cfg.netParams)
+        cache = blockchain.subsidyCache
         self.stakebase.setText(r(cache.calcStakeVoteSubsidy(tpinfo.height), ", "))
 
         stakeDiff = blockchain.stakeDiff()

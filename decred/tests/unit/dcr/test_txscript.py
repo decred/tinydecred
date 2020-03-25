@@ -812,10 +812,14 @@ def ssgenMsgTxWrongFirstOut():
 
 
 class TestSubsidyCache:
+    """
+    Based on dcrd's TestSubsidyCacheCalcs.
+    """
+
     def test_subsidy_cache_calcs(self, registerChain):
         """
-        TestSubsidyCacheCalcs ensures the subsidy cache calculates the various
-        subsidy proportions and values as expected.
+        Ensures the subsidy cache calculates the various subsidy proportions
+        and values as expected.
         """
 
         tests = [
@@ -1053,8 +1057,7 @@ class TestSubsidyCache:
 
     def test_total_subsidy(self, registerChain):
         """
-        TestTotalSubsidy ensures the total subsidy produced matches the expected
-        value.
+        Ensures the total subsidy produced matches the expected value.
         """
         # Locals for convenience.
         reductionInterval = mainnet.SubsidyReductionInterval
@@ -1109,8 +1112,8 @@ class TestSubsidyCache:
 
     def test_calc_block_subsidy_sparse_caching(self, registerChain):
         """
-        TestCalcBlockSubsidySparseCaching ensures the cache calculations work
-        properly when accessed sparsely and out of order.
+        Ensures the cache calculations work properly when accessed sparsely
+        and out of order.
         """
 
         # perCacheTest describes a test to run against the same cache.
