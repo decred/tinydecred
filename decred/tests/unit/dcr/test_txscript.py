@@ -4414,3 +4414,37 @@ def test_pay_to_addr_script():
         assert (
             res == test["want"]
         ), f'wanted {test["want"].hex()} but got {res.hex()} for test {test["name"]}'
+
+
+def test_as_small_int():
+    """
+    name (str): Short description of the test.
+    op (int): An opcode.
+    wantException (Exception): The exception expected if any.
+    want (int): The opcode as an integer.
+    """
+    tests = [
+        dict(name="zero", op=opcode.OP_0, want=0,),
+        dict(name="lowest converted small int", op=opcode.OP_1, want=1,),
+        dict(
+            name="one less than lowest converted small int",
+            op=opcode.OP_1 - 1,
+            wantException=DecredError,
+        ),
+        dict(name="highest converted small int", op=opcode.OP_16, want=16,),
+        dict(
+            name="one more than highest converted small int",
+            op=opcode.OP_16 + 1,
+            wantException=DecredError,
+        ),
+        dict(name="an opcode in the middle", op=opcode.OP_8, want=8,),
+    ]
+    for test in tests:
+        if test.get("wantException"):
+            with pytest.raises(test["wantException"]):
+                res = txscript.asSmallInt(test["op"])
+            continue
+        res = txscript.asSmallInt(test["op"])
+        assert (
+            res == test["want"]
+        ), f'wanted {test["want"]} but got {res} for test {test["name"]}'
