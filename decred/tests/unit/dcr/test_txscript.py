@@ -4216,3 +4216,71 @@ def test_bits_2_octets():
         assert (
             res == test["want"]
         ), f'wanted {test["want"].hex()} but got {res.hex()} for test {test["name"]}'
+
+
+def test_pay_to_sstx_change():
+    psf = parseShortForm
+    hash160 = crypto.hash160(0)
+    addrPubKeyHash = addrlib.AddressPubKeyHash(
+        hash160, testnet, crypto.STEcdsaSecp256k1
+    )
+    addrScriptHash = addrlib.AddressScriptHash(hash160, testnet)
+    addrPubKeyHashEdwards = addrlib.AddressPubKeyHash(
+        hash160, testnet, crypto.STEcdsaSecp256k1
+    )
+    addrPubKeyHashEdwards.sigType = crypto.STEd25519
+    addrPubKeyHashSchnorr = addrlib.AddressPubKeyHash(
+        hash160, testnet, crypto.STEcdsaSecp256k1
+    )
+    addrPubKeyHashSchnorr.sigType = crypto.STSchnorrSecp256k1
+    addrPubKey = addrlib.AddressSecpPubKey(
+        psf("0x03 {}".format(hex(Curve.curve.N))), testnet
+    )
+    """
+    name (str): Short description of the test.
+    addr (Address): An address. AddressPubKeyHash or AddressScriptHash.
+    wantException (Exception): The exception expected if any.
+    want (ByteArray): The PayToSStxChange script.
+    """
+    tests = [
+        dict(
+            name="address pubkey hash",
+            addr=addrPubKeyHash,
+            want=psf(
+                "SSTXCHANGE DUP HASH160 0x{} EQUALVERIFY CHECKSIG".format(
+                    txscript.addData(hash160).hex()
+                )
+            ),
+        ),
+        dict(
+            name="address script hash",
+            addr=addrScriptHash,
+            want=psf(
+                "SSTXCHANGE HASH160 0x{} EQUAL".format(txscript.addData(hash160).hex())
+            ),
+        ),
+        dict(
+            name="edwards not implemented",
+            addr=addrPubKeyHashEdwards,
+            wantException=NotImplementedError,
+        ),
+        dict(
+            name="schnorr not implemented",
+            addr=addrPubKeyHashSchnorr,
+            wantException=NotImplementedError,
+        ),
+        dict(
+            name="address pubkey not implemented",
+            addr=addrPubKey,
+            wantException=NotImplementedError,
+        ),
+    ]
+    for test in tests:
+        if test.get("wantException"):
+            with pytest.raises(test["wantException"]):
+                res = txscript.payToSStxChange(test["addr"])
+            continue
+        res = txscript.payToSStxChange(test["addr"])
+        assert (
+            res == test["want"]
+        ), f'wanted {test["want"].hex()} but got {res.hex()} for test {test["name"]}'
