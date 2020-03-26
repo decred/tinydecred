@@ -1699,6 +1699,12 @@ def payToAddrScript(addr):
     """
     PayToAddrScript creates a new script to pay a transaction output to a the
     specified address.
+
+    Args:
+        addr (Address): An address.
+
+    Returns:
+        ByteArray: The pay to address script.
     """
     if isinstance(addr, addrlib.AddressPubKeyHash):
         if addr.sigType == crypto.STEcdsaSecp256k1:
