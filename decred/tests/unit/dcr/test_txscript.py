@@ -4284,3 +4284,52 @@ def test_pay_to_sstx_change():
         assert (
             res == test["want"]
         ), f'wanted {test["want"].hex()} but got {res.hex()} for test {test["name"]}'
+
+
+def test_multi_sig_script():
+    root = crypto.ExtendedKey.new(rando.newHash().bytes())
+    pub1 = addrlib.AddressSecpPubKey(
+        root.child(0).publicKey().serializeCompressed(), testnet
+    )
+    pub2 = addrlib.AddressSecpPubKey(
+        root.child(1).publicKey().serializeCompressed(), testnet
+    )
+    pub3 = addrlib.AddressSecpPubKey(
+        root.child(2).publicKey().serializeCompressed(), testnet
+    )
+    """
+    name (str): Short description of the test.
+    addrs (list(AddressSecpPubKey)): Addresses that make up the script.
+    nRequired (int): The number of signatures required to spend.
+    wantException (Exception): The exception expected if any.
+    want (ByteArray): The PayToSStxChange script.
+    """
+    tests = [
+        dict(
+            name="2 of 3",
+            addrs=[pub1, pub2, pub3],
+            nRequired=2,
+            want=parseShortForm(
+                "2 DATA_33 0x{} DATA_33 0x{} DATA_33 0x{} 3 CHECKMULTISIG".format(
+                    pub1.serialize().hex(),
+                    pub2.serialize().hex(),
+                    pub3.serialize().hex(),
+                )
+            ),
+        ),
+        dict(
+            name="nRequired greater than number of addresses",
+            addrs=[pub1, pub2, pub3],
+            nRequired=4,
+            wantException=DecredError,
+        ),
+    ]
+    for test in tests:
+        if test.get("wantException"):
+            with pytest.raises(test["wantException"]):
+                res = txscript.multiSigScript(test["addrs"], test["nRequired"])
+            continue
+        res = txscript.multiSigScript(test["addrs"], test["nRequired"])
+        assert (
+            res == test["want"]
+        ), f'wanted {test["want"].hex()} but got {res.hex()} for test {test["name"]}'
