@@ -1552,6 +1552,27 @@ def checkSSGen(tx):
             )
 
 
+def isSStx(tx):
+    """
+    IsSSTx returns whether or not a transaction is a stake submission
+    transaction. These are also known as ticket purchases.
+
+    Args:
+        tx (MsgTx): A msgtx.MsgTx object.
+
+    Returns:
+        bool: Whether the tx is a ticket purchase.
+    """
+    try:
+        checkSStx(tx)
+
+    except Exception as e:
+        log.debug("isSStx: {}".format(e))
+
+    else:
+        return True
+
+
 def checkSStx(tx):
     """
     checkSStx returns an error if a transaction is not a stake submission
@@ -1577,6 +1598,9 @@ def checkSStx(tx):
     OP_SSTXCHANGE tagged output [index (MaxInputsPerSStx*2)-1]
 
     The output OP_RETURN pushes should be of size 20 bytes (standard address).
+
+    Args:
+        tx (MsgTx): A msgtx.MsgTx object.
     """
     # Check to make sure there aren't too many inputs.
     # CheckTransactionSanity already makes sure that number of inputs is
