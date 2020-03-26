@@ -4238,7 +4238,7 @@ def test_pay_to_sstx_change():
     )
     """
     name (str): Short description of the test.
-    addr (object): An address. crypto.AddressPubKeyHash or crypto.AddressScriptHash.
+    addr (Address): An address. AddressPubKeyHash or AddressScriptHash.
     wantException (Exception): The exception expected if any.
     want (ByteArray): The PayToSStxChange script.
     """

@@ -1920,7 +1920,7 @@ def payToSStxChange(addr):
     valid SStxs.
 
     Args:
-        addr (object): An address. crypto.AddressPubKeyHash or crypto.AddressScriptHash.
+        addr (Address): An address. AddressPubKeyHash or AddressScriptHash.
 
     Returns:
         ByteArray: The PayToSStxChange script.
