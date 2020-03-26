@@ -161,7 +161,7 @@ class DcrdataClient:
         _, self.psURL = getSocketURLs(self.baseURL)
         self.ps = None
         self.subscribedAddresses = []
-        self.emitter = emitter
+        self.emitter = emitter if emitter else lambda msg: None
         atexit.register(self.close)
         root = self.root = DcrdataPath()
         self.listEntries = []

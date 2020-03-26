@@ -13,14 +13,12 @@ import pytest
 from decred import DecredError
 from decred.crypto import opcode
 from decred.dcr import account, agenda, nets, txscript
+from decred.dcr import dcrdata
 from decred.dcr.dcrdata import (
-    WS_DONE,
     DcrdataBlockchain,
     DcrdataClient,
     DcrdataError,
     DcrdataPath,
-    checkOutput,
-    makeOutputs,
 )
 from decred.dcr.nets import testnet
 from decred.dcr.wire import msgtx
@@ -95,15 +93,15 @@ def test_dcrdatapath(http_get_post):
 def test_makeoutputs():
     # Amount is non-integer.
     with pytest.raises(DecredError):
-        makeOutputs([("", None)], None)
+        dcrdata.makeOutputs([("", None)], None)
 
     # Amount is negative.
     with pytest.raises(DecredError):
-        makeOutputs([("", -1)], None)
+        dcrdata.makeOutputs([("", -1)], None)
 
     address = "TsfDLrRkk9ciUuwfp2b8PawwnukYD7yAjGd"  # testnet return address
     value = int(1 * 1e8)  # 1 DCR, atoms
-    output = makeOutputs([(address, value)], testnet)[0]
+    output = dcrdata.makeOutputs([(address, value)], testnet)[0]
     assert isinstance(output, msgtx.TxOut)
     assert output.value == value
 
@@ -112,38 +110,59 @@ def test_checkoutput():
     # Amount is zero.
     tx = msgtx.TxOut()
     with pytest.raises(DecredError):
-        checkOutput(tx, 0)
+        dcrdata.checkOutput(tx, 0)
 
     # Amount is negative.
     tx = msgtx.TxOut(-1)
     with pytest.raises(DecredError):
-        checkOutput(tx, 0)
+        dcrdata.checkOutput(tx, 0)
 
     # Amount is too large.
     tx = msgtx.TxOut(txscript.MaxAmount + 1)
     with pytest.raises(DecredError):
-        checkOutput(tx, 0)
+        dcrdata.checkOutput(tx, 0)
 
     # Tx is dust output.
     script = ByteArray([opcode.OP_RETURN, opcode.OP_NOP])
     tx = msgtx.TxOut(value=1, pkScript=script)
     with pytest.raises(DecredError):
-        checkOutput(tx, 0)
+        dcrdata.checkOutput(tx, 0)
 
 
 class MockWebSocketClient:
-    def __init__(self, *a, **k):
+    def __init__(self, url, on_message, on_close, on_error):
+        self.on_message = on_message
+        self.on_close = on_close
+        self.on_error = on_error
         self.sent = []
+        self.received = []
 
     def send(self, msg):
-        try:
-            msg = json.loads(msg)
-        except json.JSONDecodeError:
-            pass
         self.sent.append(msg)
 
     def close(self):
-        pass
+        self.on_close(self)
+
+    def get_emitter(self):
+
+        def emitter(msg):
+            self.received.append(msg)
+
+        return emitter
+
+    def empty_queues(self):
+        self.sent = []
+        self.received = []
+
+
+class TweakedDcrdataClient(DcrdataClient):
+    def __init__(self, url, emitter=None, monkeypatch=None):
+        if monkeypatch is None:
+            raise RuntimeError("Need monkeypatch")
+        monkeypatch.setattr(ws, "Client", MockWebSocketClient)
+        super().__init__(url, emitter)
+        self.psClient()
+        self.emitter = self.ps.get_emitter()
 
 
 def preload_api_list(http_get_post, baseURL=API_URL):
@@ -170,20 +189,39 @@ class TestDcrdataClient:
         out, err = capsys.readouterr()
         assert len(out.splitlines()) == 85
 
-    def test_subscriptions(self, http_get_post):
+    def test_subscriptions(self, http_get_post, monkeypatch):
+        # Create a DcrdataClient with a mocked ws.Client that captures the
+        # signals and stores the messages.
         preload_api_list(http_get_post)
-        ddc = DcrdataClient(BASE_URL)
+        ddc = TweakedDcrdataClient(BASE_URL, None, monkeypatch)
+        dcrdata._subcounter = 0
 
-        # Set the mock WebSocketClient.
-        ddc.ps = MockWebSocketClient()
+        # Test sending.
 
         ddc.subscribedAddresses = ["already_there"]
         ddc.subscribeAddresses(["already_there", "new_one"])
-        assert ddc.ps.sent[0]["message"]["message"] == "address:new_one"
-
-        ddc.ps.sent = []
+        assert ddc.ps.sent[0] == (
+            '{"event": "subscribe", '
+            '"message": {"request_id": 1, "message": "address:new_one"}}'
+        )
         ddc.subscribeBlocks()
-        assert ddc.ps.sent[0]["message"]["message"] == "newblock"
+        assert ddc.ps.sent[1] == (
+            '{"event": "subscribe", '
+            '"message": {"request_id": 1, "message": "newblock"}}'
+        )
+
+        # Test receiving.
+
+        ddc.ps.on_message(ddc.ps, '{"event": "ping"}')
+        assert not ddc.ps.received
+
+        ddc.ps.on_message(ddc.ps, "not_json")
+        assert ddc.ps.received[0] == "not_json"
+
+        ddc.ps.on_close(ddc.ps)
+        assert ddc.ps.received[1] == dcrdata.WS_DONE
+
+        ddc.ps.on_error(ddc.ps, DecredError("test_error"))
 
     def test_static(self):
         assert DcrdataClient.timeStringToUnix("1970-01-01 00:00:00") == 0
@@ -342,7 +380,7 @@ class TestDcrdataBlockchain:
         http_get_post(f"{API_URL}/stake/diff", {"estimates": {"expected": 1}})
         assert ddb.nextStakeDiff() == 1e8
 
-    def test_subscriptions(self, http_get_post):
+    def test_subscriptions(self, http_get_post, monkeypatch):
         # Exception in updateTip.
         preload_api_list(http_get_post)
         with pytest.raises(DecredError):
@@ -351,10 +389,10 @@ class TestDcrdataBlockchain:
         # Successful creation.
         preload_api_list(http_get_post)
         http_get_post(f"{API_URL}/block/best", dict(height=1))
-        ddb = DcrdataBlockchain(":memory:", testnet, BASE_URL)
-
-        # Set the mock WebsocketClient.
-        ddb.dcrdata.ps = MockWebSocketClient()
+        ddb = DcrdataBlockchain(":memory:", testnet, BASE_URL, skipConnect=True)
+        ddb.dcrdata = TweakedDcrdataClient(ddb.datapath, ddb.pubsubSignal, monkeypatch)
+        ddb.updateTip()
+        dcrdata._subcounter = 0
 
         # Receiver
         block_queue = []
@@ -370,15 +408,20 @@ class TestDcrdataBlockchain:
 
         # subscribeBlocks
         ddb.subscribeBlocks(blockReceiver)
-        assert ddb.dcrdata.ps.sent[0]["message"]["message"] == "newblock"
-        ddb.dcrdata.ps.sent = []
+        assert ddb.dcrdata.ps.sent[0] == (
+            '{"event": "subscribe", '
+            '"message": {"request_id": 1, "message": "newblock"}}'
+        )
 
         # subscribeAddresses
         ddb.subscribeAddresses(["new_one"], addrReceiver)
-        assert ddb.dcrdata.ps.sent[0]["message"]["message"] == "address:new_one"
+        assert ddb.dcrdata.ps.sent[1] == (
+            '{"event": "subscribe", '
+            '"message": {"request_id": 1, "message": "address:new_one"}}'
+        )
 
         # pubsubSignal
-        assert ddb.pubsubSignal(WS_DONE) is None
+        assert ddb.pubsubSignal(dcrdata.WS_DONE) is None
         assert ddb.pubsubSignal(dict(event="subscribeResp")) is None
         assert ddb.pubsubSignal(dict(event="ping")) is None
         assert ddb.pubsubSignal(dict(event="unknown")) is None
