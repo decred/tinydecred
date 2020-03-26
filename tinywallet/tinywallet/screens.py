@@ -1802,7 +1802,9 @@ class LiveTicketsScreen(Screen):
         """
         hostname = nets.normalizeName(cfg.netParams.Name)
         utxo = self.liveTickets[item.text()[:8]]
-        url = urlunsplit(("https", f"{hostname}.dcrdata.org", f"/{utxo.txid}", "", ""))
+        url = urlunsplit(
+            ("https", f"{hostname}.dcrdata.org", f"/tx/{utxo.txid}", "", "")
+        )
         openInBrowser(url)
 
     def addItems(self, liveTickets):
