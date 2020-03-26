@@ -4299,7 +4299,7 @@ def test_multi_sig_script():
     )
     """
     name (str): Short description of the test.
-    addrs (AddressSecpPubKey): Addresses that make up the script.
+    addrs (list(AddressSecpPubKey)): Addresses that make up the script.
     nRequired (int): The number of signatures required to spend.
     wantException (Exception): The exception expected if any.
     want (ByteArray): The PayToSStxChange script.
