@@ -9,7 +9,7 @@ Before running this script, send the wallet some DCR from the faucet.
 
 from getpass import getpass
 
-from decred.wallet.simple import SimpleWallet
+from decred.wallet.wallet import SimpleWallet
 
 # Testnet return address for faucet.decred.org.
 TESTNET_ADDRESS = "TsfDLrRkk9ciUuwfp2b8PawwnukYD7yAjGd"
