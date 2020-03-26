@@ -12,8 +12,7 @@ import pytest
 
 from decred import DecredError
 from decred.crypto import opcode
-from decred.dcr import account, agenda, nets, txscript
-from decred.dcr import dcrdata
+from decred.dcr import account, agenda, dcrdata, nets, txscript
 from decred.dcr.dcrdata import (
     DcrdataBlockchain,
     DcrdataClient,
@@ -144,7 +143,6 @@ class MockWebSocketClient:
         self.on_close(self)
 
     def get_emitter(self):
-
         def emitter(msg):
             self.received.append(msg)
 
