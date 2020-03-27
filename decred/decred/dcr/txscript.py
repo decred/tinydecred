@@ -1661,12 +1661,22 @@ def checkSStx(tx):
             )
 
 
-# asSmallInt returns the passed opcode, which must be true according to
-# isSmallInt(), as an integer.
 def asSmallInt(op):
+    """
+    asSmallInt returns the passed opcode, which must be true according to
+    isSmallInt(), as an integer.
+
+    Args:
+        op (int): An opcode.
+
+    Returns:
+        int: The opcode as an integer.
+    """
+    if not isSmallInt(op):
+        raise DecredError(f"asSmallInt:{op} is not a small int")
     if op == opcode.OP_0:
         return 0
-    return int(op - (opcode.OP_1 - 1))
+    return op - (opcode.OP_1 - 1)
 
 
 def isSmallInt(op):
@@ -1699,6 +1709,12 @@ def payToAddrScript(addr):
     """
     PayToAddrScript creates a new script to pay a transaction output to a the
     specified address.
+
+    Args:
+        addr (Address): An address.
+
+    Returns:
+        ByteArray: The pay to address script.
     """
     if isinstance(addr, addrlib.AddressPubKeyHash):
         if addr.sigType == crypto.STEcdsaSecp256k1:

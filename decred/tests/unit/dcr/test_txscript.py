@@ -4333,3 +4333,118 @@ def test_multi_sig_script():
         assert (
             res == test["want"]
         ), f'wanted {test["want"].hex()} but got {res.hex()} for test {test["name"]}'
+
+
+def test_pay_to_addr_script():
+    psf = parseShortForm
+    hash160 = crypto.hash160(0)
+    addrPubKeyHash = addrlib.AddressPubKeyHash(
+        hash160, testnet, crypto.STEcdsaSecp256k1
+    )
+    addrScriptHash = addrlib.AddressScriptHash(hash160, testnet)
+    addrPubKeyHashEdwards = addrlib.AddressPubKeyHash(
+        hash160, testnet, crypto.STEcdsaSecp256k1
+    )
+    addrPubKeyHashEdwards.sigType = crypto.STEd25519
+    addrPubKeyHashSchnorr = addrlib.AddressPubKeyHash(
+        hash160, testnet, crypto.STEcdsaSecp256k1
+    )
+    addrPubKeyHashSchnorr.sigType = crypto.STSchnorrSecp256k1
+    pubBytes = psf("0x03 {}".format(hex(Curve.curve.N)))
+    addrSecpPubKey = addrlib.AddressSecpPubKey(pubBytes, testnet)
+    addrEdwardsPubKey = addrlib.AddressEdwardsPubKey.__new__(
+        addrlib.AddressEdwardsPubKey
+    )
+    addrSchnorrPubKey = addrlib.AddressSecSchnorrPubKey.__new__(
+        addrlib.AddressSecSchnorrPubKey
+    )
+    """
+    name (str): Short description of the test.
+    addr (Address): An address.
+    wantException (Exception): The exception expected if any.
+    want (ByteArray): The pay to address script.
+    """
+    tests = [
+        dict(
+            name="address pubkey hash",
+            addr=addrPubKeyHash,
+            want=psf(
+                "DUP HASH160 0x{} EQUALVERIFY CHECKSIG".format(
+                    txscript.addData(hash160).hex()
+                )
+            ),
+        ),
+        dict(
+            name="edwards hash not implemented",
+            addr=addrPubKeyHashEdwards,
+            wantException=NotImplementedError,
+        ),
+        dict(
+            name="schnorr hash not implemented",
+            addr=addrPubKeyHashEdwards,
+            wantException=NotImplementedError,
+        ),
+        dict(
+            name="address script hash",
+            addr=addrScriptHash,
+            want=psf("HASH160 0x{} EQUAL".format(txscript.addData(hash160).hex())),
+        ),
+        dict(
+            name="address secp pubkey",
+            addr=addrSecpPubKey,
+            want=psf("0x{} CHECKSIG".format(txscript.addData(pubBytes).hex())),
+        ),
+        dict(
+            name="edwards pubkey not implemented",
+            addr=addrEdwardsPubKey,
+            wantException=NotImplementedError,
+        ),
+        dict(
+            name="schnorr pubkey not implemented",
+            addr=addrSchnorrPubKey,
+            wantException=NotImplementedError,
+        ),
+    ]
+    for test in tests:
+        if test.get("wantException"):
+            with pytest.raises(test["wantException"]):
+                res = txscript.payToAddrScript(test["addr"])
+            continue
+        res = txscript.payToAddrScript(test["addr"])
+        assert (
+            res == test["want"]
+        ), f'wanted {test["want"].hex()} but got {res.hex()} for test {test["name"]}'
+
+
+def test_as_small_int():
+    """
+    name (str): Short description of the test.
+    op (int): An opcode.
+    wantException (Exception): The exception expected if any.
+    want (int): The opcode as an integer.
+    """
+    tests = [
+        dict(name="zero", op=opcode.OP_0, want=0,),
+        dict(name="lowest converted small int", op=opcode.OP_1, want=1,),
+        dict(
+            name="one less than lowest converted small int",
+            op=opcode.OP_1 - 1,
+            wantException=DecredError,
+        ),
+        dict(name="highest converted small int", op=opcode.OP_16, want=16,),
+        dict(
+            name="one more than highest converted small int",
+            op=opcode.OP_16 + 1,
+            wantException=DecredError,
+        ),
+        dict(name="an opcode in the middle", op=opcode.OP_8, want=8,),
+    ]
+    for test in tests:
+        if test.get("wantException"):
+            with pytest.raises(test["wantException"]):
+                res = txscript.asSmallInt(test["op"])
+            continue
+        res = txscript.asSmallInt(test["op"])
+        assert (
+            res == test["want"]
+        ), f'wanted {test["want"]} but got {res} for test {test["name"]}'
