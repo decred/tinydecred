@@ -920,7 +920,6 @@ class DcrdataBlockchain:
         Arg:
             sig (dict or string): The block explorer's notification, decoded.
         """
-        # log.debug("pubsub signal recieved: %s" % repr(sig))
         if sig == WS_DONE:
             return
         sigType = sig["event"]

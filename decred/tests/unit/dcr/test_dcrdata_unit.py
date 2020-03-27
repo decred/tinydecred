@@ -148,10 +148,6 @@ class MockWebSocketClient:
 
         return emitter
 
-    def empty_queues(self):
-        self.sent = []
-        self.received = []
-
 
 class TweakedDcrdataClient(DcrdataClient):
     def __init__(self, url, emitter=None, monkeypatch=None):
@@ -389,7 +385,6 @@ class TestDcrdataBlockchain:
         http_get_post(f"{API_URL}/block/best", dict(height=1))
         ddb = DcrdataBlockchain(":memory:", testnet, BASE_URL, skipConnect=True)
         ddb.dcrdata = TweakedDcrdataClient(ddb.datapath, ddb.pubsubSignal, monkeypatch)
-        ddb.updateTip()
         dcrdata._subcounter = 0
 
         # Receiver
@@ -424,11 +419,12 @@ class TestDcrdataBlockchain:
         assert ddb.pubsubSignal(dict(event="ping")) is None
         assert ddb.pubsubSignal(dict(event="unknown")) is None
         # pubsubSignal address
-        ddb.subscribeAddresses(["the_address"], addrReceiver)
         sig = dict(
             event="address",
             message=dict(address="the_address", transaction="transaction"),
         )
+        assert ddb.pubsubSignal(sig) is None
+        ddb.subscribeAddresses(["the_address"], addrReceiver)
         ddb.pubsubSignal(sig)
         assert addr_queue[0] == ("the_address", "transaction")
         # pubsubSignal newblock
@@ -649,3 +645,16 @@ class TestDcrdataBlockchain:
         http_get_post(f"https://thisurl.org/api/block/best", dict(height=1))
         ddb.changeServer("https://thisurl.org/")
         assert ddb.dcrdata.baseURL == "https://thisurl.org/"
+
+        preload_api_list(http_get_post, baseURL="https://thisurl.org/api")
+        with pytest.raises(DecredError):
+            ddb.changeServer("https://thisurl.org/")
+
+    def test_broadcast(self, http_get_post):
+        preload_api_list(http_get_post)
+        http_get_post(f"{API_URL}/block/best", dict(height=1))
+        ddb = DcrdataBlockchain(":memory:", testnet, BASE_URL)
+        with pytest.raises(KeyError):
+            ddb.broadcast("some_addr")
+        http_get_post((f"{INSIGHT_URL}/tx/send", "{'rawtx': 'some_addr'}"), None)
+        assert ddb.broadcast("some_addr")
