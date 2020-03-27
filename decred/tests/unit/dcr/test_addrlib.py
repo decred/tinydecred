@@ -396,4 +396,4 @@ def test_decodeAddressPubKey():
     )
     for d in decoded:
         with pytest.raises(NotImplementedError):
-            addrlib.decodeAddressPubKey(decoded, testnet)
+            addrlib.decodeAddressPubKey(d, testnet)
