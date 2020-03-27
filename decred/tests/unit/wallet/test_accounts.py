@@ -7,7 +7,7 @@ import pytest
 
 from decred import DecredError
 from decred.crypto import crypto, rando
-from decred.dcr import account, nets
+from decred.dcr import addrlib, nets
 from decred.util import chains, database, encode
 from decred.wallet import accounts
 
@@ -108,7 +108,7 @@ def test_discover(prepareLogger):
 
     coinExtKey = acctMgr.coinKey(cryptoKey)
     acct2ExtKey = coinExtKey.deriveAccountKey(2).neuter().child(0)
-    acct2Addr5 = account.deriveChildAddress(acct2ExtKey, 5, nets.mainnet)
+    acct2Addr5 = addrlib.deriveChildAddress(acct2ExtKey, 5, nets.mainnet)
     txs[acct2Addr5] = ["tx"]
     acctMgr.discover(cryptoKey)
     assert len(acctMgr.accounts) == 3

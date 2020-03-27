@@ -4,7 +4,6 @@ Copyright (c) 2020, the Decred developers
 
 
 import time
-from urllib.parse import urlsplit, urlunsplit
 
 from decred.crypto import crypto
 from decred.dcr import addrlib, rpc
@@ -14,20 +13,6 @@ from decred.util.encode import ByteArray
 
 
 log = helpers.getLogger("blockchain")
-
-
-def getSocketURL(url):
-    """
-    Turn the HTTP/HTTPS URL into a WS/WSS one.
-
-    Args:
-        url (string): The DCRD RPC URL.
-    Returns:
-        string: the WebSocket URL.
-    """
-    url = urlsplit(url)
-    scheme = "wss" if url.scheme in ("https", "wss") else "ws"
-    return urlunsplit((scheme, url.netloc, "/ws", "", ""))
 
 
 class LocalNode:
@@ -54,8 +39,7 @@ class LocalNode:
         self.headerDB = self.db.child(
             "headers", blobber=BlockHeader, keyBlobber=ByteArray
         )
-        # self.txsDB = self.db.child("txs", blobber=MsgTx, keyBlobber=ByteArray)
-        self.socketURL = getSocketURL(url)
+        self.socketURL = helpers.makeWebsocketURL(url, "ws")
         self.rpc = rpc.WebsocketClient(self.socketURL, user, pw, cert=certPath)
 
     def close(self):
@@ -66,8 +50,7 @@ class LocalNode:
 
     def header(self, blockHash):
         """
-        Get the header, from the headerDB if possible, otherwise fetch from
-        RPC.
+        Get the header, from the headerDB if possible, otherwise fetch from RPC.
 
         Args:
             blockHash (ByteArray): The block header hash.
@@ -103,7 +86,7 @@ class LocalNode:
         Find all addresses associated with the extended public key, beginning at
         index and looking up to gap addresses past the last seen address. For
         example, if startIdx = 5, and gap = 5, and no new addresses are found
-        before 5 + 5 = 10, then to results will be returned. If, on the other
+        before 5 + 5 = 10, then no results will be returned. If, on the other
         hand, a result is found at index 9, addresses will be checked up to
         index 14. If an address is then found at index 13, result will be
         checked  up to 18, and so on.
@@ -128,7 +111,8 @@ class LocalNode:
         while end > idx:
             its += 1
             addrs = [
-                deriveChildAddress(xPub, i, netParams) for i in range(idx, end + 1)
+                addrlib.deriveChildAddress(xPub, i, netParams)
+                for i in range(idx, end + 1)
             ]
             founds = self.rpc.existsAddresses(addrs)
             for j, found in enumerate(founds):
@@ -190,8 +174,7 @@ class LocalNode:
             root (ByteArray): The block hash of the root.
 
         Returns:
-            list(ByteArray): A list of blocks hashes for blocks removed from
-                mainchain.
+            list(ByteArray): A list of hashes for blocks removed from mainchain.
         """
         synced = 0
         mainchain = self.mainchainDB
@@ -244,12 +227,12 @@ class LocalNode:
 
     def syncHeaderRange(self, start, end):
         """
-        Store mainchain block headers in the range [start:end), e.g. start is
-        not included.
+        Retrieve and store mainchain block headers in the range [start:end),
+        e.g. start is not included.
 
         Args:
             start (int): The start height. The block for this height is not
-                synced except in the special cast of start = 0, which does
+                synced except in the special case of start = 0, which does
                 trigger storage of the genesis block.
             end (int): The last block to sync. This block for this height will
                 be synced.
@@ -291,22 +274,3 @@ class LocalNode:
             headers = self.rpc.getHeaders([startHash], stopHash)
 
         return synced
-
-
-def deriveChildAddress(branchXPub, i, netParams):
-    """
-    The base-58 encoded address for the i'th child.
-
-    Args:
-        i (int): Child number.
-        netParams (module): Network parameters.
-
-    Returns:
-        str: Child address.
-    """
-    child = branchXPub.child(i)
-    return addrlib.AddressPubKeyHash(
-        crypto.hash160(child.publicKey().serializeCompressed().b),
-        netParams,
-        crypto.STEcdsaSecp256k1,
-    ).string()

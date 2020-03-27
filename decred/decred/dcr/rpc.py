@@ -3467,7 +3467,8 @@ class WebsocketClient(Client):
         Set or add to the current transaction filter.
 
         Args:
-            clear (bool): If true, previous filter will be cleared.
+            clear (bool): If True, previous filter will be cleared, otherwise,
+                the new filter will be combined with the old one.
             addresses list(string): Addresses of interest.
             outPoints list(msgtx.OutPoint): Outputs to look for.
         """
@@ -3492,13 +3493,16 @@ class WebsocketClient(Client):
 
 
 class RescanBlock:
-    """rescan result"""
+    """
+    The result from a rescan. Represents one block with one or more transaction
+    that matched the transaction filter.
+    """
 
     def __init__(self, blockHash, txs):
         """
         Args:
             blockHash (ByteArray): The block hash.
-            txs list(MsgTx): The transactions that matched the rescan filter.
+            txs list(MsgTx): The transactions that matched the tx filter.
         """
         self.hash = blockHash
         self.txs = txs

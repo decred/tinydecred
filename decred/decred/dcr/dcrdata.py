@@ -17,7 +17,7 @@ from decred.crypto import crypto
 from decred.dcr import addrlib
 from decred.util import database, tinyhttp, ws
 from decred.util.encode import ByteArray
-from decred.util.helpers import formatTraceback, getLogger
+from decred.util.helpers import formatTraceback, getLogger, makeWebsocketURL
 
 from . import account, agenda, txscript
 from .wire import msgblock, msgtx, wire
@@ -119,12 +119,7 @@ def getSocketURLs(url):
     Returns:
         string, string: the WebSocket and PubSub URLs.
     """
-    url = urlsplit(url)
-    scheme = "wss" if url.scheme == "https" else "ws"
-    return (
-        urlunsplit((scheme, url.netloc, "/ws", "", "")),
-        urlunsplit((scheme, url.netloc, "/ps", "", "")),
-    )
+    return makeWebsocketURL(url, "ws"), makeWebsocketURL(url, "ps")
 
 
 # TODO: get the full list here.

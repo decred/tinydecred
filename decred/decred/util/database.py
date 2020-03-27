@@ -282,7 +282,16 @@ class Bucket:
             yield decoder(row[0])
             row = cursor.fetchone()
 
-    def _getTuple(self, query):
+    def _getKV(self, query):
+        """
+        A helper to run a parameter-less query intended to return a single row.
+
+        Args:
+            query (str): The query.
+
+        Returns:
+            tuple: The key and value, decoded.
+        """
         cursor = self.conn.cursor()
         cursor.execute(query)
         row = cursor.fetchone()
@@ -292,21 +301,21 @@ class Bucket:
 
     def last(self):
         """
-        Get the highest key in the table. Also returns the value.
+        Get the highest key in the table and its value as a tuple.
 
         Returns:
             tuple: Key and value.
         """
-        return self._getTuple(self.lastQuery)
+        return self._getKV(self.lastQuery)
 
     def first(self):
         """
-        Get the lowest key in the table. Also returns the value.
+        Get the lowest key in the table and its value as a tuple.
 
         Returns:
             tuple: Key and value.
         """
-        return self._getTuple(self.firstQuery)
+        return self._getKV(self.firstQuery)
 
     def clear(self):
         """

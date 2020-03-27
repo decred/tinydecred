@@ -446,3 +446,20 @@ def decodeAddressPubKey(decoded, netParams):
         raise NotImplementedError("Schnorr signatures not implemented")
     else:
         raise NotImplementedError(f"unknown address type {suite}")
+
+
+def deriveChildAddress(branchXPub, i, netParams):
+    """
+    The base-58 encoded address for the i'th child.
+
+    Args:
+        i (int): Child number.
+        netParams (module): Network parameters.
+
+    Returns:
+        str: Child address, as a base-58 encoded string.
+    """
+    child = branchXPub.child(i)
+    return AddressPubKeyHash(
+        hash160(child.publicKey().serializeCompressed().b), netParams, STEcdsaSecp256k1,
+    ).string()

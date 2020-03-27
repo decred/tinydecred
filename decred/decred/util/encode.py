@@ -286,10 +286,10 @@ class ByteArray:
             self.b[i + j] = v[j]
 
     def __reversed__(self):
-        # TODO: The bytearray shouldn't be necessary here.
         return ByteArray(bytearray(reversed(self.b)))
 
     def __hash__(self):
+        """Enables ByteArray to be a dict key."""
         return hash(bytes(self.b))
 
     def hex(self):
@@ -364,6 +364,10 @@ class ByteArray:
 def rba(b):
     """
     Reversed ByteArray.
+
+    Args:
+        b: The intializer. Can be any type accepted by the ByteArray
+            constructor.
     """
     return reversed(ByteArray(b))
 

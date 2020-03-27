@@ -13,6 +13,7 @@ import platform
 import sys
 import time
 import traceback
+from urllib.parse import urlsplit, urlunsplit
 
 from appdirs import AppDirs
 
@@ -206,3 +207,19 @@ def appDataDir(appName):
 
     # Fall back to the current directory if all else fails.
     return "."
+
+
+def makeWebsocketURL(baseURL, path):
+    """
+    Turn the HTTP/HTTPS URL into a WS/WSS one.
+
+    Args:
+        url (str): The base URL.
+        path (str): The websocket endpoint path. e.g. path of "ws" will yield
+            URL wss://yourhost.com/ws.
+    Returns:
+        string: the WebSocket URL.
+    """
+    url = urlsplit(baseURL)
+    scheme = "wss" if url.scheme in ("https", "wss") else "ws"
+    return urlunsplit((scheme, url.netloc, f"/{path}", "", ""))

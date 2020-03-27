@@ -1,8 +1,6 @@
 """
 Copyright (c) 2020, the Decred developers
 See LICENSE for details
-
-Tests use the "http_get_post" fixture in conftest.py .
 """
 
 import pytest
