@@ -14,9 +14,12 @@ import webbrowser
 
 from PyQt5 import QtCore, QtGui, QtSvg, QtWidgets
 
+from decred import DecredError
+from decred.crypto import crypto
 from decred.dcr import constants as DCR, nets
+from decred.dcr.blockchain import LocalNode
 from decred.dcr.vsp import VotingServiceProvider
-from decred.util import chains, helpers
+from decred.util import chains, database, helpers
 from decred.wallet.wallet import Wallet
 from tinywallet.config import DB
 
@@ -241,12 +244,11 @@ class TinyDialog(QtWidgets.QFrame):
             return
         popped.setVisible(False)
         self.layout.removeWidget(popped)
-        # log.debug("pop setting top screen to %s" % type(top).__name__)
+        if hasattr(popped, "unstacked"):
+            popped.unstacked()
         top.setVisible(True)
         top.runAnimation(FADE_IN_ANIMATION)
         self.setIcons(top)
-        self.setIcons(top)
-        widgetList = list(Q.layoutWidgets(self.layout))
 
     def setHomeScreen(self, home):
         """
@@ -259,12 +261,14 @@ class TinyDialog(QtWidgets.QFrame):
         # log.debug("setting home screen")
         for wgt in list(Q.layoutWidgets(self.layout)):
             wgt.setVisible(False)
+            if hasattr(wgt, "unstacked"):
+                wgt.unstacked()
             self.layout.removeWidget(wgt)
         home.setVisible(True)
         home.runAnimation(FADE_IN_ANIMATION)
         self.layout.addWidget(home)
-        if hasattr(home, "inserted"):
-            home.inserted()
+        if hasattr(home, "stacked"):
+            home.stacked()
         self.setIcons(home)
 
     def setIcons(self, top):
@@ -534,7 +538,8 @@ class AccountScreen(Screen):
         newAddrBttn.clicked.connect(self.newAddressClicked)
 
         row, lyt = Q.makeRow(addrLbl, Q.STRETCH, newAddrBttn)
-        self.address = AddressDisplay("")
+        self.address = Q.makeLabel("", 14)
+        self.address.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         box, lyt = Q.makeWidget(QtWidgets.QWidget, Q.VERTICAL)
         lyt.addWidget(self.address, 0, Q.ALIGN_TOP)
         Q.addDropShadow(box)
@@ -543,7 +548,6 @@ class AccountScreen(Screen):
 
         left, _ = Q.makeColumn(Q.STRETCH, row, box)
         left.setContentsMargins(5, 5, 5, 10)
-        left.setMaximumWidth(320)
 
         # OPTIONS
 
@@ -706,27 +710,31 @@ class AccountScreen(Screen):
         """
         Start syncing the account.
         """
+        if self.account.synced:
+            app.home(self)
+            return
 
         def done(ret):
-            app.emitSignal(ui.DONE_SIGNAL)
-            app.emitSignal(ui.SYNC_SIGNAL)
+            if ret:
+                app.emitSignal(ui.SYNC_SIGNAL)
 
-        def sync(x):
+        def sync():
             if not self.account.isUnlocked():
                 return
-            app.home(self)
-            app.emitSignal(ui.WORKING_SIGNAL)
-            app.makeThread(self.account.sync, done)
+            try:
+                app.emitSignal(ui.WORKING_SIGNAL)
+                app.home(self)
+                return self.account.sync()
+            finally:
+                app.emitSignal(ui.DONE_SIGNAL)
 
-        unlockAccount(self.account, sync)
+        withUnlockedAccount(self.account, sync, done)
 
 
 class PasswordDialog(Screen):
     """
     PasswordDialog is a simple form for getting a user-supplied password.
     """
-
-    doneSig = QtCore.pyqtSignal()
 
     def __init__(self):
         """
@@ -739,76 +747,100 @@ class PasswordDialog(Screen):
         mainLayout.setSpacing(10)
         self.isPoppable = True
         self.canGoHome = False
+        self.promptText = "Password"
 
-        self.args = tuple()
-        self.doneSig.connect(self.done_)
+        # Password is not stacked directly, but by using withCallback. The
+        # callback is set there.
+        self.callback = lambda pw: True
 
-        mainLayout.addWidget(QtWidgets.QLabel("password"))
+        # The default prompt text is "Password", but different text can be
+        # specified in withCallback.
+        self.prompt = QtWidgets.QLabel(self.promptText)
+        mainLayout.addWidget(self.prompt)
         pw = self.pwInput = QtWidgets.QLineEdit()
-        mainLayout.addWidget(pw)
+
+        # The default echo mode of the password input will not show plain text.
         pw.setEchoMode(QtWidgets.QLineEdit.Password)
         pw.setMinimumWidth(250)
-        pw.returnPressed.connect(self.doneSig.emit)
+        pw.returnPressed.connect(self.done)
+        pw.setStyleSheet("QLineEdit{font-size:10px;padding:5px 6px;}")
 
-        # Allow user to toggle plain text display.
-        row, lyt = Q.makeWidget(QtWidgets.QWidget, Q.HORIZONTAL)
-        mainLayout.addWidget(row)
-        toggle = Q.QToggle(self, callback=self.showPwToggled)
-        lyt.addWidget(QtWidgets.QLabel("show password"))
-        lyt.addWidget(toggle)
+        # The echo mode can be toggled with the eye icons, only one of which
+        # is visible at a time.
+        self.showPw = SVGWidget("open-eye", h=20, click=self.showPwClicked)
+        self.hidePw = SVGWidget("closed-eye", h=20, click=self.hidePwClicked)
+        self.hidePw.setVisible(False)
 
-    def showEvent(self, e):
+        # The password will be submitted when enter is pressed, but a button is
+        # also offered.
+        submit = app.getButton(SMALL, "Go")
+        submit.clicked.connect(self.done)
+        submit.setFixedWidth(35)
+
+        pwRow, _ = Q.makeRow(pw, self.showPw, self.hidePw, submit)
+        mainLayout.addWidget(pwRow)
+
+    def stacked(self):
         """
-        QWidget method. Set the cursor when the screen is stacked.
+        Set the cursor when the screen is stacked.
         """
+        self.prompt.setText(self.promptText)
         self.pwInput.setFocus()
 
-    def hideEvent(self, e):
+    def unstacked(self):
         """
-        QWidget method. Clear the password field when the screen is popped.
+        Clear the password field when the screen is popped.
         """
         self.pwInput.setText("")
 
-    def showPwToggled(self, state, switch):
+    def showPwClicked(self, e=None):
         """
-        QToggle callback. Set plain text password field display.
-
-        Args:
-            state (bool): The toggle switch state.
-            switch (QToggle): The toggle switch instance.
+        showPwClicked is connected to the open-eye icon clicked signal. Show
+        the password in plain text.
         """
-        if state:
-            self.pwInput.setEchoMode(QtWidgets.QLineEdit.Normal)
-        else:
-            self.pwInput.setEchoMode(QtWidgets.QLineEdit.Password)
+        self.showPw.setVisible(False)
+        self.hidePw.setVisible(True)
+        self.pwInput.setEchoMode(QtWidgets.QLineEdit.Normal)
+        self.pwInput.setStyleSheet("QLineEdit{font-size:14px;}")
 
-    def done_(self):
-        callback, args, kwargs = self.args
-        callback(self.pwInput.text(), *args, **kwargs)
-
-    def withCallback(self, callback, *args, **kwargs):
+    def hidePwClicked(self, e=None):
         """
-        Sets the screens callback function, which will be called when the user
-        presses the return key while the password field has focus.
+        showPwClicked is connected to the closed-eye icon clicked signal. Set
+        the echo mode to password.
+        """
+        self.showPw.setVisible(True)
+        self.hidePw.setVisible(False)
+        self.pwInput.setEchoMode(QtWidgets.QLineEdit.Password)
+        self.pwInput.setStyleSheet("QLineEdit{font-size:10px;padding:5px 6px;}")
+
+    def done(self, e=None):
+        """
+        Connected to the submit buttons clicked signal. Call the callback
+        function with the current password field text.
+        """
+        self.callback(self.pwInput.text())
+
+    def withCallback(self, callback, prompt="Password"):
+        """
+        Sets the screens callback function to receive the password field value
+        on form submission.
 
         Args:
             callback (func(str, ...)): A function to receive the users password.
-            *args: optional. Positional arguments to pass to the callback. The
-                arguments are shifted and the password will be the zeroth
-                argument.
-            **kwargs: optional. Keyword arguments to pass through to the
-                callback.
+            prompt (str): optional. The text to display above the password
+                field.
 
         Returns:
-            The screen itself is returned as a convenience.
+            self: The PasswordDialog itself is returned as a convenience.
         """
-        self.args = (callback, args, kwargs)
+        self.promptText = prompt
+        self.callback = callback
         return self
 
 
 class Clicker:
     """
-    Clicker add click functionality to any QWidget. Designed for multiple
+    Clicker adds click functionality to any QWidget. Designed for multiple
     inheritance.
     """
 
@@ -900,7 +932,7 @@ class InitializationScreen(Screen):
         Qt Slot for the new wallet button. Initializes the creation of a new
         wallet.
         """
-        app.getPassword(self.initPasswordCallback)
+        app.getPassword(self.initPasswordCallback, "Create a wallet password")
 
     def initPasswordCallback(self, pw):
         """
@@ -970,6 +1002,31 @@ class InitializationScreen(Screen):
         app.appWindow.stack(restoreScreen)
 
 
+class AssetControl:
+    """
+    AssetControl is used for inter-screen communications.
+    """
+
+    def __init__(self, acctMgr, settings, node, setNode, connectNode, refreshAccounts):
+        """
+        Args:
+            acctMgr (AccountManager): The asset's account manager.
+            settings (database.Bucket): The settings bucket.
+            node func() -> LocalNode: A getter for the currently connected node.
+            setNode func(LocalNode): A setter for the currently connected node.
+            connectNode func() -> LocalNode: This function should connect a
+                LocalNode to the currently saved configuration settings.
+            refreshAccount func(): Called by screens when a change to the number
+                or status of accounts has been made.
+        """
+        self.acctMgr = acctMgr
+        self.settings = settings
+        self.node = node
+        self.setNode = setNode
+        self.connectNode = connectNode
+        self.refreshAccounts = refreshAccounts
+
+
 class AssetScreen(Screen):
     """
     AssetScreen is screen for choosing one account out of many, or changing
@@ -984,8 +1041,27 @@ class AssetScreen(Screen):
             TinyDialog.maxWidth * 0.9,
             TinyDialog.maxHeight * 0.9 - TinyDialog.topMenuHeight,
         )
+        self.configured = False
         self.accountScreens = {}
-        self.settingsScreen = AssetSettingsScreen()
+        assetDir = app.assetDirectory("dcr")
+        self.acctMgr = app.wallet.accountManager("dcr", app.blockchainSignals)
+        self.settingsDB = database.KeyValueDatabase(assetDir / "settings.db")
+        self.settings = self.settingsDB.child("settings")
+        self.dcrd = None
+
+        def currentNode():
+            return self.dcrd
+
+        ctl = AssetControl(
+            acctMgr=self.acctMgr,
+            settings=self.settings,
+            node=currentNode,
+            setNode=self.setNode,
+            connectNode=self.connectNode,
+            refreshAccounts=self.doButtons,
+        )
+
+        self.settingsScreen = AssetSettingsScreen(ctl)
 
         logo = SVGWidget(DCR.LOGO, h=25)
         lbl = Q.makeLabel("Decred", 25, fontFamily="Roboto Medium")
@@ -996,16 +1072,117 @@ class AssetScreen(Screen):
         self.layout.addWidget(wgt)
 
         header = Q.makeLabel("Select an account", 20)
-        header.setContentsMargins(0, 15, 0, 5)
+        header.setContentsMargins(0, 5, 0, 5)
         header.setAlignment(Q.ALIGN_LEFT)
-        self.layout.addWidget(header)
+
+        # Indicators for the connection status of dcrdata and dcrd.
+        self.dcrdLight = Q.makeLabel("⚫", 20, color="orange")
+        lbl = Q.makeLabel("dcrd", 14)
+        dcrdBox, lyt = Q.makeRow(self.dcrdLight, lbl)
+        lyt.setSpacing(2)
+        Q.addClickHandler(dcrdBox, self.stackDcrd)
+        dcrdBox.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+        self.dcrdataLight = Q.makeLabel("⚫", 20, color="#76d385")
+        lbl = Q.makeLabel("dcrdata", 14)
+        dcrdataBox, lyt = Q.makeRow(self.dcrdataLight, lbl)
+        lyt.setSpacing(2)
+        dcrdataBox.setContentsMargins(0, 0, 20, 0)
+        row, _ = Q.makeRow(dcrdataBox, dcrdBox)
+        row.setContentsMargins(0, 8, 0, 0)
+        row, _ = Q.makeRow(header, Q.STRETCH, row)
+        self.layout.addWidget(row)
 
         wgt, self.accountsList = Q.makeWidget(QtWidgets.QWidget, Q.GRID)
         self.layout.addWidget(wgt)
-        self.acctMgr = app.wallet.accountManager("dcr", app.blockchainSignals)
 
-        self.newAcctScreen = NewAccountScreen(self.acctMgr, self.doButtons)
+        self.newAcctScreen = NewAccountScreen(ctl)
         self.doButtons()
+
+    def stacked(self):
+        """
+        Called by the application when this screen is stacked.
+        """
+        if self.configured:
+            return
+
+        # Connect dcrdata.
+        self.configured = True
+        try:
+            app.dcrdata.connect()
+        except DecredError as e:
+            app.appWindow.showError(f"failed to connect to dcrdata: {e}")
+            return
+
+        # Check for a dcrd configuration. If found, request the cryptoKey so the
+        # rpcpass can be decrypted and a connection attempted.
+        settings = self.settings
+        nodeConfigured = DB.rpchost in settings
+        if not nodeConfigured:
+            return
+        if settings[DB.dcrdon] != database.TRUE:
+            return
+
+        def withNode(node):
+            if not node or not node.connected():
+                app.appWindow.showError("could not connect to dcrd")
+                return
+            self.setNode(node)
+
+        self.connectNode(withNode)
+
+    def shutdown(self):
+        """
+        Called by the application at shutdown. Handle all Decred-related
+        shutdown actions.
+        """
+        blockchain = chains.chain("dcr")
+        if blockchain:
+            blockchain.close()
+        if self.dcrd:
+            self.dcrd.close()
+        self.settingsScreen.shutdown()
+
+    def setNode(self, node):
+        """
+        Set the currently saved LocalNode and inform the AccountManager. Set the
+        indicator light.
+
+        Args:
+            node (LocalNode): The new dcrd connection.
+        """
+        Q.setProperties(self.dcrdLight, color="#76d385" if node else "orange")
+        self.dcrd = node
+        self.settings[DB.dcrdon] = database.TRUE if node else database.FALSE
+        self.acctMgr.setNode(node)
+
+    def connectNode(self, done):
+        """
+        Attempt to get a node with the currently stored configuration.
+
+        Args:
+            done func(LocalNode): A receiver for the node. If a node cannot be
+                found, None is passed.
+        """
+        settings = self.settings
+        if DB.rpcuser not in settings:
+            done(None)
+
+        def withCK4dcrd(cryptoKey):
+            rpcPass = crypto.decrypt(cryptoKey, settings[DB.rpcpass]).b.decode()
+            return LocalNode(
+                netParams=cfg.netParams,
+                dbPath=app.assetDirectory("dcr") / "localnode.db",
+                url=settings[DB.rpchost].decode(),
+                user=settings[DB.rpcuser].decode(),
+                pw=rpcPass,
+                certPath=settings[DB.rpccert].decode(),
+            )
+
+        app.withCryptoKey(withCK4dcrd, done, prompt="Enter password to connect to dcrd")
+
+    def stackDcrd(self, e=None):
+        """Connected to the dcrd indicator light."""
+        app.appWindow.stack(self.settingsScreen.dcrdConfigScreen)
 
     def doButtons(self, idx=None):
         """
@@ -1080,12 +1257,19 @@ class AssetScreen(Screen):
 class AssetSettingsScreen(Screen):
     """A screen to adjust asset-specific settings."""
 
-    def __init__(self):
+    def __init__(self, ctl):
+        """
+        Args:
+            ctl (AssetControl): The shared asset data.
+        """
         super().__init__()
         self.canGoHome = True
         self.isPoppable = True
 
+        self.ctl = ctl
         self.blockchain = chains.chain("dcr")
+
+        self.dcrdConfigScreen = DCRDConfigScreen(ctl)
 
         self.wgt.setFixedSize(
             TinyDialog.maxWidth * 0.9,
@@ -1099,6 +1283,7 @@ class AssetSettingsScreen(Screen):
 
         self.layout.addStretch(1)
 
+        # Add a QLineEdit to change the dcrdata endpoint.
         wgt, grid = Q.makeWidget(QtWidgets.QWidget, Q.GRID)
         self.layout.addWidget(wgt)
         grid.setColumnStretch(0, 1)
@@ -1110,8 +1295,29 @@ class AssetSettingsScreen(Screen):
         bttn = app.getButton(SMALL, "change")
         bttn.clicked.connect(self.dcrdataChangeClicked)
         grid.addWidget(bttn, row, 1)
+        row += 1
+
+        # Add a button that allows connecting to a local dcrd RPC server.
+        lbl = Q.makeLabel(
+            "The wallet is faster and more secure when connected directly to a dcrd RPC server.",
+            14,
+            Q.ALIGN_LEFT,
+        )
+        lbl.setWordWrap(True)
+        lbl.setContentsMargins(0, 20, 0, 0)
+        grid.addWidget(lbl, row, 0, 1, 2)
+        row += 1
+        bttn = app.getButton(SMALL, "configure dcrd")
+        bttn.clicked.connect(self.connectDcrdClicked)
+        bttnRow, _ = Q.makeRow(bttn, Q.STRETCH)
+        grid.addWidget(bttnRow, row, 0, 1, 2)
+        row += 1
 
         self.layout.addStretch(1)
+
+    def shutdown(self):
+        """Called when the application is shut down."""
+        self.dcrdConfigScreen.shutdown()
 
     def dcrdataChangeClicked(self, e=None):
         """
@@ -1142,6 +1348,435 @@ class AssetSettingsScreen(Screen):
             app.appWindow.showSuccess("dcrdata changed")
 
         app.waitThread(runChangeDcrdata, doneChangeDcrdata)
+
+    def connectDcrdClicked(self, e=None):
+        """
+        Qt slot connected to "connect to dcrd" button. Stacks a dcrd
+        configuration screen.
+        """
+        app.appWindow.stack(self.dcrdConfigScreen)
+
+
+class DCRDConfigScreen(Screen):
+    """A screen to adjust dcrd-specific settings."""
+
+    foundMsg = "A dcrd RPC server was found with these settings. Would you like to use this server?"
+    notFoundMsg = "Enter your dcrd connection details."
+
+    def __init__(self, ctl):
+        """
+        Args:
+            ctl (AssetControl): The shared asset data.
+        """
+        super().__init__()
+        self.canGoHome = True
+        self.isPoppable = True
+        self.wgt.setFixedSize(
+            TinyDialog.maxWidth * 0.8,
+            TinyDialog.maxHeight * 0.9 - TinyDialog.topMenuHeight,
+        )
+        self.ctl = ctl
+
+        # If a node is found by a search of the default config file location,
+        # it will be stored temporarily in tmpNode. Once the user confirms their
+        # intention to use the server, AssetControl.setNode be called.
+        self.tmpNode = None
+        self.tmpConfig = None
+
+        self.layout.addStretch(1)
+
+        # Try to auto-fill the fields with data from a config file at the
+        # default location. This info will persist, even if a connection cannot
+        # be made with these credentials in stacked.
+        node = ctl.node()
+        if node:
+            nodeConfig = dict(rpchost=ctl.settings[DB.rpchost],)
+        else:
+            nodeConfig = config.dcrd(cfg.netParams)
+
+        self.remoteForm, grid = Q.makeWidget(QtWidgets.QWidget, Q.GRID)
+        self.remoteForm.setVisible(node is None)
+        self.layout.addWidget(self.remoteForm)
+        row = 0
+
+        def insertSpace():
+            spacer = Q.makeLabel("", 5)
+            spacer.setContentsMargins(0, 5, 0, 0)
+            grid.addWidget(spacer, row, 0, 1, 4)
+
+        # The header text depends on whether we are displaying information found
+        # automatically, or only expecting user input.
+        self.header = lbl = Q.makeLabel(self.notFoundMsg, 14)
+        lbl.setWordWrap(True)
+        lbl.setAlignment(Q.ALIGN_LEFT)
+        lbl.setFixedHeight(40)
+        grid.addWidget(lbl, row, 0, 1, 4)
+        row += 1
+
+        # URL and user name.
+        grid.addWidget(Q.makeLabel("dcrd URL", 14, Q.ALIGN_LEFT), row, 0, 1, 3)
+        grid.addWidget(Q.makeLabel("RPC username", 14, Q.ALIGN_LEFT), row, 3)
+        row += 1
+        defaultRpclisten = f"127.0.0.1:{config.DcrdPorts[cfg.netParams.Name]}"
+        host = nodeConfig.get("rpclisten", defaultRpclisten)
+
+        self.rpcListen = QtWidgets.QLineEdit(f"https://{host}")
+        grid.addWidget(self.rpcListen, row, 0, 1, 3)
+        self.rpcUser = QtWidgets.QLineEdit(nodeConfig.get("rpcuser", ""))
+        grid.addWidget(self.rpcUser, row, 3)
+        row += 1
+        insertSpace()
+        row += 1
+
+        # TLS certificate info. This row has a little button that opens a file
+        # dialog.
+        grid.addWidget(Q.makeLabel("TLS certificate", 14, Q.ALIGN_LEFT), row, 0, 1, 3)
+        row += 1
+        self.certPath = QtWidgets.QLineEdit(nodeConfig.get("rpccert", ""))
+        grid.addWidget(self.certPath, row, 0, 1, 3)
+        pickaFile = app.getButton(TINY, "choose a file")
+        pickaFile.clicked.connect(self.pickaFileClicked)
+        pickaFile.setIcon(SVGWidget("folder", h=12).icon())
+        pickRow, _ = Q.makeRow(pickaFile, Q.STRETCH)
+        grid.addWidget(pickRow, row, 3)
+        row += 1
+        insertSpace()
+        row += 1
+
+        # Password and submit button. Password has a litte eye icon to click
+        # to toggle the password to plain text. Default is password mode.
+        grid.addWidget(Q.makeLabel("RPC password", 14, Q.ALIGN_LEFT), row, 0, 1, 2)
+        row += 1
+        bttn = self.rpcPass = QtWidgets.QLineEdit(nodeConfig.get("rpcpass", ""))
+        bttn.setContentsMargins(0, 0, 0, 10)
+        bttn.setEchoMode(QtWidgets.QLineEdit.Password)
+        bttn.setStyleSheet("QLineEdit{font-size:10px;}")
+        self.showPw = SVGWidget("open-eye", h=20, click=self.showPwClicked)
+        self.hidePw = SVGWidget("closed-eye", h=20, click=self.hidePwClicked)
+        self.hidePw.setVisible(False)
+        vizBttns, _ = Q.makeRow(self.showPw, self.hidePw)
+        vizBttns.setContentsMargins(0, 4, 0, 4)
+        pwRow, _ = Q.makeRow(bttn, vizBttns)
+        grid.addWidget(pwRow, row, 0, 1, 3)
+        self.submitBttn = app.getButton(SMALL, "connect")
+        self.submitBttn.clicked.connect(self.submitBttnClicked)
+        self.useTmpBttn = app.getButton(SMALL, "use these settings")
+        self.useTmpBttn.clicked.connect(self.useTempNodeClicked)
+        self.useTmpBttn.setVisible(False)
+        bttns, _ = Q.makeRow(self.submitBttn, self.useTmpBttn)
+        grid.addWidget(bttns, row, 3)
+        row += 1
+        [grid.setColumnStretch(i, 1) for i in range(4)]
+        for edit in (self.rpcListen, self.rpcUser, self.certPath, self.rpcPass):
+            edit.textEdited.connect(self.fieldEdited)
+
+        # When tinywallet is already connected to a node, the only thing shown
+        # is a message and an option to disconnect.
+        self.connectedWgt, lyt = Q.makeWidget(QtWidgets.QWidget, Q.VERTICAL)
+        self.layout.addWidget(self.connectedWgt)
+        self.connectedLbl = Q.makeLabel("", 15)
+        lyt.addWidget(self.connectedLbl)
+        self.hostLbl = Q.makeLabel("", 17, fontFamily="Roboto Medium")
+        self.hostLbl.setContentsMargins(0, 5, 0, 5)
+        lyt.addWidget(self.hostLbl)
+        self.onToggle = Q.Toggle(callback=self.connectionToggled)
+        row, _ = Q.makeRow(
+            Q.STRETCH,
+            Q.makeLabel("off", 14),
+            self.onToggle,
+            Q.makeLabel("on", 14),
+            Q.STRETCH,
+        )
+        lyt.addWidget(row)
+        clear = ClickyLabel(self.clearNode, "forget this node")
+        Q.setProperties(clear, underline=True, fontSize=14, color="blue")
+        clear.setAlignment(Q.ALIGN_CENTER)
+        clear.setContentsMargins(0, 10, 0, 0)
+        lyt.addWidget(clear)
+
+        self.layout.addStretch(1)
+
+    def shutdown(self):
+        """Shut down any stored temporary LocalNode."""
+        self.dumpTempNode()
+
+    def stacked(self):
+        """
+        Called when the screen is stacked. Look at current node configuration
+        and decide what to show.
+        """
+        # If dcrd is configured, do nothing.
+        if self.readConfig():
+            return
+
+        # There is no connection configured. Check for a config file and if one
+        # is found, try to connect.
+        nodeConfig = config.dcrd(cfg.netParams)
+        if not nodeConfig:
+            # There is no config file in the default location. The user will
+            # have to manually enter details, or point towards a non-default
+            # config file location.
+            self.showLive(False)
+            return
+
+        def receiveNode(node):
+            if not node:
+                return
+            if node.connected():
+                self.tmpNode = node
+                self.tmpConfig = nodeConfig
+                self.rpcListen.setText(nodeConfig["rpclisten"])
+                self.rpcUser.setText(nodeConfig["rpcuser"])
+                self.certPath.setText(nodeConfig["rpccert"])
+                self.rpcPass.setText(nodeConfig["rpcpass"])
+                self.showLive(True)
+            else:
+                self.showLive(False)
+
+        def tryConnect():
+            try:
+                return LocalNode(
+                    netParams=cfg.netParams,
+                    dbPath=app.assetDirectory("dcr") / "localnode.db",
+                    url=nodeConfig["rpclisten"],
+                    user=nodeConfig["rpcuser"],
+                    pw=nodeConfig["rpcpass"],
+                    certPath=nodeConfig["rpccert"],
+                )
+
+            except Exception as e:
+                log.debug(
+                    "Auto-location attempt failed to connect (not an error): %s"
+                    % formatTraceback(e)
+                )
+
+        app.waitThread(tryConnect, receiveNode)
+
+    def unstacked(self):
+        """
+        Called when the screen is unstacked. Shut down any stored temporary
+        node.
+        """
+        self.dumpTempNode()
+        self.rpcPass.setText("")
+
+    def showLive(self, show):
+        """
+        Whether the header and buttons should indicate that a server was
+        discovered automatically or not.
+
+        Args:
+            show (bool): If True, show a message indicating an RPC server was
+                discovered, and the user can choose to accept the discovered
+                credentials. If False, the message inidicates that manual entry
+                of credentials is required.
+        """
+        self.header.setText(self.foundMsg if show else self.notFoundMsg)
+        self.submitBttn.setVisible(not show)
+        self.useTmpBttn.setVisible(show)
+
+    def readConfig(self):
+        """
+        Shows the configuration form if dcrd is not configured, else the
+        on/off switch.
+
+        Returns:
+            bool: True if dcrd is currently configured.
+        """
+        ctl = self.ctl
+        node = ctl.node()
+        nodeConfigured = DB.rpchost in self.ctl.settings
+        self.onToggle.set(node and node.connected())
+        if nodeConfigured:
+            self.remoteForm.setVisible(False)
+            self.connectedWgt.setVisible(True)
+            self.hostLbl.setText(ctl.settings[DB.rpchost].decode())
+            if node and node.connected():
+                self.connectedLbl.setText(f"Connected to dcrd")
+            else:
+                self.connectedLbl.setText(f"Connection to dcrd is currently off")
+        else:
+            self.remoteForm.setVisible(True)
+            self.connectedWgt.setVisible(False)
+
+        return nodeConfigured
+
+    def connectionToggled(self, on):
+        """
+        Connected to the connection on/off toggle switch.
+        """
+        node = self.ctl.node()
+        if on:
+            if node:
+                node.connect()
+                self.ctl.setNode(node)
+            else:
+
+                def withDCRD(node):
+                    if node:
+                        self.ctl.setNode(node)
+
+                self.ctl.connectNode(withDCRD)
+
+        else:
+            node.close()
+            self.ctl.setNode(None)
+
+    def fieldEdited(self, s):
+        """
+        Field editing is equivalent to rejecting the auto-discovered node, so
+        dump it and show the right header and buttons.
+        """
+        self.showLive(False)
+        self.dumpTempNode()
+
+    def dumpTempNode(self):
+        """
+        If there is a temporary (discovered) node, close it and clear the
+        reference.
+        """
+        if self.tmpNode:
+            self.tmpNode.close()
+            self.tmpNode = None
+            self.tmpConfig = None
+
+    def pickaFileClicked(self, e=None):
+        """
+        Connected to the TLS certificate file selection button's clicked signal.
+        Show a file dialog for the user to select a TLS certificate. The
+        certPath QLineEdit will be set with the selected file's path.
+        """
+        filename = QtWidgets.QFileDialog.getOpenFileName(
+            parent=self, caption="Select a file", filter="TLS Certificates (*.cert)",
+        )[0]
+        if filename:
+            self.certPath.setText(filename)
+
+    def submitBttnClicked(self, e=None):
+        """
+        Connected to the submission button's clicked signal. Try to connect
+        with the current credentials. If successful, store the credentials and
+        call AssetControl.setNode.
+        """
+
+        rpcURL = self.rpcListen.text()
+        if not rpcURL:
+            app.appWindow.showError("URL cannot be empty")
+        rpcUser = self.rpcUser.text()
+        rpcPass = self.rpcPass.text()
+        certPath = self.certPath.text()
+
+        def receiveDCRD(node):
+            if node.connected():
+                app.appWindow.showSuccess("connected to dcrd")
+                self.useNode(node, rpcURL, rpcUser, rpcPass, certPath)
+            else:
+                app.appWindow.showError("failed to connect")
+
+        def runConnectRPC():
+            return LocalNode(
+                netParams=cfg.netParams,
+                dbPath=app.assetDirectory("dcr") / "localnode.db",
+                url=rpcURL,
+                user=rpcUser,
+                pw=rpcPass,
+                certPath=certPath,
+            )
+
+        app.waitThread(runConnectRPC, receiveDCRD)
+
+    def saveSettings(self, cryptoKey, rpcURL, rpcUser, rpcPass, certPath):
+        """
+        Save the RPC credentials to the asset settings database bucket.
+
+        Args:
+            cryptoKey (SecretKey): The encryption key.
+            rpcURL (str): The dcrd 'rpclisten' value, with protocol.
+            rpcUser (str): The dcrd 'rpcuser' value.
+            rpcPass (str): The dcrd 'rpcpass' value.
+            certPath (str): The dcrd 'rpccert' value.
+        """
+        settings = self.ctl.settings
+        settings[DB.rpcuser] = rpcUser.encode()
+        settings[DB.rpcpass] = crypto.encrypt(cryptoKey, rpcPass.encode()).b
+        settings[DB.rpccert] = certPath.encode()
+        settings[DB.rpchost] = rpcURL.encode()
+
+    def useTempNodeClicked(self, e=None):
+        """
+        Connected to the "use these settings" button's clicked signal. The
+        button is shown when a node is found in auto-discovery.
+        """
+        d = self.tmpConfig
+        self.useNode(
+            self.tmpNode, d["rpclisten"], d["rpcuser"], d["rpcpass"], d["rpccert"]
+        )
+
+    def useNode(self, node, rpcURL, rpcUser, rpcPass, certPath):
+        """
+        Set the node and save the configuration.
+
+        Args:
+            node (LocalNode): The dcrd connection.
+
+        The rest of the arguments are passed directly to saveSettings.
+        """
+
+        def withCK(cryptoKey):
+            if not cryptoKey:
+                return
+            self.saveSettings(cryptoKey, rpcURL, rpcUser, rpcPass, certPath)
+            return True
+
+        def doneSaving(ret):
+            if not ret:
+                return
+            self.onToggle.set(True)
+            self.ctl.setNode(node)
+            app.appWindow.showSuccess("connected to dcrd")
+            self.tmpNode = self.tmpConfig = None
+            app.home()
+
+        app.withCryptoKey(withCK, doneSaving)
+
+    def clearNode(self, e=None):
+        """
+        Callback for the "forget this node" ClickyLabel. Disconnects and deletes
+        the saved configuration for dcrd, after ConfirmScreen.
+        """
+
+        def confirmed():
+            node = self.ctl.node()
+            if node:
+                node.close()
+            s = self.ctl.settings
+            del s[DB.rpchost]
+            del s[DB.rpcuser]
+            del s[DB.rpccert]
+            del s[DB.rpcpass]
+            self.ctl.setNode(None)
+            app.appWindow.showSuccess("settings cleared")
+            app.appWindow.pop(self)
+
+        app.confirm(
+            "Are you sure you want to forget the configuration settings for "
+            "this connection? ",
+            confirmed,
+        )
+
+    def showPwClicked(self, e=None):
+        """Connected to the eye icon. Sets echo mode to normal."""
+        self.showPw.setVisible(False)
+        self.hidePw.setVisible(True)
+        self.rpcPass.setEchoMode(QtWidgets.QLineEdit.Normal)
+        self.rpcPass.setStyleSheet("QLineEdit{font-size:14px;}")
+
+    def hidePwClicked(self, e=None):
+        """Connected to the crossed eye icon. Sets echo mode to password."""
+        self.showPw.setVisible(True)
+        self.hidePw.setVisible(False)
+        self.rpcPass.setEchoMode(QtWidgets.QLineEdit.Password)
+        self.rpcPass.setStyleSheet("QLineEdit{font-size:10px;padding:5px 6px;}")
 
 
 class AccountSelector(QtWidgets.QPushButton):
@@ -1243,18 +1878,16 @@ class NewAccountScreen(Screen):
     A screen that displays a form to create a new account.
     """
 
-    def __init__(self, acctMgr, refresh):
+    def __init__(self, ctl):
         """
         Args:
-            acctMgr (AccountManager): A Decred account manager.
-            refresh (function): A function to be called when a new account is
-                added.
+            ctl (AssetControl): The shared asset data.
         """
         super().__init__()
         self.canGoHome = True
         self.isPoppable = True
-        self.acctMgr = acctMgr
-        self.refresh = refresh
+        self.acctMgr = ctl.acctMgr
+        self.refresh = ctl.refreshAccounts
         lbl = Q.makeLabel("Name your new account", 16)
         self.layout.addWidget(lbl)
         self.nameField = QtWidgets.QLineEdit()
@@ -1279,6 +1912,8 @@ class NewAccountScreen(Screen):
             self.refresh(acct.idx)
 
         def runCreateAcct(cryptoKey):
+            if not cryptoKey:
+                return
             try:
                 acct = self.acctMgr.addAccount(cryptoKey, name)
                 acct.unlock(cryptoKey)
@@ -1289,19 +1924,7 @@ class NewAccountScreen(Screen):
                     % formatTraceback(e)
                 )
 
-        def createAcctPW(pw):
-            try:
-                cryptoKey = app.wallet.cryptoKey(pw)
-                app.waitThread(runCreateAcct, doneCreateAcct, cryptoKey)
-            except Exception as e:
-                log.warning(
-                    "exception encountered while decoding wallet key: %s"
-                    % formatTraceback(e)
-                )
-                app.appWindow.showError("error")
-
-        app.waiting()
-        app.getPassword(createAcctPW)
+        app.withCryptoKey(runCreateAcct, doneCreateAcct)
 
 
 class WaitingScreen(Screen):
@@ -1449,7 +2072,7 @@ class MnemonicRestorer(Screen):
         def withpw(pw):
             app.waitThread(create, finish, pw)
 
-        app.getPassword(withpw)
+        app.getPassword(withpw, prompt="Create a walllet password")
 
 
 class StakingScreen(Screen):
@@ -1623,7 +2246,8 @@ class StakingScreen(Screen):
             except Exception as e:
                 log.error("revoke tickets error: %s" % formatTraceback(e))
                 return False
-            app.emitSignal(ui.DONE_SIGNAL)
+            finally:
+                app.emitSignal(ui.DONE_SIGNAL)
 
         withUnlockedAccount(self.account, revoke, self.revoked)
 
@@ -2808,19 +3432,6 @@ class HorizontalRule(QtWidgets.QFrame):
         self.setStyleSheet(f"QFrame{{border: 2px solid {color};}}")
 
 
-class AddressDisplay(QtWidgets.QLabel):
-    """
-    A box to display an address.
-    """
-
-    def __init__(self, *a):
-        super().__init__(*a)
-        font = self.font()
-        font.setPixelSize(14)
-        self.setFont(font)
-        self.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
-
-
 def withUnlockedAccount(acct, f, cb):
     """
     Run the provided function with the account open. If the account is not
@@ -2835,33 +3446,16 @@ def withUnlockedAccount(acct, f, cb):
         app.waitThread(f, cb)
         return
 
-    def done(ret):
-        app.appWindow.pop(app.waitingScreen)
-        app.appWindow.pop(app.pwDialog)
-        cb(ret)
-
-    def withpw(pw):
+    def withkey(cryptoKey):
+        if not cryptoKey:
+            return
         try:
-            app.waiting()
-            cryptoKey = app.wallet.cryptoKey(pw)
             acct.unlock(cryptoKey)
-            app.waitThread(f, done)
+            return f()
         except Exception as e:
             log.warning(
-                "exception encountered while performing wallet action: %s"
-                % formatTraceback(e)
+                f"exception encountered while performing wallet action: {formatTraceback(e)}"
             )
             app.appWindow.showError("error")
 
-    app.getPassword(withpw)
-
-
-def unlockAccount(acct, cb):
-    """
-    Similar to withUnlockedAccount, but doesn't run a function, just a callback
-    once the accopunt is successfully unlocked.
-
-    Args:
-        cb (func(x)): A callback to receive the return value from f.
-    """
-    withUnlockedAccount(acct, lambda: True, cb)
+    app.withCryptoKey(withkey, cb)

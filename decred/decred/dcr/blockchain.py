@@ -40,13 +40,30 @@ class LocalNode:
             "headers", blobber=BlockHeader, keyBlobber=ByteArray
         )
         self.socketURL = helpers.makeWebsocketURL(url, "ws")
-        self.rpc = rpc.WebsocketClient(self.socketURL, user, pw, cert=certPath)
+        self.rpc = None
+
+        def connect():
+            self.close()
+            self.rpc = rpc.WebsocketClient(self.socketURL, user, pw, cert=certPath)
+
+        self.connect = connect
+        connect()
 
     def close(self):
         """
         Close the node connection.
         """
-        self.rpc.close()
+        if self.rpc:
+            self.rpc.close()
+
+    def connected(self):
+        """
+        Whether the websocket client appears to be connected.
+
+        Returns:
+            bool: True if connected.
+        """
+        return self.rpc and not self.rpc.closed
 
     def header(self, blockHash):
         """

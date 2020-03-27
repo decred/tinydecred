@@ -75,6 +75,7 @@ class AccountManager:
 
         self.watchingOnly = False
 
+        self.node = None
         self.acctDB = None
         self.signals = None
         self.accounts = {}
@@ -132,6 +133,17 @@ class AccountManager:
             self.accounts[idx] = acct
             db = self.dbForAcctIdx(idx)
             acct.load(self.dbForAcctIdx(idx), blockchain, self.signals)
+
+    def setNode(self, node):
+        """
+        Set the dcrd connection for the account.
+
+        Args:
+            node (LocalNode): A connected LocalNode.
+        """
+        self.node = node
+        for acct in self.accounts.values():
+            acct.setNode(node)
 
     def coinKey(self, cryptoKey):
         """

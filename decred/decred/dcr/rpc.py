@@ -3380,11 +3380,15 @@ class WebsocketClient(Client):
     def __init__(self, *a, **k):
         super().__init__(*a, **k)
         self.waiters = {}
+        self.lastErr = None
+        self.closed = True
         self.connect()
 
     def connect(self):
         """Connect to the websocket server."""
 
+        self.lastErr = None
+        self.closed = False
         self.ws = ws.Client(
             url=makeWebsocketURL(self.url, "ws"),
             header=[f"{k}: {v}" for k, v in self.headers.items()],
@@ -3435,10 +3439,12 @@ class WebsocketClient(Client):
 
     def on_close(self, ws):
         """Called by ws.Client when the websocket disconnects."""
+        self.closed = True
         log.debug("websocket closing")
 
     def on_error(self, error):
         """Called by ws.Client when an error is encountered."""
+        self.lastErr = error
         log.error(f"websocket error: {error}")
 
     def loadTxFilter(self, clear, addresses, outPoints):

@@ -19,6 +19,10 @@ import threading
 from decred import DecredError
 
 
+TRUE = bytearray([1])
+FALSE = bytearray([0])
+
+
 class NoValueError(DecredError):
     pass
 

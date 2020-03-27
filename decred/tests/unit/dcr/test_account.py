@@ -562,6 +562,10 @@ class TestAccount:
         assert ticketAddrs[0] == ticketAddr
         assert acct.hasPool()
 
+        # Exercise setNode
+        acct.setNode(1)
+        assert acct.node == 1
+
         # Add a coinbase transaction output to the account.
         coinbase = newCoinbaseTx()
         cbUTXO = account.UTXO("addr", ByteArray(b"id"), 1, height=5, satoshis=int(1e8))
