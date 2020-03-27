@@ -152,6 +152,8 @@ class DcrdataClient:
         Args:
             url (string): the URL to a DCRData server, e.g.
                 http://explorer.dcrdata.org/.
+            emitter (function): a function that accepts incoming subscription
+                messages as JSON-decoded dicts as the only parameter.
         """
         url = urlsplit(url)
         # Remove any path.
