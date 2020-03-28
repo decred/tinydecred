@@ -4381,7 +4381,7 @@ def test_pay_to_addr_script():
         ),
         dict(
             name="schnorr hash not implemented",
-            addr=addrPubKeyHashEdwards,
+            addr=addrPubKeyHashSchnorr,
             wantException=NotImplementedError,
         ),
         dict(
