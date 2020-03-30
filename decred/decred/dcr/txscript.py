@@ -1745,6 +1745,12 @@ def payToPubKeyHashScript(pkHash):
     """
     payToAddrScript creates a new script to pay a transaction output to a the
     specified address.
+
+    Args:
+        pkHash (ByteArray): The pubkey hash to pay to.
+
+    Returns:
+        ByteArray: The script that pays to the pubkey hash.
     """
     if len(pkHash) != 20:
         raise DecredError(
@@ -1764,6 +1770,12 @@ def payToScriptHashScript(scriptHash):
     """
     payToScriptHashScript creates a new script to pay a transaction output to a
     script hash. It is expected that the input is a valid hash.
+
+    Args:
+        scriptHash (ByteArray): The script hash to pay to.
+
+    Returns:
+        ByteArray: The script that pays to the script hash.
     """
     script = ByteArray("")
     script += opcode.OP_HASH160
@@ -1776,6 +1788,12 @@ def payToPubKeyScript(serializedPubKey):
     """
     payToPubkeyScript creates a new script to pay a transaction output to a
     public key. It is expected that the input is a valid pubkey.
+
+    Args:
+        serializedPubKey (ByteArray): The pubkey bytes to pay to.
+
+    Returns:
+        ByteArray: The script that pays to the pubkey.
     """
     script = ByteArray("")
     script += addData(serializedPubKey)
@@ -1784,6 +1802,18 @@ def payToPubKeyScript(serializedPubKey):
 
 
 def payToStakePKHScript(addr, stakeCode):
+    """
+    Create a new script to pay a transaction for a ticket purchase with a pubkey
+    hash.
+
+    Args:
+        addr (AddressPubKeyHash): An address.
+        stakeCode (int): An op code for the type of stake submission transaction.
+            SSTX or SSTXCHANGE.
+
+    Returns:
+        ByteArray: The script that pays to the pubkey hash of the address.
+    """
     script = ByteArray(stakeCode)
     script += opcode.OP_DUP
     script += opcode.OP_HASH160
@@ -1794,6 +1824,18 @@ def payToStakePKHScript(addr, stakeCode):
 
 
 def payToStakeSHScript(addr, stakeCode):
+    """
+    Create a new script to pay a transaction for a ticket purchase with a script
+    hash.
+
+    Args:
+        addr (AddressScriptHash): An address.
+        stakeCode (int): An op code for the type of stake submission transaction.
+            SSTX or SSTXCHANGE.
+
+    Returns:
+        ByteArray: The script that pays to the script hash of the address.
+    """
     script = ByteArray(stakeCode)
     script += opcode.OP_HASH160
     script += addData(addr.scriptAddress())
@@ -1862,10 +1904,10 @@ def payToSSRtxPKHDirect(pkh):
     pubkeyhash (instead of an address).
 
     Args:
-        sh (byte-like): raw script.
+        pkh (ByteArray): The pubkey hash bytes to pay to.
 
     Returns:
-        byte-like: script to pay a stake based public key hash.
+        ByteArray: Script to pay a stake based pubkey hash.
     """
     script = ByteArray(b"")
     script += opcode.OP_SSRTX
