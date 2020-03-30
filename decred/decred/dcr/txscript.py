@@ -233,13 +233,6 @@ MaxInputsPerSStx = 64
 # you need +1 for the tagged SStx output.
 MaxOutputsPerSStx = MaxInputsPerSStx * 2 + 1
 
-# validSStxAddressOutPrefix is the valid prefix for a 30-byte
-# minimum OP_RETURN push for a commitment for an SStx.
-# Example SStx address out:
-# 0x6a (OP_RETURN)
-# 0x1e (OP_DATA_30, push length: 30 bytes)
-validSStxAddressOutMinPrefix = ByteArray([opcode.OP_RETURN, opcode.OP_DATA_30])
-
 # validSSGenReferenceOutPrefix is the valid prefix for a block
 # reference output for an SSGen tx.
 validSSGenReferenceOutPrefix = ByteArray([opcode.OP_RETURN, opcode.OP_DATA_36])
@@ -247,10 +240,6 @@ validSSGenReferenceOutPrefix = ByteArray([opcode.OP_RETURN, opcode.OP_DATA_36])
 # validSSGenVoteOutMinPrefix is the valid prefix for a vote output for an
 # SSGen tx.
 validSSGenVoteOutMinPrefix = ByteArray([opcode.OP_RETURN, opcode.OP_DATA_2])
-
-# validSStxAddressOutPrefix is the valid prefix for a 30-byte
-# minimum OP_RETURN push for a commitment for an SStx.
-validSStxAddressOutMinPrefix = ByteArray([opcode.OP_RETURN, opcode.OP_DATA_30])
 
 # MaxSingleBytePushLength is the largest maximum push for an
 # SStx commitment or VoteBits push.
@@ -1554,8 +1543,8 @@ def checkSSGen(tx):
 
 def isSStx(tx):
     """
-    IsSSTx returns whether or not a transaction is a stake submission
-    transaction. These are also known as ticket purchases.
+    isSSTx returns whether or not a transaction is a stake submission
+    transaction. These are also known as tickets.
 
     Args:
         tx (MsgTx): A msgtx.MsgTx object.
@@ -1664,24 +1653,6 @@ def checkSStx(tx):
                 "SStx output at output index %d was a NullData (OP_RETURN) push"
                 " of the wrong size",
                 outTxIndex,
-            )
-
-        # The OP_RETURN output script prefix should conform to the standard.
-        outputScriptBuffer = rawScript.copy()
-        outputScriptPrefix = outputScriptBuffer[:2]
-
-        minPush = validSStxAddressOutMinPrefix[1]
-        maxPush = validSStxAddressOutMinPrefix[1] + (MaxSingleBytePushLength - minPush)
-        pushLen = outputScriptPrefix[1]
-        pushLengthValid = (pushLen >= minPush) and (pushLen <= maxPush)
-        # The first byte should be OP_RETURN, while the second byte should be a
-        # valid push length.
-        if (
-            not (outputScriptPrefix[0] == validSStxAddressOutMinPrefix[0])
-            or not pushLengthValid
-        ):
-            raise DecredError(
-                "sstx commitment at output idx %v had an invalid prefix", outTxIndex
             )
 
 

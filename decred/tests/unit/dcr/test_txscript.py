@@ -4605,8 +4605,9 @@ def test_as_small_int():
 
 def test_SStx():
     """
-    ensures the CheckSStx and IsSStx functions correctly recognize stake submission
-    transactions.
+    ensures the checkSStx and isSStx functions correctly recognize stake submission
+    transactions. This combines TestSStx and TestSSTxErrors tests found in the
+    decred/dcrd repo.
     """
     sstx = sstxMsgTx()
     sstx.tree = wire.TxTreeStake
@@ -4772,3 +4773,22 @@ def test_SStx():
     sstx.index = 0
 
     ensureErr(sstx, "too big push")
+    # ---------------------------------------------------------------------------
+    # Test for no outputs
+    sstx = sstxMsgTx()
+
+    sstx.txOut = []
+    sstx.tree = wire.TxTreeStake
+    sstx.index = 0
+
+    ensureErr(sstx, "no outputs")
+    # ---------------------------------------------------------------------------
+    # Test for wrong script it sstxchange position
+    sstx = sstxMsgTx()
+
+    # Replace sstx change script with sstx
+    sstx.txOut[2].pkScript = sstxTxOut1().pkScript
+    sstx.tree = wire.TxTreeStake
+    sstx.index = 0
+
+    ensureErr(sstx, "wrong script at sstxchange")
