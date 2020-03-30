@@ -142,21 +142,20 @@ class MockWebSocketClient:
     def close(self):
         self.on_close(self)
 
-    def get_emitter(self):
-        def emitter(msg):
-            self.received.append(msg)
-
-        return emitter
+    def receive(self, msg):
+        self.received.append(msg)
 
 
-class TweakedDcrdataClient(DcrdataClient):
-    def __init__(self, url, emitter=None, monkeypatch=None):
-        if monkeypatch is None:
-            raise RuntimeError("Need monkeypatch")
-        monkeypatch.setattr(ws, "Client", MockWebSocketClient)
-        super().__init__(url, emitter)
-        self.psClient()
-        self.emitter = self.ps.get_emitter()
+@pytest.fixture
+def tweakedDcrdataClient(monkeypatch):
+    monkeypatch.setattr(ws, "Client", MockWebSocketClient)
+
+    def make():
+        ddc = DcrdataClient(BASE_URL)
+        ddc.emitter = ddc.psClient().receive
+        return ddc
+
+    return make
 
 
 def preload_api_list(http_get_post, baseURL=API_URL):
@@ -183,11 +182,11 @@ class TestDcrdataClient:
         out, err = capsys.readouterr()
         assert len(out.splitlines()) == 85
 
-    def test_subscriptions(self, http_get_post, monkeypatch):
+    def test_subscriptions(self, http_get_post, tweakedDcrdataClient):
         # Create a DcrdataClient with a mocked ws.Client that captures the
         # signals and stores the messages.
         preload_api_list(http_get_post)
-        ddc = TweakedDcrdataClient(BASE_URL, None, monkeypatch)
+        ddc = tweakedDcrdataClient()
         dcrdata._subcounter = 0
 
         # Test sending.
@@ -374,7 +373,7 @@ class TestDcrdataBlockchain:
         http_get_post(f"{API_URL}/stake/diff", {"estimates": {"expected": 1}})
         assert ddb.nextStakeDiff() == 1e8
 
-    def test_subscriptions(self, http_get_post, monkeypatch):
+    def test_subscriptions(self, http_get_post, tweakedDcrdataClient):
         # Exception in updateTip.
         preload_api_list(http_get_post)
         with pytest.raises(DecredError):
@@ -384,7 +383,7 @@ class TestDcrdataBlockchain:
         preload_api_list(http_get_post)
         http_get_post(f"{API_URL}/block/best", dict(height=1))
         ddb = DcrdataBlockchain(":memory:", testnet, BASE_URL, skipConnect=True)
-        ddb.dcrdata = TweakedDcrdataClient(ddb.datapath, ddb.pubsubSignal, monkeypatch)
+        ddb.dcrdata = tweakedDcrdataClient()
         dcrdata._subcounter = 0
 
         # Receiver
