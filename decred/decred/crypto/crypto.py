@@ -124,17 +124,17 @@ def hash160(b):
     return ByteArray(h.digest())
 
 
-def checksum(input):
+def checksum(b):
     """
     A checksum.
 
     Args:
-        input (byte-like): Bytes to obtain a checksum for.
+        b (byte-like): Bytes to obtain a checksum for.
 
     Returns:
         bytes: A 4-byte checksum.
     """
-    return blake_hash(blake_hash(input))[:4]
+    return blake_hash(blake_hash(b))[:4]
 
 
 def sha256ChecksumByte(input):
