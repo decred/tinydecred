@@ -128,31 +128,13 @@ def test_checkoutput():
         dcrdata.checkOutput(tx, 0)
 
 
-class MockWebSocketClient:
-    def __init__(self, url, on_message, on_close, on_error):
-        self.on_message = on_message
-        self.on_close = on_close
-        self.on_error = on_error
-        self.sent = []
-        self.received = []
-
-    def send(self, msg):
-        self.sent.append(msg)
-
-    def close(self):
-        self.on_close(self)
-
-    def receive(self, msg):
-        self.received.append(msg)
-
-
 @pytest.fixture
-def tweakedDcrdataClient(monkeypatch):
-    monkeypatch.setattr(ws, "Client", MockWebSocketClient)
+def tweakedDcrdataClient(monkeypatch, MockWebSocketClient_class):
+    monkeypatch.setattr(ws, "Client", MockWebSocketClient_class)
 
     def make():
         ddc = DcrdataClient(BASE_URL)
-        ddc.emitter = ddc.psClient().receive
+        ddc.emitter = ddc.psClient().emit
         return ddc
 
     return make
@@ -203,16 +185,16 @@ class TestDcrdataClient:
             '"message": {"request_id": 1, "message": "newblock"}}'
         )
 
-        # Test receiving.
+        # Test emitting.
 
         ddc.ps.on_message(ddc.ps, '{"event": "ping"}')
-        assert not ddc.ps.received
+        assert not ddc.ps.emitted
 
         ddc.ps.on_message(ddc.ps, "not_json")
-        assert ddc.ps.received[0] == "not_json"
+        assert ddc.ps.emitted[0] == "not_json"
 
         ddc.ps.on_close(ddc.ps)
-        assert ddc.ps.received[1] == dcrdata.WS_DONE
+        assert ddc.ps.emitted[1] == dcrdata.WS_DONE
 
         ddc.ps.on_error(ddc.ps, DecredError("test_error"))
 
@@ -632,8 +614,8 @@ class TestDcrdataBlockchain:
         http_get_post(f"{INSIGHT_URL}/addrs/{addr}/txs?from=0&to=1", res)
         assert not ddb.addrsHaveTxs([addr])
 
-    def test_changeServer(self, http_get_post, monkeypatch):
-        monkeypatch.setattr(ws, "Client", MockWebSocketClient)
+    def test_changeServer(self, http_get_post, monkeypatch, MockWebSocketClient_class):
+        monkeypatch.setattr(ws, "Client", MockWebSocketClient_class)
         preload_api_list(http_get_post)
         http_get_post(f"{API_URL}/block/best", dict(height=1))
         ddb = DcrdataBlockchain(":memory:", testnet, BASE_URL)

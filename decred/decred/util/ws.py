@@ -15,14 +15,14 @@ class Client(websocket.WebSocketApp):
     related tasks.
     """
 
-    def __init__(self, url, *a, certPath=None, **k):
+    def __init__(self, url, certPath=None, **k):
         """
         Args:
             url str: The websocket server URL.
 
-        Additional positional and keyword arguments are passed directly to the
-        WebSocketApp constructor. The caller should provide callback functions
-        for various events. The most common callbacks are listed here.
+        Additional keyword arguments are passed directly to the WebSocketApp
+        constructor. The caller should provide callback functions for various
+        events. The most common callbacks are listed here.
 
             on_open: Called at opening websocket. This function has one
                 argument, the instance of Client.
@@ -60,7 +60,7 @@ class Client(websocket.WebSocketApp):
             if user_close:
                 user_close(ws)
 
-        super().__init__(cleanURL, on_open=on_open, on_close=on_close, *a, **k)
+        super().__init__(cleanURL, on_open=on_open, on_close=on_close, **k)
 
         sslopt = {"ca_certs": certPath} if certPath else None
 

@@ -3403,8 +3403,13 @@ class WebsocketClient(Client):
         req = self.jsonRequest(method, params)
         q = queue.Queue(1)
         self.waiters[req.id] = q
-        self.ws.send(req.json())
-        resp = q.get(timeout=self.requestTimeout)
+        msg = req.json()
+        self.ws.send(msg)
+        try:
+            resp = q.get(timeout=self.requestTimeout)
+        except queue.Empty:
+            log.error(f"no reply from dcrd: {msg}")
+            return
         if resp.error:
             raise DecredError(f"{method} error: {resp.error}")
         return resp.result
@@ -3413,8 +3418,8 @@ class WebsocketClient(Client):
         """Called by ws.Client when a message is received."""
         try:
             resp = Response(msg)
-            q = self.waiters[resp.id]
-            if not q:
+            q = self.waiters.get(resp.id)
+            if q is None:
                 log.error(f"unknown message received from dcrd: {msg}")
                 return
             del self.waiters[resp.id]
