@@ -466,6 +466,127 @@ def sstxTxOut4VerBad():
     # fmt: on
 
 
+def sstxMsgTx():
+    """
+    sstxMsgTx is a valid SStx MsgTx with an input and outputs and is used in various
+    tests
+    """
+    return msgtx.MsgTx(
+        serType=wire.TxSerializeFull,
+        version=1,
+        txIn=[sstxTxIn(), sstxTxIn(), sstxTxIn()],
+        txOut=[
+            sstxTxOut0(),
+            sstxTxOut1(),
+            sstxTxOut2(),  # emulate change address
+            sstxTxOut1(),
+            sstxTxOut2(),  # emulate change address
+            sstxTxOut3(),  # P2SH
+            sstxTxOut4(),  # P2SH change
+        ],
+        lockTime=0,
+        expiry=0,
+        cachedHash=None,
+    )
+
+
+def sstxMsgTxExtraInput():
+    """
+    sstxMsgTxExtraInputs is an invalid SStx MsgTx with too many inputs
+    """
+    # fmt: off
+    return msgtx.MsgTx(
+        serType=wire.TxSerializeFull,
+        version=1,
+        txIn=[
+            sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(),
+            sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(),
+            sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(),
+            sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(),
+            sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(),
+            sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(),
+            sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(),
+            sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(),
+            sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(),
+            sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(),
+            sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(),
+            sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(), sstxTxIn(),
+        ],
+        txOut=[
+            sstxTxOut0(),
+            sstxTxOut1(),
+        ],
+        lockTime=0,
+        expiry=0,
+        cachedHash=None,
+    )
+    # fmt: on
+
+
+def sstxMsgTxExtraOutputs():
+    """
+    sstxMsgTxExtraOutputs is an invalid SStx MsgTx with too many outputs
+    """
+    # fmt: off
+    return msgtx.MsgTx(
+        serType=wire.TxSerializeFull,
+        version=1,
+        txIn=[
+            sstxTxIn(),
+        ],
+        txOut=[
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+            sstxTxOut0(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(), sstxTxOut1(),
+        ],
+        lockTime=0,
+        expiry=0,
+        cachedHash=None,
+    )
+    # fmt: on
+
+
+def sstxMismatchedInsOuts():
+    """
+    sstxMismatchedInsOuts is an invalid SStx MsgTx with too many outputs for the
+    number of inputs it has
+    """
+    return msgtx.MsgTx(
+        serType=wire.TxSerializeFull,
+        version=1,
+        txIn=[sstxTxIn(),],
+        txOut=[sstxTxOut0(), sstxTxOut1(), sstxTxOut2(), sstxTxOut1(), sstxTxOut2(),],
+        lockTime=0,
+        expiry=0,
+        cachedHash=None,
+    )
+
+
 def sstxBadVersionOut():
     """
     sstxBadVersionOut is an invalid SStx MsgTx with an output containing a bad
@@ -484,6 +605,38 @@ def sstxBadVersionOut():
             sstxTxOut3(),  # 5 P2SH
             sstxTxOut4VerBad(),  # 6 P2SH change
         ],
+        lockTime=0,
+        expiry=0,
+        cachedHash=None,
+    )
+
+
+def sstxNullDataMissing():
+    """
+    sstxNullDataMissing is an invalid SStx MsgTx with no address push in the second
+    output
+    """
+    return msgtx.MsgTx(
+        serType=wire.TxSerializeFull,
+        version=1,
+        txIn=[sstxTxIn()],
+        txOut=[sstxTxOut0(), sstxTxOut0(), sstxTxOut2()],
+        lockTime=0,
+        expiry=0,
+        cachedHash=None,
+    )
+
+
+def sstxNullDataMisplaced():
+    """
+    sstxNullDataMisplaced is an invalid SStx MsgTx that has the commitment and
+    change outputs swapped
+    """
+    return msgtx.MsgTx(
+        serType=wire.TxSerializeFull,
+        version=1,
+        txIn=[sstxTxIn()],
+        txOut=[sstxTxOut0(), sstxTxOut2(), sstxTxOut1()],
         lockTime=0,
         expiry=0,
         cachedHash=None,
@@ -4448,3 +4601,194 @@ def test_as_small_int():
         assert (
             res == test["want"]
         ), f'wanted {test["want"]} but got {res} for test {test["name"]}'
+
+
+def test_SStx():
+    """
+    ensures the checkSStx and isSStx functions correctly recognize stake submission
+    transactions. This combines TestSStx and TestSSTxErrors tests found in the
+    decred/dcrd repo.
+    """
+    sstx = sstxMsgTx()
+    sstx.tree = wire.TxTreeStake
+    sstx.index = 0
+
+    assert txscript.isSStx(sstx), f"unexpected false for isSStx for test ok"
+    txscript.checkSStx(sstx)
+
+    # ---------------------------------------------------------------------------
+    # Test for an OP_RETURN commitment push of the maximum size
+    # fmt: off
+    biggestPush = ByteArray([
+        0x6a, 0x4b,  # OP_RETURN Push 75-bytes
+        0x14, 0x94, 0x8c, 0x76, 0x5a, 0x69, 0x14, 0xd4,  # 75 bytes
+        0x3f, 0x2a, 0x7a, 0xc1, 0x77, 0xda, 0x2c, 0x2f,
+        0x6b, 0x52, 0xde, 0x3d, 0x7c, 0x7c, 0x7c, 0x7c,
+        0x6b, 0x52, 0xde, 0x3d, 0x7c, 0x7c, 0x7c, 0x7c,
+        0x6b, 0x52, 0xde, 0x3d, 0x7c, 0x7c, 0x7c, 0x7c,
+        0x6b, 0x52, 0xde, 0x3d, 0x7c, 0x7c, 0x7c, 0x7c,
+        0x6b, 0x52, 0xde, 0x3d, 0x7c, 0x7c, 0x7c, 0x7c,
+        0x6b, 0x52, 0xde, 0x3d, 0x7c, 0x7c, 0x7c, 0x7c,
+        0x6b, 0x52, 0xde, 0x3d, 0x7c, 0x7c, 0x7c, 0x7c,
+        0x6b, 0x52, 0xde,
+    ])
+    # fmt: on
+
+    sstx = sstxMsgTx()
+    sstx.txOut[1].pkScript = biggestPush
+    sstx.tree = wire.TxTreeStake
+    sstx.index = 0
+
+    assert txscript.isSStx(sstx), f"unexpected false for isSStx for test biggest push"
+    txscript.checkSStx(sstx)
+
+    def ensureErr(tx, name):
+        assert not txscript.isSStx(tx), f"unexpected true for isSStx for test {name}"
+        with pytest.raises(DecredError):
+            txscript.checkSStx(tx)
+
+    # ---------------------------------------------------------------------------
+    # Test too many inputs with sstxMsgTxExtraInputs
+
+    sstx = sstxMsgTxExtraInput()
+    sstx.tree = wire.TxTreeStake
+    sstx.setIndex = 0
+
+    ensureErr(sstx, "too many inputs")
+    # ---------------------------------------------------------------------------
+    # Test too many outputs with sstxMsgTxExtraOutputs
+
+    sstx = sstxMsgTxExtraOutputs()
+    sstx.tree = wire.TxTreeStake
+    sstx.index = 0
+
+    ensureErr(sstx, "too many outputs")
+    # ---------------------------------------------------------------------------
+    # Check to make sure the first output is OP_SSTX tagged
+    sstx = sstxMsgTx()
+    b = sstx.serialize().bytes()
+    # Replace SSTX tag
+    # fmt: off
+    b = b.replace(
+        bytes(
+            [
+                0x00, 0xe3, 0x23, 0x21, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x1a, 0xba,
+            ]
+        ),
+        bytes(
+            [
+                0x00, 0xe3, 0x23, 0x21, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x19,
+            ]
+        ),
+    )
+    # fmt: on
+
+    # Deserialize the manipulated tx
+    sstx = msgtx.MsgTx.deserialize(b)
+    sstx.tree = wire.TxTreeStake
+    sstx.index = 0
+
+    ensureErr(sstx, "bad first output")
+    # ---------------------------------------------------------------------------
+    # Test for mismatched number of inputs versus number of outputs
+    sstx = sstxMismatchedInsOuts()
+    sstx.tree = wire.TxTreeStake
+    sstx.setIndex = 0
+
+    ensureErr(sstx, "number of inputs and outputs differ")
+    # ---------------------------------------------------------------------------
+    # Test for bad version of output.
+    sstx = sstxBadVersionOut()
+    sstx.tree = wire.TxTreeStake
+    sstx.setIndex = 0
+
+    ensureErr(sstx, "output has bad version")
+    # ---------------------------------------------------------------------------
+    # Test for second or more output not being OP_RETURN push
+    sstx = sstxNullDataMissing()
+    sstx.tree = wire.TxTreeStake
+    sstx.setIndex = 0
+
+    ensureErr(sstx, "second output not OP_RETURN")
+    # ---------------------------------------------------------------------------
+    # Test for change output being in the wrong place
+    sstx = sstxNullDataMisplaced()
+    sstx.tree = wire.TxTreeStake
+    sstx.setIndex = 0
+
+    ensureErr(sstx, "change output in wrong position")
+    # ---------------------------------------------------------------------------
+    # Test for too short of a pubkeyhash being given in an OP_RETURN output
+    sstx = sstxMsgTx()
+    b = sstx.serialize().bytes()
+    # Remove pubkey hash byte.
+    # fmt: off
+    b = b.replace(
+        bytes(
+            [
+                0x20, 0x6a, 0x1e, 0x94, 0x8c, 0x76, 0x5a, 0x69,
+                0x14, 0xd4, 0x3f, 0x2a, 0x7a, 0xc1, 0x77, 0xda,
+                0x2c, 0x2f, 0x6b, 0x52, 0xde, 0x3d, 0x7c,
+            ]
+        ),
+        bytes(
+            [
+                0x1f, 0x6a, 0x1d, 0x94, 0x8c, 0x76, 0x5a, 0x69,
+                0x14, 0xd4, 0x3f, 0x2a, 0x7a, 0xc1, 0x77, 0xda,
+                0x2c, 0x2f, 0x6b, 0x52, 0xde, 0x3d,
+            ]
+        ),
+    )
+    # fmt: on
+
+    # Deserialize the manipulated tx
+    sstx = msgtx.MsgTx.deserialize(b)
+    sstx.tree = wire.TxTreeStake
+    sstx.index = 0
+
+    ensureErr(sstx, "pubkey hash too short")
+    # ---------------------------------------------------------------------------
+    # Test for an invalid OP_RETURN prefix with too big of a push
+    # fmt: off
+    sstx = sstxMsgTx()
+    tooBigPush = ByteArray([
+        0x6a, 0x4c, 0x4c,  # OP_RETURN Push 76-bytes
+        0x14, 0x94, 0x8c, 0x76, 0x5a, 0x69, 0x14, 0xd4,  # 76 bytes
+        0x3f, 0x2a, 0x7a, 0xc1, 0x77, 0xda, 0x2c, 0x2f,
+        0x6b, 0x52, 0xde, 0x3d, 0x7c, 0x7c, 0x7c, 0x7c,
+        0x6b, 0x52, 0xde, 0x3d, 0x7c, 0x7c, 0x7c, 0x7c,
+        0x6b, 0x52, 0xde, 0x3d, 0x7c, 0x7c, 0x7c, 0x7c,
+        0x6b, 0x52, 0xde, 0x3d, 0x7c, 0x7c, 0x7c, 0x7c,
+        0x6b, 0x52, 0xde, 0x3d, 0x7c, 0x7c, 0x7c, 0x7c,
+        0x6b, 0x52, 0xde, 0x3d, 0x7c, 0x7c, 0x7c, 0x7c,
+        0x6b, 0x52, 0xde, 0x3d, 0x7c, 0x7c, 0x7c, 0x7c,
+        0x6b, 0x52, 0xde, 0x3d,
+    ])
+    # fmt: on
+
+    sstx.txOut[1].pkScript = tooBigPush
+    sstx.tree = wire.TxTreeStake
+    sstx.index = 0
+
+    ensureErr(sstx, "too big push")
+    # ---------------------------------------------------------------------------
+    # Test for no outputs
+    sstx = sstxMsgTx()
+
+    sstx.txOut = []
+    sstx.tree = wire.TxTreeStake
+    sstx.index = 0
+
+    ensureErr(sstx, "no outputs")
+    # ---------------------------------------------------------------------------
+    # Test for wrong script it sstxchange position
+    sstx = sstxMsgTx()
+
+    # Replace sstx change script with sstx
+    sstx.txOut[2].pkScript = sstxTxOut1().pkScript
+    sstx.tree = wire.TxTreeStake
+    sstx.index = 0
+
+    ensureErr(sstx, "wrong script at sstxchange")
