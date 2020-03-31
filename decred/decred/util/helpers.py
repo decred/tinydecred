@@ -179,7 +179,7 @@ def appDataDir(appName):
 
     # The caller really shouldn't prepend the appName with a period, but
     # if they do, handle it gracefully by stripping it.
-    appName = appName.lstrip()
+    appName = appName.lstrip(".")
     appNameUpper = appName.capitalize()
     appNameLower = appName.lower()
 
