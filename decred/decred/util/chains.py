@@ -63,10 +63,10 @@ def parseCoinType(coinType):
     if isinstance(coinType, str):
         ticker = coinType.lower()
         if ticker not in SymbolIDs:
-            raise DecredError("ticker symbol %d not found" % ticker)
+            raise DecredError(f"ticker symbol {ticker} not found")
         coinType = SymbolIDs[ticker]
     if not isinstance(coinType, int):
-        raise DecredError("unsupported type for coinType %s" % type(coinType))
+        raise DecredError(f"unsupported type for coinType {type(coinType)}")
     return coinType
 
 

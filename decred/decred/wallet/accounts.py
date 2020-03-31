@@ -147,7 +147,7 @@ class AccountManager:
 
     def dbForAcctIdx(self, idx):
         """
-        Get the databse bucket for the specified index.
+        Get the database bucket for the specified index.
 
         Args:
             idx (int): The account index.

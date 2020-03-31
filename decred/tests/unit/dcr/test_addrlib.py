@@ -4,6 +4,7 @@ See LICENSE for details
 """
 
 from base58 import b58decode
+import pytest
 
 from decred import DecredError
 from decred.crypto import crypto
@@ -27,7 +28,7 @@ def test_addresses():
     scriptAddress (ByteArray): The expected Address.scriptAddress(), but for
         the address made with make.
     make (func -> str): A function to create a new Address.
-    net (module): The network parameters.
+    netParams (module): The network parameters.
     skipComp (bool): Skip string comparison of decoded address. For
         AddressSecpPubKey, the encoded pubkey is unrecoverable from the
         AddressSecpPubKey.address() string.
@@ -386,3 +387,13 @@ def test_addresses():
         b = addrlib.Address.blob(addr)
         reAddr = addrlib.Address.unblob(b)
         assert addr == reAddr
+
+
+def test_decodeAddressPubKey():
+    decoded = (
+        ByteArray([crypto.STEd25519]) + ByteArray(b"", length=32),
+        ByteArray([crypto.STSchnorrSecp256k1]) + ByteArray(b"", length=32),
+    )
+    for d in decoded:
+        with pytest.raises(NotImplementedError):
+            addrlib.decodeAddressPubKey(d, testnet)

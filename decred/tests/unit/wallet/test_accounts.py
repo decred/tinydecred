@@ -59,6 +59,7 @@ def test_account_manager(prepareLogger):
     tempAcct = acctMgr.addAccount(cryptoKey, "temp")
     assert acctMgr.account(1) == tempAcct
     assert acctMgr.listAccounts() == [acct, tempAcct]
+
     acctMgr.accounts[3] = tempAcct
     del acctMgr.accounts[1]
     with pytest.raises(DecredError):
@@ -71,7 +72,6 @@ def test_account_manager(prepareLogger):
     zeroth = acct.currentAddress()
     b = acctMgr.serialize()
     reAM = accounts.AccountManager.unblob(b.b)
-
     assert acctMgr.coinType == reAM.coinType
     assert acctMgr.netName == reAM.netName
     assert acctMgr.netName == reAM.netName
@@ -79,8 +79,11 @@ def test_account_manager(prepareLogger):
     reAM.load(db, None)
     reAcct = reAM.openAccount(0, cryptoKey)
     reZeroth = reAcct.currentAddress()
-
     assert zeroth == reZeroth
+
+    acctMgr.saveAccount(0)
+    db = acctMgr.dbForAcctIdx(0)
+    assert db.name == "tmp$accts$0"
 
 
 def test_discover(prepareLogger):
