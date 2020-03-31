@@ -152,6 +152,8 @@ class DcrdataClient:
         Args:
             url (string): the URL to a DCRData server, e.g.
                 http://explorer.dcrdata.org/.
+            emitter (function): a function that accepts incoming subscription
+                messages as JSON-decoded dicts as the only parameter.
         """
         url = urlsplit(url)
         # Remove any path.
@@ -161,7 +163,7 @@ class DcrdataClient:
         _, self.psURL = getSocketURLs(self.baseURL)
         self.ps = None
         self.subscribedAddresses = []
-        self.emitter = emitter
+        self.emitter = emitter if emitter else lambda msg: None
         atexit.register(self.close)
         root = self.root = DcrdataPath()
         self.listEntries = []
@@ -920,7 +922,6 @@ class DcrdataBlockchain:
         Arg:
             sig (dict or string): The block explorer's notification, decoded.
         """
-        # log.debug("pubsub signal recieved: %s" % repr(sig))
         if sig == WS_DONE:
             return
         sigType = sig["event"]
