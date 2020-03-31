@@ -976,7 +976,7 @@ class Client:
         Returns:
             GetWorkResult or bool: If data is not provided, returns GetWorkResult,
                 else returns whether or not the solved data is valid and was
-                added to the chain
+                added to the chain.
         """
         res = self.call("getwork", *([data.hex()] if data else []))
         return res if data else GetWorkResult.parse(res)
@@ -1028,7 +1028,7 @@ class Client:
                 to a peer
         """
         self.call(
-            "node", self, subcmd, target, *([connectSubCmd] if connectSubCmd else [])
+            "node", subcmd, target, *([connectSubCmd] if connectSubCmd else [])
         )
 
     def ping(self):
