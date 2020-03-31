@@ -1257,20 +1257,6 @@ class Client:
         return {k: VersionResult.parse(v) for k, v in self.call("version").items()}
 
 
-def get(k, obj):
-    """
-    Helper method to check for nil keys and set those values to None.
-
-    Args:
-        k (str): dict key
-        obj (dict): the dict to search
-
-    Returns:
-        object: the thing found at k or None.
-    """
-    return obj[k] if k in obj else None
-
-
 class COut:
     """
     Models data used when sending a createRawSSTx. Contains an sstxcommitment output.
@@ -1346,9 +1332,9 @@ class DecodeScriptResult:
         return DecodeScriptResult(
             asm=obj["asm"],
             scriptType=obj["type"],
-            reqSigs=get("reqSigs", obj),
-            addresses=[addr for addr in obj["addresses"]] if "addresses" in obj else [],
-            p2sh=get("p2sh", obj),
+            reqSigs=obj.get("reqSigs"),
+            addresses=[addr for addr in obj.get("addresses", [])],
+            p2sh=obj.get("p2sh"),
         )
 
 
@@ -1388,7 +1374,7 @@ class EstimateStakeDiffResult:
             diffMin=obj["min"],
             diffMax=obj["max"],
             expected=obj["expected"],
-            user=get("user", obj),
+            user=obj.get("user"),
         )
 
 
@@ -1607,12 +1593,11 @@ class GetAddedNodeInfoResult:
         """
         return GetAddedNodeInfoResult(
             addedNode=obj["addednode"],
-            connected=get("connected", obj),
+            connected=obj.get("connected"),
             addresses=[
-                GetAddedNodeInfoResultAddr.parse(addr) for addr in obj["addresses"]
-            ]
-            if "addresses" in obj
-            else [],
+                GetAddedNodeInfoResultAddr.parse(addr)
+                for addr in obj.get(["addresses"], [])
+            ],
         )
 
 
@@ -2019,9 +2004,9 @@ class GetPeerInfoResult:
             startingHeight=obj["startingheight"],
             banScore=obj["banscore"],
             syncNode=obj["syncnode"],
-            addrLocal=get("addrlocal", obj),
-            pingWait=get("pingwait", obj),
-            currentHeight=get("currentheight", obj),
+            addrLocal=obj.get("addrlocal"),
+            pingWait=obj.get("pingwait"),
+            currentHeight=obj.get("currentheight"),
         )
 
 
@@ -2786,9 +2771,9 @@ class FeeInfoResult:
             mean=obj["mean"],
             median=obj["median"],
             stdDev=obj["stddev"],
-            height=get("height", obj),
-            startHeight=get("startheight", obj),
-            endHeight=get("endheight", obj),
+            height=obj.get("height"),
+            startHeight=obj.get("startheight"),
+            endHeight=obj.get("endheight"),
         )
 
 
@@ -3063,11 +3048,11 @@ class RawTransactionResult:
             blockHash=reversed(ByteArray(obj["blockhash"]))
             if "blockhash" in obj
             else None,
-            blockHeight=get("blockheight", obj),
-            blockIndex=get("blockindex", obj),
-            confirmations=get("confirmations", obj),
-            time=get("time", obj),
-            blockTime=get("blocktime", obj),
+            blockHeight=obj.get("blockheight"),
+            blockIndex=obj.get("blockindex"),
+            confirmations=obj.get("confirmations"),
+            time=obj.get("time"),
+            blockTime=obj.get("blocktime"),
         )
 
 
@@ -3176,13 +3161,13 @@ class Vin:
             if "stakebase" in obj
             else None,
             txHash=reversed(ByteArray(obj["txid"])) if "txid" in obj else None,
-            vout=get("vout", obj),
-            tree=get("tree", obj),
-            blockHeight=get("blockheight", obj),
-            blockIndex=get("blockindex", obj),
+            vout=obj.get("vout"),
+            tree=obj.get("tree"),
+            blockHeight=obj.get("blockheight"),
+            blockIndex=obj.get("blockindex"),
             scriptSig=ScriptSig.parse(obj["scriptSig"]) if "scriptSig" in obj else None,
             prevOut=PrevOut.parse(obj["prevout"]) if "prevout" in obj else None,
-            sequence=get("sequence", obj),
+            sequence=obj.get("sequence"),
         )
 
 
@@ -3297,10 +3282,10 @@ class ScriptPubKeyResult:
         return ScriptPubKeyResult(
             asm=obj["asm"],
             Type=obj["type"],
-            script=ByteArray(get("hex", obj)),
-            reqSigs=get("reqSigs", obj),
-            addresses=get("addresses", obj),
-            commitAmt=get("commitAmt", obj),
+            script=ByteArray(obj.get("hex")),
+            reqSigs=obj.get("reqSigs"),
+            addresses=obj.get("addresses"),
+            commitAmt=obj.get("commitAmt"),
         )
 
 
@@ -3332,7 +3317,7 @@ class ValidateAddressChainResult:
             ValidateAddressChainResult: The ValidateAddressChainResult.
         """
         return ValidateAddressChainResult(
-            isValid=obj["isvalid"], address=get("address", obj),
+            isValid=obj["isvalid"], address=obj.get("address"),
         )
 
 
