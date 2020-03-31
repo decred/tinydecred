@@ -1026,9 +1026,7 @@ class Client:
                 connected peer a permanent one, 'temp' to try a single connect
                 to a peer
         """
-        self.call(
-            "node", subcmd, target, *([connectSubCmd] if connectSubCmd else [])
-        )
+        self.call("node", subcmd, target, *([connectSubCmd] if connectSubCmd else []))
 
     def ping(self):
         """
@@ -1558,6 +1556,14 @@ class GetAddedNodeInfoResultAddr:
             address=obj["address"], connected=obj["connected"],
         )
 
+    def __eq__(self, other):
+        try:
+            return (self.address == other.address) and (
+                self.connected == other.connected
+            )
+        except AttributeError:
+            return False
+
 
 class GetAddedNodeInfoResult:
     """
@@ -1594,8 +1600,7 @@ class GetAddedNodeInfoResult:
             addedNode=obj["addednode"],
             connected=obj.get("connected"),
             addresses=[
-                GetAddedNodeInfoResultAddr.parse(addr)
-                for addr in obj.get(["addresses"], [])
+                GetAddedNodeInfoResultAddr.parse(addr) for addr in obj.get("addresses")
             ],
         )
 
