@@ -8,12 +8,11 @@ import json
 import queue
 import ssl
 import types
-from urllib.parse import urlparse
 
 from decred import DecredError
 from decred.util import tinyhttp, ws
 from decred.util.encode import ByteArray
-from decred.util.helpers import getLogger
+from decred.util.helpers import getLogger, makeWebsocketURL
 
 from . import agenda, txscript
 from .wire.msgblock import BlockHeader
@@ -3366,21 +3365,6 @@ class VersionResult:
         )
 
 
-def websocketURI(host):
-    """
-    Parse the dcrd websocket URI from the HTTP URI.
-
-    Args:
-        host (str): The host.
-
-    Returns:
-        str: The websocket URI.
-    """
-    uri = urlparse(host)
-    prot = "wss" if uri.scheme in ("https", "wss") else "ws"
-    return f"{prot}://{uri.netloc}/ws"
-
-
 class WebsocketClient(Client):
     """
     A dcrd RPC client that communicates over websocket.
@@ -3397,7 +3381,7 @@ class WebsocketClient(Client):
         """Connect to the websocket server."""
 
         self.ws = ws.Client(
-            url=websocketURI(self.url),
+            url=makeWebsocketURL(self.url, "ws"),
             header=[f"{k}: {v}" for k, v in self.headers.items()],
             on_message=self.on_message,
             on_close=self.on_close,
