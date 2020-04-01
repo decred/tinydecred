@@ -131,7 +131,7 @@ class BitReader:
 
 class FilterV2:
     """
-    A GCS filter for determining probabilistic set membership.
+    A GCS filter for determining set membership with a 1/M false positive rate.
     """
 
     def __init__(self, n, filterData):
@@ -200,14 +200,14 @@ class FilterV2:
         term = (term * self.modulusNM) >> 64
 
         # Go through the search filter and look for the desired value.
-        br = BitReader(self.filterData)
+        bitStream = BitReader(self.filterData)
         lastValue = 0
-        uint64 = self.readFullUint64
+        readInt = self.readFullUint64
         while lastValue <= term:
             # Read the difference between previous and new value from
             # bitstream.
             try:
-                value = uint64(br)
+                value = readInt(bitStream)
             except EncodingError:  # out of bytes
                 return False
 
@@ -254,16 +254,16 @@ class FilterV2:
 
         # Zip down the filters, comparing values until we either run out of
         # values to compare in one of the filters or we reach a matching value.
-        br = BitReader(self.filterData)
+        bitStream = BitReader(self.filterData)
         searchSize = len(data)
         searchIdx = 0
         filterVal = 0
 
-        uint64 = self.readFullUint64
+        readInt = self.readFullUint64
         for i in range(self.n):
             # Read the next item to compare from the filter.
             try:
-                delta = uint64(br)
+                delta = readInt(bitStream)
             except EncodingError:  # out of bytes
                 return False
 
