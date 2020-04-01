@@ -1777,6 +1777,8 @@ def payToScriptHashScript(scriptHash):
     Returns:
         ByteArray: The script that pays to the script hash.
     """
+    if len(scriptHash) != 20:
+        raise DecredError(f"script hash must be 20 bytes but is {len(scriptHash)}")
     script = ByteArray("")
     script += opcode.OP_HASH160
     script += addData(scriptHash)
@@ -1795,6 +1797,8 @@ def payToPubKeyScript(serializedPubKey):
     Returns:
         ByteArray: The script that pays to the pubkey.
     """
+    if not isStrictPubKeyEncoding(serializedPubKey):
+        raise DecredError(f"serilized pubkey has incorrect encoding")
     script = ByteArray("")
     script += addData(serializedPubKey)
     script += opcode.OP_CHECKSIG
@@ -1814,6 +1818,10 @@ def payToStakePKHScript(addr, stakeCode):
     Returns:
         ByteArray: The script that pays to the pubkey hash of the address.
     """
+    if not isinstance(addr, addrlib.AddressPubKeyHash):
+        raise DecredError(f"address is not an AddressPubKeyHash")
+    if stakeCode not in (opcode.OP_SSTX, opcode.OP_SSTXCHANGE):
+        raise DecredError(f"stake code is not sstx or sstxchange: {hex(stakeCode)}")
     script = ByteArray(stakeCode)
     script += opcode.OP_DUP
     script += opcode.OP_HASH160
@@ -1836,6 +1844,10 @@ def payToStakeSHScript(addr, stakeCode):
     Returns:
         ByteArray: The script that pays to the script hash of the address.
     """
+    if not isinstance(addr, addrlib.AddressScriptHash):
+        raise DecredError(f"address is not an AddressScriptHash")
+    if stakeCode not in (opcode.OP_SSTX, opcode.OP_SSTXCHANGE):
+        raise DecredError(f"stake code is not sstx or sstxchange: {hex(stakeCode)}")
     script = ByteArray(stakeCode)
     script += opcode.OP_HASH160
     script += addData(addr.scriptAddress())
@@ -1909,6 +1921,8 @@ def payToSSRtxPKHDirect(pkh):
     Returns:
         ByteArray: Script to pay a stake based pubkey hash.
     """
+    if len(pkh) != 20:
+        raise DecredError(f"pubkey hash must be 20 bytes but is {len(pkh)}")
     script = ByteArray(b"")
     script += opcode.OP_SSRTX
     script += opcode.OP_DUP
@@ -1932,6 +1946,8 @@ def payToSSRtxSHDirect(sh):
     Returns:
         byte-like: script to pay a stake based script hash.
     """
+    if len(sh) != 20:
+        raise DecredError(f"script hash must be 20 bytes but is {len(sh)}")
     script = ByteArray(b"")
     script += opcode.OP_SSRTX
     script += opcode.OP_HASH160
