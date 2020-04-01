@@ -1798,7 +1798,7 @@ def payToPubKeyScript(serializedPubKey):
         ByteArray: The script that pays to the pubkey.
     """
     if not isStrictPubKeyEncoding(serializedPubKey):
-        raise DecredError(f"serilized pubkey has incorrect encoding")
+        raise DecredError(f"serialized pubkey has incorrect encoding")
     script = ByteArray("")
     script += addData(serializedPubKey)
     script += opcode.OP_CHECKSIG
