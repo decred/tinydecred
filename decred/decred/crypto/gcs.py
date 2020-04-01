@@ -4,7 +4,7 @@ See LICENSE for details
 """
 
 from blake256.blake256 import blake_hash
-from csiphash import siphash24
+from nacl.hash import siphash24
 
 from decred import DecredError
 from decred.dcr.wire import wire
@@ -24,6 +24,17 @@ M = 784931
 # KeySize is the size of the byte array required for key material for the
 # SipHash keyed hash function.
 KeySize = 16
+
+
+class SiphashEncoder:
+    """
+    PyNaCl's siphash 24 takes an encoder argument, which must have an encode
+    method.
+    """
+
+    @staticmethod
+    def encode(b):
+        return ByteArray(b)
 
 
 class EncodingError(DecredError):
@@ -196,7 +207,11 @@ class FilterV2:
             raise DecredError(f"key length {len(key)} != 16 not allowed")
 
         # Hash the search term with the same parameters as the filter.
-        term = ByteArray(siphash24(key.bytes(), data.bytes())).littleEndian().int()
+        term = (
+            siphash24(data.bytes(), key=key.bytes(), encoder=SiphashEncoder)
+            .littleEndian()
+            .int()
+        )
         term = (term * self.modulusNM) >> 64
 
         # Go through the search filter and look for the desired value.
@@ -244,7 +259,11 @@ class FilterV2:
         for d in data:
             if len(d) == 0:
                 continue
-            v = ByteArray(siphash24(keyB, d.bytes())).littleEndian().int()
+            v = (
+                siphash24(d.bytes(), key=keyB, encoder=SiphashEncoder)
+                .littleEndian()
+                .int()
+            )
             values.append((v * mod) >> 64)
 
         if len(values) == 0:
