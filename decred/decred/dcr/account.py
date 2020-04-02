@@ -7,6 +7,7 @@ See LICENSE for details
 from decred import DecredError
 from decred.crypto import crypto, opcode
 from decred.dcr import addrlib
+from decred.dcr.txscript import DefaultRelayFeePerKb
 from decred.util import encode, helpers
 from decred.util.encode import BuildyBytes, ByteArray, unblobCheck
 
@@ -801,6 +802,7 @@ class Account:
         self.coinID = BIPID
         self.netID = netID
         self.netParams = nets.parse(netID)
+        self.relayFee = int(DefaultRelayFeePerKb)
         # For external addresses, the cursor can sit on the last seen address,
         # so start the lastSeen at the 0th external address. This is necessary
         # because the currentAddress method grabs the address at the current
@@ -856,6 +858,7 @@ class Account:
             .addData(encode.intToBytes(acct.cursorExt, signed=True))
             .addData(acct.cursorInt)
             .addData(acct.gapLimit)
+            .addData(acct.relayFee)
             .b
         )
 
@@ -863,7 +866,7 @@ class Account:
     def unblob(b):
         """Satisfies the encode.Blobber API"""
         ver, d = encode.decodeBlob(b)
-        unblobCheck("Account", ver, len(d), {0: 8})
+        unblobCheck("Account", ver, len(d), {0: 9})
 
         iFunc = encode.intFromBytes
 
@@ -876,6 +879,7 @@ class Account:
         acct.cursorExt = iFunc(d[5], signed=True)
         acct.cursorInt = iFunc(d[6])
         acct.gapLimit = iFunc(d[7])
+        acct.relayFee = iFunc(d[8])
         return acct
 
     @staticmethod
