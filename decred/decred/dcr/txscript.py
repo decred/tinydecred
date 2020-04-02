@@ -2556,6 +2556,14 @@ def signP2PKHMsgTx(msgtx, prevOutputs, keysource, netParams):
     signP2PKHMsgTx sets the SignatureScript for every item in msgtx.TxIn.
     It must be called every time a msgtx is changed.
     Only P2PKH outputs are supported at this point.
+
+    The passed msgtx is modified.
+
+    Args:
+        msgtx (MsgTx): The transaction to sign.
+        prevOutputs (list(Credit)): A list of txscript.Credit to sign.
+        keysource (Keysource): An account.KeySource source for private keys.
+        netParams (module): Network parameters.
     """
     prevOutLen, txInLen = len(prevOutputs), len(msgtx.txIn)
     if prevOutLen != txInLen:
@@ -2988,7 +2996,7 @@ def mergeScripts(
     versions.
 
     Args:
-        netParams (obj): Network parameters.
+        netParams (module): Network parameters.
         tx (msgtx.Tx): Transaction that pkScript belongs to.
         idx (int): The output index that pkScript belongs to.
         pkScript (ByteArray): The script that spends output idx of tx.
