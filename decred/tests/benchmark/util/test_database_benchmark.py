@@ -10,12 +10,13 @@ import pytest
 from decred.util import database
 
 
-def test_benchmark(tmpdir):
+def test_benchmark(tmpdir, capsys):
     # Open a key value db in the temp directory.
     db = database.KeyValueDatabase(tmpdir.join("bm.sqlite")).child("testdb")
     # run some benchmarks
     num = 100
-    print(f"\nrunning benchmark with {num} values")
+    with capsys.disabled():
+        print(f"\nrunning benchmark with {num} values")
 
     data = [(str(i).encode(), str(i).encode()) for i in range(num)]
 
@@ -24,7 +25,8 @@ def test_benchmark(tmpdir):
     def lap(tag):
         nonlocal start
         elapsed = (time.time() - start) * 1000
-        print(f"{tag}: {int(elapsed)} ms")
+        with capsys.disabled():
+            print(f"{tag}: {int(elapsed)} ms")
         start = time.time()
 
     for k, v in data:
