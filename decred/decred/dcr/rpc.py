@@ -3169,7 +3169,7 @@ class Vin:
         Returns:
             Vin: The Parsed Vin.
         """
-        Vin(
+        return Vin(
             amountIn=obj["amountin"],
             coinbase=ByteArray(obj["coinbase"]) if "coinbase" in obj else None,
             stakebase=reversed(ByteArray(obj["stakebase"]))
