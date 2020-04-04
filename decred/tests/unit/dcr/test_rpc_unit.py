@@ -2,7 +2,7 @@
 Copyright (c) 2020, the Decred developers
 See LICENSE for details
 
-Tests use the "MockWebSocketClient_class" fixture in conftest.py .
+Tests use the "http_get_post" and "MockWebSocketClient" fixtures in conftest.py
 """
 
 import pytest
@@ -13,13 +13,26 @@ from decred.util import ws
 from decred.util.encode import ByteArray
 
 
+def test_Client(http_get_post):
+    http_get_post(
+        (
+            "https://example.org",
+            "{'jsonrpc': '2.0', 'id': 0, 'method': 'stop', 'params': ()}",
+        ),
+        '{"id": 0, "result": "dcrd stopping.", "error": ""}',
+    )
+    client = rpc.Client(url="https://example.org", user="username", pw="password",)
+    assert client.stop() == "dcrd stopping."
+
+
 GET_ADDED_NODE_INFO_RESULT_ADDR_RAW = dict(address="127.0.0.1", connected="false")
-# Parsed values are the same as the raw ones.
-GET_ADDED_NODE_INFO_RESULT_ADDR_PARSED = GET_ADDED_NODE_INFO_RESULT_ADDR_RAW
-GET_ADDED_NODE_INFO_RESULT_ADDR_ATTRS = ("address", "connected")
 
 
 def test_GetAddedNodeInfoResultAddr():
+    # Parsed values are the same as the raw ones.
+    GET_ADDED_NODE_INFO_RESULT_ADDR_PARSED = GET_ADDED_NODE_INFO_RESULT_ADDR_RAW
+    GET_ADDED_NODE_INFO_RESULT_ADDR_ATTRS = ("address", "connected")
+
     do_test(
         class_=rpc.GetAddedNodeInfoResultAddr,
         raw=GET_ADDED_NODE_INFO_RESULT_ADDR_RAW,
@@ -28,20 +41,19 @@ def test_GetAddedNodeInfoResultAddr():
     )
 
 
-GET_ADDED_NODE_INFO_RESULT_RAW = dict(
-    addednode="127.0.0.1",
-    connected=False,
-    addresses=[GET_ADDED_NODE_INFO_RESULT_ADDR_RAW],
-)
-# Make a copy of the raw dict in order not to overwrite it.
-GET_ADDED_NODE_INFO_RESULT_PARSED = dict(GET_ADDED_NODE_INFO_RESULT_RAW)
-GET_ADDED_NODE_INFO_RESULT_PARSED["addresses"] = [
-    rpc.GetAddedNodeInfoResultAddr.parse(GET_ADDED_NODE_INFO_RESULT_ADDR_RAW)
-]
-GET_ADDED_NODE_INFO_RESULT_ATTRS = ("addedNode", "connected", "addresses")
-
-
 def test_GetAddedNodeInfoResult():
+    GET_ADDED_NODE_INFO_RESULT_RAW = dict(
+        addednode="127.0.0.1",
+        connected=False,
+        addresses=[GET_ADDED_NODE_INFO_RESULT_ADDR_RAW],
+    )
+    # Make a copy of the raw dict in order not to overwrite it.
+    GET_ADDED_NODE_INFO_RESULT_PARSED = dict(GET_ADDED_NODE_INFO_RESULT_RAW)
+    GET_ADDED_NODE_INFO_RESULT_PARSED["addresses"] = [
+        rpc.GetAddedNodeInfoResultAddr.parse(GET_ADDED_NODE_INFO_RESULT_ADDR_RAW)
+    ]
+    GET_ADDED_NODE_INFO_RESULT_ATTRS = ("addedNode", "connected", "addresses")
+
     do_test(
         class_=rpc.GetAddedNodeInfoResult,
         raw=GET_ADDED_NODE_INFO_RESULT_RAW,
@@ -50,12 +62,11 @@ def test_GetAddedNodeInfoResult():
     )
 
 
-GET_WORK_RESULT_RAW = dict(data=[0, 1], target=[2, 3])
-GET_WORK_RESULT_PARSED = dict(data=ByteArray([0, 1]), target=ByteArray([2, 3]))
-GET_WORK_RESULT_ATTRS = ("data", "target")
-
-
 def test_GetWorkResult():
+    GET_WORK_RESULT_RAW = dict(data=[0, 1], target=[2, 3])
+    GET_WORK_RESULT_PARSED = dict(data=ByteArray([0, 1]), target=ByteArray([2, 3]))
+    GET_WORK_RESULT_ATTRS = ("data", "target")
+
     do_test(
         class_=rpc.GetWorkResult,
         raw=GET_WORK_RESULT_RAW,
@@ -64,13 +75,12 @@ def test_GetWorkResult():
     )
 
 
-PREV_OUT_RAW = dict(value=1.0, addresses=["addr"])
-# Parsed values are the same as the raw ones.
-PREV_OUT_PARSED = PREV_OUT_RAW
-PREV_OUT_ATTRS = ("value", "addresses")
-
-
 def test_PrevOut():
+    PREV_OUT_RAW = dict(value=1.0, addresses=["addr"])
+    # Parsed values are the same as the raw ones.
+    PREV_OUT_PARSED = PREV_OUT_RAW
+    PREV_OUT_ATTRS = ("value", "addresses")
+
     do_test(
         class_=rpc.PrevOut,
         raw=PREV_OUT_RAW,
@@ -99,9 +109,9 @@ def test_eq():
     assert address == address
 
 
-def test_WebsocketClient(monkeypatch, MockWebSocketClient_class):
+def test_WebsocketClient(monkeypatch, MockWebSocketClient):
 
-    monkeypatch.setattr(ws, "Client", MockWebSocketClient_class)
+    monkeypatch.setattr(ws, "Client", MockWebSocketClient)
 
     wsClient = rpc.WebsocketClient(
         url="https://example.org", user="username", pw="password",

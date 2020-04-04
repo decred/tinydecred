@@ -514,9 +514,6 @@ def test_Client(dcrdConfig):
 
     assert rpcClient.setGenerate(False) is None
 
-    # This actually stops the local server.
-    # assert rpcClient.stop() is None
-
     with pytest.raises(DecredError):
         rpcClient.submitBlock(ByteArray(b""))
 

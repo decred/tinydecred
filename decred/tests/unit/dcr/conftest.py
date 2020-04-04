@@ -34,8 +34,8 @@ def http_get_post(monkeypatch):
 
 
 @pytest.fixture
-def MockWebSocketClient_class():
-    class MockWebSocketClient:
+def MockWebSocketClient():
+    class MockWebSocketClient_inner:
         def __init__(self, **kargs):
             self.on_message = kargs["on_message"]
             self.on_close = kargs["on_close"]
@@ -52,4 +52,4 @@ def MockWebSocketClient_class():
         def emit(self, msg):
             self.emitted.append(msg)
 
-    return MockWebSocketClient
+    return MockWebSocketClient_inner

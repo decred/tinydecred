@@ -2,7 +2,7 @@
 Copyright (c) 2020, the Decred developers
 See LICENSE for details
 
-Tests use the "http_get_post" fixture in conftest.py .
+Tests use the "http_get_post" and "MockWebSocketClient" fixtures in conftest.py
 """
 
 import json
@@ -129,8 +129,8 @@ def test_checkoutput():
 
 
 @pytest.fixture
-def tweakedDcrdataClient(monkeypatch, MockWebSocketClient_class):
-    monkeypatch.setattr(ws, "Client", MockWebSocketClient_class)
+def tweakedDcrdataClient(monkeypatch, MockWebSocketClient):
+    monkeypatch.setattr(ws, "Client", MockWebSocketClient)
 
     def make():
         ddc = DcrdataClient(BASE_URL)
@@ -614,8 +614,8 @@ class TestDcrdataBlockchain:
         http_get_post(f"{INSIGHT_URL}/addrs/{addr}/txs?from=0&to=1", res)
         assert not ddb.addrsHaveTxs([addr])
 
-    def test_changeServer(self, http_get_post, monkeypatch, MockWebSocketClient_class):
-        monkeypatch.setattr(ws, "Client", MockWebSocketClient_class)
+    def test_changeServer(self, http_get_post, monkeypatch, MockWebSocketClient):
+        monkeypatch.setattr(ws, "Client", MockWebSocketClient)
         preload_api_list(http_get_post)
         http_get_post(f"{API_URL}/block/best", dict(height=1))
         ddb = DcrdataBlockchain(":memory:", testnet, BASE_URL)
