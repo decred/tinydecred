@@ -92,7 +92,7 @@ class BitReader:
             int: The bits interpreted as a big-endian integer.
         """
         if n > 64 or n < 0:
-            raise DecredError(f"n > 64 not allowed. given {n}")
+            raise DecredError(f"n > 64 or < 0 not allowed. given {n}")
         if n == 0:
             return 0
 
@@ -101,7 +101,7 @@ class BitReader:
 
         value = 0
 
-        # If byte is partially read, read the rest
+        # If byte is partially read, read the rest.
         if self.next != 1 << 7:
             while n > 0:
                 if self.next == 0:
