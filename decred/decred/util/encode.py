@@ -361,15 +361,12 @@ class ByteArray:
         return b
 
 
-def rba(b):
+def rba(*a, **k):
     """
-    Reversed ByteArray.
-
-    Args:
-        b: The intializer. Can be any type accepted by the ByteArray
-            constructor.
+    Reversed ByteArray. All args and kwargs are passed to the ByteArray
+    constructor.
     """
-    return reversed(ByteArray(b))
+    return reversed(ByteArray(*a, **k))
 
 
 class BuildyBytes(ByteArray):
