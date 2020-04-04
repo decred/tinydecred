@@ -176,7 +176,7 @@ class LocalNode:
         Returns:
             list(ByteArray): A list of hashes for blocks removed from mainchain.
         """
-        synced = 0
+        synced = 0  # Keep a count of the number of headers synced.
         mainchain = self.mainchainDB
 
         # Get the root header
@@ -227,7 +227,7 @@ class LocalNode:
 
     def syncHeaderRange(self, start, end):
         """
-        Retrieve and store mainchain block headers in the range [start:end),
+        Retrieve and store mainchain block headers in the range (start:end],
         e.g. start is not included.
 
         Args:
@@ -243,6 +243,7 @@ class LocalNode:
 
         storage = self.headerDB
         mainchain = self.mainchainDB
+        # Keep a count of the actual number synced. This can be < start - end.
         synced = 0
         if start == 0:
             # store the genesis block

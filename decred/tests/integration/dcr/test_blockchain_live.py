@@ -71,7 +71,7 @@ def test_syncAccount(node):
 def test_syncHeaders(node):
     # Get the current best tip.
     tip = node.rpc.getBestBlock()
-    # Go back 10 block, inclusive of ends, so 11 blocks total to sync.
+    # Go back 10 blocks, inclusive of ends, so 11 blocks total to sync.
     rootHash = node.rpc.getBlockHash(tip.height - 10)
     rootHeight = node.rpc.getBlock(rootHash).height
 
