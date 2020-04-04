@@ -38,6 +38,7 @@ black = "^19.10b0"
 isort = "^4.3"
 websocket-server = "^0.4"
 pytest-benchmark = "^3.2.3"
+pytest-profiling = "^1.7.0"
 
 [tool.isort]
 atomic = "true"
