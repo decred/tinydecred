@@ -109,19 +109,6 @@ class DcrdataPath:
         return tinyhttp.post(self.getCallsignPath(), data, headers=POST_HEADERS)
 
 
-def getSocketURLs(url):
-    """
-    Turn a HTTP/HTTPS URL into a WS/WSS one.
-
-    Args:
-        url (string): the URL to be adapted.
-
-    Returns:
-        string, string: the WebSocket and PubSub URLs.
-    """
-    return makeWebsocketURL(url, "ws"), makeWebsocketURL(url, "ps")
-
-
 # TODO: get the full list here.
 InsightPaths = [
     "/tx/send",
@@ -155,7 +142,7 @@ class DcrdataClient:
         self.baseURL = urlunsplit((url.scheme, url.netloc, "/", "", ""))
         # Add the "/api" path.
         self.baseApi = urlunsplit((url.scheme, url.netloc, "/api/", "", ""))
-        _, self.psURL = getSocketURLs(self.baseURL)
+        self.psURL = makeWebsocketURL(self.baseURL, "ps")
         self.ps = None
         self.subscribedAddresses = []
         self.emitter = emitter if emitter else lambda msg: None

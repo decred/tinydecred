@@ -6,7 +6,7 @@ See LICENSE for details
 from decred.dcr.agenda import Agenda, AgendaChoices, AgendaInfo, AgendasInfo
 
 
-AGENDA_INFO_RAW = dict(status="defined", since=1, starttime=2, expiretime=3,)
+AGENDA_INFO_RAW = dict(status="defined", since=1, starttime=2, expiretime=3)
 # Parsed values are the same as the raw ones.
 AGENDA_INFO_PARSED = AGENDA_INFO_RAW
 AGENDA_INFO_ATTRS = (

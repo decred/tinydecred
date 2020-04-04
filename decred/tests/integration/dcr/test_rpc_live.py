@@ -178,6 +178,11 @@ def test_Client(dcrdConfig):
         "0df0adba",
     ]
 
+    with pytest.raises(DecredError):
+        rpcClient.call("no_such_method")
+
+    assert rpcClient.addNode("127.0.0.1", "onetry") is None
+
     debugLevel = rpcClient.debugLevel("show")
     assert isinstance(debugLevel, str)
 
@@ -228,7 +233,7 @@ def test_Client(dcrdConfig):
             break
 
     else:
-        raise DecredError("did not find a suitable script to decode")
+        raise RuntimeError("did not find a suitable script to decode")
 
     existsExpiredTickets = rpcClient.existsExpiredTickets([aTicket, aTicket])
     assert existsExpiredTickets == [False, False]
@@ -375,6 +380,8 @@ def test_Client(dcrdConfig):
     assert isinstance(getVoteInfo, rpc.GetVoteInfoResult)
 
     # getWork will fail if --mininaddr is not set when starting dcrd
+    with pytest.raises(DecredError):
+        rpcClient.getWork()
     # getWork = rpcClient.getWork()
     # assert isinstance(getWork, rpc.GetWorkResult)
 
@@ -386,6 +393,8 @@ def test_Client(dcrdConfig):
 
     missedTickets = rpcClient.missedTickets()
     assert isinstance(missedTickets, list)
+
+    assert rpcClient.node("connect", "127.0.0.1", "temp") is None
 
     revocableTicket = rpcClient.getRawTransaction(missedTickets[0])
 
@@ -488,13 +497,25 @@ def test_Client(dcrdConfig):
     existsMissedTickets = rpcClient.existsMissedTickets(missedTickets[:8])
     assert existsMissedTickets == [True for _ in range(8)]
 
+    with pytest.raises(DecredError):
+        rpcClient.generate(2)
+
     rpcClient.ping()
 
     searchRawTransactions = rpcClient.searchRawTransactions(mainnetAddress)
     assert isinstance(searchRawTransactions[0], rpc.RawTransactionResult)
 
-    searchRawTransactions = rpcClient.searchRawTransactions(mainnetAddress, 0)
-    assert isinstance(searchRawTransactions[0], MsgTx)
+    searchRawTransactions = rpcClient.searchRawTransactions(mainnetAddress, False)
+    msgtx = searchRawTransactions[0]
+    assert isinstance(msgtx, MsgTx)
+
+    with pytest.raises(DecredError):
+        rpcClient.sendRawTransaction(msgtx)
+
+    assert rpcClient.setGenerate(False) is None
+
+    with pytest.raises(DecredError):
+        rpcClient.submitBlock(ByteArray(b""))
 
     ticketFeeInfo = rpcClient.ticketFeeInfo()
     assert isinstance(ticketFeeInfo, rpc.TicketFeeInfoResult)

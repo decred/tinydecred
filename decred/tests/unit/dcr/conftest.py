@@ -1,5 +1,5 @@
 """
-Copyright (c) 2019, the Decred developers
+Copyright (c) 2019-2020, the Decred developers
 See LICENSE for details
 """
 
@@ -31,3 +31,25 @@ def http_get_post(monkeypatch):
         q.setdefault(k, []).append(v)
 
     return queue
+
+
+@pytest.fixture
+def MockWebSocketClient():
+    class MockWebSocketClient_inner:
+        def __init__(self, **kargs):
+            self.on_message = kargs["on_message"]
+            self.on_close = kargs["on_close"]
+            self.on_error = kargs["on_error"]
+            self.sent = []
+            self.emitted = []
+
+        def send(self, msg):
+            self.sent.append(msg)
+
+        def close(self):
+            self.on_close(self)
+
+        def emit(self, msg):
+            self.emitted.append(msg)
+
+    return MockWebSocketClient_inner
