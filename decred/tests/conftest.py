@@ -3,6 +3,7 @@ Copyright (c) 2019, the Decred developers
 See LICENSE for details
 """
 
+import os
 import random
 
 import pytest
@@ -46,3 +47,19 @@ def prepareLogger(request):
 @pytest.fixture(scope="class")
 def registerChain(request):
     chains.registerChain("dcr", None)
+
+
+@pytest.fixture(scope="session")
+def dcrdConfig():
+    dcrdCfgDir = helpers.appDataDir("dcrd")
+    cfgPath = os.path.join(dcrdCfgDir, "dcrd.conf")
+    if not os.path.isfile(cfgPath):
+        return None
+    cfg = helpers.readINI(cfgPath, ["rpcuser", "rpcpass", "rpccert"])
+    assert "rpcuser" in cfg
+    assert "rpcpass" in cfg
+    if "rpccert" not in cfg:
+        cfg["rpccert"] = os.path.join(dcrdCfgDir, "rpc.cert")
+    if "rpclisten" not in cfg:
+        cfg["rpclisten"] = "localhost:9109"
+    return cfg

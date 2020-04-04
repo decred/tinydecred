@@ -55,25 +55,6 @@ def filterCrazyAddress(addrs):
     return [a for a in addrs if a != CrazyAddress]
 
 
-def deriveChildAddress(branchXPub, i, netParams):
-    """
-    The base-58 encoded address for the i'th child.
-
-    Args:
-        i (int): Child number.
-        netParams (module): Network parameters.
-
-    Returns:
-        Address: Child address.
-    """
-    child = branchXPub.child(i)
-    return addrlib.AddressPubKeyHash(
-        crypto.hash160(child.publicKey().serializeCompressed().b),
-        netParams,
-        crypto.STEcdsaSecp256k1,
-    ).string()
-
-
 class KeySource:
     """
     Implements the KeySource API from tinydecred.api. Must provide access to
@@ -909,11 +890,11 @@ class Account:
         extPub = pubX.child(EXTERNAL_BRANCH)
         intPub = pubX.child(INTERNAL_BRANCH)
         addrs = [
-            deriveChildAddress(extPub, idx, blockchain.params)
+            addrlib.deriveChildAddress(extPub, idx, blockchain.params)
             for idx in range(DefaultGapLimit)
         ]
         addrs += [
-            deriveChildAddress(intPub, idx, blockchain.params)
+            addrlib.deriveChildAddress(intPub, idx, blockchain.params)
             for idx in range(DefaultGapLimit)
         ]
         return blockchain.addrsHaveTxs(addrs)
@@ -1420,7 +1401,7 @@ class Account:
         def nextAddr():
             idx = len(branchAddrs)
             try:
-                addr = deriveChildAddress(branchKey, idx, self.netParams)
+                addr = addrlib.deriveChildAddress(branchKey, idx, self.netParams)
             except crypto.CrazyKeyError:
                 addr = CrazyAddress
             branchAddrs.append(addr)

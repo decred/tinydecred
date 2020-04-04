@@ -234,7 +234,7 @@ class ByteArray:
         return bytearray.__gt__(self.b, decodeBA(a))
 
     def __repr__(self):
-        return "ByteArray(" + str(self.b) + ")"
+        return "ByteArray(" + self.hex() + ")"
 
     def __len__(self):
         return len(self.b)
@@ -288,6 +288,10 @@ class ByteArray:
     def __reversed__(self):
         return ByteArray(bytearray(reversed(self.b)))
 
+    def __hash__(self):
+        """Enables ByteArray to be a dict key."""
+        return hash(bytes(self.b))
+
     def hex(self):
         """
         A hexadecimal string representation of the bytes.
@@ -296,6 +300,15 @@ class ByteArray:
             str: The hex bytes.
         """
         return self.b.hex()
+
+    def rhex(self):
+        """
+        A reversed hexadecimal string representation of the bytes.
+
+        Returns:
+            str: The hex bytes.
+        """
+        return self.__reversed__().hex()
 
     def zero(self):
         """
@@ -346,6 +359,17 @@ class ByteArray:
         b = self[:n]
         self.b = self.b[n:]
         return b
+
+
+def rba(b):
+    """
+    Reversed ByteArray.
+
+    Args:
+        b: The intializer. Can be any type accepted by the ByteArray
+            constructor.
+    """
+    return reversed(ByteArray(b))
 
 
 class BuildyBytes(ByteArray):

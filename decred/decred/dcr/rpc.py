@@ -425,7 +425,7 @@ class Client:
         Returns:
             list(bool): Bool list showing if addresses exist or not.
         """
-        mask = int(self.call("existsaddresses", addresses), 16)
+        mask = ByteArray(self.call("existsaddresses", addresses)).littleEndian().int()
         return [bool(mask & 1 << n) for n in range(len(addresses))]
 
     def existsExpiredTickets(self, txHashes):
@@ -607,7 +607,7 @@ class Client:
 
         Returns:
             GetBlockHeaderVerboseResult or msgblock.BlockHeader: The
-                GetBlockHeaderVerboseResult if vebose or the msgblock.BlockHeader
+                GetBlockHeaderVerboseResult if verbose or the BlockHeader
                 otherwise.
         """
         res = self.call("getblockheader", stringify(blockHash), verbose)
@@ -3461,3 +3461,62 @@ class WebsocketClient(Client):
     def on_error(self, error):
         """Called by ws.Client when an error is encountered."""
         log.error(f"websocket error: {error}")
+
+    def loadTxFilter(self, clear, addresses, outPoints):
+        """
+        Set or add to the current transaction filter.
+
+        Args:
+            clear (bool): If True, previous filter will be cleared, otherwise,
+                the new filter will be combined with the old one.
+            addresses list(string): Addresses of interest.
+            outPoints list(msgtx.OutPoint): Outputs to look for.
+        """
+        ops = [
+            dict(hash=op.hash.rhex(), tree=op.tree, index=op.index) for op in outPoints
+        ]
+        self.call("loadtxfilter", clear, addresses, ops)
+
+    def rescan(self, blockHashes):
+        """
+        Scan the blocks with the currently loaded tx filter.
+
+        Args:
+            blockHashes list(ByteArray): A list of block hashes to scan.
+
+        Returns:
+            list(RescanBlock): A list of results, each representing one block
+                with one or more transactions.
+        """
+        res = self.call("rescan", [h.rhex() for h in blockHashes])
+        return [RescanBlock.parse(blk) for blk in res["discovereddata"]]
+
+
+class RescanBlock:
+    """
+    The result from a rescan. Represents one block with one or more transaction
+    that matched the transaction filter.
+    """
+
+    def __init__(self, blockHash, txs):
+        """
+        Args:
+            blockHash (ByteArray): The block hash.
+            txs list(MsgTx): The transactions that matched the tx filter.
+        """
+        self.hash = blockHash
+        self.txs = txs
+
+    @staticmethod
+    def parse(obj):
+        """
+        Parse the RescanBlock from the decoded RPC response.
+
+        Args:
+            obj (dict): A dictionary from the rescan results 'discovereddata'
+                list.
+        """
+        return RescanBlock(
+            blockHash=reversed(ByteArray(obj["hash"])),
+            txs=[MsgTx.deserialize(hexTX) for hexTX in obj["transactions"]],
+        )
