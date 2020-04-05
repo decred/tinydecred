@@ -3,12 +3,10 @@ Copyright (c) 2019, the Decred developers
 See LICENSE for details
 """
 
-import unittest
-
 from decred.crypto.secp256k1 import field
 
 
-class TestField(unittest.TestCase):
+class TestField:
     def test_set_int(self):
         """
         TestSetInt ensures that setting a field value to various native integers
@@ -24,25 +22,25 @@ class TestField(unittest.TestCase):
         for i, v in tests:
             f = field.FieldVal()
             f.setInt(i)
-            self.assertListEqual(v, f.n)
+            assert v == f.n
 
     def test_zero(self):
         """TestZero ensures that zeroing a field value zero works as expected."""
         f = field.FieldVal()
         f.setInt(2)
         f.zero()
-        self.assertTrue(all((x == 0 for x in f.n)))
+        assert all((x == 0 for x in f.n))
 
     def test_is_zero(self):
         """TestIsZero ensures that checking if a field IsZero works as expected."""
         f = field.FieldVal()
-        self.assertTrue(f.isZero())
+        assert f.isZero()
 
         f.setInt(1)
-        self.assertFalse(f.isZero())
+        assert not f.isZero()
 
         f.zero()
-        self.assertTrue(f.isZero())
+        assert f.isZero()
 
     def test_normalize(self):
         """
@@ -488,7 +486,7 @@ class TestField(unittest.TestCase):
             f = field.FieldVal()
             f.n = raw
             f.normalize()
-            self.assertListEqual(normalized, f.n, msg="test %i" % i)
+            assert normalized == f.n, f"test {i}"
 
     def test_equals(self):
         """
@@ -519,7 +517,7 @@ class TestField(unittest.TestCase):
         for i, (a, b, eq) in enumerate(tests):
             fa = field.FieldVal.fromHex(a).normalize()
             fb = field.FieldVal.fromHex(b).normalize()
-            self.assertEqual(fa.equals(fb), eq, msg="test %i" % i)
+            assert fa.equals(fb) == eq, f"test {i}"
 
     def test_negate(self):
         """
@@ -558,7 +556,7 @@ class TestField(unittest.TestCase):
         for i, (a, b) in enumerate(tests):
             fa = field.FieldVal.fromHex(a).normalize().negate(1).normalize()
             fb = field.FieldVal.fromHex(b).normalize()
-            self.assertTrue(fa.equals(fb), msg="test %i" % i)
+            assert fa.equals(fb), f"test {i}"
 
     def test_add(self):
         """
@@ -608,7 +606,7 @@ class TestField(unittest.TestCase):
             fb = field.FieldVal.fromHex(b).normalize()
             fres = field.FieldVal.fromHex(res).normalize()
             result = fa.add(fb).normalize()
-            self.assertTrue(fres.equals(result), msg="test %i" % i)
+            assert fres.equals(result), f"test {i}"
 
     def test_add2(self):
         """
@@ -665,7 +663,7 @@ class TestField(unittest.TestCase):
             fb = field.FieldVal.fromHex(b).normalize()
             fres = field.FieldVal.fromHex(res).normalize()
             result = fa.add2(fa, fb).normalize()
-            self.assertTrue(fres.equals(result), msg="test %i" % i)
+            assert fres.equals(result), f"test {i}"
 
     def test_mul(self):
         """
@@ -728,7 +726,7 @@ class TestField(unittest.TestCase):
             fb = field.FieldVal.fromHex(b).normalize()
             fres = field.FieldVal.fromHex(res).normalize()
             result = fa.mul(fb).normalize()
-            self.assertTrue(fres.equals(result), msg="test %i" % i)
+            assert fres.equals(result), f"test {i}"
 
     def test_square(self):
         """
@@ -765,7 +763,7 @@ class TestField(unittest.TestCase):
         for i, (a, res) in enumerate(tests):
             f = field.FieldVal.fromHex(a).normalize().square().normalize()
             expected = field.FieldVal.fromHex(res).normalize()
-            self.assertTrue(f.equals(expected), msg="test %i" % i)
+            assert f.equals(expected), f"test {i}"
 
     def test_string(self):
         """ TestStringer ensures the stringer returns the appropriate hex string."""
@@ -839,7 +837,7 @@ class TestField(unittest.TestCase):
 
         for i, (a, res) in enumerate(tests):
             f = field.FieldVal.fromHex(a)
-            self.assertEqual(res, f.string(), msg="test %i" % i)
+            assert res == f.string(), f"test {i}"
 
     def test_inverse(self):
         """
@@ -884,4 +882,4 @@ class TestField(unittest.TestCase):
             f = field.FieldVal.fromHex(a).normalize()
             expected = field.FieldVal.fromHex(e).normalize()
             result = f.inverse().normalize()
-            self.assertTrue(result.equals(expected))
+            assert result.equals(expected)
