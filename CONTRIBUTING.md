@@ -32,7 +32,7 @@ Existing tests in the stdlib `unittest` format may be rewritten to use pytest
 as needed.
 
 Tests may be debugged more conveniently using the
-[pudb](https://documen.tician.de/pudb/) console-based visual debugger, invoked
+[PuDB](https://documen.tician.de/pudb/) console-based visual debugger, invoked
 via the `./decred/dbg-pudb.sh` script.
 
 For displaying line-by-line test coverage in a web browser see the
