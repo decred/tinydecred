@@ -1,12 +1,12 @@
 """
-Copyright (c) 2019, the Decred developers
+Copyright (c) 2019-2020, the Decred developers
 See LICENSE for details
 """
 
 from decred.crypto.secp256k1 import field
 
 
-class TestField:
+class Test_FieldVal:
     def test_set_int(self):
         """
         TestSetInt ensures that setting a field value to various native integers

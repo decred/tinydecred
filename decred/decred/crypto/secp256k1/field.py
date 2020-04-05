@@ -48,41 +48,41 @@ fieldPrimeWordZero = 0x3FFFC2F
 # internal field representation.  It is used during negation.
 fieldPrimeWordOne = 0x3FFFFBF
 
-"""
-fieldVal implements optimized fixed-precision arithmetic over the
-secp256k1 finite field.  This means all arithmetic is performed modulo
-0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f.  It
-represents each 256-bit value as 10 32-bit integers in base 2^26.  This
-provides 6 bits of overflow in each word (10 bits in the most significant
-word) for a total of 64 bits of overflow (9*6 + 10 = 64).  It only implements
-the arithmetic needed for elliptic curve operations.
-
-The following depicts the internal representation:
-     -----------------------------------------------------------------
-    |        n[9]       |        n[8]       | ... |        n[0]       |
-    | 32 bits available | 32 bits available | ... | 32 bits available |
-    | 22 bits for value | 26 bits for value | ... | 26 bits for value |
-    | 10 bits overflow  |  6 bits overflow  | ... |  6 bits overflow  |
-    | Mult: 2^(26*9)    | Mult: 2^(26*8)    | ... | Mult: 2^(26*0)    |
-     -----------------------------------------------------------------
-
-For example, consider the number 2^49 + 1.  It would be represented as:
-    n[0] = 1
-    n[1] = 2^23
-    n[2..9] = 0
-
-The full 256-bit value is then calculated by looping i from 9..0 and
-doing sum(n[i] * 2^(26i)) like so:
-    n[9] * 2^(26*9) = 0    * 2^234 = 0
-    n[8] * 2^(26*8) = 0    * 2^208 = 0
-    ...
-    n[1] * 2^(26*1) = 2^23 * 2^26  = 2^49
-    n[0] * 2^(26*0) = 1    * 2^0   = 1
-    Sum: 0 + 0 + ... + 2^49 + 1 = 2^49 + 1
-"""
-
 
 class FieldVal:
+    """
+    FieldVal implements optimized fixed-precision arithmetic over the
+    secp256k1 finite field.  This means all arithmetic is performed modulo
+    0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f.  It
+    represents each 256-bit value as 10 32-bit integers in base 2^26.  This
+    provides 6 bits of overflow in each word (10 bits in the most significant
+    word) for a total of 64 bits of overflow (9*6 + 10 = 64).  It only
+    implements the arithmetic needed for elliptic curve operations.
+
+    The following depicts the internal representation:
+         -----------------------------------------------------------------
+        |        n[9]       |        n[8]       | ... |        n[0]       |
+        | 32 bits available | 32 bits available | ... | 32 bits available |
+        | 22 bits for value | 26 bits for value | ... | 26 bits for value |
+        | 10 bits overflow  |  6 bits overflow  | ... |  6 bits overflow  |
+        | Mult: 2^(26*9)    | Mult: 2^(26*8)    | ... | Mult: 2^(26*0)    |
+         -----------------------------------------------------------------
+
+    For example, consider the number 2^49 + 1.  It would be represented as:
+        n[0] = 1
+        n[1] = 2^23
+        n[2..9] = 0
+
+    The full 256-bit value is then calculated by looping i from 9..0 and
+    doing sum(n[i] * 2^(26i)) like so:
+        n[9] * 2^(26*9) = 0    * 2^234 = 0
+        n[8] * 2^(26*8) = 0    * 2^208 = 0
+        ...
+        n[1] * 2^(26*1) = 2^23 * 2^26  = 2^49
+        n[0] * 2^(26*0) = 1    * 2^0   = 1
+        Sum: 0 + 0 + ... + 2^49 + 1 = 2^49 + 1
+    """
+
     def __init__(self):
         self.zero()
 
@@ -998,14 +998,15 @@ class FieldVal:
 
     def inverse(self):
         """
-        Inverse finds the modular multiplicative inverse of the field value.  The
-        existing field value is modified.
+        Inverse finds the modular multiplicative inverse of the field value.
+        The existing field value is modified.
 
-        The field value is returned to support chaining.  This enables syntax like:
+        The field value is returned to support chaining.  This enables syntax
+        like:
         f.Inverse().Mul(f2) so that f = f^-1 * f2.
         """
         # Fermat's little theorem states that for a nonzero number a and prime
-        # prime p, a^(p-1) = 1 (mod p).  Since the multipliciative inverse is
+        # prime p, a^(p-1) = 1 (mod p).  Since the multiplicative inverse is
         # a*b = 1 (mod p), it follows that b = a*a^(p-2) = a^(p-1) = 1 (mod p).
         # Thus, a^(p-2) is the multiplicative inverse.
 
