@@ -121,7 +121,7 @@ class FieldVal:
 
     def __init__(self):
         """
-        Set the newl-created field value to zero.
+        Set the newly created field value to zero.
         """
         self.zero()
 
@@ -209,7 +209,7 @@ class FieldVal:
         Equals returns whether or not the two field values are the same.
 
         Preconditions:
-          - Both field values being compared MUST be normalized
+          - Both field values being compared MUST be normalized.
 
         Args:
             f (FieldVal): the field value to be compared.
@@ -420,12 +420,12 @@ class FieldVal:
             f = -f + 1
 
         Preconditions:
-          - The max magnitude MUST be 63
+          - The max magnitude MUST be 63.
         Output Normalized: No
         Output Max Magnitude: Input magnitude + 1
 
         Args:
-            magnitue (): the magnitude of the field value.
+            magnitude (integer): the magnitude of the field value.
 
         Return:
             FieldVal: the object itself.
@@ -443,9 +443,14 @@ class FieldVal:
         so that:
             f = -f2 + 1
 
+        Preconditions:
+          - The max magnitude MUST be 63.
+        Output Normalized: No
+        Output Max Magnitude: Input magnitude + 1
+
         Args:
             val (FieldVal): the field value to be negated.
-            magnitue (): the magnitude of the field value.
+            magnitude (integer): the magnitude of the field value.
 
         Return:
             FieldVal: the object itself.
@@ -492,10 +497,10 @@ class FieldVal:
 
         Preconditions:
           - The sum of the magnitudes of the two field values MUST be a max of
-            64
+            64.
         Output Normalized: No
         Output Max Magnitude: Sum of the magnitude of the two individual field
-            values
+            values.
 
         Args:
             val (FieldVal): the field value to be added.
@@ -532,7 +537,7 @@ class FieldVal:
             f = f^2 * f2
 
         Preconditions:
-          - The field value MUST have a max magnitude of 8
+          - The field value MUST have a max magnitude of 8.
         Output Normalized: No
         Output Max Magnitude: 1
 
@@ -554,7 +559,7 @@ class FieldVal:
             f3 = f^2 * f2 = f^3
 
         Preconditions:
-          - The field value MUST have a max magnitude of 8
+          - The field value MUST have a max magnitude of 8.
         Output Normalized: No
         Output Max Magnitude: 1
 
@@ -804,6 +809,13 @@ class FieldVal:
         so that:
             f = f * 2 + f2
 
+        Preconditions:
+          - The field value magnitude multiplied by given val MUST be a max of
+            64.
+        Output Normalized: No
+        Output Max Magnitude: Existing field magnitude times the provided
+            integer val.
+
         Args:
             val (int): the integer to be multiplied.
 
@@ -841,6 +853,11 @@ class FieldVal:
         so that:
             f = f * f2 + 1
 
+        Preconditions:
+          - Both field values MUST have a max magnitude of 8.
+        Output Normalized: No
+        Output Max Magnitude: 1
+
         Args:
             val (FieldVal): the field value to be multiplied.
 
@@ -861,6 +878,11 @@ class FieldVal:
             f3.mul2(f, f2).addInt(1)
         so that:
             f3 = f * f2 + 1
+
+        Preconditions:
+          - Both input field values MUST have a max magnitude of 8.
+        Output Normalized: No
+        Output Max Magnitude: 1
 
         Args:
             val (FieldVal): the first field value to be multiplied.
@@ -1166,9 +1188,9 @@ class FieldVal:
 
         Preconditions:
           - The sum of the magnitudes of the two field values MUST be a max of
-            64
+            64.
         Output Normalized: No
-        Output Max Magnitude: Sum of the magnitude of the two field values
+        Output Max Magnitude: Sum of the magnitude of the two field values.
 
         Args:
             val (FieldVal): the first field value to be added.
@@ -1266,8 +1288,8 @@ class FieldVal:
         string returns the field value as a human-readable hex string.
 
         Preconditions: None
-        Output Normalized: Same as input value
-        Output Max Magnitude: Same as input value
+        Output Normalized: Same as input value.
+        Output Max Magnitude: Same as input value.
         """
         # Make a copy of the field value, so that we can normalize the copy
         # without changing the original value.
@@ -1285,7 +1307,7 @@ class FieldVal:
             f = f^-1 * f2
 
         Preconditions:
-          - The field value MUST have a max magnitude of 8
+          - The field value MUST have a max magnitude of 8.
         Output Normalized: No
         Output Max Magnitude: 1
 
