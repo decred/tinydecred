@@ -515,7 +515,7 @@ class Test_FieldVal:
                 "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
                 True,
             ),
-            # 1 == prime + 1 (mod prime)?
+            # 1 == prime+1 (mod prime)?
             (
                 "1",
                 "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
@@ -590,7 +590,7 @@ class Test_FieldVal:
                 "1",
                 "0",
             ),
-            # secp256k1 prime+1
+            # secp256k1 prime + 1
             (
                 "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
                 "1",
@@ -831,7 +831,7 @@ class Test_FieldVal:
                 "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
                 "0000000000000000000000000000000000000000000000000000000000000000",
             ),
-            # 2^256-4294968274 (the secp256k1 prime + 1, so should result in 1)
+            # 2^256-4294968274 (the secp256k1 prime+1, so should result in 1)
             (
                 "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30",
                 "0000000000000000000000000000000000000000000000000000000000000001",
