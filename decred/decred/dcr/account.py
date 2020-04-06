@@ -883,9 +883,8 @@ class Account:
         Returns True if any transactions are found within the default gap limit.
 
         Args:
-            blockchain (Blockchain): A Blockchain.
             pubX (crypto.ExtendedKey): An extended public account key.
-            netParams (module): The network parameters.
+            blockchain (Blockchain): A Blockchain.
         """
         extPub = pubX.child(EXTERNAL_BRANCH)
         intPub = pubX.child(INTERNAL_BRANCH)

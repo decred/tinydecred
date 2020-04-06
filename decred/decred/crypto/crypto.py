@@ -117,7 +117,7 @@ def hash160(b):
         b (byte-like): The bytes to hash.
 
     Returns:
-        byte-like: A 20-byte hash.
+        ByteArray: A 20-byte hash.
     """
     h = hashlib.new("ripemd160")
     h.update(blake_hash(b))

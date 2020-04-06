@@ -32,10 +32,13 @@ websocket_client = "^0.57.0"
 [tool.poetry.dev-dependencies]
 pytest = "^5.3"
 pytest-cov = "^2.8"
+pytest-pudb = "^0.7.0"
 flake8 = "^3.7"
 black = "^19.10b0"
 isort = "^4.3"
 websocket-server = "^0.4"
+pytest-benchmark = "^3.2.3"
+pytest-profiling = "^1.7.0"
 
 [tool.isort]
 atomic = "true"

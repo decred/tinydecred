@@ -2,7 +2,8 @@ decred/examples/wallets
 decred/dist
 tinywallet/dist
 decred/poetry.lock
-htmlcov
+htmlcov/
+prof/
 __pycache__/
 .pytest_cache
 .coverage
