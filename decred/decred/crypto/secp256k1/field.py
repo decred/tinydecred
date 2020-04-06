@@ -1,6 +1,6 @@
 """
 Copyright (c) 2019, Brian Stafford
-Copyright (c) 2019, The Decred developers
+Copyright (c) 2019-2020, The Decred developers
 See LICENSE for details
 """
 
@@ -19,6 +19,7 @@ sixBitsMask = 0x3F
 eightBitsMask = 0xFF
 
 # Constants related to the field representation.
+
 # fieldWords is the number of words used to internally represent the
 # 256-bit value.
 fieldWords = 10
@@ -51,10 +52,45 @@ fieldPrimeWordOne = 0x3FFFFBF
 
 class FieldVal:
     """
+    WARNING: Since it is so important for the field arithmetic to be extremely
+    fast for high performance crypto, this type does not perform any validation
+    of documented preconditions where it ordinarily would.  As a result, it is
+    IMPERATIVE for callers to understand some key concepts that are described
+    below and ensure the methods are called with the necessary preconditions that
+    each method is documented with.  For example, some methods only give the
+    correct result if the field value is normalized and others require the field
+    values involved to have a maximum magnitude and THERE ARE NO EXPLICIT CHECKS
+    TO ENSURE THOSE PRECONDITIONS ARE SATISFIED.  This does, unfortunately, make
+    the type more difficult to use correctly and while I typically prefer to
+    ensure all state and input is valid for most code, this is a bit of an
+    exception because those extra checks really add up in what ends up being
+    critical hot paths.
+
+    The first key concept when working with this type is normalization.  In order
+    to avoid the need to propagate a ton of carries, the internal representation
+    provides additional overflow bits for each word of the overall 256-bit value.
+    This means that there are multiple internal representations for the same
+    value and, as a result, any methods that rely on comparison of the value,
+    such as equality and oddness determination, require the caller to provide a
+    normalized value.
+
+    The second key concept when working with this type is magnitude.  As
+    previously mentioned, the internal representation provides additional
+    overflow bits which means that the more math operations that are performed on
+    the field value between normalizations, the more those overflow bits
+    accumulate.  The magnitude is effectively that maximum possible number of
+    those overflow bits that could possibly be required as a result of a given
+    operation.  Since there are only a limited number of overflow bits available,
+    this implies that the max possible magnitude MUST be tracked by the caller
+    and the caller MUST normalize the field value if a given operation would
+    cause the magnitude of the result to exceed the max allowed value.
+
+    IMPORTANT: The max allowed magnitude of a field value is 64.
+
     FieldVal implements optimized fixed-precision arithmetic over the
     secp256k1 finite field.  This means all arithmetic is performed modulo
-    0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f.  It
-    represents each 256-bit value as 10 32-bit integers in base 2^26.  This
+    0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f.  Each
+    256-bit value is represented as 10 32-bit integers in base 2^26.  This
     provides 6 bits of overflow in each word (10 bits in the most significant
     word) for a total of 64 bits of overflow (9*6 + 10 = 64).  It only
     implements the arithmetic needed for elliptic curve operations.
@@ -84,19 +120,38 @@ class FieldVal:
     """
 
     def __init__(self):
+        """
+        Set the newl-created field value to zero.
+        """
         self.zero()
 
     def zero(self):
+        """
+        zero sets the field value to zero.  A newly created field value is
+        already set to zero.  This function can be useful to clear an existing
+        field value for reuse.
+
+        Preconditions: None
+        Output Normalized: Yes
+        Output Max Magnitude: 1
+        """
         self.n = [0] * 10
 
     @staticmethod
-    def fromHex(hexString):  # string) *fieldVal {
+    def fromHex(hexString):
         """
-         SetHex decodes the passed big-endian hex string into the internal field value
-         representation.  Only the first 32-bytes are used.
+        fromHex decodes the passed big-endian hex string into the internal
+        field value representation.  Only the first 32-bytes are used.
 
-         The field value is returned to support chaining.  This enables syntax like:
-         #= new(fieldVal).SetHex("0abc").Add(1) so that f = 0x0abc + 1
+        The field value is returned to support chaining, enabling syntax like:
+            f = FieldVal.fromHex("0abc").add(1)
+        so that:
+            f = 0x0abc + 1
+
+        Args:
+            hexString (str): the hex string to be used as field value.
+        Return:
+            FieldVal: the created object.
         """
         if len(hexString) % 2 != 0:
             hexString = "0" + hexString
@@ -107,18 +162,80 @@ class FieldVal:
 
     @staticmethod
     def fromInt(i):
+        """
+        fromInt sets the passed integer into the internal field value
+        representation.
+
+        The field value is returned to support chaining, enabling syntax like:
+            f = FieldVal.fromInt(2).mul(3)
+        so that:
+            f = 2 * 3
+
+        Args:
+            i (int): the integer to be used as field value.
+        Return:
+            FieldVal: the created object.
+        """
         f = FieldVal()
         return f.setInt(i)
 
     def setInt(self, i):
+        """
+        setInt sets the field value to the passed integer.  This is a
+        convenience function since it is fairly common to perform some
+        arithmetic with small native integers.
+
+        The field value is returned to support chaining, enabling syntax like:
+            f = FieldVal().setInt(2).mul(f2)
+        so that:
+            f = 2 * f2
+
+        Preconditions: None
+        Output Normalized: Yes
+        Output Max Magnitude: 1
+
+        Args:
+            i (int): the integer value to be set as the field value.
+
+        Return:
+            FieldVal: the object itself.
+        """
         self.zero()
         self.n[0] = i
         return self
 
     def equals(self, f):
+        """
+        Equals returns whether or not the two field values are the same.
+
+        Preconditions:
+          - Both field values being compared MUST be normalized
+
+        Args:
+            f (FieldVal): the field value to be compared.
+
+        Return:
+            bool: True if the two field values are the same, False otherwise.
+        """
         return all((x == y for x, y in zip(f.n, self.n)))
 
     def setBytes(self, b):
+        """
+        SetBytes packs the passed 32-byte big-endian value into the internal
+        field value representation.
+
+        The field value is returned to support chaining, enabling syntax like:
+            f = FieldVal().setBytes(b).mul(f2)
+        so that:
+            f = b * f2
+
+        Preconditions: None
+        Output Normalized: Yes
+        Output Max Magnitude: 1
+
+        Args:
+            b (bytes-like): the bytearray value to be set as the field value.
+        """
         b = ByteArray(b, length=32, copy=False)
         self.n[0] = b[31] | b[30] << 8 | b[29] << 16 | (b[28] & twoBitsMask) << 24
         self.n[1] = b[28] >> 2 | b[27] << 6 | b[26] << 14 | (b[25] & fourBitsMask) << 22
@@ -132,36 +249,72 @@ class FieldVal:
         self.n[9] = b[2] >> 2 | b[1] << 6 | b[0] << 14
 
     def isZero(self):
+        """
+        isZero returns whether or not the field value is equal to zero in
+        constant time.
+
+        Preconditions:
+        - The field value MUST be normalized.
+
+        Return:
+            bool: True if the field value is zero, False otherwise.
+        """
         return all((x == 0 for x in self.n))
 
     def set(self, f):
+        """
+        set sets the field value equal to the passed value.  The normalization
+        and magnitude of the two fields will be identical.
+
+        The field value is returned to support chaining, enabling syntax like:
+            f = FieldVal().set(f2).add(1)
+        so that:
+            f = f2 + 1
+        where f2 is not modified.
+
+        Preconditions: None
+        Output Normalized: Same as input value
+        Output Max Magnitude: Same as input value
+
+        Args:
+            f (FieldVal): the field value to be copied.
+
+        Return:
+            FieldVal: the object itself.
+        """
         self.n = [x for x in f.n]
         return self
 
-    def normalize(self):  # *fieldVal {
+    def normalize(self):
         """
         Normalize normalizes the internal field words into the desired range and
-        performs fast modular reduction over the secp256k1 prime by making use of the
-        special form of the prime.
+        performs fast modular reduction over the secp256k1 prime by making use
+        of the special form of the prime.
+
+        Preconditions: None
+        Output Normalized: Yes
+        Output Max Magnitude: 1
+
+        Return:
+            FieldVal: the object itself.
         """
-        # The field representation leaves 6 bits of overflow in each word so
+        # The field representation leaves 6 bits of overflow in each word, so
         # intermediate calculations can be performed without needing to
-        # propagate the carry to each higher word during the calculations.  In
-        # order to normalize, we need to "compact" the full 256-bit value to
-        # the right while propagating any carries through to the high order
-        # word.
-        #         Since this field is doing arithmetic modulo the secp256k1 prime, we
+        # propagate the carry to each higher word.  In order to normalize, we
+        # need to "compact" the full 256-bit value to the right while
+        # propagating any carries through to the high order word.
+        #   Since this field is doing arithmetic modulo the secp256k1 prime, we
         # also need to perform modular reduction over the prime.
-        #         Per [HAC] section 14.3.4: Reduction method of moduli of special form,
+        #   Per [HAC] section 14.3.4: Reduction method of moduli of special form,
         # when the modulus is of the special form m = b^t - c, highly efficient
         # reduction can be achieved.
-        #         The secp256k1 prime is equivalent to 2^256 - 4294968273, so it fits
+        #   The secp256k1 prime is equivalent to 2^256 - 4294968273, so it fits
         # this criteria.
-        #         4294968273 in field representation (base 2^26) is:
+        #   4294968273 in field representation (base 2^26) is:
         # n[0] = 977
         # n[1] = 64
-        # That is to say (2^26 * 64) + 977 = 4294968273
-        #         The algorithm presented in the referenced section typically repeats
+        #   That is to say (2^26 * 64) + 977 = 4294968273
+        #   The algorithm presented in the referenced section typically repeats
         # until the quotient is zero.  However, due to our field representation
         # we already know to within one reduction how many times we would need
         # to repeat as it's the uppermost bits of the high order word.  Thus we
@@ -192,17 +345,17 @@ class FieldVal:
         t9 = (t8 >> fieldBase) + t9
         t8 = t8 & fieldBaseMask
 
-        # At this point, the magnitude is guaranteed to be one, however, the
+        # At this point, the magnitude is guaranteed to be one; however, the
         # value could still be greater than the prime if there was either a
         # carry through to bit 256 (bit 22 of the higher order word) or the
         # value is greater than or equal to the field characteristic.  The
-        # following determines if either or these conditions are true and does
+        # following determines if either of these conditions is true and does
         # the final reduction in constant time.
         #
         # Note that the if/else statements here intentionally do the bitwise
         # operators even when it won't change the value to ensure constant time
         # between the branches.  Also note that 'm' will be zero when neither
-        # of the aforementioned conditions are true and the value will not be
+        # of the aforementioned conditions is true, and the value will not be
         # changed when 'm' is zero.
         m = 1
         if t9 == fieldMSBMask:
@@ -255,23 +408,47 @@ class FieldVal:
         f.n[9] = t9
         return f
 
-    def negate(self, magnitude):  # uint32) *fieldVal {
+    def negate(self, magnitude):
         """
-        # Negate negates the field value.  The existing field value is modified.  The
-        # caller must provide the magnitude of the field value for a correct result.
-        #
-        # The field value is returned to support chaining.  This enables syntax like:
-        # f.Negate().AddInt(1) so that f = -f + 1.
+        negate negates the field value.  The existing field value is modified.
+        The caller must provide the magnitude of the field value for a correct
+        result.
+
+        The field value is returned to support chaining, enabling syntax like:
+            f.negate().addInt(1)
+        so that:
+            f = -f + 1
+
+        Preconditions:
+          - The max magnitude MUST be 63
+        Output Normalized: No
+        Output Max Magnitude: Input magnitude + 1
+
+        Args:
+            magnitue (): the magnitude of the field value.
+
+        Return:
+            FieldVal: the object itself.
         """
         return self.negateVal(self, magnitude)
 
-    def negateVal(self, val, magnitude):  # val *fieldVal, magnitude uint32) *fieldVal {
+    def negateVal(self, val, magnitude):
         """
-        NegateVal negates the passed value and stores the result in f.  The caller
-        must provide the magnitude of the passed value for a correct result.
+        negateVal negates the passed value and stores the result in f.  The
+        caller must provide the magnitude of the passed value for a correct
+        result.
 
-        The field value is returned to support chaining.  This enables syntax like:
-        f.NegateVal(f2).AddInt(1) so that f = -f2 + 1.
+        The field value is returned to support chaining, enabling syntax like:
+            f.negateVal(f2).addInt(1)
+        so that:
+            f = -f2 + 1
+
+        Args:
+            val (FieldVal): the field value to be negated.
+            magnitue (): the magnitude of the field value.
+
+        Return:
+            FieldVal: the object itself.
         """
         # Negation in the field is just the prime minus the value.  However,
         # in order to allow negation against a field value without having to
@@ -289,7 +466,7 @@ class FieldVal:
         # value is already in the desired range, its magnitude is 1.  Since 19
         # is an additional "step", its magnitude (mod 12) is 2.  Since any
         # multiple of the modulus is conguent to zero (mod m), the answer can
-        # be shortcut by simply mulplying the magnitude by the modulus and
+        # be shortcut by simply multiplying the magnitude by the modulus and
         # subtracting.  Keeping with the example, this would be (2*12)-19 = 5.
         self.n[0] = (magnitude + 1) * fieldPrimeWordZero - val.n[0]
         self.n[1] = (magnitude + 1) * fieldPrimeWordOne - val.n[1]
@@ -303,13 +480,28 @@ class FieldVal:
         self.n[9] = (magnitude + 1) * fieldMSBMask - val.n[9]
         return self
 
-    def add(self, val):  # *fieldVal) *fieldVal {
+    def add(self, val):
         """
-        Add adds the passed value to the existing field value and stores the result
-        in f.
+        add adds the passed value to the existing field value and stores the
+        result in f.
 
-        The field value is returned to support chaining.  This enables syntax like:
-        f.Add(f2).AddInt(1) so that f = f + f2 + 1.
+        The field value is returned to support chaining, enabling syntax like:
+            f.add(f2).addInt(1)
+        so that:
+            f = f + f2 + 1
+
+        Preconditions:
+          - The sum of the magnitudes of the two field values MUST be a max of
+            64
+        Output Normalized: No
+        Output Max Magnitude: Sum of the magnitude of the two individual field
+            values
+
+        Args:
+            val (FieldVal): the field value to be added.
+
+        Return:
+            FieldVal: the object itself.
         """
         # Since the field representation intentionally provides overflow bits,
         # it's ok to use carryless addition as the carry bit is safely part of
@@ -328,17 +520,49 @@ class FieldVal:
         return self
 
     def square(self):
+        """
+        square squares the field value.  The existing field value is modified.
+        Note that this function can overflow if multiplying any of the
+        individual words exceeds a max uint32.  In practice, this means the
+        magnitude of the field must be a max of 8 to prevent overflow.
+
+        The field value is returned to support chaining, enabling syntax like:
+            f.square().mul(f2)
+        so that:
+            f = f^2 * f2
+
+        Preconditions:
+          - The field value MUST have a max magnitude of 8
+        Output Normalized: No
+        Output Max Magnitude: 1
+
+        Return:
+            FieldVal: the object itself.
+        """
         return self.squareVal(self)
 
-    def squareVal(self, val):  # *fieldVal) *fieldVal {
+    def squareVal(self, val):
         """
-        SquareVal squares the passed value and stores the result in f.  Note that
-        this function can overflow if multiplying any of the individual words
-        exceeds a max uint32.  In practice, this means the magnitude of the field
-        being squred must be a max of 8 to prevent overflow.
+        SquareVal squares the passed value and stores the result in f. Note
+        that this function can overflow if multiplying any of the individual
+        words exceeds a max uint32.  In practice, this means the magnitude of
+        the field being squared must be a max of 8 to prevent overflow.
 
-        The field value is returned to support chaining.  This enables syntax like:
-        f3.SquareVal(f).Mul(f) so that f3 = f^2 * f = f^3.
+        The field value is returned to support chaining, enabling syntax like:
+            f3.squareVal(f).mul(f)
+        so that:
+            f3 = f^2 * f2 = f^3
+
+        Preconditions:
+          - The field value MUST have a max magnitude of 8
+        Output Normalized: No
+        Output Max Magnitude: 1
+
+        Args:
+            val (FieldVal): the field value to be squared.
+
+        Return:
+            FieldVal: the object itself.
         """
         # This could be done with a couple of for loops and an array to store
         # the intermediate terms, but this unrolled version is significantly
@@ -567,15 +791,24 @@ class FieldVal:
 
         return self
 
-    def mulInt(self, val):  # uint) *fieldVal {
+    def mulInt(self, val):
         """
-        MulInt multiplies the field value by the passed int and stores the result in
-        f.  Note that this function can overflow if multiplying the value by any of
-        the individual words exceeds a max uint32.  Therefore it is important that
-        the caller ensures no overflows will occur before using this function.
+        mulInt multiplies the field value by the passed integer and stores the
+        result in f.  Note that this function can overflow if multiplying the
+        value by any of the individual words exceeds a max uint32.  Therefore
+        it is important that the caller ensures no overflows will occur before
+        using this function.
 
-        The field value is returned to support chaining.  This enables syntax like:
-        f.MulInt(2).Add(f2) so that f = 2 * f + f2.
+        The field value is returned to support chaining, enabling syntax like:
+            f.mulInt(2).add(f2)
+        so that:
+            f = f * 2 + f2
+
+        Args:
+            val (int): the integer to be multiplied.
+
+        Return:
+            FieldVal: the object itself.
         """
         # Since each word of the field representation can hold up to
         # 32 - fieldBase extra bits which will be normalized out, it's safe
@@ -593,32 +826,48 @@ class FieldVal:
         self.n[7] *= val
         self.n[8] *= val
         self.n[9] *= val
-
         return self
 
     def mul(self, f):
         """
-        Mul multiplies the passed value to the existing field value and stores the
-        result in f.  Note that this function can overflow if multiplying any
-        of the individual words exceeds a max uint32.  In practice, this means the
-        magnitude of either value involved in the multiplication must be a max of
-        8.
+        mul multiplies the passed value to the existing field value and stores
+        the result in f.  Note that this function can overflow if multiplying
+        any of the individual words exceeds a max uint32.  In practice, this
+        means the magnitude of either value involved in the multiplication must
+        be a max of 8.
 
-        The field value is returned to support chaining.  This enables syntax like:
-        f.Mul(f2).AddInt(1) so that f = (f * f2) + 1.
+        The field value is returned to support chaining, enabling syntax like:
+            f.mul(f2).addInt(1)
+        so that:
+            f = f * f2 + 1
+
+        Args:
+            val (FieldVal): the field value to be multiplied.
+
+        Return:
+            FieldVal: the object itself.
         """
         return self.mul2(self, f)
 
-    def mul2(self, val, val2):  # val *fieldVal, val2 *fieldVal) *fieldVal {
+    def mul2(self, val, val2):
         """
-        Mul2 multiplies the passed two field values together and stores the result
-        result in f.  Note that this function can overflow if multiplying any of
-        the individual words exceeds a max uint32.  In practice, this means the
-        magnitude of either value involved in the multiplication must be a max of
-        8.
+        mul multiplies the passed value to the existing field value and stores
+        the result in f.  Note that this function can overflow if multiplying
+        any of the individual words exceeds a max uint32.  In practice, this
+        means the magnitude of either value involved in the multiplication must
+        be a max of 8.
 
-        The field value is returned to support chaining.  This enables syntax like:
-        f3.Mul2(f, f2).AddInt(1) so that f3 = (f * f2) + 1.
+        The field value is returned to support chaining, enabling syntax like:
+            f3.mul2(f, f2).addInt(1)
+        so that:
+            f3 = f * f2 + 1
+
+        Args:
+            val (FieldVal): the first field value to be multiplied.
+            val2 (FieldVal): the second field value to be multiplied.
+
+        Return:
+            FieldVal: the object itself.
         """
         # This could be done with a couple of for loops and an array to store
         # the intermediate terms, but this unrolled version is significantly
@@ -905,12 +1154,28 @@ class FieldVal:
         self.n[9] = t9
         return self
 
-    def add2(self, val, val2):  # val *fieldVal, val2 *fieldVal) *fieldVal {
+    def add2(self, val, val2):
         """
-        Add2 adds the passed two field values together and stores the result in f.
+        add2 adds the passed two field values together and stores the result in
+        f.
 
-        The field value is returned to support chaining.  This enables syntax like:
-        f3.Add2(f, f2).AddInt(1) so that f3 = f + f2 + 1.
+        The field value is returned to support chaining, enabling syntax like:
+            f3.add2(f, f2).addInt(1)
+        so that:
+            f3 = f + f2 + 1
+
+        Preconditions:
+          - The sum of the magnitudes of the two field values MUST be a max of
+            64
+        Output Normalized: No
+        Output Max Magnitude: Sum of the magnitude of the two field values
+
+        Args:
+            val (FieldVal): the first field value to be added.
+            val2 (FieldVal): the second field value to be added.
+
+        Return:
+            FieldVal: the object itself.
         """
         # Since the field representation intentionally provides overflow bits,
         # it's ok to use carryless addition as the carry bit is safely part of
@@ -930,19 +1195,21 @@ class FieldVal:
 
     def putBytes(self, b):
         """
-        PutBytes unpacks the field value to a 32-byte big-endian value using the
-        passed byte array.  There is a similar function, Bytes, which unpacks the
+        putBytes unpacks the field value to a 32-byte big-endian value using the
+        passed bytearray.  There is a similar function, bytes, which unpacks the
         field value into a new array and returns that.  This version is provided
-        since it can be useful to cut down on the number of allocations by allowing
-        the caller to reuse a buffer.
+        since it can be useful to cut down on the number of allocations by
+        allowing the caller to reuse a bytearray.
 
-        The field value must be normalized for this function to return the correct
-        result.
+        Preconditions:
+          - The field value MUST be normalized.
+
+        Args:
+            b (bytes-like): the bytearray value to be set as the field value.
         """
         # Unpack the 256 total bits from the 10 uint32 words with a max of
         # 26-bits per word.  This could be done with a couple of for loops,
-        # but this unrolled version is a bit faster.  Benchmarks show this is
-        # about 10 times faster than the variant which uses loops.
+        # but this unrolled version is faster.
         f = self
         b[31] = f.n[0] & eightBitsMask
         b[30] = (f.n[0] >> 8) & eightBitsMask
@@ -979,31 +1246,51 @@ class FieldVal:
 
     def bytes(self):
         """
-        Bytes unpacks the field value to a 32-byte big-endian value.  See PutBytes
-        for a variant that allows the a buffer to be passed which can be useful to
-        to cut down on the number of allocations by allowing the caller to reuse a
-        buffer.
+        bytes unpacks the field value to a 32-byte big-endian ByteArray.  See
+        putBytes for a variant that allows a bytearray to be passed, which can
+        be useful to cut down on the number of allocations by allowing the
+        caller to reuse a bytearray.
 
-        The field value must be normalized for this function to return correct
-        result.
+        Preconditions:
+          - The field value MUST be normalized.
+
+        Return:
+            ByteArray: the field value converted to a 32-byte ByteArray.
         """
         b = ByteArray(0, length=32)
         self.putBytes(b)
         return b
 
     def string(self):
-        """  String returns the field value as a human-readable hex string."""
+        """
+        string returns the field value as a human-readable hex string.
+
+        Preconditions: None
+        Output Normalized: Same as input value
+        Output Max Magnitude: Same as input value
+        """
+        # Make a copy of the field value, so that we can normalize the copy
+        # without changing the original value.
         f = FieldVal().set(self).normalize()
         return f.bytes().hex()
 
     def inverse(self):
         """
-        Inverse finds the modular multiplicative inverse of the field value.
+        inverse finds the modular multiplicative inverse of the field value.
         The existing field value is modified.
 
-        The field value is returned to support chaining.  This enables syntax
-        like:
-        f.Inverse().Mul(f2) so that f = f^-1 * f2.
+        The field value is returned to support chaining, enabling syntax like:
+            f.inverse().mul(f2)
+        so that:
+            f = f^-1 * f2
+
+        Preconditions:
+          - The field value MUST have a max magnitude of 8
+        Output Normalized: No
+        Output Max Magnitude: 1
+
+        Return:
+            FieldVal: the object itself.
         """
         # Fermat's little theorem states that for a nonzero number a and prime
         # prime p, a^(p-1) = 1 (mod p).  Since the multiplicative inverse is
@@ -1011,13 +1298,14 @@ class FieldVal:
         # Thus, a^(p-2) is the multiplicative inverse.
 
         # In order to efficiently compute a^(p-2), p-2 needs to be split into
-        # a sequence of squares and multipications that minimizes the number of
-        # multiplications needed (since they are more costly than squarings).
-        # Intermediate results are saved and reused as well.
+        # a sequence of squares and multiplications that minimizes the number
+        # of multiplications needed (since they are more costly than
+        # squarings). Intermediate results are saved and reused as well.
 
         # The secp256k1 prime - 2 is 2^256 - 4294968275.
 
         # This has a cost of 258 field squarings and 33 field multiplications.
+
         # fmt: off
         f = self
         fv = FieldVal
