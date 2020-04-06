@@ -33,7 +33,7 @@ as needed.
 
 Tests may be debugged more conveniently using the
 [PuDB](https://documen.tician.de/pudb/) console-based visual debugger, invoked
-via the `./decred/dbg-pudb.sh` script.
+via the `./decred/debugger.sh` script.
 
 For displaying line-by-line test coverage in a web browser see the
 `./decred/coverage-html.sh` script.
