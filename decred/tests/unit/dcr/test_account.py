@@ -441,6 +441,10 @@ class TestAccount:
         """
         Test account functionality.
         """
+        # Set up globals for test.
+        origDefaultGapLimit = account.DefaultGapLimit
+        account.DefaultGapLimit = 2
+
         db = KeyValueDatabase(":memory:").child("tmp")
         acct = self.newAccount(db)
         acct.unlock(self.cryptoKey)
@@ -684,6 +688,9 @@ class TestAccount:
         acct.blockchain.revokeTicket = rev
         acct.revokeTickets()
         assert revoked
+
+        # Restore globals.
+        account.DefaultGapLimit = origDefaultGapLimit
 
     def test_readAddrs(self):
         readAddrs = account.Account.readAddrs

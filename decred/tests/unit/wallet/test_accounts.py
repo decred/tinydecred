@@ -7,7 +7,7 @@ import pytest
 
 from decred import DecredError
 from decred.crypto import crypto, rando
-from decred.dcr import addrlib, nets
+from decred.dcr import account, addrlib, nets
 from decred.util import chains, database, encode
 from decred.wallet import accounts
 
@@ -50,6 +50,10 @@ def test_change_addresses(prepareLogger):
 
 
 def test_account_manager(prepareLogger):
+    # Set up globals for test.
+    origDefaultGapLimit = account.DefaultGapLimit
+    account.DefaultGapLimit = 2
+
     cryptoKey = rando.newKey()
     db = database.KeyValueDatabase(":memory:").child("tmp")
     # 42 = Decred
@@ -89,6 +93,9 @@ def test_account_manager(prepareLogger):
     db = acctMgr.dbForAcctIdx(0)
     assert db.name == "tmp$accts$0"
 
+    # Restore globals.
+    account.DefaultGapLimit = origDefaultGapLimit
+
 
 def test_discover(prepareLogger):
     cryptoKey = rando.newKey()
@@ -102,20 +109,25 @@ def test_discover(prepareLogger):
         params = nets.mainnet
         addrsHaveTxs = lambda addrs: any(a in txs for a in addrs)
 
-    ogChain = chains.chain("dcr")
+    # Set up globals for test.
+    origChain = chains.chain("dcr")
     chains.registerChain("dcr", Blockchain)
-    ogLimit = accounts.ACCOUNT_GAP_LIMIT
+    origAccountGapLimit = accounts.ACCOUNT_GAP_LIMIT
     accounts.ACCOUNT_GAP_LIMIT = 2
+    origDefaultGapLimit = account.DefaultGapLimit
+    account.DefaultGapLimit = 4
 
     acctMgr.discover(cryptoKey)
     assert len(acctMgr.accounts) == 1
 
     coinExtKey = acctMgr.coinKey(cryptoKey)
     acct2ExtKey = coinExtKey.deriveAccountKey(2).neuter().child(0)
-    acct2Addr5 = addrlib.deriveChildAddress(acct2ExtKey, 5, nets.mainnet)
-    txs[acct2Addr5] = ["tx"]
+    acct2Addr3 = addrlib.deriveChildAddress(acct2ExtKey, 3, nets.mainnet)
+    txs[acct2Addr3] = ["tx"]
     acctMgr.discover(cryptoKey)
     assert len(acctMgr.accounts) == 3
 
-    chains.registerChain("dcr", ogChain)
-    accounts.ACCOUNT_GAP_LIMIT = ogLimit
+    # Restore globals.
+    chains.registerChain("dcr", origChain)
+    accounts.ACCOUNT_GAP_LIMIT = origAccountGapLimit
+    account.DefaultGapLimit = origDefaultGapLimit
