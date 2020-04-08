@@ -7,7 +7,7 @@ from decred.crypto.secp256k1 import field
 
 
 class Test_FieldVal:
-    def test_set_int(self):
+    def test_setInt(self):
         """
         test_set_int ensures that setting a field value to various native
         integers works as expected.
@@ -36,7 +36,7 @@ class Test_FieldVal:
         f.zero()
         assert all((x == 0 for x in f.n))
 
-    def test_is_zero(self):
+    def test_isZero(self):
         """
         test_is_zero ensures that checking if a field is zero works as expected.
         """

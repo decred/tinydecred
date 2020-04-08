@@ -20,6 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3.8",
     "Topic :: Office/Business :: Financial"
 ]
+build = "build.py"
 
 [tool.poetry.dependencies]
 python = "^3.6"
@@ -39,6 +40,7 @@ isort = "^4.3"
 websocket-server = "^0.4"
 pytest-benchmark = "^3.2.3"
 pytest-profiling = "^1.7.0"
+Cython = "^0.29.16"
 
 [tool.isort]
 atomic = "true"
