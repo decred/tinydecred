@@ -1764,30 +1764,38 @@ class TestTxScript:
             opcodeNum = 0
             while tokenizer.next():
                 # Ensure Next never returns true when there is an error set.
-                assert tokenizer.err is None, (
-                    "{}: Next returned true when tokenizer has err: {}".format(
-                        test_name, tokenizer.err))
+                assert (
+                    tokenizer.err is None
+                ), "{}: Next returned true when tokenizer has err: {}".format(
+                    test_name, tokenizer.err
+                )
 
                 # Ensure the test data expects a token to be parsed.
                 op = tokenizer.opcode()
                 data = tokenizer.data()
-                assert opcodeNum < len(test_expected), (
-                    "{}: unexpected token '{}' (data: '{}')".format(
-                        test_name, op, data))
+                assert opcodeNum < len(
+                    test_expected
+                ), "{}: unexpected token '{}' (data: '{}')".format(test_name, op, data)
                 expected_op, expected_data, expected_index = test_expected[opcodeNum]
 
                 # Ensure the opcode and data are the expected values.
-                assert op == expected_op, (
-                    "{}: unexpected opcode -- got {}, want {}".format(
-                        test_name, op, expected_op))
-                assert data == expected_data, (
-                    "{}: unexpected data -- got {}, want {}".format(
-                        test_name, data, expected_data))
+                assert (
+                    op == expected_op
+                ), "{}: unexpected opcode -- got {}, want {}".format(
+                    test_name, op, expected_op
+                )
+                assert (
+                    data == expected_data
+                ), "{}: unexpected data -- got {}, want {}".format(
+                    test_name, data, expected_data
+                )
 
                 tokenizerIdx = tokenizer.offset
-                assert tokenizerIdx == expected_index, (
-                    "{}: unexpected byte index -- got {}, want {}".format(
-                        test_name, tokenizerIdx, expected_index))
+                assert (
+                    tokenizerIdx == expected_index
+                ), "{}: unexpected byte index -- got {}, want {}".format(
+                    test_name, tokenizerIdx, expected_index
+                )
 
                 opcodeNum += 1
 
@@ -1797,19 +1805,25 @@ class TestTxScript:
 
             # Ensure the error is as expected.
             if test_err is None:
-                assert tokenizer.err is None, (
-                    "{}: unexpected tokenizer err -- got {}, want None".format(
-                        test_name, tokenizer.err))
+                assert (
+                    tokenizer.err is None
+                ), "{}: unexpected tokenizer err -- got {}, want None".format(
+                    test_name, tokenizer.err
+                )
             else:
-                assert isinstance(tokenizer.err, test_err), (
-                    "{}: unexpected tokenizer err -- got {}, want {}".format(
-                        test_name, tokenizer.err, test_err))
+                assert isinstance(
+                    tokenizer.err, test_err
+                ), "{}: unexpected tokenizer err -- got {}, want {}".format(
+                    test_name, tokenizer.err, test_err
+                )
 
             # Ensure the final index is the expected value.
             tokenizerIdx = tokenizer.offset
-            assert tokenizerIdx == test_finalIdx, (
-                "{}: unexpected final byte index -- got {}, want {}".format(
-                    test_name, tokenizerIdx, test_finalIdx))
+            assert (
+                tokenizerIdx == test_finalIdx
+            ), "{}: unexpected final byte index -- got {}, want {}".format(
+                test_name, tokenizerIdx, test_finalIdx
+            )
 
         def test_isSSGen(self):
             """
@@ -1864,11 +1878,13 @@ class TestTxScript:
                 pass
             else:
                 raise AssertionError(
-                    'expected exception in test "{}" did not occur'.format(name))
+                    'expected exception in test "{}" did not occur'.format(name)
+                )
 
             if txscript.isSSGen(tx):
                 raise AssertionError(
-                    'expected false for isSSGen for test "{}"'.format(name))
+                    'expected false for isSSGen for test "{}"'.format(name)
+                )
 
         # ---------------------------------------------------------------------------
         # Test too many inputs with ssgenMsgTxExtraInputs
@@ -3318,8 +3334,9 @@ class TestTxScript:
 
         for num, serialized in tests:
             gotBytes = txscript.scriptNumBytes(num)
-            assert gotBytes == serialized, (
-                f"{num}: wanted {serialized.hex()}, got {gotBytes.hex()}")
+            assert (
+                gotBytes == serialized
+            ), f"{num}: wanted {serialized.hex()}, got {gotBytes.hex()}"
 
 
 def test_is_unspendable():

@@ -37,10 +37,6 @@ class TestWire:
         assert wire.readVarInt(ByteArray([0xFC]), wire.ProtocolVersion) == 0xFC
         with pytest.raises(DecredError):
             wire.readVarInt(
-                ByteArray([0xFE, 0xFF, 0xFF, 0x0, 0x0]),
-                wire.ProtocolVersion
+                ByteArray([0xFE, 0xFF, 0xFF, 0x0, 0x0]), wire.ProtocolVersion
             )
-            wire.readVarInt(
-                ByteArray([0xFD, 0xFC, 0x0]),
-                wire.ProtocolVersion
-            )
+            wire.readVarInt(ByteArray([0xFD, 0xFC, 0x0]), wire.ProtocolVersion)
