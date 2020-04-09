@@ -5,7 +5,6 @@ See LICENSE for details
 
 import json
 import os
-import unittest
 
 import pytest
 
@@ -1414,7 +1413,7 @@ class TestSubsidyCache:
                 assert result == pcTest["want"], t["name"]
 
 
-class TestTxScript(unittest.TestCase):
+class TestTxScript:
     def test_stake_pool_ticketFee(self):
         class test:
             def __init__(self, StakeDiff, Fee, Height, PoolFee, Expected):
@@ -1435,7 +1434,7 @@ class TestTxScript(unittest.TestCase):
             poolFeeAmt = txscript.stakePoolTicketFee(
                 t.StakeDiff, t.Fee, t.Height, t.PoolFee, cache, mainnet
             )
-            self.assertEqual(poolFeeAmt, t.Expected, str(i))
+            assert poolFeeAmt == t.Expected, f"test {i}"
 
     def test_generate_sstx_addr_push(self):
         """
@@ -1473,10 +1472,10 @@ class TestTxScript(unittest.TestCase):
                 ),
             )
         )
-        for t in tests:
+        for i, t in enumerate(tests):
             addr = addrlib.decodeAddress(t.addrStr, t.net)
             s = txscript.generateSStxAddrPush(addr, t.amount, t.limits)
-            self.assertEqual(s, t.expected)
+            assert s == t.expected, f"test {i}"
 
     def test_var_int_serialize(self):
         """
@@ -1495,9 +1494,7 @@ class TestTxScript(unittest.TestCase):
         ]
 
         for i, (val, size) in enumerate(tests):
-            self.assertEqual(
-                txscript.varIntSerializeSize(val), size, msg="test at index %d" % i
-            )
+            assert txscript.varIntSerializeSize(val) == size, f"test {i}"
 
     def test_calc_signature_hash(self):
         """
@@ -1531,20 +1528,16 @@ class TestTxScript(unittest.TestCase):
         msg2 = txscript.calcSignatureHash(
             script, txscript.SigHashAll, tx, 0, prefixHash
         )
-
-        self.assertEqual(msg1, want)
-
-        self.assertEqual(msg2, want)
-
-        self.assertEqual(msg1, msg2)
+        assert msg1 == want
+        assert msg2 == want
+        assert msg1 == msg2
 
         # Move the index and make sure that we get a whole new hash, despite
         # using the same TxOuts.
         msg3 = txscript.calcSignatureHash(
             script, txscript.SigHashAll, tx, 1, prefixHash
         )
-
-        self.assertNotEqual(msg1, msg3)
+        assert msg1 != msg3
 
     def test_script_tokenizer(self):
         """
@@ -1771,76 +1764,52 @@ class TestTxScript(unittest.TestCase):
             opcodeNum = 0
             while tokenizer.next():
                 # Ensure Next never returns true when there is an error set.
-                self.assertIs(
-                    tokenizer.err,
-                    None,
-                    msg="%s: Next returned true when tokenizer has err: %r"
-                    % (test_name, tokenizer.err),
-                )
+                assert tokenizer.err is None, (
+                    "{}: Next returned true when tokenizer has err: {}".format(
+                        test_name, tokenizer.err))
 
                 # Ensure the test data expects a token to be parsed.
                 op = tokenizer.opcode()
                 data = tokenizer.data()
-                self.assertFalse(
-                    opcodeNum >= len(test_expected),
-                    msg="%s: unexpected token '%r' (data: '%s')"
-                    % (test_name, op, data),
-                )
+                assert opcodeNum < len(test_expected), (
+                    "{}: unexpected token '{}' (data: '{}')".format(
+                        test_name, op, data))
                 expected_op, expected_data, expected_index = test_expected[opcodeNum]
 
                 # Ensure the opcode and data are the expected values.
-                self.assertEqual(
-                    op,
-                    expected_op,
-                    msg="%s: unexpected opcode -- got %d, want %d"
-                    % (test_name, op, expected_op),
-                )
-                self.assertEqual(
-                    data,
-                    expected_data,
-                    msg="%s: unexpected data -- got %s, want %s"
-                    % (test_name, data, expected_data),
-                )
+                assert op == expected_op, (
+                    "{}: unexpected opcode -- got {}, want {}".format(
+                        test_name, op, expected_op))
+                assert data == expected_data, (
+                    "{}: unexpected data -- got {}, want {}".format(
+                        test_name, data, expected_data))
 
                 tokenizerIdx = tokenizer.offset
-                self.assertEqual(
-                    tokenizerIdx,
-                    expected_index,
-                    msg="%s: unexpected byte index -- got %d, want %d"
-                    % (test_name, tokenizerIdx, expected_index),
-                )
+                assert tokenizerIdx == expected_index, (
+                    "{}: unexpected byte index -- got {}, want {}".format(
+                        test_name, tokenizerIdx, expected_index))
 
                 opcodeNum += 1
 
             # Ensure the tokenizer claims it is done.  This should be the case
             # regardless of whether or not there was a parse error.
-            self.assertTrue(
-                tokenizer.done(), msg="%s: tokenizer claims it is not done" % test_name
-            )
+            assert tokenizer.done(), f"{test_name}: tokenizer claims it is not done"
 
             # Ensure the error is as expected.
             if test_err is None:
-                self.assertIs(
-                    tokenizer.err,
-                    None,
-                    msg="%s: unexpected tokenizer err -- got %r, want None"
-                    % (test_name, tokenizer.err),
-                )
+                assert tokenizer.err is None, (
+                    "{}: unexpected tokenizer err -- got {}, want None".format(
+                        test_name, tokenizer.err))
             else:
-                self.assertTrue(
-                    isinstance(tokenizer.err, test_err),
-                    msg="%s: unexpected tokenizer err -- got %r, want %r"
-                    % (test_name, tokenizer.err, test_err),
-                )
+                assert isinstance(tokenizer.err, test_err), (
+                    "{}: unexpected tokenizer err -- got {}, want {}".format(
+                        test_name, tokenizer.err, test_err))
 
             # Ensure the final index is the expected value.
             tokenizerIdx = tokenizer.offset
-            self.assertEqual(
-                tokenizerIdx,
-                test_finalIdx,
-                msg="%s: unexpected final byte index -- got %d, want %d"
-                % (test_name, tokenizerIdx, test_finalIdx),
-            )
+            assert tokenizerIdx == test_finalIdx, (
+                "{}: unexpected final byte index -- got {}, want {}".format(
+                    test_name, tokenizerIdx, test_finalIdx))
 
         def test_isSSGen(self):
             """
@@ -1852,7 +1821,7 @@ class TestTxScript(unittest.TestCase):
             ssgen.index = 0
 
             if not txscript.isSSGen(ssgen):
-                raise Exception("isSSGen claimed a valid ssgen is invalid")
+                raise AssertionError("isSSGen claimed a valid ssgen is invalid")
 
             # fmt: off
             # Test for an OP_RETURN VoteBits push of the maximum size
@@ -1879,7 +1848,7 @@ class TestTxScript(unittest.TestCase):
             ssgen.txOut[1].pkScript = biggestPush
 
             if not txscript.isSSGen(ssgen):
-                raise Exception("isSSGen claimed a valid ssgen is invalid")
+                raise AssertionError("isSSGen claimed a valid ssgen is invalid")
 
     def test_checkSSGen(self):
         """
@@ -1891,15 +1860,15 @@ class TestTxScript(unittest.TestCase):
         def ensureErr(tx, name):
             try:
                 txscript.checkSSGen(tx)
-            except Exception:
+            except DecredError:
                 pass
             else:
-                raise Exception(
-                    'expected exception in test "{}" did not occur'.format(name)
-                )
+                raise AssertionError(
+                    'expected exception in test "{}" did not occur'.format(name))
 
             if txscript.isSSGen(tx):
-                raise Exception('expected false for isSSGen for test "{}"'.format(name))
+                raise AssertionError(
+                    'expected false for isSSGen for test "{}"'.format(name))
 
         # ---------------------------------------------------------------------------
         # Test too many inputs with ssgenMsgTxExtraInputs
@@ -2380,7 +2349,7 @@ class TestTxScript(unittest.TestCase):
             try:
                 txscript.Signature.parse(ByteArray(test.sig), test.der)
             except DecredError:
-                self.assertFalse(test.isValid)
+                assert not test.isValid
 
     def test_sign_tx(self):
         """
@@ -2518,7 +2487,7 @@ class TestTxScript(unittest.TestCase):
                         privKey = crypto.privKeyFromBytes(k)
                         pkBytes = privKey.pub.serializeCompressed()
                     else:
-                        raise DecredError(
+                        raise NotImplementedError(
                             "test for signature suite %d not implemented" % suite
                         )
 
@@ -2546,11 +2515,7 @@ class TestTxScript(unittest.TestCase):
                         suite,
                     )
 
-                    self.assertEqual(
-                        sigScript,
-                        ByteArray(sigStr),
-                        msg="%d:%d:%d" % (hashType, idx, suite),
-                    )
+                    assert sigScript == ByteArray(sigStr), f"{hashType}, {idx}, {suite}"
 
         # Pay to Pubkey Hash for a ticket (SStx) (compressed)
         # For compressed keys
@@ -2596,7 +2561,7 @@ class TestTxScript(unittest.TestCase):
                         privKey = crypto.privKeyFromBytes(k)
                         pkBytes = privKey.pub.serializeCompressed()
                     else:
-                        raise DecredError(
+                        raise NotImplementedError(
                             "test for signature suite %d not implemented" % suite
                         )
 
@@ -2622,11 +2587,7 @@ class TestTxScript(unittest.TestCase):
                         suite,
                     )
 
-                    self.assertEqual(
-                        sigScript,
-                        ByteArray(sigStr),
-                        msg="%d:%d:%d" % (hashType, idx, suite),
-                    )
+                    assert sigScript == ByteArray(sigStr), f"{hashType}, {idx}, {suite}"
 
         # Pay to Pubkey Hash for a ticket revocation (SSRtx) (compressed)
         # For compressed keys
@@ -2672,7 +2633,7 @@ class TestTxScript(unittest.TestCase):
                         privKey = crypto.privKeyFromBytes(k)
                         pkBytes = privKey.pub.serializeCompressed()
                     else:
-                        raise DecredError(
+                        raise NotImplementedError(
                             "test for signature suite %d not implemented" % suite
                         )
 
@@ -2703,11 +2664,7 @@ class TestTxScript(unittest.TestCase):
                         suite,
                     )
 
-                    self.assertEqual(
-                        sigScript,
-                        ByteArray(sigStr),
-                        msg="%d:%d:%d" % (hashType, idx, suite),
-                    )
+                    assert sigScript == ByteArray(sigStr), f"{hashType}, {idx}, {suite}"
 
         # Basic Multisig (compressed)
         # For compressed keys
@@ -2768,7 +2725,7 @@ class TestTxScript(unittest.TestCase):
                         pkBytes = privKey.pub.serializeCompressed()
                         pkBytes2 = privKey2.pub.serializeCompressed()
                     else:
-                        raise DecredError(
+                        raise NotImplementedError(
                             "test for signature suite %d not implemented" % suite
                         )
 
@@ -2805,11 +2762,7 @@ class TestTxScript(unittest.TestCase):
                     )
                     print(sigScript.hex())
 
-                    self.assertEqual(
-                        sigScript,
-                        ByteArray(sigStr),
-                        msg="%d:%d:%d" % (hashType, idx, suite),
-                    )
+                    assert sigScript == ByteArray(sigStr), f"{hashType}, {idx}, {suite}"
 
     def test_sign_stake_p2pkh_outputs(self):
         txIn = msgtx.TxIn(
@@ -3143,9 +3096,9 @@ class TestTxScript(unittest.TestCase):
                 scriptVersion, test["script"], mainnet
             )
 
-            self.assertEqual(scriptClass, test["scriptClass"], test["name"])
+            assert scriptClass == test["scriptClass"], test["name"]
 
-            self.assertEqual(reqSigs, test["reqSigs"], test["name"])
+            assert reqSigs == test["reqSigs"], test["name"]
 
             checkAddrs(test["addrs"], addrs, test["name"])
 
@@ -3254,12 +3207,12 @@ class TestTxScript(unittest.TestCase):
         for t in tests:
             try:
                 pkScript = txscript.payToAddrScript(t.inAddr)
-            except NotImplementedError as e:
+            except Exception as e:
                 if not t.err:
-                    self.fail("unexpected exception: %s" % e)
+                    pytest.fail(f"unexpected exception: {e}")
                 continue
 
-            self.assertEqual(pkScript, parseShortForm(t.expected))
+            assert pkScript == parseShortForm(t.expected)
 
     def test_script_class(self):
         """
@@ -3270,7 +3223,7 @@ class TestTxScript(unittest.TestCase):
         for test in scriptClassTests():
             script = parseShortForm(test.script)
             scriptClass = txscript.getScriptClass(scriptVersion, script)
-            self.assertEqual(scriptClass, test.scriptClass, test.name)
+            assert scriptClass == test.scriptClass, test.name
 
     def test_calc_signature_hash_reference(self):
         """
@@ -3296,7 +3249,7 @@ class TestTxScript(unittest.TestCase):
             elif len(test) == 7:
                 txHex, scriptHex, vin, hashType, sigHashHex, err, comment = test
             else:
-                raise DecredError("Test #%d: wrong length %d" % (i, len(test)))
+                raise RuntimeError("Test #%d: wrong length %d" % (i, len(test)))
 
             # Extract and parse the transaction from the test fields.
             tx = msgtx.MsgTx.deserialize(ByteArray(txHex))
@@ -3305,7 +3258,7 @@ class TestTxScript(unittest.TestCase):
             subScript = ByteArray(scriptHex)
             scriptErr = txscript.checkScriptParses(scriptVersion, subScript)
             if scriptErr:
-                self.fail("checkScriptParses failed with error %s" % scriptErr)
+                pytest.fail(f"checkScriptParses failed with error {scriptErr}")
 
             # Extract and parse the signature hash from the test fields.
             expectedHash = ByteArray(sigHashHex)
@@ -3315,10 +3268,10 @@ class TestTxScript(unittest.TestCase):
                 sigHash = txscript.calcSignatureHash(subScript, hashType, tx, vin, None)
             except DecredError as e:
                 if err == "OK":
-                    self.fail("unexpected calcSignatureHash exception: %s" % e)
+                    pytest.fail(f"unexpected calcSignatureHash exception: {e}")
                 continue
 
-            self.assertEqual(sigHash, expectedHash)
+            assert sigHash == expectedHash
 
     def test_scriptNumBytes(self):
         tests = [
@@ -3365,11 +3318,8 @@ class TestTxScript(unittest.TestCase):
 
         for num, serialized in tests:
             gotBytes = txscript.scriptNumBytes(num)
-            self.assertEqual(
-                gotBytes,
-                serialized,
-                (str(num) + ": wanted " + serialized.hex() + ", got " + gotBytes.hex()),
-            )
+            assert gotBytes == serialized, (
+                f"{num}: wanted {serialized.hex()}, got {gotBytes.hex()}")
 
 
 def test_is_unspendable():
