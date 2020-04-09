@@ -3,8 +3,6 @@ Copyright (c) 2019, the Decred developers
 See LICENSE for details
 """
 
-import unittest
-
 import pytest
 
 from decred import DecredError
@@ -19,7 +17,7 @@ testSeed = ByteArray(
 ).b
 
 
-class TestCrypto(unittest.TestCase):
+class TestCrypto:
     def test_addr_secp_pubkey(self):
         data = [
             (
@@ -50,8 +48,8 @@ class TestCrypto(unittest.TestCase):
         ]
         for hexKey, addrStr, hash160 in data:
             addr = addrlib.AddressSecpPubKey(ByteArray(hexKey), mainnet)
-            self.assertEqual(addr.string(), addrStr)
-            self.assertEqual(addr.hash160().hex(), hash160)
+            assert addr.string() == addrStr
+            assert addr.hash160().hex() == hash160
 
     def test_addr_pubkey_hash(self):
         pairs = [
@@ -79,9 +77,9 @@ class TestCrypto(unittest.TestCase):
         for pubkeyHash, addrStr in pairs:
             pubkeyHashBA = ByteArray(pubkeyHash)
             addr = addrlib.AddressPubKeyHash(pubkeyHashBA, mainnet)
-            self.assertEqual(addr.string(), addrStr)
-            self.assertEqual(addr.scriptAddress(), pubkeyHashBA)
-            self.assertEqual(addr.hash160(), pubkeyHashBA)
+            assert addr.string() == addrStr
+            assert addr.scriptAddress() == pubkeyHashBA
+            assert addr.hash160() == pubkeyHashBA
 
     def test_addr_script_hash(self):
         pairs = [
@@ -108,7 +106,7 @@ class TestCrypto(unittest.TestCase):
         ]
         for scriptHash, addrStr in pairs:
             addr = addrlib.AddressScriptHash(ByteArray(scriptHash), mainnet)
-            self.assertEqual(addr.string(), addrStr)
+            assert addr.string() == addrStr
 
     def test_extended_key(self):
         """
@@ -116,68 +114,60 @@ class TestCrypto(unittest.TestCase):
         """
         kpriv = crypto.ExtendedKey.new(testSeed)
         kpriv.setNetwork(mainnet)
-        self.assertEqual(
-            kpriv.key.hex(),
-            "f2418d00085be520c6449ddb94b25fe28a1944b5604193bd65f299168796f862",
+        assert kpriv.key.hex() == (
+            "f2418d00085be520c6449ddb94b25fe28a1944b5604193bd65f299168796f862"
         )
         kpub = kpriv.neuter()
-        self.assertEqual(
-            kpub.key.hex(),
-            "0317a47499fb2ef0ff8dc6133f577cd44a5f3e53d2835ae15359dbe80c41f70c9b",
+        assert kpub.key.hex() == (
+            "0317a47499fb2ef0ff8dc6133f577cd44a5f3e53d2835ae15359dbe80c41f70c9b"
         )
         # Neutering again should make no difference.
         kpub2 = kpub.neuter()
-        self.assertEqual(
-            kpub2.key.hex(),
-            "0317a47499fb2ef0ff8dc6133f577cd44a5f3e53d2835ae15359dbe80c41f70c9b",
+        assert kpub2.key.hex() == (
+            "0317a47499fb2ef0ff8dc6133f577cd44a5f3e53d2835ae15359dbe80c41f70c9b"
         )
         kpub_branch0 = kpub.child(0)
-        self.assertEqual(
-            kpub_branch0.key.hex(),
-            "02dfed559fddafdb8f0041cdd25c4f9576f71b0e504ce61837421c8713f74fb33c",
+        assert kpub_branch0.key.hex() == (
+            "02dfed559fddafdb8f0041cdd25c4f9576f71b0e504ce61837421c8713f74fb33c"
         )
         kpub_branch0_child1 = kpub_branch0.child(1)
-        self.assertEqual(
-            kpub_branch0_child1.key.hex(),
-            "03745417792d529c66980afe36f364bee6f85a967bae117bc4d316b77e7325f50c",
+        assert kpub_branch0_child1.key.hex() == (
+            "03745417792d529c66980afe36f364bee6f85a967bae117bc4d316b77e7325f50c"
         )
         kpriv_branch0 = kpriv.child(0)
-        self.assertEqual(
-            kpriv_branch0.key.hex(),
-            "6469a8eb3ed6611cc9ee4019d44ec545f3174f756cc41f9867500efdda742dd9",
+        assert kpriv_branch0.key.hex() == (
+            "6469a8eb3ed6611cc9ee4019d44ec545f3174f756cc41f9867500efdda742dd9"
         )
         kpriv_branch0_child1 = kpriv_branch0.child(1)
-        self.assertEqual(
-            kpriv_branch0_child1.key.hex(),
-            "fb8efe52b3e4f31bc12916cbcbfc0e84ef5ebfbceb7197b8103e8009c3a74328",
+        assert kpriv_branch0_child1.key.hex() == (
+            "fb8efe52b3e4f31bc12916cbcbfc0e84ef5ebfbceb7197b8103e8009c3a74328"
         )
         kpriv01_neutered = kpriv_branch0_child1.neuter()
-        self.assertEqual(kpriv01_neutered.key.hex(), kpub_branch0_child1.key.hex())
+        assert kpriv01_neutered.key.hex() == kpub_branch0_child1.key.hex()
 
         # fmt: off
         # Incorrect length of network version bytes.
-        self.assertRaises(
-            DecredError,
-            crypto.ExtendedKey,
-            # privVer too short.
-            ByteArray([0, 0, 0]),
-            ByteArray([0, 0, 0, 0]),
-            None, None, None, None, None, None, None
-        )
-        self.assertRaises(
-            DecredError,
-            crypto.ExtendedKey,
-            ByteArray([0, 0, 0, 0]),
-            # pubVer too long.
-            ByteArray([0, 0, 0, 0, 0]),
-            None, None, None, None, None, None, None
-        )
+        with pytest.raises(DecredError):
+            crypto.ExtendedKey(
+                # privVer too short.
+                ByteArray([0, 0, 0]),
+                ByteArray([0, 0, 0, 0]),
+                None, None, None, None, None, None, None
+            )
+        with pytest.raises(DecredError):
+            crypto.ExtendedKey(
+                ByteArray([0, 0, 0, 0]),
+                # pubVer too long.
+                ByteArray([0, 0, 0, 0, 0]),
+                None, None, None, None, None, None, None
+            )
         # fmt: on
 
         # Cannot serialize an empty private key.
         kpriv2 = crypto.ExtendedKey.new(testSeed)
         kpriv2.key.zero()
-        self.assertRaises(DecredError, kpriv2.serialize)
+        with pytest.raises(DecredError):
+            kpriv2.serialize()
 
 
 def test_kdf_params():
