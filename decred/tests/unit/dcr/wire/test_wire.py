@@ -1,54 +1,46 @@
 """
-Copyright (c) 2019, the Decred developers
+Copyright (c) 2019-2020, the Decred developers
 See LICENSE for details
 """
 
-import unittest
+import pytest
 
 from decred import DecredError
 from decred.dcr.wire import wire
-from decred.util import helpers
 from decred.util.encode import ByteArray
 
 
-class TestWire(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        helpers.prepareLogging()
-        # fmt: off
-        cls.data = (
-            (0xFC,               [0xFC]),
-            (0xFD,               [0xFD, 0xFD, 0x0]),
-            (wire.MaxUint16,     [0xFD, 0xFF, 0xFF]),
-            (wire.MaxUint16 + 1, [0xFE, 0x0,  0x0,  0x1,  0x0]),
-            (wire.MaxUint32,     [0xFE, 0xFF, 0xFF, 0xFF, 0xFF]),
-            (wire.MaxUint32 + 1, [0xFF, 0x0,  0x0,  0x0,  0x0,  0x1,  0x0,  0x0,  0x0]),
-            (wire.MaxUint64,     [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]),
-        )
-        # fmt: on
+class TestWire:
+    # fmt: off
+    data = (
+        (0xFC,               [0xFC]),
+        (0xFD,               [0xFD, 0xFD, 0x0]),
+        (wire.MaxUint16,     [0xFD, 0xFF, 0xFF]),
+        (wire.MaxUint16 + 1, [0xFE, 0x0,  0x0,  0x1,  0x0]),
+        (wire.MaxUint32,     [0xFE, 0xFF, 0xFF, 0xFF, 0xFF]),
+        (wire.MaxUint32 + 1, [0xFF, 0x0,  0x0,  0x0,  0x0,  0x1,  0x0,  0x0,  0x0]),
+        (wire.MaxUint64,     [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]),
+    )
+    # fmt: on
 
-    def test_write_var_int(self):
+    def test_write_var_int(self, prepareLogger):
         for val, bytes_ in self.data:
             from_val = wire.writeVarInt(wire.ProtocolVersion, val)
             from_bytes = ByteArray(bytes_)
-            self.assertEqual(from_val, from_bytes)
+            assert from_val == from_bytes
             val_from_bytes = wire.readVarInt(from_bytes, wire.ProtocolVersion)
-            self.assertEqual(val_from_bytes, val)
-        self.assertRaises(
-            DecredError, wire.writeVarInt, wire.ProtocolVersion, wire.MaxUint64 + 1
-        )
+            assert val_from_bytes == val
+        with pytest.raises(DecredError):
+            wire.writeVarInt(wire.ProtocolVersion, wire.MaxUint64 + 1)
 
-    def test_read_var_int(self):
-        self.assertEqual(wire.readVarInt(ByteArray([0xFC]), wire.ProtocolVersion), 0xFC)
-        self.assertRaises(
-            DecredError,
-            wire.readVarInt,
-            ByteArray([0xFE, 0xFF, 0xFF, 0x0, 0x0]),
-            wire.ProtocolVersion,
-        )
-        self.assertRaises(
-            DecredError,
-            wire.readVarInt,
-            ByteArray([0xFD, 0xFC, 0x0]),
-            wire.ProtocolVersion,
-        )
+    def test_read_var_int(self, prepareLogger):
+        assert wire.readVarInt(ByteArray([0xFC]), wire.ProtocolVersion) == 0xFC
+        with pytest.raises(DecredError):
+            wire.readVarInt(
+                ByteArray([0xFE, 0xFF, 0xFF, 0x0, 0x0]),
+                wire.ProtocolVersion
+            )
+            wire.readVarInt(
+                ByteArray([0xFD, 0xFC, 0x0]),
+                wire.ProtocolVersion
+            )
