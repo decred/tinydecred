@@ -225,8 +225,7 @@ class TinyDialog(QtWidgets.QFrame):
         w.setVisible(True)
         self.setIcons(w)
         self.setVisible(True)
-        if hasattr(w, "stacked"):
-            w.stacked()
+        w.stacked()
 
     def pop_(self, screen=None):
         """
@@ -244,8 +243,7 @@ class TinyDialog(QtWidgets.QFrame):
             return
         popped.setVisible(False)
         self.layout.removeWidget(popped)
-        if hasattr(popped, "unstacked"):
-            popped.unstacked()
+        popped.unstacked()
         top.setVisible(True)
         top.runAnimation(FADE_IN_ANIMATION)
         self.setIcons(top)
@@ -261,14 +259,12 @@ class TinyDialog(QtWidgets.QFrame):
         # log.debug("setting home screen")
         for wgt in list(Q.layoutWidgets(self.layout)):
             wgt.setVisible(False)
-            if hasattr(wgt, "unstacked"):
-                wgt.unstacked()
+            wgt.unstacked()
             self.layout.removeWidget(wgt)
         home.setVisible(True)
         home.runAnimation(FADE_IN_ANIMATION)
         self.layout.addWidget(home)
-        if hasattr(home, "stacked"):
-            home.stacked()
+        home.stacked()
         self.setIcons(home)
 
     def setIcons(self, top):
@@ -440,6 +436,20 @@ class Screen(QtWidgets.QWidget):
             self.setGraphicsEffect(effect)
         else:
             self.animations.pop(FADE_IN_ANIMATION, None)
+
+    def stacked(self):
+        """
+        Can be implemented by inheriting classes. Will be called when the
+        screen is stacked.
+        """
+        pass
+
+    def unstacked(self):
+        """
+        Can be implemented by inheriting classes. Will be called when the
+        screen is unstacked.
+        """
+        pass
 
 
 class AccountScreen(Screen):
