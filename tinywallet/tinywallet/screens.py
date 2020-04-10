@@ -1076,13 +1076,13 @@ class AssetScreen(Screen):
         header.setAlignment(Q.ALIGN_LEFT)
 
         # Indicators for the connection status of dcrdata and dcrd.
-        self.dcrdLight = Q.makeLabel("⚫", 20, color="orange")
+        self.dcrdLight = Q.makeLabel("\u26ab", 20, color="orange")
         lbl = Q.makeLabel("dcrd", 14)
         dcrdBox, lyt = Q.makeRow(self.dcrdLight, lbl)
         lyt.setSpacing(2)
         Q.addClickHandler(dcrdBox, self.stackDcrd)
         dcrdBox.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
-        self.dcrdataLight = Q.makeLabel("⚫", 20, color="#76d385")
+        self.dcrdataLight = Q.makeLabel("\u26ab", 20, color="#76d385")
         lbl = Q.makeLabel("dcrdata", 14)
         dcrdataBox, lyt = Q.makeRow(self.dcrdataLight, lbl)
         lyt.setSpacing(2)
@@ -1417,7 +1417,7 @@ class DCRDConfigScreen(Screen):
         grid.addWidget(Q.makeLabel("dcrd URL", 14, Q.ALIGN_LEFT), row, 0, 1, 3)
         grid.addWidget(Q.makeLabel("RPC username", 14, Q.ALIGN_LEFT), row, 3)
         row += 1
-        defaultRpclisten = f"127.0.0.1:{config.DcrdPorts[cfg.netParams.Name]}"
+        defaultRpclisten = f"127.0.0.1:{nets.DcrdPorts[cfg.netParams.Name]}"
         host = nodeConfig.get("rpclisten", defaultRpclisten)
 
         self.rpcListen = QtWidgets.QLineEdit(f"https://{host}")

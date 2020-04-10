@@ -109,13 +109,6 @@ class DB:
     dcrdon = "dcrdon".encode()
 
 
-DcrdPorts = {
-    nets.mainnet.Name: "9109",
-    nets.testnet.Name: "19109",
-    nets.simnet.Name: "19556",
-}
-
-
 def dcrd(netParams):
     """
     Attempt to fetch the dcrd configuration settings. Values will be parsed for
@@ -142,7 +135,7 @@ def dcrd(netParams):
     if "rpclisten" in dcrdCfg:
         dcrdCfg["rpclisten"] = "https://" + dcrdCfg["rpclisten"]
     else:
-        dcrdCfg["rpclisten"] = f"https://localhost:{DcrdPorts[netParams.Name]}"
+        dcrdCfg["rpclisten"] = f"https://localhost:{nets.DcrdPorts[netParams.Name]}"
     return dcrdCfg
 
 

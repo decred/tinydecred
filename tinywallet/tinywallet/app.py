@@ -260,6 +260,8 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
             cb func(x): A function to receive the return value of f. If an
                 exception is encountered while fetching the key or running the
                 function, cb will receive None.
+            prompt (str): optional. default: "Password". A short message that
+                will be displayed above the password input field.
         """
 
         def getCK(pw):
