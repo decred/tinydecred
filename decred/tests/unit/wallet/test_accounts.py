@@ -49,10 +49,9 @@ def test_change_addresses(prepareLogger):
         acct.nextInternalAddress()
 
 
-def test_account_manager(prepareLogger):
+def test_account_manager(monkeypatch, prepareLogger):
     # Set up globals for test.
-    origDefaultGapLimit = account.DefaultGapLimit
-    account.DefaultGapLimit = 2
+    monkeypatch.setattr(account, "DefaultGapLimit", 2)
 
     cryptoKey = rando.newKey()
     db = database.KeyValueDatabase(":memory:").child("tmp")
@@ -93,11 +92,8 @@ def test_account_manager(prepareLogger):
     db = acctMgr.dbForAcctIdx(0)
     assert db.name == "tmp$accts$0"
 
-    # Restore globals.
-    account.DefaultGapLimit = origDefaultGapLimit
 
-
-def test_discover(prepareLogger):
+def test_discover(monkeypatch, prepareLogger):
     cryptoKey = rando.newKey()
     db = database.KeyValueDatabase(":memory:").child("tmp")
     acctMgr = accounts.createNewAccountManager(
@@ -112,10 +108,9 @@ def test_discover(prepareLogger):
     # Set up globals for test.
     origChain = chains.chain("dcr")
     chains.registerChain("dcr", Blockchain)
-    origAccountGapLimit = accounts.ACCOUNT_GAP_LIMIT
-    accounts.ACCOUNT_GAP_LIMIT = 2
-    origDefaultGapLimit = account.DefaultGapLimit
-    account.DefaultGapLimit = 4
+    # Set up globals for test.
+    monkeypatch.setattr(accounts, "ACCOUNT_GAP_LIMIT", 2)
+    monkeypatch.setattr(account, "DefaultGapLimit", 4)
 
     acctMgr.discover(cryptoKey)
     assert len(acctMgr.accounts) == 1
@@ -129,5 +124,3 @@ def test_discover(prepareLogger):
 
     # Restore globals.
     chains.registerChain("dcr", origChain)
-    accounts.ACCOUNT_GAP_LIMIT = origAccountGapLimit
-    account.DefaultGapLimit = origDefaultGapLimit

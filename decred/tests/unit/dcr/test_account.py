@@ -437,13 +437,12 @@ class TestAccount:
             0, pubKeyEncrypted, privKeyEncrypted, "acctName", "mainnet", db, blockchain
         )
 
-    def test_main(self):
+    def test_main(self, monkeypatch):
         """
         Test account functionality.
         """
         # Set up globals for test.
-        origDefaultGapLimit = account.DefaultGapLimit
-        account.DefaultGapLimit = 2
+        monkeypatch.setattr(account, "DefaultGapLimit", 2)
 
         db = KeyValueDatabase(":memory:").child("tmp")
         acct = self.newAccount(db)
@@ -688,9 +687,6 @@ class TestAccount:
         acct.blockchain.revokeTicket = rev
         acct.revokeTickets()
         assert revoked
-
-        # Restore globals.
-        account.DefaultGapLimit = origDefaultGapLimit
 
     def test_readAddrs(self):
         readAddrs = account.Account.readAddrs
