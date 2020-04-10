@@ -9,11 +9,13 @@ from decred.crypto.secp256k1 import field
 class Test_FieldVal:
     def test_set_int(self):
         """
-        TestSetInt ensures that setting a field value to various native integers
-        works as expected.
+        test_set_int ensures that setting a field value to various native
+        integers works as expected.
         """
         tests = [
-            (5, [5, 0, 0, 0, 0, 0, 0, 0, 0, 0]),  # 2^26
+            (1, [1, 0, 0, 0, 0, 0, 0, 0, 0, 0]),  # 1
+            (5, [5, 0, 0, 0, 0, 0, 0, 0, 0, 0]),  # 5
+            (65535, [65535, 0, 0, 0, 0, 0, 0, 0, 0, 0]),  # 2^16 - 1
             (67108864, [67108864, 0, 0, 0, 0, 0, 0, 0, 0, 0]),  # 2^26
             (67108865, [67108865, 0, 0, 0, 0, 0, 0, 0, 0, 0]),  # 2^26 + 1
             (4294967295, [4294967295, 0, 0, 0, 0, 0, 0, 0, 0, 0]),  # 2^32 - 1
@@ -25,14 +27,19 @@ class Test_FieldVal:
             assert v == f.n
 
     def test_zero(self):
-        """TestZero ensures that zeroing a field value zero works as expected."""
-        f = field.FieldVal()
-        f.setInt(2)
+        """
+        test_zero ensures that zeroing a field value works as expected.
+        """
+        f = field.FieldVal.fromHex(
+            "a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5"
+        )
         f.zero()
         assert all((x == 0 for x in f.n))
 
     def test_is_zero(self):
-        """TestIsZero ensures that checking if a field IsZero works as expected."""
+        """
+        test_is_zero ensures that checking if a field is zero works as expected.
+        """
         f = field.FieldVal()
         assert f.isZero()
 
@@ -44,10 +51,11 @@ class Test_FieldVal:
 
     def test_normalize(self):
         """
-        TestNormalize ensures that normalizing the internal field words works as
-        expected.
+        test_normalize ensures that normalizing the internal field words works
+        as expected.
         """
         tests = [
+            # 5
             [  # 0
                 [0x00000005, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                 [0x00000005, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -184,7 +192,7 @@ class Test_FieldVal:
                 ],
             ],
             # Prime larger than P where both first and second words are larger
-            # than P's first and second words
+            # than P's first and second words.
             [  # 14
                 [
                     0xFFFFFC30,
@@ -490,7 +498,7 @@ class Test_FieldVal:
 
     def test_equals(self):
         """
-        TestEquals ensures that checking two field values for equality via Equals
+        test_equals ensures that checking two field values for equality
         works as expected.
         """
         tests = [
@@ -521,18 +529,22 @@ class Test_FieldVal:
 
     def test_negate(self):
         """
-        TestNegate ensures that negating field values via Negate works as expected.
+        test_negate ensures that negating field values works as expected.
         """
         tests = [
-            # secp256k1 prime (aka 0)
+            # zero
             ("0", "0"),
+            # secp256k1 prime (direct val in with 0 out)
             ("fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f", "0"),
+            # "secp256k1 prime (0 in with direct val out)"
             ("0", "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"),
-            # secp256k1 prime-1
+            # 1 -> secp256k1 prime - 1
             ("fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e", "1"),
+            # secp256k1 prime-1 -> 1
             ("1", "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e"),
-            # secp256k1 prime-2
+            # 2 -> secp256k1 prime-2
             ("2", "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2d"),
+            # secp256k1 prime-2 -> 2
             ("fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2d", "2"),
             # Random sampling
             (
@@ -558,13 +570,19 @@ class Test_FieldVal:
             fb = field.FieldVal.fromHex(b).normalize()
             assert fa.equals(fb), f"test {i}"
 
-    def test_add(self):
+    def test_add_add2(self):
         """
-        TestAdd ensures that adding two field values together via Add works as expected.
+        test_add ensures that adding two field values together works as
+        expected.
         """
         tests = [
+            # zero + zero
+            ("0", "0", "0"),
+            # zero + one
             ("0", "1", "1"),
+            # one + zero
             ("1", "0", "1"),
+            # one + one
             ("1", "1", "2"),
             # secp256k1 prime-1 + 1
             (
@@ -577,6 +595,12 @@ class Test_FieldVal:
                 "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
                 "1",
                 "1",
+            ),
+            # close but over the secp256k1 prime
+            (
+                "fffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000",
+                "f1ffff000",
+                "1ffff3d1",
             ),
             # Random samples.
             (
@@ -599,43 +623,6 @@ class Test_FieldVal:
                 "a475aa5a31dcca90ef5b53c097d9133d6b7117474b41e7877bb199590fc0489c",
                 "a191d150d4104c76c6e10e492c6dff42fedacfcff8c61954e38a628ec541284e",
             ),
-        ]
-
-        for i, (a, b, res) in enumerate(tests):
-            fa = field.FieldVal.fromHex(a).normalize()
-            fb = field.FieldVal.fromHex(b).normalize()
-            fres = field.FieldVal.fromHex(res).normalize()
-            result = fa.add(fb).normalize()
-            assert fres.equals(result), f"test {i}"
-
-    def test_add2(self):
-        """
-        TestAdd2 ensures that adding two field values together via Add2 works as
-        expected.
-        """
-        tests = [
-            ("0", "1", "1"),
-            ("1", "0", "1"),
-            ("1", "1", "2"),
-            # secp256k1 prime-1 + 1
-            (
-                "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e",
-                "1",
-                "0",
-            ),
-            # secp256k1 prime + 1
-            (
-                "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
-                "1",
-                "1",
-            ),
-            # close but over the secp256k1 prime
-            (
-                "fffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000",
-                "f1ffff000",
-                "1ffff3d1",
-            ),
-            # Random samples.
             (
                 "ad82b8d1cc136e23e9fd77fe2c7db1fe5a2ecbfcbde59ab3529758334f862d28",
                 "4d6a4e95d6d61f4f46b528bebe152d408fd741157a28f415639347a84f6f574b",
@@ -662,17 +649,26 @@ class Test_FieldVal:
             fa = field.FieldVal.fromHex(a).normalize()
             fb = field.FieldVal.fromHex(b).normalize()
             fres = field.FieldVal.fromHex(res).normalize()
+            # add
+            result = fa.add(fb).normalize()
+            assert fres.equals(result), f"test add {i}"
+            # add2
+            fa = field.FieldVal.fromHex(a).normalize()
             result = fa.add2(fa, fb).normalize()
-            assert fres.equals(result), f"test {i}"
+            assert fres.equals(result), f"test add2 {i}"
 
     def test_mul(self):
         """
-        TestMul ensures that multiplying two field valuess via Mul works as expected.
+        test_mul ensures that multiplying two field values works as expected.
         """
         tests = [
+            # zero * zero
             ("0", "0", "0"),
+            # one * zero
             ("1", "0", "0"),
+            # zero * one
             ("0", "1", "0"),
+            # one * one
             ("1", "1", "1"),
             # slightly over prime
             (
@@ -730,12 +726,14 @@ class Test_FieldVal:
 
     def test_square(self):
         """
-        TestSquare ensures that squaring field values via Square works as expected.
+        test_square ensures that squaring field values works as expected.
         """
         tests = [
-            # secp256k1 prime (aka 0)
+            # zero
             ("0", "0"),
+            # secp256k1 prime (direct val in with 0 out) -> 0
             ("fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f", "0"),
+            # 0 -> secp256k1 prime (direct val in with 0 out)
             ("0", "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"),
             # secp256k1 prime-1
             ("fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2e", "1"),
@@ -766,16 +764,27 @@ class Test_FieldVal:
             assert f.equals(expected), f"test {i}"
 
     def test_string(self):
-        """ TestStringer ensures the stringer returns the appropriate hex string."""
+        """
+        test_string ensures the stringer returns the appropriate hex string.
+        """
         tests = [
+            # zero
             ("0", "0000000000000000000000000000000000000000000000000000000000000000"),
+            # one
             ("1", "0000000000000000000000000000000000000000000000000000000000000001"),
+            # ten
             ("a", "000000000000000000000000000000000000000000000000000000000000000a"),
+            # eleven
             ("b", "000000000000000000000000000000000000000000000000000000000000000b"),
+            # twelve
             ("c", "000000000000000000000000000000000000000000000000000000000000000c"),
+            # thirteen
             ("d", "000000000000000000000000000000000000000000000000000000000000000d"),
+            # fourteen
             ("e", "000000000000000000000000000000000000000000000000000000000000000e"),
+            # fifteen
             ("f", "000000000000000000000000000000000000000000000000000000000000000f"),
+            # 240
             ("f0", "00000000000000000000000000000000000000000000000000000000000000f0"),
             # 2^26-1
             (
@@ -841,13 +850,15 @@ class Test_FieldVal:
 
     def test_inverse(self):
         """
-         TestInverse ensures that finding the multiplicative inverse via Inverse works
-         as expected.
+        test_inverse ensures that finding the multiplicative inverse works as
+        expected.
         """
         tests = [
-            # secp256k1 prime (aka 0)
+            # zero
             ("0", "0"),
+            # secp256k1 prime (direct val in with 0 out) -> 0
             ("fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f", "0"),
+            # 0 -> secp256k1 prime (direct val in with 0 out)
             ("0", "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"),
             # secp256k1 prime-1
             (
