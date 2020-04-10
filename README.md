@@ -25,8 +25,8 @@ using the [`pip`](https://pip.pypa.io/) command as usual.
 ### GitHub
 
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/y/decred/tinydecred)
-![GitHub contributors](https://img.shields.io/github/contributors/decred/tinydecred)
 ![GitHub last commit](https://img.shields.io/github/last-commit/decred/tinydecred)
+![GitHub contributors](https://img.shields.io/github/contributors/decred/tinydecred)
 [![GitHub](https://img.shields.io/github/license/decred/tinydecred)](https://copyfree.org/)
 
 ## Roadmap
