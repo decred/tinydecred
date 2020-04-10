@@ -239,13 +239,8 @@ class FieldVal:
         setBytes packs the passed 32-byte big-endian value into the internal
         field value representation.
 
-        The field value is returned to support chaining, enabling syntax like:
-            f = FieldVal().setBytes(b).mul(f2)
-        so that:
-            f = b * f2
-
         Preconditions: None
-        Output Normalized: Yes
+        Output Normalized: Yes if no overflow, no otherwise
         Output Max Magnitude: 1
 
         Args:
