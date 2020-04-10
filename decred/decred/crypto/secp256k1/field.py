@@ -49,8 +49,7 @@ fieldPrimeWordZero = 0x3FFFC2F
 # internal field representation.  It is used during negation.
 fieldPrimeWordOne = 0x3FFFFBF
 
-# The secp256k1 prime is equivalent to 2^256 - 4294968273, so it fits
-# this criteria.
+# The secp256k1 prime is equivalent to 2^256 - 4294968273.
 # 4294968273 in field representation (base 2^26) is:
 # n[0] = 977
 # n[1] = 64
@@ -162,7 +161,7 @@ class FieldVal:
         The field value is returned to support chaining, enabling syntax like:
             f = FieldVal.fromHex("abc").add(1)
         so that:
-            f = 0x0abc + 1
+            f = 0xabc + 1
 
         Args:
             hexString (str): the hex string to be used as field value.
