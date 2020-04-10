@@ -9,93 +9,93 @@ dynamic library speeding up the field.py code.
 import cython
 
 
-cdef int twoBitsMask = 0x03
-cdef int fourBitsMask = 0x0F
-cdef int sixBitsMask = 0x3F
-cdef int eightBitsMask = 0xFF
-cdef int fieldWords = 10
-cdef int fieldBase = 26
-cdef int fieldBaseMask = (1 << fieldBase) - 1
-cdef int fieldMSBBits = 256 - (fieldBase * (fieldWords - 1))
-cdef int fieldMSBMask = (1 << fieldMSBBits) - 1
-cdef long fieldPrimeWordZero = 0x3FFFC2F
-cdef long fieldPrimeWordOne = 0x3FFFFBF
-cdef long primePartBy16 = 68719492368
+cdef unsigned long twoBitsMask = 0x03
+cdef unsigned long fourBitsMask = 0x0F
+cdef unsigned long sixBitsMask = 0x3F
+cdef unsigned long eightBitsMask = 0xFF
+cdef unsigned long fieldWords = 10
+cdef unsigned long fieldBase = 26
+cdef unsigned long fieldBaseMask = (1 << fieldBase) - 1
+cdef unsigned long fieldMSBBits = 256 - (fieldBase * (fieldWords - 1))
+cdef unsigned long fieldMSBMask = (1 << fieldMSBBits) - 1
+cdef unsigned long fieldPrimeWordZero = 0x3FFFC2F
+cdef unsigned long fieldPrimeWordOne = 0x3FFFFBF
+cdef unsigned long primePartBy16 = 68719492368
 
 
 cdef class FieldVal:
-    cdef public long n[10]
+    cdef public unsigned long n[10]
 
     @cython.locals(
-        m=cython.long,
-        t0=cython.long,
-        t1=cython.long,
-        t2=cython.long,
-        t3=cython.long,
-        t4=cython.long,
-        t5=cython.long,
-        t6=cython.long,
-        t7=cython.long,
-        t8=cython.long,
-        t9=cython.long,
+        m=cython.ulong,
+        t0=cython.ulong,
+        t1=cython.ulong,
+        t2=cython.ulong,
+        t3=cython.ulong,
+        t4=cython.ulong,
+        t5=cython.ulong,
+        t6=cython.ulong,
+        t7=cython.ulong,
+        t8=cython.ulong,
+        t9=cython.ulong,
     )
     cpdef normalize(self)
 
-    cpdef negateVal(self, FieldVal val, int magnitude)
+    cpdef negateVal(self, FieldVal val, unsigned long magnitude)
 
     cpdef add(self, FieldVal val)
 
     @cython.locals(
-        m=cython.long,
-        n=cython.long,
-        t0=cython.long,
-        t1=cython.long,
-        t2=cython.long,
-        t3=cython.long,
-        t4=cython.long,
-        t5=cython.long,
-        t6=cython.long,
-        t7=cython.long,
-        t8=cython.long,
-        t9=cython.long,
-        t10=cython.long,
-        t11=cython.long,
-        t12=cython.long,
-        t13=cython.long,
-        t14=cython.long,
-        t15=cython.long,
-        t16=cython.long,
-        t17=cython.long,
-        t18=cython.long,
-        t19=cython.long,
+        m=cython.ulong,
+        n=cython.ulong,
+        t0=cython.ulong,
+        t1=cython.ulong,
+        t2=cython.ulong,
+        t3=cython.ulong,
+        t4=cython.ulong,
+        t5=cython.ulong,
+        t6=cython.ulong,
+        t7=cython.ulong,
+        t8=cython.ulong,
+        t9=cython.ulong,
+        t10=cython.ulong,
+        t11=cython.ulong,
+        t12=cython.ulong,
+        t13=cython.ulong,
+        t14=cython.ulong,
+        t15=cython.ulong,
+        t16=cython.ulong,
+        t17=cython.ulong,
+        t18=cython.ulong,
+        t19=cython.ulong,
     )
     cpdef squareVal(self, FieldVal val)
 
     cpdef mulInt(self, long val)
 
     @cython.locals(
-        d=cython.long,
-        m=cython.long,
-        t0=cython.long,
-        t1=cython.long,
-        t2=cython.long,
-        t3=cython.long,
-        t4=cython.long,
-        t5=cython.long,
-        t6=cython.long,
-        t7=cython.long,
-        t8=cython.long,
-        t9=cython.long,
-        t10=cython.long,
-        t11=cython.long,
-        t12=cython.long,
-        t13=cython.long,
-        t14=cython.long,
-        t15=cython.long,
-        t16=cython.long,
-        t17=cython.long,
-        t18=cython.long,
-        t19=cython.long,
+        d=cython.ulong,
+        m=cython.ulong,
+        t0=cython.ulong,
+        t1=cython.ulong,
+        t2=cython.ulong,
+        t3=cython.ulong,
+        t4=cython.ulong,
+        t5=cython.ulong,
+        t6=cython.ulong,
+        t7=cython.ulong,
+        t8=cython.ulong,
+        t9=cython.ulong,
+        t10=cython.ulong,
+        t11=cython.ulong,
+        t12=cython.ulong,
+        t13=cython.ulong,
+        t14=cython.ulong,
+        t15=cython.ulong,
+        t16=cython.ulong,
+        t17=cython.ulong,
+        t18=cython.ulong,
+        t19=cython.ulong,
     )
     cpdef mul2(self, FieldVal val, FieldVal val2)
 
