@@ -1,8 +1,5 @@
 # tinydecred
 
-[![Build Status](https://github.com/decred/tinydecred/workflows/Build%20and%20Test/badge.svg)](https://github.com/decred/tinydecred/actions)
-[![ISC License](https://img.shields.io/badge/license-ISC-blue.svg)](https://copyfree.org/)
-
 TinyDecred is a Python 3 toolkit that can be used to integrate
 [Decred](https://decred.org/) into Python projects.
 
@@ -14,6 +11,23 @@ The [`tinywallet`](./tinywallet) package contains a wallet based on the
 
 Each package may be installed from the [Python Package Index](https://pypi.org/)
 using the [`pip`](https://pip.pypa.io/) command as usual.
+
+## Status
+
+[![Check and test both packages](https://github.com/decred/tinydecred/workflows/Check%20and%20test%20both%20packages/badge.svg)](https://github.com/decred/tinydecred/actions)
+![Test coverage](https://img.shields.io/badge/coverage-98%25-green)
+
+### PyPI
+
+[![PyPI release](https://img.shields.io/pypi/v/decred)](https://pypi.org/project/decred/)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/decred)](https://docs.python.org/3/)
+
+### GitHub
+
+![GitHub commit activity](https://img.shields.io/github/commit-activity/y/decred/tinydecred)
+![GitHub contributors](https://img.shields.io/github/contributors/decred/tinydecred)
+![GitHub last commit](https://img.shields.io/github/last-commit/decred/tinydecred)
+[![GitHub](https://img.shields.io/github/license/decred/tinydecred)](https://copyfree.org/)
 
 ## Roadmap
 

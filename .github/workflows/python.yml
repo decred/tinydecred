@@ -1,4 +1,4 @@
-name: Check and test both projects
+name: Check and test both packages
 on: [push, pull_request]
 
 jobs:
@@ -7,7 +7,7 @@ jobs:
     strategy:
       matrix:
         python-version: [3.6, 3.7, 3.8]
-        project: [decred, tinywallet]
+        package: [decred, tinywallet]
     steps:
     - uses: actions/checkout@v1
     - name: Set up Python ${{ matrix.python-version }}
@@ -20,32 +20,32 @@ jobs:
     - name: Install the poetry tool
       run: |
         pip install poetry
-    - name: Install the ${{ matrix.project }} project and its dependencies
-      working-directory: ${{ format('./{0}/', matrix.project) }}
+    - name: Install the ${{ matrix.package }} package and its dependencies
+      working-directory: ${{ format('./{0}/', matrix.package) }}
       run: |
         poetry install
-    - name: Lint the ${{ matrix.project }} code with black
-      working-directory: ${{ format('./{0}/', matrix.project) }}
+    - name: Lint the ${{ matrix.package }} code with black
+      working-directory: ${{ format('./{0}/', matrix.package) }}
       run: |
         # stop the build if the code was not reformatted by black
         poetry run black --check --diff .
-    - name: Sort ${{ matrix.project }} import lines with isort
-      working-directory: ${{ format('./{0}/', matrix.project) }}
+    - name: Sort ${{ matrix.package }} import lines with isort
+      working-directory: ${{ format('./{0}/', matrix.package) }}
       run: |
         # stop the build if import lines were not sorted by isort
         poetry run isort --check-only --diff --recursive .
-    - name: Lint the ${{ matrix.project }} code with flake8
-      working-directory: ${{ format('./{0}/', matrix.project) }}
+    - name: Lint the ${{ matrix.package }} code with flake8
+      working-directory: ${{ format('./{0}/', matrix.package) }}
       run: |
         # stop the build if there are syntax errors or undefined names
         poetry run flake8 --select=E9,F63,F7,F82 --show-source .
         # exit-zero treats all errors as warnings
         poetry run flake8 --ignore=E203,E221,E261,E731,W503 --exit-zero .
-    - name: Test the ${{ matrix.project }} project with pytest
-      working-directory: ${{ format('./{0}/', matrix.project) }}
+    - name: Test the ${{ matrix.package }} package with pytest
+      working-directory: ${{ format('./{0}/', matrix.package) }}
       run: |
         poetry run pytest ./tests/unit/
-    # - name: Build the ${{ matrix.project }} project
-    #   working-directory: ${{ format('./{0}/', matrix.project) }}
+    # - name: Build the ${{ matrix.package }} package
+    #   working-directory: ${{ format('./{0}/', matrix.package) }}
     #   run: |
     #     poetry build
