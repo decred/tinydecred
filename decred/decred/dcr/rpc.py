@@ -10,6 +10,7 @@ import ssl
 import types
 
 from decred import DecredError
+from decred.crypto.opcode import OP_SSRTX
 from decred.util import tinyhttp, ws
 from decred.util.encode import ByteArray
 from decred.util.helpers import getLogger, makeWebsocketURL
@@ -219,11 +220,11 @@ class Client:
             # All remaining outputs pay to the output destinations and amounts tagged
             # by the ticket purchase.
             for i in range(len(ticketHash160s)):
-                scriptFn = txscript.payToSSRtxPKHDirect
+                scriptFn = txscript.payToStakePKHScript
                 # P2SH
                 if ticketPayKinds[i]:
-                    scriptFn = txscript.payToSSRtxSHDirect
-                script = scriptFn(ticketHash160s[i])
+                    scriptFn = txscript.payToStakeSHScript
+                script = scriptFn(ticketHash160s[i], OP_SSRTX)
                 outs.append(TxOut(values[i], script))
 
             # Calculate the estimated signed serialize size.
