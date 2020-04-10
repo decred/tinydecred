@@ -7,6 +7,7 @@ A PyQt light wallet.
 """
 
 import os
+from pathlib import Path
 import sys
 
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -82,7 +83,7 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
         st = self.sysTray = QtWidgets.QSystemTrayIcon(QtGui.QIcon(DCR.FAVICON))
         self.contextMenu = ctxMenu = QtWidgets.QMenu()
         ctxMenu.addAction("minimize").triggered.connect(self.minimizeApp)
-        ctxMenu.addAction("quit").triggered.connect(lambda *a: self.qApp.quit())
+        ctxMenu.addAction("quit").triggered.connect(self.shutdown)
         st.setContextMenu(ctxMenu)
         st.activated.connect(self.sysTrayActivated)
 
@@ -106,7 +107,7 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
         self.settings = self.appDB.child("settings")
         self.loadSettings()
 
-        dcrdataDB = database.KeyValueDatabase(os.path.join(self.netDirectory, "dcr.db"))
+        dcrdataDB = database.KeyValueDatabase(self.assetDirectory("dcr") / "dcrdata.db")
         # The initialized DcrdataBlockchain will not be connected, as that is a
         # blocking operation. It will be called when the wallet is open.
         self.dcrdata = DcrdataBlockchain(
@@ -149,6 +150,11 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
 
         self.initialize()
 
+    def shutdown(self, e=None):
+        """Connected to the context menu "quit" option. Shut down TinyWallet."""
+        self.assetScreen.shutdown()
+        self.qApp.quit()
+
     def initLogging(self):
         """
         Initialize logging for the entire app.
@@ -174,7 +180,6 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
         if os.path.isfile(path):
 
             try:
-                self.dcrdata.connect()
                 w = Wallet(path)
                 self.setWallet(w)
                 self.home(self.assetScreen)
@@ -196,6 +201,12 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
         """
         self.appWindow.stack(self.waitingScreen)
 
+    def notWaiting(self):
+        """
+        Pop the waiting screen.
+        """
+        self.appWindow.pop(self.waitingScreen)
+
     def waitThread(self, f, cb, *a, **k):
         """
         Wait thread shows a waiting screen while the provided function is run
@@ -207,8 +218,6 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
             *args (tuple): Positional arguments passed to f.
             **kwargs (dict): Keyword arguments passed directly to f.
         """
-        cb = cb if cb else lambda *a, **k: None
-        self.waiting()
 
         def run():
             try:
@@ -217,11 +226,12 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
                 err_msg = "waitThread execution error {} failed: {}"
                 self.log.error(err_msg.format(f.__name__, formatTraceback(e)))
             finally:
-                self.appWindow.pop(self.waitingScreen)
+                self.notWaiting()
 
+        self.waiting()
         self.makeThread(run, cb)
 
-    def getPassword(self, f, *args, **kwargs):
+    def getPassword(self, f, prompt="Password"):
         """
         Calls the provided function with a user-provided password string as its
         first argument. Any additional arguments provided to getPassword are
@@ -230,15 +240,62 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
         Args:
             f (func): A function that will receive the user's password
                 and any other provided arguments.
-            *args (tuple): Positional arguments passed to f. The position
-                of the args will be shifted by 1 position with the user's
-                password inserted at position 0.
-            **kwargs (dict): Keyword arguments passed directly to f.
         """
-        self.appWindow.stack(self.pwDialog.withCallback(f, *args, **kwargs))
+        self.appWindow.stack(self.pwDialog.withCallback(f, prompt))
+
+    def withCryptoKey(self, f, cb, prompt="Password"):
+        """
+        Run the provided function, passing the function a single argument, the
+        encryption key, and send the return value of the function to the
+        callback. The function is run in a separate thread with the waiting
+        screen shown, but notWaiting() is routed through a signal and can be
+        called from the thread if desired. The callback function is called in
+        the main thread, so UI updates should be performed in the callback.
+
+        Args:
+            f func(SecretKey): A function of a single argument. The function
+                will be provided the wallet encryption key, and will be run in
+                a separate thread, so UI updates should be properly signaled or
+                restricted to the callback function.
+            cb func(x): A function to receive the return value of f. If an
+                exception is encountered while fetching the key or running the
+                function, cb will receive None.
+            prompt (str): optional. default: "Password". A short message that
+                will be displayed above the password input field.
+        """
+
+        def getCK(pw):
+            try:
+                cryptoKey = self.wallet.cryptoKey(pw)
+                return f(cryptoKey)
+            except Exception as e:
+                self.log.error(
+                    f"error decoding encryption key with provided password: {e}"
+                )
+                self.log.debug(formatTraceback(e))
+                self.appWindow.showError("password error")
+
+        def receivepw(pw):
+            self.appWindow.pop(self.pwDialog)
+            self.waitThread(getCK, cb, pw)
+
+        self.getPassword(receivepw, prompt)
 
     def walletFilename(self):
         return self.settings[DB.wallet].decode()
+
+    def assetDirectory(self, coinID):
+        """
+        Get a directory for asset-specific storage. The directory is a
+        subdirectory of the network directory.
+
+        Args:
+            coinID (int or str): The BIP-0044 asset ID or a ticker symbol.
+        """
+        symbol = chains.IDSymbols[chains.parseCoinType(coinID)]
+        dirPath = Path(self.netDirectory) / symbol
+        helpers.mkdir(dirPath)
+        return dirPath
 
     def sysTrayActivated(self, trigger):
         """
@@ -250,7 +307,7 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
             self.appWindow.show()
             self.appWindow.activateWindow()
 
-    def minimizeApp(self, *a):
+    def minimizeApp(self, e=None):
         """
         Minimizes the application. Because TinyWallet is a system-tray app, the
         program does not halt execution, but the icon is removed from the

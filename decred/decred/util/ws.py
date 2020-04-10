@@ -47,18 +47,18 @@ class Client(websocket.WebSocketApp):
         user_open = k.pop("on_open", None)
 
         def on_open(ws):
-            initEvent.set()
             if user_open:
                 user_open(ws)
+            initEvent.set()
 
         user_close = k.pop("on_close", None)
 
         def on_close(ws):
             # Some initialization errors won't call on_open, but they will call
             # on_close, so set the initEvent here too.
-            initEvent.set()
             if user_close:
                 user_close(ws)
+            initEvent.set()
 
         super().__init__(cleanURL, on_open=on_open, on_close=on_close, **k)
 

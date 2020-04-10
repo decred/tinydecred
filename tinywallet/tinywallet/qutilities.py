@@ -225,7 +225,7 @@ class QConsole(QtWidgets.QPlainTextEdit):
                     self.consoleState.scrollBottom = False
 
 
-class QToggle(QtWidgets.QAbstractButton):
+class Toggle(QtWidgets.QAbstractButton):
     """
     Implementation of a clean looking toggle switch translated from
     https://stackoverflow.com/a/38102598/1124661
@@ -233,49 +233,35 @@ class QToggle(QtWidgets.QAbstractButton):
     """
 
     def __init__(
-        self,
-        parent,
-        slotWidth=None,
-        onColor=None,
-        slotColor=None,
-        switchColor=None,
-        disabledColor=None,
-        callback=None,
-        linkedSetting=None,
-        linkedDict=None,
+        self, callback,
     ):
-        super(QToggle, self).__init__(parent)
+        """
+        Args:
+            callback func(bool): The callback function will receive the current
+                state after it is changed due to a click.
+        """
+        super().__init__()
         self.callback = callback
-        self.linkedSetting = linkedSetting
-        self.linkedDict = linkedDict
-        self.onBrush = (
-            QtGui.QBrush(QtGui.QColor(onColor))
-            if onColor
-            else QtGui.QBrush(QtGui.QColor("#357f30"))
-        )
-        self.slotBrush = (
-            QtGui.QBrush(QtGui.QColor(slotColor))
-            if slotColor
-            else QtGui.QBrush(QtGui.QColor("#999999"))
-        )
-        # QtGui.QBrush(QtGui.QColor(switchColor)) if switchColor else QtGui.QBrush(
-        #     QtGui.QColor("#d5d5d5"))
+        self.onBrush = QtGui.QBrush(QtGui.QColor("#569167"))
+        self.slotBrush = QtGui.QBrush(QtGui.QColor("#999999"))
         self.switchBrush = self.slotBrush
-        self.disabledBrush = (
-            QtGui.QBrush(QtGui.QColor(disabledColor))
-            if disabledColor
-            else QtGui.QBrush(QtGui.QColor("#666666"))
-        )
-        self.state = False
-        self.opacity = 0
-        self.xPos = 8
-        self.yPos = 8
-        self.slotHeight = 16
-        self.slotWidth = slotWidth if slotWidth else 38
-        self.setFixedWidth(self.slotWidth)
+        self.disabledBrush = QtGui.QBrush(QtGui.QColor("#666666"))
+        self.on = False
+        self.fullHeight = 18
+        self.halfHeight = self.xPos = self.fullHeight / 2
+        self.fullWidth = 34
+        self.setFixedWidth(self.fullWidth)
         self.slotMargin = 3
-        # self.track
+        self.slotHeight = self.fullHeight - 2 * self.slotMargin
+        self.travel = self.fullWidth - self.fullHeight
+        self.slotRect = QtCore.QRect(
+            self.slotMargin,
+            self.slotMargin,
+            self.fullWidth - 2 * self.slotMargin,
+            self.slotHeight,
+        )
         self.animation = QtCore.QPropertyAnimation(self, b"pqProp", self)
+        self.animation.setDuration(120)
         self.setCursor(QtCore.Qt.PointingHandCursor)
 
     def paintEvent(self, e):
@@ -285,113 +271,58 @@ class QToggle(QtWidgets.QAbstractButton):
         painter = QtGui.QPainter(self)
         painter.setPen(QtCore.Qt.NoPen)
         painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
-        if self.isEnabled():
-            painter.setBrush(self.switchBrush)
-            painter.setOpacity(0.6 if self.state else 0.4)
-            painter.drawRoundedRect(
-                QtCore.QRect(
-                    self.slotMargin,
-                    self.slotMargin,
-                    self.slotWidth - 2 * self.slotMargin,
-                    self.height() - 2 * self.slotMargin,
-                ),
-                8.0,
-                8.0,
-            )
-            # painter.setBrush(self.switchBrush)
-            painter.setOpacity(1.0)
-            painter.drawEllipse(
-                QtCore.QRect(
-                    self.xPos - self.slotHeight / 2,
-                    self.yPos - self.slotHeight / 2,
-                    self.height(),
-                    self.height(),
-                )
-            )
-        else:
-            painter.setBrush(self.disabledBrush)
-            painter.setOpacity(1.0)
-            painter.drawRoundedRect(
-                QtCore.QRect(
-                    self.slotMargin,
-                    self.slotMargin,
-                    self.slotWidth - 2 * self.slotMargin,
-                    self.height() - 2 * self.slotMargin,
-                ),
-                8.0,
-                8.0,
-            )
-            painter.setOpacity(0.75)
-            painter.setBrush(self.slotBrush)
-            painter.drawEllipse(
-                QtCore.QRect(
-                    self.xPos - self.slotHeight / 2,
-                    self.yPos - self.slotHeight / 2,
-                    self.height(),
-                    self.height(),
-                )
-            )
+        painter.setBrush(self.switchBrush if self.on else self.disabledBrush)
+        painter.setOpacity(0.6)
+        painter.drawRoundedRect(
+            self.slotRect, self.slotHeight / 2, self.slotHeight / 2,
+        )
+        painter.setOpacity(1.0)
+        painter.drawEllipse(
+            QtCore.QRect(self.xPos, 0, self.fullHeight, self.fullHeight,)
+        )
 
     def mouseReleaseEvent(self, e):
         """
         Toggle the button.
         """
         if e.button() == QtCore.Qt.LeftButton:
-            self.state = False if self.state else True
-            self.switchBrush = self.onBrush if self.state else self.slotBrush
-            if self.state:
-                self.animation.setStartValue(self.slotHeight / 2)
-                self.animation.setEndValue(self.width() - self.slotHeight)
-                self.animation.setDuration(120)
-                self.animation.start()
-            else:
-                self.animation.setStartValue(self.xPos)
-                self.animation.setEndValue(self.slotHeight / 2)
-                self.animation.setDuration(120)
-                self.animation.start()
-            if self.linkedSetting and self.linkedDict:
-                self.linkedDict[self.linkedSetting] = self.state
+            self.on = not self.on
+            self.switchBrush = self.onBrush if self.on else self.slotBrush
+            self.animation.setStartValue(self.xPos)
+            self.animation.setEndValue(self.travel if self.on else 0)
+            self.animation.start()
             if self.callback:
-                self.callback(self.state, self)
+                self.callback(self.on)
         super().mouseReleaseEvent(e)
 
     def sizeHint(self):
         """
         Required to be implemented and return the size of the widget.
         """
-        return QtCore.QSize(
-            2 * (self.slotHeight + self.slotMargin),
-            self.slotHeight + 2 * self.slotMargin,
-        )
+        return QtCore.QSize(self.fullWidth, self.fullHeight,)
 
     def setOffset(self, o):
         """
-        Setter for QPropertyAnimation
+        Setter for QPropertyAnimation.
         """
         self.xPos = o
         self.update()
 
     def getOffset(self):
         """
-        Getter for QPropertyAnimation
+        Getter for QPropertyAnimation.
         """
         return self.xPos
 
     pqProp = QtCore.pyqtProperty(int, fget=getOffset, fset=setOffset)
 
-    def setToggle(self, toggle):
+    def set(self, on):
         """
-        Set `switch` to `toggle`, and trigger repaint.
+        Set state to on, and trigger repaint.
         """
-        self.switch = toggle
-        if self.linkedSetting and self.linkedDict:
-            self.linkedDict[self.linkedSetting] = self.switch
-        if self.switch:
-            self.switchBrush = self.onBrush
-            self.xPos = self.width() - self.slotHeight
-        else:
-            self.switchBrush = self.slotBrush
-            self.xPos = self.slotHeight / 2
+        self.on = on
+        self.switchBrush = self.onBrush if on else self.slotBrush
+        self.xPos = self.travel if on else 0
         self.update()
 
 
@@ -537,7 +468,6 @@ def setProperties(lbl, color=None, fontSize=None, fontFamily=None, underline=Fal
     font = lbl.font()
     if fontSize:
         font.setPixelSize(fontSize)
-        lbl.setFont(font)
     if fontFamily:
         font.setFamily(fontFamily)
     if underline:

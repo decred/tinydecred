@@ -13,6 +13,13 @@ if "testnet3" in the_nets:
     the_nets["testnet"] = the_nets["testnet3"]
 
 
+DcrdPorts = {
+    mainnet.Name: "9109",
+    testnet.Name: "19109",
+    simnet.Name: "19556",
+}
+
+
 def parse(name):
     """
     Get the network parameters based on the network name.

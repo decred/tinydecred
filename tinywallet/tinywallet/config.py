@@ -102,6 +102,41 @@ class DB:
     wallet = "wallet".encode()
     theme = "theme".encode()
     dcrdata = "dcrdata".encode()
+    rpcuser = "rpcuser".encode()
+    rpcpass = "rpcpass".encode()
+    rpccert = "rpccert".encode()
+    rpchost = "rpchost".encode()
+    dcrdon = "dcrdon".encode()
+
+
+def dcrd(netParams):
+    """
+    Attempt to fetch the dcrd configuration settings. Values will be parsed for
+    'rpcuser', 'rpcpass', 'rpclisten', and 'rpccert'. The setting for 'rpcuser'
+    must be present in the file. If values are not found for 'rpccert' or
+    'rpclisten', default locations are populated.
+
+    Args:
+        netParams (bool): The network parameters.
+
+    Returns:
+        dict or None: The parsed configuration settings.
+    """
+    dcrdCfgDir = helpers.appDataDir("dcrd")
+    cfgPath = os.path.join(dcrdCfgDir, "dcrd.conf")
+    if not os.path.isfile(cfgPath):
+        return {}
+    dcrdCfg = helpers.readINI(cfgPath, ["rpclisten", "rpcuser", "rpcpass", "rpccert"])
+    if "rpcuser" not in dcrdCfg:
+        return None
+    if "rpccert" not in dcrdCfg:
+        dcrdCfg["rpccert"] = os.path.join(dcrdCfgDir, "rpc.cert")
+    # Tinywallet uses the protocol (scheme) of the URL for now.
+    if "rpclisten" in dcrdCfg:
+        dcrdCfg["rpclisten"] = "https://" + dcrdCfg["rpclisten"]
+    else:
+        dcrdCfg["rpclisten"] = f"https://localhost:{nets.DcrdPorts[netParams.Name]}"
+    return dcrdCfg
 
 
 tinyConfig = None

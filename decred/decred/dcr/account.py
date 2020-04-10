@@ -837,6 +837,7 @@ class Account:
         self.addressDB = None
         # ticketDB is a mapping of txid to tickets (UTXO objects).
         self.ticketDB = None
+        self.synced = False
         # If a database was provided, load it. This would be the case when
         # the account is first created, as opposed to be unblobbed.
         if db is not None:
@@ -935,6 +936,7 @@ class Account:
             signals (Signals): A signaller.
         """
         self.blockchain = blockchain
+        self.node = None
         self.signals = signals
         self.masterDB = db.child("meta")
         self.utxoDB = db.child("utxos", blobber=UTXO)
@@ -959,6 +961,15 @@ class Account:
         if MetaKeys.vsp in self.masterDB:
             apiKeys = encode.unblobStrList(self.masterDB[MetaKeys.vsp])
             self.stakePools = [self.vspDB[apiKey] for apiKey in apiKeys]
+
+    def setNode(self, node):
+        """
+        Set the dcrd connection for the account.
+
+        Args:
+            node (LocalNode): A connected LocalNode.
+        """
+        self.node = node
 
     def unlock(self, cryptoKey):
         """
@@ -2011,6 +2022,7 @@ class Account:
                 f"subscribed to {len(watchAddresses)} addresses for account {self.name}"
             )
         # Signal the new balance.
+        self.synced = True
         signals.balance(self.calcBalance())
 
         return True

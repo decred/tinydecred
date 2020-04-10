@@ -60,6 +60,10 @@ def test_account_manager(prepareLogger):
     assert acctMgr.account(1) == tempAcct
     assert acctMgr.listAccounts() == [acct, tempAcct]
 
+    acctMgr.setNode("node")
+    assert acctMgr.node == "node"
+    assert tempAcct.node == "node"
+
     acctMgr.accounts[3] = tempAcct
     del acctMgr.accounts[1]
     with pytest.raises(DecredError):

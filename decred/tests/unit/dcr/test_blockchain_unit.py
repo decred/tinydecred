@@ -17,6 +17,9 @@ def node(monkeypatch, tmp_path):
     existsAddresses = set()
 
     class TestWsClient:
+
+        closed = False
+
         def __init__(self, url, user, pw, cert=None):
             pass
 
@@ -31,6 +34,7 @@ def node(monkeypatch, tmp_path):
         user="user",
         pw="pass",
     )
+    assert bc.connected()
     bc._existsAddresses = existsAddresses
     return bc
 
