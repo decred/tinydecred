@@ -1056,6 +1056,13 @@ def isStakeScriptHash(script, stakeOpcode):
     """
     isStakeScriptHash returns whether or not the passed public key script is a
     standard pay-to-script-hash script tagged with the provided stake opcode.
+
+    Args:
+        script (ByteArray): The script to check.
+        stakeOpcode (int): An opcode for the type of stake transaction.
+
+    Returns:
+        bool: Whether the script is a pay to stake script using the passed opcode.
     """
     return extractStakeScriptHash(script, stakeOpcode) is not None
 
@@ -1065,6 +1072,13 @@ def extractStakeScriptHash(script, stakeOpcode):
     extractStakeScriptHash extracts a script hash from the passed public key
     script if it is a standard pay-to-script-hash script tagged with the provided
     stake opcode. It will return None otherwise.
+
+    Args:
+        script (ByteArray): The script to check.
+        stakeOpcode (int): An opcode for the type of stake transaction.
+
+    Returns:
+        ByteArray: The script hash or None.
     """
     if (
         len(script) == 24
