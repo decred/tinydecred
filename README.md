@@ -15,7 +15,7 @@ using the [`pip`](https://pip.pypa.io/) command as usual.
 ## Status
 
 [![Check and test both packages](https://github.com/decred/tinydecred/workflows/Check%20and%20test%20both%20packages/badge.svg)](https://github.com/decred/tinydecred/actions)
-![Test coverage](https://img.shields.io/badge/coverage-98%25-green)
+<img src="https://img.shields.io/badge/coverage-98%25-green" alt="Test coverage" title="Test coverage" />
 
 ### PyPI
 
@@ -24,10 +24,10 @@ using the [`pip`](https://pip.pypa.io/) command as usual.
 
 ### GitHub
 
-![GitHub commit activity](https://img.shields.io/github/commit-activity/y/decred/tinydecred)
-![GitHub last commit](https://img.shields.io/github/last-commit/decred/tinydecred)
-![GitHub contributors](https://img.shields.io/github/contributors/decred/tinydecred)
-[![GitHub](https://img.shields.io/github/license/decred/tinydecred)](https://copyfree.org/)
+<img src="https://img.shields.io/github/commit-activity/y/decred/tinydecred" alt="GitHub commit activity" title="GitHub commit activity" />
+<img src="https://img.shields.io/github/last-commit/decred/tinydecred" alt="GitHub last commit" title="GitHub last commit" />
+<img src="https://img.shields.io/github/contributors/decred/tinydecred" alt="GitHub contributors" title="GitHub contributors" />
+[![GitHub](https://img.shields.io/github/license/decred/tinydecred)](./LICENSE)
 
 ## Roadmap
 
