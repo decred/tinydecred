@@ -39,4 +39,5 @@ class TestWire:
             wire.readVarInt(
                 ByteArray([0xFE, 0xFF, 0xFF, 0x0, 0x0]), wire.ProtocolVersion
             )
+        with pytest.raises(DecredError):
             wire.readVarInt(ByteArray([0xFD, 0xFC, 0x0]), wire.ProtocolVersion)
