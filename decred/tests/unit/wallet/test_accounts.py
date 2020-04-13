@@ -7,7 +7,7 @@ import pytest
 
 from decred import DecredError
 from decred.crypto import crypto, rando
-from decred.dcr import addrlib, nets
+from decred.dcr import account, addrlib, nets
 from decred.util import chains, database, encode
 from decred.wallet import accounts
 
@@ -49,7 +49,10 @@ def test_change_addresses(prepareLogger):
         acct.nextInternalAddress()
 
 
-def test_account_manager(prepareLogger):
+def test_account_manager(monkeypatch, prepareLogger):
+    # Set up globals for test.
+    monkeypatch.setattr(account, "DefaultGapLimit", 2)
+
     cryptoKey = rando.newKey()
     db = database.KeyValueDatabase(":memory:").child("tmp")
     # 42 = Decred
@@ -90,7 +93,7 @@ def test_account_manager(prepareLogger):
     assert db.name == "tmp$accts$0"
 
 
-def test_discover(prepareLogger):
+def test_discover(monkeypatch, prepareLogger):
     cryptoKey = rando.newKey()
     db = database.KeyValueDatabase(":memory:").child("tmp")
     acctMgr = accounts.createNewAccountManager(
@@ -102,20 +105,22 @@ def test_discover(prepareLogger):
         params = nets.mainnet
         addrsHaveTxs = lambda addrs: any(a in txs for a in addrs)
 
-    ogChain = chains.chain("dcr")
+    # Set up globals for test.
+    origChain = chains.chain("dcr")
     chains.registerChain("dcr", Blockchain)
-    ogLimit = accounts.ACCOUNT_GAP_LIMIT
-    accounts.ACCOUNT_GAP_LIMIT = 2
+    # Set up globals for test.
+    monkeypatch.setattr(accounts, "ACCOUNT_GAP_LIMIT", 2)
+    monkeypatch.setattr(account, "DefaultGapLimit", 4)
 
     acctMgr.discover(cryptoKey)
     assert len(acctMgr.accounts) == 1
 
     coinExtKey = acctMgr.coinKey(cryptoKey)
     acct2ExtKey = coinExtKey.deriveAccountKey(2).neuter().child(0)
-    acct2Addr5 = addrlib.deriveChildAddress(acct2ExtKey, 5, nets.mainnet)
-    txs[acct2Addr5] = ["tx"]
+    acct2Addr3 = addrlib.deriveChildAddress(acct2ExtKey, 3, nets.mainnet)
+    txs[acct2Addr3] = ["tx"]
     acctMgr.discover(cryptoKey)
     assert len(acctMgr.accounts) == 3
 
-    chains.registerChain("dcr", ogChain)
-    accounts.ACCOUNT_GAP_LIMIT = ogLimit
+    # Restore globals.
+    chains.registerChain("dcr", origChain)

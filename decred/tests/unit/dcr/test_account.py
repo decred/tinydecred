@@ -437,10 +437,13 @@ class TestAccount:
             0, pubKeyEncrypted, privKeyEncrypted, "acctName", "mainnet", db, blockchain
         )
 
-    def test_main(self):
+    def test_main(self, monkeypatch):
         """
         Test account functionality.
         """
+        # Set up globals for test.
+        monkeypatch.setattr(account, "DefaultGapLimit", 2)
+
         db = KeyValueDatabase(":memory:").child("tmp")
         acct = self.newAccount(db)
         acct.unlock(self.cryptoKey)
