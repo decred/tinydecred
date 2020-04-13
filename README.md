@@ -24,8 +24,8 @@ using the [`pip`](https://pip.pypa.io/) command as usual.
 
 ### GitHub
 
-[![GitHub commit activity](https://img.shields.io/github/commit-activity/y/decred/tinydecred)](./graphs/commit-activity)
-[![GitHub contributors](https://img.shields.io/github/contributors/decred/tinydecred)](./graphs/contributors)
+[![GitHub commit activity](https://img.shields.io/github/commit-activity/y/decred/tinydecred)](https://github.com/decred/tinydecred/graphs/commit-activity)
+[![GitHub contributors](https://img.shields.io/github/contributors/decred/tinydecred)](https://github.com/decred/tinydecred/graphs/contributors)
 [![GitHub](https://img.shields.io/github/license/decred/tinydecred)](./LICENSE)
 
 ## Roadmap
