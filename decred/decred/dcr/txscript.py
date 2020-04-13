@@ -1777,6 +1777,8 @@ def payToScriptHashScript(scriptHash):
     Returns:
         ByteArray: The script that pays to the script hash.
     """
+    if len(scriptHash) != 20:
+        raise DecredError(f"script hash must be 20 bytes but is {len(scriptHash)}")
     script = ByteArray("")
     script += opcode.OP_HASH160
     script += addData(scriptHash)
@@ -1795,50 +1797,64 @@ def payToPubKeyScript(serializedPubKey):
     Returns:
         ByteArray: The script that pays to the pubkey.
     """
+    if not isStrictPubKeyEncoding(serializedPubKey):
+        raise DecredError(f"serialized pubkey has incorrect encoding")
     script = ByteArray("")
     script += addData(serializedPubKey)
     script += opcode.OP_CHECKSIG
     return script
 
 
-def payToStakePKHScript(addr, stakeCode):
+def payToStakePKHScript(pkh, stakeCode):
     """
     Create a new script to pay a transaction for a ticket purchase with a pubkey
     hash.
 
     Args:
-        addr (AddressPubKeyHash): An address.
+        pkh (ByteArray): A pubkey hash.
         stakeCode (int): An op code for the type of stake submission transaction.
-            SSTX or SSTXCHANGE.
+            SSTX, SSTXCHANGE, or SSRTX.
 
     Returns:
         ByteArray: The script that pays to the pubkey hash of the address.
     """
+    if len(pkh) != 20:
+        raise DecredError(f"pubkey hash must be 20 bytes but is {len(pkh)}")
+    if stakeCode not in (opcode.OP_SSTX, opcode.OP_SSTXCHANGE, opcode.OP_SSRTX):
+        raise DecredError(
+            f"stake code is not sstx, sstxchange, or ssrtx: {hex(stakeCode)}"
+        )
     script = ByteArray(stakeCode)
     script += opcode.OP_DUP
     script += opcode.OP_HASH160
-    script += addData(addr.scriptAddress())
+    script += addData(pkh)
     script += opcode.OP_EQUALVERIFY
     script += opcode.OP_CHECKSIG
     return script
 
 
-def payToStakeSHScript(addr, stakeCode):
+def payToStakeSHScript(sh, stakeCode):
     """
     Create a new script to pay a transaction for a ticket purchase with a script
     hash.
 
     Args:
-        addr (AddressScriptHash): An address.
+        sh (ByteArray): A script hash.
         stakeCode (int): An op code for the type of stake submission transaction.
-            SSTX or SSTXCHANGE.
+            SSTX, SSTXCHANGE, or SSRTX.
 
     Returns:
         ByteArray: The script that pays to the script hash of the address.
     """
+    if len(sh) != 20:
+        raise DecredError(f"script hash must be 20 bytes but is {len(sh)}")
+    if stakeCode not in (opcode.OP_SSTX, opcode.OP_SSTXCHANGE, opcode.OP_SSRTX):
+        raise DecredError(
+            f"stake code is not sstx, sstxchange, or ssrtx: {hex(stakeCode)}"
+        )
     script = ByteArray(stakeCode)
     script += opcode.OP_HASH160
-    script += addData(addr.scriptAddress())
+    script += addData(sh)
     script += opcode.OP_EQUAL
     return script
 
@@ -1892,52 +1908,8 @@ def payToSStx(addr):
         )
 
     if scriptType == PubKeyHashTy:
-        return payToStakePKHScript(addr, opcode.OP_SSTX)
-    return payToStakeSHScript(addr, opcode.OP_SSTX)
-
-
-def payToSSRtxPKHDirect(pkh):
-    """
-    payToSSRtxPKHDirect creates a new script to pay a transaction output to a
-    public key hash, but tags the output with OP_SSRTX. For use in constructing
-    valid SSRtx. Unlike payToSSRtx, this function directly uses the HASH160
-    pubkeyhash (instead of an address).
-
-    Args:
-        pkh (ByteArray): The pubkey hash bytes to pay to.
-
-    Returns:
-        ByteArray: Script to pay a stake based pubkey hash.
-    """
-    script = ByteArray(b"")
-    script += opcode.OP_SSRTX
-    script += opcode.OP_DUP
-    script += opcode.OP_HASH160
-    script += addData(pkh)
-    script += opcode.OP_EQUALVERIFY
-    script += opcode.OP_CHECKSIG
-    return script
-
-
-def payToSSRtxSHDirect(sh):
-    """
-    payToSSRtxSHDirect creates a new script to pay a transaction output to a
-    script hash, but tags the output with OP_SSRTX. For use in constructing
-    valid SSRtx. Unlike payToSSRtx, this function directly uses the HASH160
-    script hash (instead of an address).
-
-    Args:
-        sh (byte-like): raw script.
-
-    Returns:
-        byte-like: script to pay a stake based script hash.
-    """
-    script = ByteArray(b"")
-    script += opcode.OP_SSRTX
-    script += opcode.OP_HASH160
-    script += addData(sh)
-    script += opcode.OP_EQUAL
-    return script
+        return payToStakePKHScript(addr.scriptAddress(), opcode.OP_SSTX)
+    return payToStakeSHScript(addr.scriptAddress(), opcode.OP_SSTX)
 
 
 def generateSStxAddrPush(addr, amount, limits):
@@ -2006,8 +1978,8 @@ def payToSStxChange(addr):
         )
 
     if scriptType == PubKeyHashTy:
-        return payToStakePKHScript(addr, opcode.OP_SSTXCHANGE)
-    return payToStakeSHScript(addr, opcode.OP_SSTXCHANGE)
+        return payToStakePKHScript(addr.scriptAddress(), opcode.OP_SSTXCHANGE)
+    return payToStakeSHScript(addr.scriptAddress(), opcode.OP_SSTXCHANGE)
 
 
 def makePayToAddrScript(addrStr, netParams):
@@ -4137,11 +4109,11 @@ def makeRevocation(ticketPurchase, feePerKB):
     # All remaining outputs pay to the output destinations and amounts tagged
     # by the ticket purchase.
     for i in range(len(ticketHash160s)):
-        scriptFn = payToSSRtxPKHDirect
+        scriptFn = payToStakePKHScript
         # P2SH
         if ticketPayKinds[i]:
-            scriptFn = payToSSRtxSHDirect
-        script = scriptFn(ticketHash160s[i])
+            scriptFn = payToStakeSHScript
+        script = scriptFn(ticketHash160s[i], opcode.OP_SSRTX)
         revocation.addTxOut(msgtx.TxOut(revocationValues[i], script))
 
     # Revocations must pay a fee but do so by decreasing one of the output

@@ -2680,10 +2680,11 @@ class TestTxScript(unittest.TestCase):
                         crypto.hash160(pkBytes.bytes()), testingParams, suite
                     )
 
-                    pkScript = txscript.payToSSRtxPKHDirect(
+                    pkScript = txscript.payToStakePKHScript(
                         addrlib.decodeAddress(
                             address.string(), testingParams
-                        ).scriptAddress()
+                        ).scriptAddress(),
+                        opcode.OP_SSRTX,
                     )
 
                     class keysource:
@@ -2838,7 +2839,9 @@ class TestTxScript(unittest.TestCase):
                 return privKey
 
         for opCode in (opcode.OP_SSGEN, opcode.OP_SSRTX, opcode.OP_SSTX):
-            pkScript = txscript.payToStakePKHScript(addr, opcode.OP_SSTX)
+            pkScript = txscript.payToStakePKHScript(
+                addr.scriptAddress(), opcode.OP_SSTX
+            )
             # Just looking to raise an exception for now.
             txscript.signTxOutput(
                 mainnet,
@@ -4796,7 +4799,7 @@ def test_SStx():
 
 def test_pay_to_pub_key_hash_script():
     # name (str): Short description of the test.
-    # pkHash (ByteArray): The public key hash to pay to.
+    # pkHash (ByteArray): The pubkey hash to pay to.
     # wantException (Exception): The exception expected if any.
     # want (ByteArray): The script that pays to the public key hash.
     tests = [
@@ -4825,29 +4828,78 @@ def test_pay_to_pub_key_hash_script():
 
 
 def test_pay_to_script_hash_script():
-    res = txscript.payToScriptHashScript(parseShortForm("NULL_BYTES_20"))
-    want = parseShortForm("HASH160 DATA_20 NULL_BYTES_20 EQUAL")
-    assert res == want, f"wanted {want.hex()} but got {res.hex()}"
+    # name (str): Short description of the test.
+    # scriptHash (ByteArray): The script hash to pay to.
+    # wantException (Exception): The exception expected if any.
+    # want (ByteArray): The script that pays to the script hash.
+    tests = [
+        dict(
+            name="ok",
+            scriptHash=parseShortForm("NULL_BYTES_20"),
+            want=parseShortForm("HASH160 DATA_20 NULL_BYTES_20 EQUAL"),
+        ),
+        dict(
+            name="script hash wrong size",
+            scriptHash=parseShortForm("NULL_BYTES_21"),
+            wantException=DecredError,
+        ),
+    ]
+    for test in tests:
+        if test.get("wantException"):
+            with pytest.raises(test["wantException"]):
+                res = txscript.payToScriptHashScript(test["scriptHash"])
+            continue
+        res = txscript.payToScriptHashScript(test["scriptHash"])
+        assert (
+            res == test["want"]
+        ), f'wanted {test["want"].hex()} but got {res.hex()} for test {test["name"]}'
 
 
 def test_pay_to_pubkey_script():
-    res = txscript.payToPubKeyScript(parseShortForm("NULL_BYTES_33"))
-    want = parseShortForm("DATA_33 NULL_BYTES_33 CHECKSIG")
-    assert res == want, f"wanted {want.hex()} but got {res.hex()}"
+    # name (str): Short description of the test.
+    # serializedPubKey (ByteArray): The pubkey bytes to pay to.
+    # wantException (Exception): The exception expected if any.
+    # want (ByteArray): The script that pays to the pubkey.
+    tests = [
+        dict(
+            name="compressed pubkey",
+            serializedPubKey=parseShortForm("0x03 NULL_BYTES_32"),
+            want=parseShortForm("DATA_33 0x03 NULL_BYTES_32 CHECKSIG"),
+        ),
+        dict(
+            name="uncompressed pubkey",
+            serializedPubKey=parseShortForm("0x04 NULL_BYTES_64"),
+            want=parseShortForm("DATA_65 0x04 NULL_BYTES_64 CHECKSIG"),
+        ),
+        dict(
+            name="pubkey has incorrect encoding",
+            serializedPubKey=parseShortForm("NULL_BYTES_33"),
+            wantException=DecredError,
+        ),
+    ]
+    for test in tests:
+        if test.get("wantException"):
+            with pytest.raises(test["wantException"]):
+                res = txscript.payToPubKeyScript(test["serializedPubKey"])
+            continue
+        res = txscript.payToPubKeyScript(test["serializedPubKey"])
+        assert (
+            res == test["want"]
+        ), f'wanted {test["want"].hex()} but got {res.hex()} for test {test["name"]}'
 
 
 def test_pay_to_stake_pubkey_hash_script():
-    hash160 = parseShortForm("NULL_BYTES_20")
-    addr = addrlib.AddressPubKeyHash(hash160, testnet, crypto.STEcdsaSecp256k1)
+    pkh = parseShortForm("NULL_BYTES_20")
     # name (str): Short description of the test.
-    # addr (AddressPubKeyHash): An address.
+    # pkh (ByteArray): A pubkey hash.
     # stakeCode (int): An op code for the type of stake submission transaction.
-    #     SSTX or SSTXCHANGE.
+    #     SSTX, SSTXCHANGE, or SSTRX.
+    # wantException (Exception): The exception expected if any.
     # want (ByteArray): The script that pays to the pubkey hash of the address.
     tests = [
         dict(
             name="sstx",
-            addr=addr,
+            pkh=pkh,
             stakeCode=opcode.OP_SSTX,
             want=parseShortForm(
                 "SSTX DUP HASH160 DATA_20 NULL_BYTES_20 EQUALVERIFY CHECKSIG"
@@ -4855,58 +4907,90 @@ def test_pay_to_stake_pubkey_hash_script():
         ),
         dict(
             name="sstx change",
-            addr=addr,
+            pkh=pkh,
             stakeCode=opcode.OP_SSTXCHANGE,
             want=parseShortForm(
                 "SSTXCHANGE DUP HASH160 DATA_20 NULL_BYTES_20 EQUALVERIFY CHECKSIG"
             ),
         ),
+        dict(
+            name="ssrtx",
+            pkh=pkh,
+            stakeCode=opcode.OP_SSRTX,
+            want=parseShortForm(
+                "SSRTX DUP HASH160 DATA_20 NULL_BYTES_20 EQUALVERIFY CHECKSIG"
+            ),
+        ),
+        dict(
+            name="wrong stake code",
+            pkh=pkh,
+            stakeCode=opcode.OP_SSGEN,
+            wantException=DecredError,
+        ),
+        dict(
+            name="pkh wrong size",
+            pkh=pkh[1:],
+            stakeCode=opcode.OP_SSTX,
+            wantException=DecredError,
+        ),
     ]
     for test in tests:
-        res = txscript.payToStakePKHScript(test["addr"], test["stakeCode"])
+        if test.get("wantException"):
+            with pytest.raises(test["wantException"]):
+                res = txscript.payToStakePKHScript(test["pkh"], test["stakeCode"])
+            continue
+        res = txscript.payToStakePKHScript(test["pkh"], test["stakeCode"])
         assert (
             res == test["want"]
         ), f'wanted {test["want"].hex()} but got {res.hex()} for test {test["name"]}'
 
 
 def test_pay_to_stake_script_hash_script():
-    hash160 = parseShortForm("NULL_BYTES_20")
-    addr = addrlib.AddressScriptHash(hash160, testnet)
+    sh = parseShortForm("NULL_BYTES_20")
     # name (str): Short description of the test.
-    # addr (AddressScriptHash): An address.
+    # sh (ByteArray): A script hash.
     # stakeCode (int): An op code for the type of stake submission transaction.
-    #     SSTX or SSTXCHANGE.
+    #     SSTX, SSTXCHANGE, or SSTRX.
+    # wantException (Exception): The exception expected if any.
     # want (ByteArray): The script that pays to the pubkey hash of the address.
     tests = [
         dict(
             name="sstx",
-            addr=addr,
+            sh=sh,
             stakeCode=opcode.OP_SSTX,
             want=parseShortForm("SSTX HASH160 DATA_20 NULL_BYTES_20 EQUAL"),
         ),
         dict(
             name="sstx change",
-            addr=addr,
+            sh=sh,
             stakeCode=opcode.OP_SSTXCHANGE,
             want=parseShortForm("SSTXCHANGE HASH160 DATA_20 NULL_BYTES_20 EQUAL"),
         ),
+        dict(
+            name="ssrtx",
+            sh=sh,
+            stakeCode=opcode.OP_SSRTX,
+            want=parseShortForm("SSRTX HASH160 DATA_20 NULL_BYTES_20 EQUAL"),
+        ),
+        dict(
+            name="wrong stake code",
+            sh=sh,
+            stakeCode=opcode.OP_SSGEN,
+            wantException=DecredError,
+        ),
+        dict(
+            name="sh wrong size",
+            sh=sh[1:],
+            stakeCode=opcode.OP_SSTX,
+            wantException=DecredError,
+        ),
     ]
     for test in tests:
-        res = txscript.payToStakeSHScript(test["addr"], test["stakeCode"])
+        if test.get("wantException"):
+            with pytest.raises(test["wantException"]):
+                res = txscript.payToStakeSHScript(test["sh"], test["stakeCode"])
+            continue
+        res = txscript.payToStakeSHScript(test["sh"], test["stakeCode"])
         assert (
             res == test["want"]
         ), f'wanted {test["want"].hex()} but got {res.hex()} for test {test["name"]}'
-
-
-def test_pay_to_ssrtx_pubkey_hash_direct():
-    res = txscript.payToSSRtxPKHDirect(parseShortForm("NULL_BYTES_20"))
-    want = parseShortForm(
-        "SSRTX DUP HASH160 DATA_20 NULL_BYTES_20 EQUALVERIFY CHECKSIG"
-    )
-    assert res == want, f"wanted {want.hex()} but got {res.hex()}"
-
-
-def test_pay_to_ssrtx_script_hash_direct():
-    res = txscript.payToSSRtxSHDirect(parseShortForm("NULL_BYTES_20"))
-    want = parseShortForm("SSRTX HASH160 DATA_20 NULL_BYTES_20 EQUAL")
-    assert res == want, f"wanted {want.hex()} but got {res.hex()}"
