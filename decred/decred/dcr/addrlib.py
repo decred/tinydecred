@@ -125,8 +125,10 @@ class AddressPubKeyHash(Address):
 
         super().__init__(netParams)
         pkh_len = len(pkHash)
-        if pkh_len != 20:
-            raise DecredError(f"AddressPubKeyHash expected 20 bytes, got {pkh_len}")
+        if pkh_len != RIPEMD160_SIZE:
+            raise DecredError(
+                f"AddressPubKeyHash expected {RIPEMD160_SIZE} bytes, got {pkh_len}"
+            )
 
         self.sigType = sigType
         self.netID = netParams.PubKeyHashAddrID

@@ -195,7 +195,8 @@ def test_filter():
     # Test some error paths.
     f = gcs.FilterV2.deserialize(
         ByteArray(
-            "1189af70ad5baf9da83c64e99b18e96a06cd7295a58b324e81f09c85d093f1e33dcd6f40f18cfcbe2aeb771d8390"
+            "1189af70ad5baf9da83c64e99b18e96a06cd7295a58b32"
+            "4e81f09c85d093f1e33dcd6f40f18cfcbe2aeb771d8390"
         )
     )
     member = ByteArray("Alex".encode())
@@ -213,19 +214,22 @@ def test_filter():
     # fmt: off
     # contents1 defines a set of known elements for use in the tests below.
     contents1 = [
-        ByteArray(s.encode()) for s in
-        ("Alex", "Bob", "Charlie", "Dick", "Ed", "Frank", "George", "Harry",
-        "Ilya", "John", "Kevin", "Larry", "Michael", "Nate", "Owen", "Paul",
-        "Quentin")
+        ByteArray(s.encode())
+        for s in (
+            "Alex", "Bob", "Charlie", "Dick", "Ed", "Frank", "George", "Harry", "Ilya",
+            "John", "Kevin", "Larry", "Michael", "Nate", "Owen", "Paul", "Quentin",
+        )
     ]
 
     # contents2 defines a separate set of known elements for use in the tests
     # below.
     contents2 = [
-        ByteArray(s.encode()) for s in
-        ("Alice", "Betty", "Charmaine", "Donna", "Edith", "Faina", "Georgia",
-        "Hannah", "Ilsbeth", "Jennifer", "Kayla", "Lena", "Michelle", "Natalie",
-        "Ophelia", "Peggy", "Queenie")
+        ByteArray(s.encode())
+        for s in (
+            "Alice", "Betty", "Charmaine", "Donna", "Edith", "Faina", "Georgia",
+            "Hannah", "Ilsbeth", "Jennifer", "Kayla", "Lena", "Michelle", "Natalie",
+            "Ophelia", "Peggy", "Queenie",
+        )
     ]
     # fmt: on
 
@@ -255,7 +259,8 @@ def test_filter():
             wantMatches=contents1,
             fixedKey=fixedKey,
             wantBytes=ByteArray(
-                "1189af70ad5baf9da83c64e99b18e96a06cd7295a58b324e81f09c85d093f1e33dcd6f40f18cfcbe2aeb771d8390"
+                "1189af70ad5baf9da83c64e99b18e96a06cd7295a58b32"
+                "4e81f09c85d093f1e33dcd6f40f18cfcbe2aeb771d8390"
             ),
             wantHash=rba(
                 "b616838c6090d3e732e775cc2f336ce0b836895f3e0f22d6c3ee4485a6ea5018"
@@ -268,7 +273,8 @@ def test_filter():
             wantMatches=contents1,
             fixedKey=fixedKey,
             wantBytes=ByteArray(
-                "1189af70ad5baf9da83c64e99b18e96a06cd7295a58b324e81f09c85d093f1e33dcd6f40f18cfcbe2aeb771d8390"
+                "1189af70ad5baf9da83c64e99b18e96a06cd7295a58b32"
+                "4e81f09c85d093f1e33dcd6f40f18cfcbe2aeb771d8390"
             ),
             wantHash=rba(
                 "b616838c6090d3e732e775cc2f336ce0b836895f3e0f22d6c3ee4485a6ea5018"
@@ -281,7 +287,8 @@ def test_filter():
             wantMatches=contents2,
             fixedKey=fixedKey,
             wantBytes=ByteArray(
-                "118d4be5372d2f4731c7e1681aefd23028be12306b4d90701a46b472ee80ad60f9fa86c4d6430cfb495ced604362"
+                "118d4be5372d2f4731c7e1681aefd23028be12306b4d90"
+                "701a46b472ee80ad60f9fa86c4d6430cfb495ced604362"
             ),
             wantHash=rba(
                 "f3028f42909209120c8bf649fbbc5a70fb907d8997a02c2c1f2eef0e6402cb15"
