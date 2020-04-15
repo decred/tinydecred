@@ -8,14 +8,34 @@ import random
 import pytest
 
 from decred import DecredError
-from decred.crypto.secp256k1 import curve
+from decred.crypto.secp256k1 import curve, field
 from decred.crypto.secp256k1.curve import curve as curve_obj
 from decred.util.encode import ByteArray
 
 
-def test_add_jacobian():
+def _isJacobianOnS256Curve(x, y, z):
     """
-    TestAddJacobian tests addition of points projected in Jacobian coordinates.
+    _isJacobianOnS256Curve returns boolean if the point (x,y,z) is on the
+    secp256k1 curve.
+    Elliptic curve equation for secp256k1 is: y^2 = x^3 + 7
+    In Jacobian coordinates, Y = y/z^3 and X = x/z^2
+    Thus:
+    (y/z^3)^2 = (x/z^2)^3 + 7
+    y^2/z^6 = x^3/z^6 + 7
+    y^2 = x^3 + 7*z^6
+    """
+    fv = field.FieldVal
+    y2, z2, x3, result = fv(), fv(), fv(), fv()
+    y2.squareVal(y).normalize()
+    z2.squareVal(z)
+    x3.squareVal(x).mul(x)
+    result.squareVal(z2).mul(z2).mulInt(7).add(x3).normalize()
+    return y2.equals(result)
+
+
+def test_addJacobian():
+    """
+    test_addJacobian tests addition of points projected in Jacobian coordinates.
     """
     tests = [
         # Addition with a point at infinity (left hand side).
@@ -216,9 +236,9 @@ def test_add_jacobian():
 
         # Ensure the test data is using points that are actually on
         # the curve (or the point at infinity).
-        assert z1.isZero() or curve.isJacobianOnS256Curve(x1, y1, z1)
-        assert z2.isZero() or curve.isJacobianOnS256Curve(x2, y2, z2)
-        assert z3.isZero() or curve.isJacobianOnS256Curve(x3, y3, z3)
+        assert z1.isZero() or _isJacobianOnS256Curve(x1, y1, z1)
+        assert z2.isZero() or _isJacobianOnS256Curve(x2, y2, z2)
+        assert z3.isZero() or _isJacobianOnS256Curve(x3, y3, z3)
 
         # Add the two points.
         fv = curve.FieldVal
@@ -229,9 +249,10 @@ def test_add_jacobian():
         assert rz.equals(z3)
 
 
-def test_double_jacobian():
+def test_doubleJacobian():
     """
-    TestDoubleJacobian tests doubling of points projected in Jacobian coordinates.
+    test_doubleJacobian tests doubling of points projected in Jacobian
+    coordinates.
     """
     tests = [
         # Doubling a point at infinity is still infinity.
@@ -278,8 +299,8 @@ def test_double_jacobian():
 
         # Ensure the test data is using points that are actually on
         # the curve (or the point at infinity).
-        assert z1.isZero() or curve.isJacobianOnS256Curve(x1, y1, z1)
-        assert z3.isZero() or curve.isJacobianOnS256Curve(x3, y3, z3)
+        assert z1.isZero() or _isJacobianOnS256Curve(x1, y1, z1)
+        assert z3.isZero() or _isJacobianOnS256Curve(x3, y3, z3)
         # Double the point.
         fv = curve.FieldVal
         rx, ry, rz = fv(), fv(), fv()
@@ -289,7 +310,7 @@ def test_double_jacobian():
         assert rz.equals(z3)
 
 
-def test_base_mult():
+def test_scalarBaseMult():
     tests = [
         (
             "AA5E28D6A97A2479A65527F7290311A3624D4CC0FA1578598EE3C2613BF99522",
@@ -324,8 +345,10 @@ def test_base_mult():
         assert py == curve.fromHex(y)
 
 
-def test_add_affine():
-    """ TestAddAffine tests addition of points in affine coordinates."""
+def test_add():
+    """
+    test_add tests addition of points in affine coordinates.
+    """
     tests = [
         # Addition with a point at infinity (left hand side).
         # ∞ + P = P
@@ -398,9 +421,11 @@ def test_add_affine():
         assert ry == y3
 
 
-def _check_naf(want):
+def _check_NAF(i, want):
     """
-    want: ByteArray
+    Args:
+        i: integer
+        want: ByteArray
     """
     nafPos, nafNeg = curve.NAF(want)
     got = 0
@@ -416,10 +441,10 @@ def _check_naf(want):
                 got -= 1
             bytePos <<= 1
             byteNeg <<= 1
-    assert got == want.int()
+    assert got == want.int(), f"test {i}"
 
 
-def test_naf():
+def test_NAF():
     tests = (
         "6df2b5d30854069ccdec40ae022f5c948936324a4e9ebed8eb82cfd5a6b6d766",
         "b776e53fb55f6b006a270d42d64ec2b1",
@@ -428,17 +453,17 @@ def test_naf():
         "a2e79d200f27f2360fba57619936159b",
     )
     for i, test in enumerate(tests):
-        _check_naf(ByteArray(test))
+        _check_NAF(i, ByteArray(test))
 
 
-def test_naf_rand(randBytes):
+def test_NAF_rand(randBytes):
     random.seed(0)
-    for _ in range(1024):
+    for i in range(1024):
         data = ByteArray(randBytes(0, 32))
-        _check_naf(data)
+        _check_NAF(i, data)
 
 
-def test_splitk(sign):
+def test_splitK(sign):
     tests = [
         dict(
             k="6df2b5d30854069ccdec40ae022f5c948936324a4e9ebed8eb82cfd5a6b6d766",
@@ -505,7 +530,7 @@ def test_splitk(sign):
         assert gotk == k
 
 
-def test_splitk_rand(randBytes):
+def test_splitK_rand(randBytes):
     random.seed(0)
     for _ in range(1024):
         k = ByteArray(randBytes(0, 32)).int()
@@ -516,7 +541,7 @@ def test_splitk_rand(randBytes):
         assert gotk == k
 
 
-def test_scalar_mult():
+def test_scalarMult():
     tests = [
         # base mult, essentially.
         dict(
@@ -547,7 +572,7 @@ def test_scalar_mult():
         assert y_got == y_want
 
 
-def test_scalar_mult_rand(randBytes):
+def test_scalarMult_rand(randBytes):
     # Strategy for this test:
     # Get a random exponent from the generator point at first.
     # This creates a new point which is used in the next iteration.
@@ -556,8 +581,7 @@ def test_scalar_mult_rand(randBytes):
     # and the new random exponent together (mod N).
     x, y = curve_obj.Gx, curve_obj.Gy
     exponent = 1
-    # 16 instead of 1024 because CPU-intensive.
-    for _ in range(16):
+    for _ in range(1024):
         data = ByteArray(randBytes(0, 32)).int()
         x, y = curve_obj.scalarMult(x, y, data)
         exponent *= data
@@ -566,7 +590,7 @@ def test_scalar_mult_rand(randBytes):
         assert y == y_want
 
 
-def test_public_keys():
+def test_PublicKey():
     # fmt: off
     tests = [
         # pubkey from bitcoin blockchain tx
@@ -804,7 +828,7 @@ def test_public_keys():
         assert pkStr == ByteArray(test["key"])
 
 
-def test_public_key_is_equal():
+def test_PublicKey_eq():
     # fmt: off
     pubKey1 = curve_obj.parsePubKey(
         bytes((
