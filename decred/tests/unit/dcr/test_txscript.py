@@ -578,8 +578,8 @@ def sstxMismatchedInsOuts():
     return msgtx.MsgTx(
         serType=wire.TxSerializeFull,
         version=1,
-        txIn=[sstxTxIn(),],
-        txOut=[sstxTxOut0(), sstxTxOut1(), sstxTxOut2(), sstxTxOut1(), sstxTxOut2(),],
+        txIn=[sstxTxIn()],
+        txOut=[sstxTxOut0(), sstxTxOut1(), sstxTxOut2(), sstxTxOut1(), sstxTxOut2()],
         lockTime=0,
         expiry=0,
         cachedHash=None,

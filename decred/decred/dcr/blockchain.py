@@ -2,10 +2,8 @@
 Copyright (c) 2020, the Decred developers
 """
 
-
 import time
 
-from decred.crypto import crypto
 from decred.dcr import addrlib, rpc
 from decred.dcr.wire.msgblock import BlockHeader
 from decred.util import database, helpers
@@ -141,7 +139,8 @@ class LocalNode:
 
         duration = time.time() - startTime
         log.debug(
-            f"{its} iterations to discover {len(discovered)} addresses. {duration:.3f} seconds"
+            f"{its} iterations to discover {len(discovered)}"
+            f" addresses. {duration:.3f} seconds"
         )
 
         return discovered
@@ -282,7 +281,8 @@ class LocalNode:
                 (start + i + 1, header.cachedHash()) for i, header in enumerate(headers)
             )
             log.debug(
-                f"{(time.time() - iterationTime) * 1e3:.3f} ms to fetch and insert {len(headers)} headers"
+                f"{(time.time() - iterationTime) * 1e3:.3f} ms"
+                f" to fetch and insert {len(headers)} headers"
             )
             startHash = headers[-1].cachedHash()
             if startHash == stopHash:

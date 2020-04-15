@@ -1508,7 +1508,8 @@ def checkSSGen(tx):
         or len(firstOutputScript) > SSGenVoteBitsOutputMaxSize
     ):
         raise DecredError(
-            "SSGen votebits output at output index 1 was a NullData (OP_RETURN) push of the wrong size"
+            "SSGen votebits output at output index 1 was"
+            " a NullData (OP_RETURN) push of the wrong size"
         )
 
     # The OP_RETURN output script prefix for voting should conform to the
@@ -1535,9 +1536,8 @@ def checkSSGen(tx):
         # The script should be a OP_SSGEN tagged output.
         if getScriptClass(scrVersion, rawScript) != StakeGenTy:
             raise DecredError(
-                "SSGen tx output at output index {} was not an OP_SSGEN tagged output".format(
-                    i + 2
-                )
+                f"SSGen tx output at output index {i + 2}"
+                " was not an OP_SSGEN tagged output"
             )
 
 
@@ -1752,10 +1752,10 @@ def payToPubKeyHashScript(pkHash):
     Returns:
         ByteArray: The script that pays to the pubkey hash.
     """
-    if len(pkHash) != 20:
+    if len(pkHash) != crypto.RIPEMD160_SIZE:
         raise DecredError(
-            "cannot create script with pubkey hash length %d. expected length 20"
-            % len(pkHash)
+            f"cannot create script with pubkey hash length {pkHash},"
+            f" expected length {crypto.RIPEMD160_SIZE}"
         )
     script = ByteArray(b"")
     script += opcode.OP_DUP
@@ -1777,8 +1777,11 @@ def payToScriptHashScript(scriptHash):
     Returns:
         ByteArray: The script that pays to the script hash.
     """
-    if len(scriptHash) != 20:
-        raise DecredError(f"script hash must be 20 bytes but is {len(scriptHash)}")
+    if len(scriptHash) != crypto.RIPEMD160_SIZE:
+        raise DecredError(
+            f"script hash must be {crypto.RIPEMD160_SIZE}"
+            f" bytes but is {len(scriptHash)}"
+        )
     script = ByteArray("")
     script += opcode.OP_HASH160
     script += addData(scriptHash)
@@ -1818,8 +1821,10 @@ def payToStakePKHScript(pkh, stakeCode):
     Returns:
         ByteArray: The script that pays to the pubkey hash of the address.
     """
-    if len(pkh) != 20:
-        raise DecredError(f"pubkey hash must be 20 bytes but is {len(pkh)}")
+    if len(pkh) != crypto.RIPEMD160_SIZE:
+        raise DecredError(
+            f"pubkey hash must be {crypto.RIPEMD160_SIZE} bytes but is {len(pkh)}"
+        )
     if stakeCode not in (opcode.OP_SSTX, opcode.OP_SSTXCHANGE, opcode.OP_SSRTX):
         raise DecredError(
             f"stake code is not sstx, sstxchange, or ssrtx: {hex(stakeCode)}"
@@ -1846,8 +1851,10 @@ def payToStakeSHScript(sh, stakeCode):
     Returns:
         ByteArray: The script that pays to the script hash of the address.
     """
-    if len(sh) != 20:
-        raise DecredError(f"script hash must be 20 bytes but is {len(sh)}")
+    if len(sh) != crypto.RIPEMD160_SIZE:
+        raise DecredError(
+            f"script hash must be {crypto.RIPEMD160_SIZE} bytes but is {len(sh)}"
+        )
     if stakeCode not in (opcode.OP_SSTX, opcode.OP_SSTXCHANGE, opcode.OP_SSRTX):
         raise DecredError(
             f"stake code is not sstx, sstxchange, or ssrtx: {hex(stakeCode)}"
@@ -1872,9 +1879,8 @@ def multiSigScript(addrs, nRequired):
     """
     if len(addrs) < nRequired:
         raise DecredError(
-            "unable to generate multisig script with {} required signatures when there are only {} public keys available".format(
-                nRequired, len(addrs)
-            )
+            f"unable to generate multisig script with {nRequired} required signatures"
+            f" when there are only {len(addrs)} public keys available"
         )
     script = ByteArray(addInt(nRequired))
     for addr in addrs:
