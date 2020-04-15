@@ -4961,3 +4961,77 @@ def test_pay_to_stake_script_hash_script():
         assert (
             res == test["want"]
         ), f'wanted {test["want"].hex()} but got {res.hex()} for test {test["name"]}'
+
+
+def test_is_stake_script_hash():
+    def makeScript(opcode, hash160):
+        return parseShortForm(
+            "{} HASH160 0x{} EQUAL".format(hex(opcode), txscript.addData(hash160).hex())
+        )
+
+    # name (str): Short description of the test.
+    # script (ByteArray): The script to check.
+    # stakeOpcode (int): An opcode for the type of stake transaction.
+    # want (bool): Whether the script is a pay to stake script using the passed opcode.
+    tests = [
+        dict(
+            name="ok",
+            script=makeScript(opcode.OP_SSTX, parseShortForm("NULL_BYTES_20")),
+            stakeOpcode=opcode.OP_SSTX,
+            want=True,
+        ),
+        dict(
+            name="different opcode",
+            script=makeScript(opcode.OP_SSTX, parseShortForm("NULL_BYTES_20")),
+            stakeOpcode=opcode.OP_SSRTX,
+            want=False,
+        ),
+        dict(
+            name="hash not 20 bytes",
+            script=makeScript(opcode.OP_SSTX, parseShortForm("NULL_BYTES_21")),
+            stakeOpcode=opcode.OP_SSRTX,
+            want=False,
+        ),
+    ]
+    for test in tests:
+        res = txscript.isStakeScriptHash(test["script"], test["stakeOpcode"])
+        assert (
+            res == test["want"]
+        ), f'wanted {test["want"]} but got {res} for test {test["name"]}'
+
+
+def test_extract_stake_script_hash():
+    def makeScript(opcode, hash160):
+        return parseShortForm(
+            "{} HASH160 0x{} EQUAL".format(hex(opcode), txscript.addData(hash160).hex())
+        )
+
+    # name (str): Short description of the test.
+    # script (ByteArray): The script to check.
+    # stakeOpcode (int): An opcode for the type of stake transaction.
+    # want (ByteArray): The expected script or None.
+    tests = [
+        dict(
+            name="ok",
+            script=makeScript(opcode.OP_SSTX, parseShortForm("NULL_BYTES_20")),
+            stakeOpcode=opcode.OP_SSTX,
+            want=parseShortForm("NULL_BYTES_20"),
+        ),
+        dict(
+            name="different opcode",
+            script=makeScript(opcode.OP_SSTX, parseShortForm("NULL_BYTES_20")),
+            stakeOpcode=opcode.OP_SSRTX,
+            want=None,
+        ),
+        dict(
+            name="hash not 20 bytes",
+            script=makeScript(opcode.OP_SSTX, parseShortForm("NULL_BYTES_21")),
+            stakeOpcode=opcode.OP_SSRTX,
+            want=None,
+        ),
+    ]
+    for test in tests:
+        res = txscript.extractStakeScriptHash(test["script"], test["stakeOpcode"])
+        assert (
+            res == test["want"]
+        ), f'wanted {test["want"].hex()} but got {res.hex()} for test {test["name"]}'
