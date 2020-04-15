@@ -27,11 +27,8 @@ sure that the changes meet some minimum requirements. The action definition
 [file](./.github/workflows/python.yml) is a useful summary of the commands
 you'll run while developing.
 
-New tests should be written in the [pytest](https://docs.pytest.org/) format.
-Existing tests in the stdlib `unittest` format may be rewritten to use pytest
-as needed.
-
-Tests may be debugged more conveniently using the
+Tests are written in the [pytest](https://docs.pytest.org/) format, and may be
+debugged more conveniently using the
 [PuDB](https://documen.tician.de/pudb/) console-based visual debugger, invoked
 via the `./decred/debugger.sh` script.
 
