@@ -1,6 +1,6 @@
 """
 Copyright (c) 2019, Brian Stafford
-Copyright (c) 2019, the Decred developers
+Copyright (c) 2019-2020, the Decred developers
 See LICENSE for details
 
 A PyQt light wallet.
@@ -15,24 +15,23 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from decred.dcr import constants as DCR
 from decred.dcr.dcrdata import DcrdataBlockchain
 from decred.util import chains, database, helpers
+from decred.util.helpers import formatTraceback
 from decred.wallet.wallet import Wallet
 from tinywallet import config, qutilities as Q, screens, ui
 from tinywallet.config import DB
 
 
-# the directory of the tinywallet package
+# The directory of the tinywallet package.
 PACKAGEDIR = os.path.dirname(os.path.realpath(__file__))
 
-# some commonly used ui constants
+# Some commonly used UI constants.
 TINY = ui.TINY
 SMALL = ui.SMALL
 MEDIUM = ui.MEDIUM
 LARGE = ui.LARGE
 
-# a filename for the wallet
+# A filename for the wallet.
 WALLET_FILE_NAME = "wallet.db"
-
-formatTraceback = helpers.formatTraceback
 
 
 class TinySignals:
@@ -46,6 +45,10 @@ class TinySignals:
         Args:
             balance (func(Balance)): A function to receive balance updates.
                 Updates are broadcast as an object implementing the Balance API.
+            working (func(Working)): A function to receive working updates.
+            done (func(Done)): A function to receive Done updates.
+            spentTickets (func(SpentTickets)): A function to receive spentTickets
+                updates.
         """
         dummy = lambda *a, **k: None
         self.balance = balance if balance else dummy
@@ -151,7 +154,9 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
         self.initialize()
 
     def shutdown(self, e=None):
-        """Connected to the context menu "quit" option. Shut down TinyWallet."""
+        """
+        Connected to the context menu "quit" option. Shut down TinyWallet.
+        """
         self.assetScreen.shutdown()
         self.qApp.quit()
 
@@ -166,8 +171,8 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
             logFilePath, logLvl=self.cfg.logLevel, lvlMap=self.cfg.moduleLevels
         )
         log = helpers.getLogger("APP")
-        log.info("configuration file at %s" % config.CONFIG_PATH)
-        log.info("data directory at %s" % config.DATA_DIR)
+        log.info(f"configuration file at {config.CONFIG_PATH}")
+        log.info(f"data directory at {config.DATA_DIR}")
         return log
 
     def initialize(self):
@@ -185,8 +190,8 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
                 self.home(self.assetScreen)
             except Exception as e:
                 self.log.warning(
-                    "exception encountered while attempting to initialize wallet: %s"
-                    % formatTraceback(e)
+                    "exception encountered while attempting"
+                    f" to initialize wallet: {formatTraceback(e)}"
                 )
                 self.appWindow.showError("error opening wallet")
 
@@ -209,22 +214,24 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
 
     def waitThread(self, f, cb, *a, **k):
         """
-        Wait thread shows a waiting screen while the provided function is run
+        waitThread shows a waiting screen while the provided function is run
         in a separate thread.
 
         Args:
             f (func): A function to run in a separate thread.
             cb (func): A callback to receive the return values from f.
             *args (tuple): Positional arguments passed to f.
-            **kwargs (dict): Keyword arguments passed directly to f.
+            **kwargs (dict): Keyword arguments passed to f.
         """
 
         def run():
             try:
                 return f(*a, **k)
             except Exception as e:
-                err_msg = "waitThread execution error {} failed: {}"
-                self.log.error(err_msg.format(f.__name__, formatTraceback(e)))
+                self.log.error(
+                    f"waitThread execution error {f.__name__}"
+                    f" failed: {formatTraceback(e)}"
+                )
             finally:
                 self.notWaiting()
 
@@ -233,13 +240,14 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
 
     def getPassword(self, f, prompt="Password"):
         """
-        Calls the provided function with a user-provided password string as its
-        first argument. Any additional arguments provided to getPassword are
-        appended as-is to the password argument.
+        Calls the provided function with a user-provided prompt string as its
+        first argument.
 
         Args:
             f (func): A function that will receive the user's password
-                and any other provided arguments.
+                and the prompt argument.
+            prompt (str): optional. default: "Password". A short message that
+                will be displayed above the password input field.
         """
         self.appWindow.stack(self.pwDialog.withCallback(f, prompt))
 
@@ -327,9 +335,8 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
                 self.netDirectory, WALLET_FILE_NAME
             ).encode()
         if DB.dcrdata not in self.settings:
-            self.settings[DB.dcrdata] = config.NetworkDefaults[self.cfg.netParams.Name][
-                "dcrdata"
-            ].encode()
+            self.settings[DB.dcrdata] = config.NetworkDefaults[
+                self.cfg.netParams.Name]["dcrdata"].encode()
 
     def registerSignal(self, sig, cb, *a, **k):
         """
@@ -344,7 +351,7 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
                 signalRegistry.
             cb (func): Consumer defined callback.
             *a (tuple): Positional arguments passed to cb.
-            **k (dict): Keyword arguments passed directly to cb.
+            **k (dict): Keyword arguments passed to cb.
         """
         if sig not in self.signalRegistry:
             self.signalRegistry[sig] = []
@@ -359,11 +366,11 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
             sig (str): A notification identifier registered with the
                 signalRegistry.
             *sigA (tuple): Positional arguments passed to cb.
-            **sigK (dict): Keyword arguments passed directly to cb.
+            **sigK (dict): Keyword arguments passed to cb.
         """
         sr = self.signalRegistry
         if sig not in sr:
-            self.log.warning("attempted to call un-registered signal %s" % sig)
+            self.log.warning(f"attempted to call un-registered signal {sig}")
             return
         for s in sr[sig]:
             sa, sk = s[1], s[3]
@@ -451,7 +458,7 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
             screen (Screen | tuple(Screen)): Behavior will differ depending on
                 type passed. If no screen is passed, the last home screen will
                 be used. If screen is a Screen, it will be set as the new home
-                screen. If screen is a tuple of Screen, The first Screen in the
+                screen. If screen is a tuple of Screen, the first Screen in the
                 tuple will be set to the home screen, and the rest will be
                 stacked.
         """
@@ -480,8 +487,8 @@ def loadFonts():
     """
     Load the application font files.
     """
-    # see https://github.com/google/material-design-icons/blob/master/iconfont/codepoints
-    # for conversions to unicode
+    # For conversions to unicode see:
+    # https://github.com/google/material-design-icons/blob/master/iconfont/codepoints
     # http://zavoloklom.github.io/material-design-iconic-font/cheatsheet.html
     for filename in os.listdir(ui.FONTDIR):
         if filename.endswith(".ttf"):
