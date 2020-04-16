@@ -324,7 +324,7 @@ class Toggle(QtWidgets.QAbstractButton):
         self.update()
 
 
-def makeWidget(widgetClass, layoutDirection="vertical", parent=None):
+def makeWidget(widgetClass, layoutDirection=VERTICAL, parent=None):
     """
     Create a tuple of (widget, layout), with layout of type specified with
     layout direction.
@@ -333,7 +333,7 @@ def makeWidget(widgetClass, layoutDirection="vertical", parent=None):
 
     Args:
         widgetClass (QtWidgets.QAbstractWidget): The type of widget to make.
-        layoutDirection (str): optional. default "vertical". One of
+        layoutDirection (str): optional. default VERTICAL. One of
             (HORIZONTAL, VERTICAL, GRID). Determines the type of layout
             applied to the widget.
         parent (object): The parent.
