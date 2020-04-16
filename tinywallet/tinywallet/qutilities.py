@@ -106,9 +106,7 @@ class SmartThread(QtCore.QThread):
         try:
             self.returns = self.func(*self.args, **self.kwargs)
         except Exception as e:
-            log.error(
-                f"exception encountered in QThread: {helpers.formatTraceback(e)}"
-            )
+            log.error(f"exception encountered in QThread: {helpers.formatTraceback(e)}")
             self.returns = False
 
     def callitback(self):

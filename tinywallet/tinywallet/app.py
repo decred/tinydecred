@@ -335,8 +335,9 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
                 self.netDirectory, WALLET_FILE_NAME
             ).encode()
         if DB.dcrdata not in self.settings:
-            self.settings[DB.dcrdata] = config.NetworkDefaults[
-                self.cfg.netParams.Name]["dcrdata"].encode()
+            self.settings[DB.dcrdata] = config.NetworkDefaults[self.cfg.netParams.Name][
+                "dcrdata"
+            ].encode()
 
     def registerSignal(self, sig, cb, *a, **k):
         """
