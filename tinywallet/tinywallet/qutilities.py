@@ -332,7 +332,7 @@ def makeWidget(widgetClass, layoutDirection="vertical", parent=None):
     margins are set to 0 on both layout and widget.
 
     Args:
-        widgetClass (QtWidgets.QAbstractWidget:) The type of widget to make.
+        widgetClass (QtWidgets.QAbstractWidget): The type of widget to make.
         layoutDirection (str): optional. default "vertical". One of
             ("vertical","horizontal","grid"). Determines the type of layout
             applied to the widget.
@@ -509,9 +509,7 @@ def layoutWidgets(layout):
     Generator to iterate the widgets in a layout.
 
     Args:
-        layout (QAbstractLayout): Layout to clear
-        delete (bool): Default False. Whether or not to delete the widget as
-            well.
+        layout (QAbstractLayout): Layout to clear.
     """
     for i in range(layout.count()):
         yield layout.itemAt(i).widget()
