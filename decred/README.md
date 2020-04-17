@@ -5,7 +5,7 @@ The `decred` package contains everything needed to create
 
 ## Features
 
-1. Pure-Python secp256k1 elliptic curve.
+1. A secp256k1 elliptic curve written in Python and accelerated by Cython.
 
 1. Serializable and de-serializable python versions of important types
 from the `dcrd/wire` package: `MsgTx`, `BlockHeader`, `OutPoint`, etc.
