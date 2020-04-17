@@ -49,7 +49,7 @@ def isEven(i):
 def NAF(k):
     """
     NAF takes a positive integer k and returns the Non-Adjacent Form (NAF) as
-    two byte slices.  The first is where 1s will be.  The second is where -1s
+    two ByteArrays.  The first is where 1s will be.  The second is where -1s
     will be.  NAF is convenient in that on average, only 1/3rd of its values
     are non-zero.  This is algorithm 3.30 from [GECC].
 
@@ -247,7 +247,7 @@ class KoblitzCurve:
     def splitK(self, k):
         """
         Args:
-            k: integer
+            k (int): A big-endian integer modulo the curve order.
 
         splitK returns a balanced length-two representation of k and their
         signs. This is algorithm 3.74 from [GECC].
@@ -378,7 +378,7 @@ class KoblitzCurve:
         x, y = self.scalarBaseMult(k)
         return PublicKey(self, x, y)
 
-    def parsePubKey(self, pubKeyStr):
+    def parsePubKey(self, pubKey):
         """
         parsePubKey parses a secp256k1 public key encoded according to the
         format specified by ANSI X9.62-1998, which means it is also compatible
@@ -393,34 +393,32 @@ class KoblitzCurve:
 
         It does not support the hybrid format, however.
         """
-        if len(pubKeyStr) == 0:
-            raise DecredError("empty pubkey string")
+        if len(pubKey) == 0:
+            raise DecredError("empty pubkey")
 
-        fmt = pubKeyStr[0]
+        fmt = pubKey[0]
         ybit = (fmt & 0x1) == 0x1
         fmt &= 0xFF ^ 0x01
 
         ifunc = lambda b: int.from_bytes(b, byteorder="big")
 
-        pkLen = len(pubKeyStr)
+        pkLen = len(pubKey)
         if pkLen == PUBKEY_LEN:
             if PUBKEY_UNCOMPRESSED != fmt:
-                raise DecredError("invalid magic in pubkey str: %d" % pubKeyStr[0])
-            x = ifunc(pubKeyStr[1:33])
-            y = ifunc(pubKeyStr[33:])
+                raise DecredError("invalid magic in pubkey: %d" % pubKey[0])
+            x = ifunc(pubKey[1:33])
+            y = ifunc(pubKey[33:])
 
         elif pkLen == PUBKEY_COMPRESSED_LEN:
             # format is 0x2 | solution, <X coordinate>
             # solution determines which solution of the curve we use.
             # / y^2 = x^3 + Curve.B
             if PUBKEY_COMPRESSED != fmt:
-                raise DecredError(
-                    "invalid magic in compressed pubkey string: %d" % pubKeyStr[0]
-                )
-            x = ifunc(pubKeyStr[1:33])
+                raise DecredError("invalid magic in compressed pubkey: %d" % pubKey[0])
+            x = ifunc(pubKey[1:33])
             y = self.decompressPoint(x, ybit)
         else:  # wrong!
-            raise DecredError("invalid pub key length %d" % len(pubKeyStr))
+            raise DecredError("invalid pub key length %d" % len(pubKey))
 
         if x > self.P:
             raise DecredError("pubkey X parameter is >= to P")
@@ -989,7 +987,7 @@ class KoblitzCurve:
 def fromHex(hx):
     """
     fromHex converts the passed hex string into an integer.  This is only
-    meant for the hard-coded constants so errors in the source code can bet
+    meant for the hard-coded constants so errors in the source code can be
     detected. It will (and must) only be called for initialization purposes.
     """
     return int(hx, 16)
