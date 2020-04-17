@@ -12,7 +12,7 @@ import time
 from urllib.parse import urlsplit, urlunsplit
 import webbrowser
 
-from PyQt5 import QtCore, QtGui, QtSvg, QtWidgets
+from PySide2 import QtCore, QtGui, QtSvg, QtWidgets
 
 from decred import DecredError
 from decred.crypto import crypto
@@ -109,11 +109,11 @@ class TinyDialog(QtWidgets.QFrame):
     maxWidth = 525
     maxHeight = 375
     targetPadding = 15
-    popSig = QtCore.pyqtSignal(Q.PyObj)
-    stackSig = QtCore.pyqtSignal(Q.PyObj)
+    popSig = QtCore.Signal(object)
+    stackSig = QtCore.Signal(object)
     topMenuHeight = 26
-    successSig = QtCore.pyqtSignal(str)
-    errorSig = QtCore.pyqtSignal(str)
+    successSig = QtCore.Signal(str)
+    errorSig = QtCore.Signal(str)
 
     def __init__(self, twApp):
         """
@@ -1825,7 +1825,7 @@ class AccountSelector(QtWidgets.QPushButton):
 
     def paintEvent(self, e):
         """
-        Paint the lock icon. This is an overloaded PyQt method.
+        Paint the lock icon. This is an overloaded PySide2 method.
         """
         super().paintEvent(e)
         painter = QtGui.QPainter(self)
