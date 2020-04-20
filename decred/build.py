@@ -31,12 +31,12 @@ class BuildExt(build_ext):
 def build(setup_kwargs):
     try:
         from Cython.Build import cythonize
-    except ImportError:
-        pass
-    else:
+
         setup_kwargs.update(
             dict(
-                cmdclass=dict(build_ext=BuildExt),
                 ext_modules=cythonize(["decred/crypto/secp256k1/field.py"]),
+                cmdclass=dict(build_ext=BuildExt),
             )
         )
+    except Exception:
+        pass
