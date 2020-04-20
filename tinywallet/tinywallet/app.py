@@ -153,7 +153,8 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
         """
         Connected to the context menu "quit" option. Shut down TinyWallet.
         """
-        self.assetScreen.shutdown()
+        if hasattr(self, "assetScreen"):
+            self.assetScreen.shutdown()
         self.qApp.quit()
 
     def initLogging(self):
