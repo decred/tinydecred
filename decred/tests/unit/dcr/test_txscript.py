@@ -11,7 +11,7 @@ import pytest
 from decred import DecredError
 from decred.crypto import crypto, opcode, rando
 from decred.crypto.secp256k1 import curve as Curve
-from decred.dcr import addrlib, txscript
+from decred.dcr import account, addrlib, txscript
 from decred.dcr.nets import mainnet, testnet
 from decred.dcr.wire import msgtx, wire
 from decred.util.encode import ByteArray
@@ -5035,3 +5035,95 @@ def test_extract_stake_script_hash():
         assert (
             res == test["want"]
         ), f'wanted {test["want"].hex()} but got {res.hex()} for test {test["name"]}'
+
+
+def test_sign_p2pkh_msgtx():
+    priv = crypto.privKeyFromBytes(ByteArray(0x00))
+    pub = priv.pub
+    pkh = crypto.hash160(pub.serializeCompressed().b)
+    addrPKH = addrlib.AddressPubKeyHash(pkh, testnet)
+    addrSH = addrlib.AddressScriptHash(pkh, testnet)
+    addrToPriv = {addrPKH.string(): priv}
+    p2pkh = txscript.payToAddrScript(addrPKH)
+    p2sh = txscript.payToAddrScript(addrSH)
+
+    def keys(k):
+        return addrToPriv[k]
+
+    keysource = account.KeySource(keys, None)
+
+    def credit(idx, script):
+        op = msgtx.OutPoint(txHash=0x00, idx=idx, tree=wire.TxTreeRegular,)
+        return txscript.Credit(
+            op=op,
+            blockMeta=None,
+            amount=1,
+            pkScript=script,
+            received=0,
+            fromCoinBase=False,
+        )
+
+    tx = sstxMsgTx()
+
+    # want is the expected serialized signed tx.
+    want = (
+        "0100000003032e38e9c0a84c6046d687d10556dcacc41d275ec55fc00779ac88f"
+        "df357a1870000000000ffffffff032e38e9c0a84c6046d687d10556dcacc41d27"
+        "5ec55fc00779ac88fdf357a1870000000000ffffffff032e38e9c0a84c6046d68"
+        "7d10556dcacc41d275ec55fc00779ac88fdf357a1870000000000ffffffff0700"
+        "e323210000000000001aba76a914c398efa9c392ba6013c5e04ee729755ef7f58"
+        "b3288ac00000000000000000000206a1e948c765a6914d43f2a7ac177da2c2f6b"
+        "52de3d7c00e3232100000000443f00e323220000000000001abd76a914c398efa"
+        "9c392ba6013c5e04ee729755ef7f58b3288ac00000000000000000000206a1e94"
+        "8c765a6914d43f2a7ac177da2c2f6b52de3d7c00e3232100000000443f00e3232"
+        "20000000000001abd76a914c398efa9c392ba6013c5e04ee729755ef7f58b3288"
+        "ac00000000000000000000206a1e948c765a6914d43f2a7ac177da2c2f6b52de3"
+        "d7c00e3232100000080443f00e3232200000000000018bda914c398efa9c392ba"
+        "6013c5e04ee729755ef7f58b32870000000000000000030000000000000000000"
+        "00000000000006b483045022100ae63114cbc5857b0cfac5b8a4f32d0e96d8cff"
+        "856a41ad4dfc2e2c85906511c502203874b3fdee1f05eb3719b8e60a78c97db4a"
+        "61f80784aca0a3de8fab963597b23012102000000000000000000000000000000"
+        "00000000000000000000000000000000000000000000000000000000000000000"
+        "06a47304402203c41799ecc6f487f03e8cc236a0539aeeeed39afde8ab6275bcb"
+        "71b2da4560f202202c76809d5dac270701602de9c49ced50a6cddc5f09d8ee7bd"
+        "cfc83de45a795eb01210200000000000000000000000000000000000000000000"
+        "00000000000000000000000000000000000000000000000000006a47304402204"
+        "854ee61c36a49f0ebf8e3c1233c72d9d66c5b6c83561ffaa79510972a4cb01302"
+        "2060cd655f38d5e6adb0a1cdbac75358daee174f794b1ba0054339507381b7463"
+        "10121020000000000000000000000000000000000000000000000000000000000"
+        "000000"
+    )
+    # name (str): Short description of the test.
+    # msgtx (MsgTx): The ticket to sign.
+    # prevOutputs (list(Credit)): A list of txscript.Credit to sign.
+    # wantException (Exception): The exception expected if any.
+    tests = [
+        dict(
+            name="ok",
+            msgtx=tx,
+            prevOuts=[credit(0, p2pkh), credit(1, p2pkh), credit(2, p2pkh)],
+        ),
+        dict(
+            name="number of outputs does not match inputs",
+            msgtx=tx,
+            prevOuts=[credit(0, p2pkh), credit(1, p2pkh)],
+            wantException=DecredError,
+        ),
+        dict(
+            name="prevOut not p2pkh",
+            msgtx=tx,
+            prevOuts=[credit(0, p2pkh), credit(1, p2pkh), credit(2, p2sh)],
+            wantException=DecredError,
+        ),
+    ]
+    for test in tests:
+        if test.get("wantException"):
+            with pytest.raises(test["wantException"]):
+                txscript.signP2PKHMsgTx(
+                    test["msgtx"], test["prevOuts"], keysource, testnet
+                )
+            continue
+        txscript.signP2PKHMsgTx(test["msgtx"], test["prevOuts"], keysource, testnet)
+        assert (
+            test["msgtx"].serialize() == want
+        ), f'wanted {want} but got {test["msgtx"].serialize()} for test {test["name"]}'
