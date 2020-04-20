@@ -195,11 +195,6 @@ class TinyDialog(QtWidgets.QFrame):
         )
 
     def showEvent(self, e):
-        # geo = app.sysTray.geometry()
-        # print(f"sysTray.x: {repr(geo.x())")
-        # print(f"sysTray.y: {repr(geo.y())")
-        # print(f"sysTray.width: {repr(geo.width())")
-        # print(f"sysTray.height: {repr(geo.height())")
         pass
 
     def closeEvent(self, e):
@@ -949,7 +944,7 @@ class InitializationScreen(Screen):
         Args:
             pw (str): A user supplied password string.
         """
-        # Either way, pop the password window
+        # Either way, pop the password window.
         def create():
             try:
                 app.dcrdata.connect()
