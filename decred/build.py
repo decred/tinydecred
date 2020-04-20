@@ -9,20 +9,34 @@ by the Poetry tool when generating the wheel archive via its `build` command.
 It uses a currently undocumented Poetry feature, see:
 https://github.com/python-poetry/poetry/issues/11#issuecomment-379484540
 
+If Cython or a C compiler cannot be found, we skip the compilation
+of the C extension, and the Python code will be used.
+
 The shared library can also be built manually using the command:
 
 $ cythonize -X language_level=3 -a -i ./decred/crypto/secp256k1/field.py
 """
 
-# fmt: off
-try:
-    from Cython.Build import cythonize
-except ImportError:
-    def build(setup_kwargs):
+from distutils.command.build_ext import build_ext
+
+
+class BuildExt(build_ext):
+    def build_extensions(self):
+        try:
+            super().build_extensions()
+        except Exception:
+            pass
+
+
+def build(setup_kwargs):
+    try:
+        from Cython.Build import cythonize
+    except ImportError:
         pass
-else:
-    def build(setup_kwargs):
+    else:
         setup_kwargs.update(
-            {"ext_modules": cythonize(["decred/crypto/secp256k1/field.py"])}
+            dict(
+                cmdclass=dict(build_ext=BuildExt),
+                ext_modules=cythonize(["decred/crypto/secp256k1/field.py"]),
+            )
         )
-# fmt: on
