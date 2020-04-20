@@ -72,7 +72,8 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
         Args:
             qApp (QApplication): An initialized QApplication.
         """
-        super().__init__()
+        QtCore.QObject.__init__(self)
+        Q.ThreadUtilities.__init__(self)
         self.qApp = qApp
         self.cfg = config.load()
         self.log = self.initLogging()
