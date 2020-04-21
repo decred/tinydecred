@@ -2918,8 +2918,8 @@ class PoolScreen(Screen):
                 self.poolIdx = random.randint(0, count - 1)
         pool = pools[self.poolIdx]
         self.poolUrl.setText(pool["URL"])
-        self.score.setText(f"{self.scorePool(pool):.1f%%}")
-        self.fee.setText(f"{pool['PoolFees']:.1f%%}")
+        self.score.setText(f"{self.scorePool(pool):.1f}%")
+        self.fee.setText(f"{pool['PoolFees']:.1f}%")
         self.users.setText(str(pool["UserCountActive"]))
 
     def scorePool(self, pool):
