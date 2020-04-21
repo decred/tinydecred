@@ -1943,6 +1943,9 @@ class AccountSettingsScreen(Screen):
         self.layout.addStretch(1)
 
     def setFeeLbl(self, fee):
+        """
+        Set the displayed fee as atoms/byte.
+        """
         self.feeLbl.setText(f"{fee//1000} atoms/byte")
 
     def nameChangeClicked(self, e):

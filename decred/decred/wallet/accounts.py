@@ -153,7 +153,7 @@ class AccountManager:
             idx (int): The account's index.
             fee (int): The relay fee in smallest unit/kb.
         """
-        acct = self.acctDB[idx]
+        acct = self.accounts[idx]
         acct.relayFee = fee
         self.acctDB[idx] = acct
 
