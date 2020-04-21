@@ -1833,7 +1833,7 @@ class Account:
         tx = self.blockchain.tx(txid)
         self.addTxid(addr, tx.txid())
 
-        matches = False
+        matches = 0
         # scan the inputs for any spends.
         for txin in tx.txIn:
             op = txin.previousOutPoint

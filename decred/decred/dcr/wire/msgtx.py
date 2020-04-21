@@ -458,7 +458,7 @@ class MsgTx:
         s("version", self.version)
         for i, txIn in enumerate(self.txIn):
             s("txIn {}".format(i), "")
-            s("previousOutPoint".format(i), "", 1)
+            s("previousOutPoint", "", 1)
             s("txid", txIn.previousOutPoint.txid(), 2)
             s("idx", txIn.previousOutPoint.index, 2)
             s("tree", txIn.previousOutPoint.tree, 2)

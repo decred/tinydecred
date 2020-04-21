@@ -429,7 +429,7 @@ class DcrdataBlockchain:
         self.heightMap = db.child("height", datatypes=("INTEGER", "BLOB"))
         self.headerDB = db.child("header", blobber=msgblock.BlockHeader)
         self.txBlockMap = db.child("blocklink")
-        self.tipHeight = None
+        self.tipHeight = -1
         self.subsidyCache = txscript.SubsidyCache(netParams)
         self.addrSubscribers = {}
         self.blockSubscribers = []

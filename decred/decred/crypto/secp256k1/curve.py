@@ -199,29 +199,48 @@ def generateKey():
     return PrivateKey(curve, b, x, y)
 
 
-class KoblitzCurve:
-    """
-    KoblitzCurve provides a secp256k1 Koblitz curve implementation.
-    """
+def fromHex(hx):
+    return int(hx, 16)
 
-    def __init__(
-        self, P, N, B, Gx, Gy, BitSize, H, q, byteSize, lambda_, beta, a1, b1, a2, b2
-    ):
-        self.P = P
-        self.N = N
-        self.B = B
-        self.Gx = Gx
-        self.Gy = Gy
-        self.BitSize = BitSize
-        self.H = H
-        self.q = q
-        self.byteSize = byteSize
-        self.lambda_ = lambda_
-        self.beta = beta
-        self.a1 = a1
-        self.b1 = b1
-        self.a2 = a2
-        self.b2 = b2
+
+class Curve:
+    def __init__(self):
+        bitSize = 256
+        p = fromHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F")
+        self.P = p
+        self.N = fromHex(
+            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141"
+        )
+        self.B = fromHex(
+            "0000000000000000000000000000000000000000000000000000000000000007"
+        )
+        self.Gx = fromHex(
+            "79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798"
+        )
+        self.Gy = fromHex(
+            "483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8"
+        )
+        self.BitSize = bitSize
+        self.H = 1
+        self.q = (p + 1) // 4
+        # Provided for convenience since this gets computed repeatedly.
+        self.byteSize = bitSize / 8
+        # Next 6 constants are from Hal Finney's bitcointalk.org post:
+        # https://bitcointalk.org/index.php?topic=3238.msg45565#msg45565
+        # May he rest in peace.
+        #
+        # They have also been independently derived from the code in the
+        # EndomorphismVectors function in gensecp256k1.go.
+        self.lambda_ = fromHex(
+            "5363AD4CC05C30E0A5261C028812645A122E22EA20816678DF02967C1B23BD72"
+        )
+        self.beta = FieldVal.fromHex(
+            "7AE96A2B657C07106E64479EAC3434E99CF0497512F58995C1396C28719501EE"
+        )
+        self.a1 = fromHex("3086D221A7D46BCDE86C90E49284EB15")
+        self.b1 = fromHex("-E4437ED6010E88286F547FA90ABFE4C3")
+        self.a2 = fromHex("114CA50F7A8E2F3F657C1108D9D44CFD8")
+        self.b2 = fromHex("3086D221A7D46BCDE86C90E49284EB15")
 
     def scalarBaseMult(self, k):
         """
@@ -982,57 +1001,6 @@ class KoblitzCurve:
 
         # Convert the field values for the now affine point to integers.
         return ByteArray(x.bytes()).int(), ByteArray(y.bytes()).int()
-
-
-def fromHex(hx):
-    """
-    fromHex converts the passed hex string into an integer.  This is only
-    meant for the hard-coded constants so errors in the source code can be
-    detected. It will (and must) only be called for initialization purposes.
-    """
-    return int(hx, 16)
-
-
-class Curve(KoblitzCurve):
-    def __init__(self):
-        bitSize = 256
-        p = fromHex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F")
-        super().__init__(
-            P=p,
-            N=fromHex(
-                "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141"
-            ),
-            B=fromHex(
-                "0000000000000000000000000000000000000000000000000000000000000007"
-            ),
-            Gx=fromHex(
-                "79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798"
-            ),
-            Gy=fromHex(
-                "483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8"
-            ),
-            BitSize=bitSize,
-            H=1,
-            q=(p + 1) // 4,
-            # Provided for convenience since this gets computed repeatedly.
-            byteSize=bitSize / 8,
-            # Next 6 constants are from Hal Finney's bitcointalk.org post:
-            # https://bitcointalk.org/index.php?topic=3238.msg45565#msg45565
-            # May he rest in peace.
-            #
-            # They have also been independently derived from the code in the
-            # EndomorphismVectors function in gensecp256k1.go.
-            lambda_=fromHex(
-                "5363AD4CC05C30E0A5261C028812645A122E22EA20816678DF02967C1B23BD72"
-            ),
-            beta=FieldVal.fromHex(
-                "7AE96A2B657C07106E64479EAC3434E99CF0497512F58995C1396C28719501EE"
-            ),
-            a1=fromHex("3086D221A7D46BCDE86C90E49284EB15"),
-            b1=fromHex("-E4437ED6010E88286F547FA90ABFE4C3"),
-            a2=fromHex("114CA50F7A8E2F3F657C1108D9D44CFD8"),
-            b2=fromHex("3086D221A7D46BCDE86C90E49284EB15"),
-        )
 
     def bigAffineToField(self, x, y):
         """
