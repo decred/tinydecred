@@ -378,7 +378,7 @@ class KoblitzCurve:
         x, y = self.scalarBaseMult(k)
         return PublicKey(self, x, y)
 
-    def parsePubKey(self, pubKey):
+    def parsePubKey(self, pubKeyB):
         """
         parsePubKey parses a secp256k1 public key encoded according to the
         format specified by ANSI X9.62-1998, which means it is also compatible
@@ -393,32 +393,32 @@ class KoblitzCurve:
 
         It does not support the hybrid format, however.
         """
-        if len(pubKey) == 0:
+        if len(pubKeyB) == 0:
             raise DecredError("empty pubkey")
 
-        fmt = pubKey[0]
+        fmt = pubKeyB[0]
         ybit = (fmt & 0x1) == 0x1
         fmt &= 0xFF ^ 0x01
 
         ifunc = lambda b: int.from_bytes(b, byteorder="big")
 
-        pkLen = len(pubKey)
+        pkLen = len(pubKeyB)
         if pkLen == PUBKEY_LEN:
             if PUBKEY_UNCOMPRESSED != fmt:
-                raise DecredError("invalid magic in pubkey: %d" % pubKey[0])
-            x = ifunc(pubKey[1:33])
-            y = ifunc(pubKey[33:])
+                raise DecredError("invalid magic in pubkey: %d" % pubKeyB[0])
+            x = ifunc(pubKeyB[1:33])
+            y = ifunc(pubKeyB[33:])
 
         elif pkLen == PUBKEY_COMPRESSED_LEN:
             # format is 0x2 | solution, <X coordinate>
             # solution determines which solution of the curve we use.
             # / y^2 = x^3 + Curve.B
             if PUBKEY_COMPRESSED != fmt:
-                raise DecredError("invalid magic in compressed pubkey: %d" % pubKey[0])
-            x = ifunc(pubKey[1:33])
+                raise DecredError("invalid magic in compressed pubkey: %d" % pubKeyB[0])
+            x = ifunc(pubKeyB[1:33])
             y = self.decompressPoint(x, ybit)
         else:  # wrong!
-            raise DecredError("invalid pub key length %d" % len(pubKey))
+            raise DecredError("invalid pub key length %d" % len(pubKeyB))
 
         if x > self.P:
             raise DecredError("pubkey X parameter is >= to P")
