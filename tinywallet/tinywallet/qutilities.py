@@ -334,7 +334,7 @@ def makeWidget(widgetClass, layoutDirection="vertical", parent=None):
     Args:
         widgetClass (QtWidgets.QAbstractWidget): The type of widget to make.
         layoutDirection (str): optional. default "vertical". One of
-            ("vertical","horizontal","grid"). Determines the type of layout
+            (HORIZONTAL, VERTICAL, GRID). Determines the type of layout
             applied to the widget.
         parent (object): The parent.
     """

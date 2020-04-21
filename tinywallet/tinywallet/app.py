@@ -240,12 +240,11 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
 
     def getPassword(self, f, prompt="Password"):
         """
-        Calls the provided function with a user-provided prompt string as its
-        first argument.
+        Calls the provided function with a user-provided password string as
+        argument.
 
         Args:
-            f (func): A function that will receive the user's password
-                and the prompt argument.
+            f (func): A function that will receive the user's password.
             prompt (str): optional. default: "Password". A short message that
                 will be displayed above the password input field.
         """
