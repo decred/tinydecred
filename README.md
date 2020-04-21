@@ -7,7 +7,8 @@ The [`decred`](./decred) package contains everything needed to create wallets
 to send and receive DCR.
 
 The [`tinywallet`](./tinywallet) package contains a wallet based on the
-`decred` toolkit.
+`decred` toolkit and on the Qt toolkit via the PySide2 bindings, which are
+licensed under LGPLv3.
 
 Each package may be installed from the [Python Package Index](https://pypi.org/)
 using the [`pip`](https://pip.pypa.io/) command as usual.
