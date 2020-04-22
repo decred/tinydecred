@@ -20,7 +20,7 @@ from appdirs import AppDirs
 
 def formatTraceback(err):
     """
-    Format a traceback for an error.
+    Format a traceback for an error so that it can go into logs.
 
     Args:
         err (BaseException): The error the traceback is extracted from.
@@ -29,7 +29,7 @@ def formatTraceback(err):
         str: The __str__() of the error, followed by the standard formatting
             of the traceback on the following lines.
     """
-    return f"{err}\nTraceback:\n{traceback.extract_tb(err.__traceback__)}"
+    return "".join(traceback.format_exception(None, err, err.__traceback__))
 
 
 def mkdir(path):

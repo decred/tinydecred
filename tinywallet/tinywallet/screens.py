@@ -1134,7 +1134,7 @@ class AssetScreen(Screen):
         except DecredError as e:
             msg = "failed to connect to dcrdata"
             app.appWindow.showError(msg)
-            log.warning(f"{msg}: {formatTraceback(e)}")
+            log.warning(f"{msg}\n{formatTraceback(e)}")
             return
 
         # Check for a dcrd configuration. If found, request the cryptoKey so the
