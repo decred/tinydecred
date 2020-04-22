@@ -18,6 +18,7 @@ from decred import DecredError
 from decred.crypto import crypto
 from decred.dcr import constants as DCR, nets
 from decred.dcr.blockchain import LocalNode
+from decred.dcr.txscript import DefaultRelayFeePerKb
 from decred.dcr.vsp import VotingServiceProvider
 from decred.util import chains, database, helpers
 from decred.wallet.wallet import Wallet
@@ -475,7 +476,9 @@ class AccountScreen(Screen):
         self.canGoHome = False
         self.ticketStats = None
         self.balance = None
-        self.settingsScreen = AccountSettingsScreen(self.saveName)
+        self.settingsScreen = AccountSettingsScreen(
+            self.account.relayFee, self.saveName, self.setRelayFee
+        )
         self.stakeScreen = StakingScreen(acct)
         self.wgt.setFixedSize(
             TinyDialog.maxWidth * 0.9,
@@ -715,6 +718,15 @@ class AccountScreen(Screen):
         self.nameLbl.setText(self.account.name)
         self.assetScreen.doButtons()
         app.home()
+
+    def setRelayFee(self, relayFee):
+        """
+        Changes and saves the relayFee of the account.
+
+        Args:
+            int: The new relayFee.
+        """
+        self.acctMgr.setRelayFee(self.account.idx, relayFee)
 
     def stackAndSync(self):
         """
@@ -1832,7 +1844,7 @@ class AccountSettingsScreen(Screen):
     Account settings screen.
     """
 
-    def __init__(self, saveName):
+    def __init__(self, relayFee, saveName, setRelayFee):
         """
         Args:
             saveName (function): A callback function to be called after the user
@@ -1846,6 +1858,7 @@ class AccountSettingsScreen(Screen):
             TinyDialog.maxHeight * 0.9 - TinyDialog.topMenuHeight,
         )
         self.saveName = saveName
+        self.setRelayFee = setRelayFee
 
         gear = SVGWidget("gear", h=20)
         lbl = Q.makeLabel("Account Settings", 22)
@@ -1853,6 +1866,11 @@ class AccountSettingsScreen(Screen):
         self.layout.addWidget(wgt)
 
         self.layout.addStretch(1)
+
+        def insertSpace():
+            spacer = Q.makeLabel("", 5)
+            spacer.setContentsMargins(0, 5, 0, 0)
+            grid.addWidget(spacer, row, 0, 1, 4)
 
         # ACCOUNT NAME
 
@@ -1869,7 +1887,66 @@ class AccountSettingsScreen(Screen):
         bttn.clicked.connect(self.nameChangeClicked)
         grid.addWidget(bttn, row, 1)
 
+        # RELAY FEE
+
+        # Set string constants.
+        self.lowStr = "low"
+        self.defaultStr = "default"
+        self.highStr = "high"
+
+        # Set values that are considered low, default, and high.
+        self.feeRates = {
+            self.lowStr: 4000,
+            self.defaultStr: int(DefaultRelayFeePerKb),
+            self.highStr: 50000,
+        }
+        self.feeLvl = ""
+
+        # Find the current level. Warn if the current level isn't one of the
+        # three.
+        for k, v in self.feeRates.items():
+            if v == relayFee:
+                self.feeLvl = k
+                break
+        else:
+            log.warn(f"non standard relay fee set: {relayFee}")
+
+        # Helper to check the current value.
+        def setChecked(btn):
+            if self.feeLvl == btn.text():
+                btn.setChecked(True)
+
+        row += 1
+        insertSpace()
+        row += 1
+        lbl = Q.makeLabel("Relay Fee", 14, Q.ALIGN_LEFT)
+        grid.addWidget(lbl, row, 0)
+        self.feeLbl = lbl = Q.makeLabel("", 14, Q.ALIGN_LEFT)
+        self.setFeeLbl(relayFee)
+        grid.addWidget(lbl, row, 1)
+        row += 1
+        btn1 = QtWidgets.QRadioButton(self.lowStr)
+        Q.setProperties(btn1, fontFamily="Roboto", fontSize=14)
+        setChecked(btn1)
+        btn1.toggled.connect(lambda: self.relayFeeChangeClicked(self.lowStr))
+        btn2 = QtWidgets.QRadioButton(self.defaultStr)
+        Q.setProperties(btn2, fontFamily="Roboto", fontSize=14)
+        setChecked(btn2)
+        btn2.toggled.connect(lambda: self.relayFeeChangeClicked(self.defaultStr))
+        btn3 = QtWidgets.QRadioButton(self.highStr)
+        Q.setProperties(btn3, fontFamily="Roboto", fontSize=14)
+        setChecked(btn3)
+        btn3.toggled.connect(lambda: self.relayFeeChangeClicked(self.highStr))
+        wgt, _ = Q.makeRow(btn1, btn2, btn3)
+        grid.addWidget(wgt, row, 0, 1, -1)
+
         self.layout.addStretch(1)
+
+    def setFeeLbl(self, fee):
+        """
+        Set the displayed fee as atoms/byte.
+        """
+        self.feeLbl.setText(f"{fee//1000} atoms/byte")
 
     def nameChangeClicked(self, e):
         """
@@ -1881,6 +1958,20 @@ class AccountSettingsScreen(Screen):
             return
         self.nameField.setText("")
         self.saveName(newName)
+
+    def relayFeeChangeClicked(self, feeLvl):
+        """
+        Qt slot connected to relay fee radio button clicked signal. Changes the
+        relay fee to feeLvl.
+        """
+        if self.feeLvl == feeLvl:
+            return
+        self.feeLvl = feeLvl
+        fee = self.feeRates[feeLvl]
+        self.setRelayFee(fee)
+        self.setFeeLbl(fee)
+        log.info(f"relay fee changed to {fee} atoms/kb")
+        app.appWindow.showSuccess(f"using {feeLvl} fees")
 
 
 class NewAccountScreen(Screen):

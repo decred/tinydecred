@@ -145,6 +145,18 @@ class AccountManager:
         for acct in self.accounts.values():
             acct.setNode(node)
 
+    def setRelayFee(self, idx, fee):
+        """
+        Save the relay fee for account at index.
+
+        Args:
+            idx (int): The account's index.
+            fee (int): The relay fee in smallest unit/kb.
+        """
+        acct = self.accounts[idx]
+        acct.relayFee = fee
+        self.acctDB[idx] = acct
+
     def coinKey(self, cryptoKey):
         """
         Decrypt the coin-type extended key.
