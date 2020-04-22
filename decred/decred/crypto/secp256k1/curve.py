@@ -3,9 +3,27 @@ Copyright (c) 2019, Brian Stafford
 Copyright (c) 2019-2020, The Decred developers
 See LICENSE for details
 
-module curve
-    Pure Python secp256k1 curve implementation. Based entirely on the Decred
-    dcrd golang version.
+Pure Python secp256k1 curve implementation. Based entirely on the Decred
+dcrd golang version.
+
+References:
+  [SECG]: Recommended Elliptic Curve Domain Parameters
+    https://www.secg.org/sec2-v2.pdf
+
+  [GECC]: Guide to Elliptic Curve Cryptography (Hankerson, Menezes, Vanstone)
+
+  [SEC1] Elliptic Curve Cryptography
+    https://www.secg.org/sec1-v2.pdf
+
+  [SEC2] Recommended Elliptic Curve Domain Parameters
+    https://www.secg.org/sec2-v2.pdf
+
+  [ANSI X9.62-1998] Public Key Cryptography For The Financial Services
+    Industry: The Elliptic Curve Digital Signature Algorithm (ECDSA)
+
+All group operations are performed using Jacobian coordinates.  For a given
+(x, y) position on the curve, the Jacobian coordinates are (x1, y1, z1)
+where x = x1/z1^2 and y = y1/z1^3.
 """
 
 from decred import DecredError
@@ -30,10 +48,10 @@ def isEven(i):
 
 def NAF(k):
     """
-    NAF takes a positive integer k and returns the Non-Adjacent Form (NAF) as two
-    byte slices.  The first is where 1s will be.  The second is where -1s will
-    be.  NAF is convenient in that on average, only 1/3rd of its values are
-    non-zero.  This is algorithm 3.30 from [GECC].
+    NAF takes a positive integer k and returns the Non-Adjacent Form (NAF) as
+    two ByteArrays.  The first is where 1s will be.  The second is where -1s
+    will be.  NAF is convenient in that on average, only 1/3rd of its values
+    are non-zero.  This is algorithm 3.30 from [GECC].
 
     Essentially, this makes it possible to minimize the number of operations
     since the resulting ints returned will be at least 50% 0s.
@@ -99,12 +117,27 @@ def NAF(k):
 
 
 class PublicKey:
+    """
+    PublicKey provides facilities for efficiently working with secp256k1 public
+    keys within this module and includes methods to serialize in both
+    uncompressed and compressed SEC (Standards for Efficient Cryptography)
+    formats.
+    """
+
     def __init__(self, curve, x, y):
+        """
+        Since this accepts arbitrary x and y coordinates, it allows creation
+        of public keys that are not valid points on the secp256k1 curve.
+        """
         self.curve = curve
         self.x = x
         self.y = y
 
     def serializeCompressed(self):
+        """
+        serializeCompressed serializes a public key in the 33-byte compressed
+        format.
+        """
         fmt = PUBKEY_COMPRESSED
         if not isEven(self.y):
             fmt |= 0x1
@@ -134,6 +167,10 @@ class PublicKey:
 
 
 class PrivateKey:
+    """
+    PrivateKey stores a secp256k1 private key and its corresponding public key.
+    """
+
     def __init__(self, curve, k, x, y):
         self.key = k
         self.pub = PublicKey(curve, x, y)
@@ -163,6 +200,10 @@ def generateKey():
 
 
 class KoblitzCurve:
+    """
+    KoblitzCurve provides a secp256k1 Koblitz curve implementation.
+    """
+
     def __init__(
         self, P, N, B, Gx, Gy, BitSize, H, q, byteSize, lambda_, beta, a1, b1, a2, b2
     ):
@@ -184,9 +225,8 @@ class KoblitzCurve:
 
     def scalarBaseMult(self, k):
         """
-        scalarBaseMult returns k*G where G is the base point of the group and k is a
-        big endian integer.
-        Part of the elliptic.Curve interface.
+        scalarBaseMult returns k*G where G is the base point of the group and k
+        is a big-endian integer.
         """
         kb = ByteArray(k % self.N)
         diff = len(BytePoints) - len(kb)
@@ -206,30 +246,32 @@ class KoblitzCurve:
 
     def splitK(self, k):
         """
-        k: integer
+        Args:
+            k (int): A big-endian integer modulo the curve order.
 
-        splitK returns a balanced length-two representation of k and their signs.
-        This is algorithm 3.74 from [GECC].
+        splitK returns a balanced length-two representation of k and their
+        signs. This is algorithm 3.74 from [GECC].
 
-        One thing of note about this algorithm is that no matter what c1 and c2 are,
-        the final equation of k = k1 + k2 * lambda (mod n) will hold.  This is
-        provable mathematically due to how a1/b1/a2/b2 are computed.
+        One thing of note about this algorithm is that no matter what c1 and c2
+        are, the final equation of k = k1 + k2 * lambda (mod n) will hold.
+        This is provable mathematically due to how a1/b1/a2/b2 are computed.
         c1 and c2 are chosen to minimize the max(k1,k2).
         """
         # At some point, it might be useful to write something similar to
         # fieldVal but for N instead of P as the prime field if this ends up
         # being a bottleneck.
         # c1 = round(b2 * k / n) from step 4.
-        # Rounding isn't really necessary and costs too much, hence skipped
+        # Rounding isn't really necessary and costs too much, hence skipped.
         c1 = (self.b2 * k) // self.N
-        # c2 = round(b1 * k / n) from step 4 (sign reversed to optimize one step)
-        # Rounding isn't really necessary and costs too much, hence skipped
+        # c2 = round(b1 * k / n) from step 4 (sign reversed to optimize one
+        # step).
+        # Rounding isn't really necessary and costs too much, hence skipped.
         c2 = (self.b1 * k) // self.N
-        # k1 = k - c1 * a1 - c2 * a2 from step 5 (note c2's sign is reversed)
+        # k1 = k - c1 * a1 - c2 * a2 from step 5 (note c2's sign is reversed).
         tmp1 = c1 * self.a1
         tmp2 = c2 * self.a2
         k1 = k - tmp1 + tmp2
-        # k2 = - c1 * b1 - c2 * b2 from step 5 (note c2's sign is reversed)
+        # k2 = - c1 * b1 - c2 * b2 from step 5 (note c2's sign is reversed).
         tmp1 = c1 * self.b1
         tmp2 = c2 * self.b2
         k2 = tmp2 - tmp1
@@ -238,8 +280,7 @@ class KoblitzCurve:
 
     def scalarMult(self, Bx, By, k):
         """
-        scalarMult returns k*(Bx, By) where k is a big endian integer.
-        Part of the elliptic.Curve interface.
+        scalarMult returns k*(Bx, By) where k is a big-endian integer.
         """
         # Point Q = ∞ (point at infinity).
         fv = FieldVal
@@ -327,7 +368,7 @@ class KoblitzCurve:
                 k2BytePos = k2BytePos << 1
                 k2ByteNeg = k2ByteNeg << 1
 
-        # Convert the Jacobian coordinate field values back to affine big.Ints.
+        # Convert the Jacobian coordinate field values back to affine integers.
         return curve.fieldJacobianToBigAffine(qx, qy, qz)
 
     def publicKey(self, k):
@@ -337,41 +378,47 @@ class KoblitzCurve:
         x, y = self.scalarBaseMult(k)
         return PublicKey(self, x, y)
 
-    def parsePubKey(self, pubKeyStr):
+    def parsePubKey(self, pubKeyB):
         """
-        parsePubKey parses a public key for a koblitz curve from a bytestring
-        into a ecdsa.Publickey, verifying that it is valid. It supports
-        compressed and uncompressed signature formats, but not the hybrid
-        format.
-        """
-        if len(pubKeyStr) == 0:
-            raise DecredError("empty pubkey string")
+        parsePubKey parses a secp256k1 public key encoded according to the
+        format specified by ANSI X9.62-1998, which means it is also compatible
+        with the SEC (Standards for Efficient Cryptography) specification which
+        is a subset of the former.  In other words, it supports the
+        uncompressed and compressed formats as follows:
 
-        fmt = pubKeyStr[0]
+        Compressed:
+          <format byte = 0x02/0x03><32-byte X coordinate>
+        Uncompressed:
+          <format byte = 0x04><32-byte X coordinate><32-byte Y coordinate>
+
+        It does not support the hybrid format, however.
+        """
+        if len(pubKeyB) == 0:
+            raise DecredError("empty pubkey")
+
+        fmt = pubKeyB[0]
         ybit = (fmt & 0x1) == 0x1
         fmt &= 0xFF ^ 0x01
 
         ifunc = lambda b: int.from_bytes(b, byteorder="big")
 
-        pkLen = len(pubKeyStr)
+        pkLen = len(pubKeyB)
         if pkLen == PUBKEY_LEN:
             if PUBKEY_UNCOMPRESSED != fmt:
-                raise DecredError("invalid magic in pubkey str: %d" % pubKeyStr[0])
-            x = ifunc(pubKeyStr[1:33])
-            y = ifunc(pubKeyStr[33:])
+                raise DecredError("invalid magic in pubkey: %d" % pubKeyB[0])
+            x = ifunc(pubKeyB[1:33])
+            y = ifunc(pubKeyB[33:])
 
         elif pkLen == PUBKEY_COMPRESSED_LEN:
             # format is 0x2 | solution, <X coordinate>
             # solution determines which solution of the curve we use.
             # / y^2 = x^3 + Curve.B
             if PUBKEY_COMPRESSED != fmt:
-                raise DecredError(
-                    "invalid magic in compressed pubkey string: %d" % pubKeyStr[0]
-                )
-            x = ifunc(pubKeyStr[1:33])
+                raise DecredError("invalid magic in compressed pubkey: %d" % pubKeyB[0])
+            x = ifunc(pubKeyB[1:33])
             y = self.decompressPoint(x, ybit)
         else:  # wrong!
-            raise DecredError("invalid pub key length %d" % len(pubKeyStr))
+            raise DecredError("invalid pub key length %d" % len(pubKeyB))
 
         if x > self.P:
             raise DecredError("pubkey X parameter is >= to P")
@@ -386,12 +433,10 @@ class KoblitzCurve:
         decompressPoint decompresses a point on the given curve given
         the X point and the solution to use.
         """
-        # TODO(oga) This will probably only work for secp256k1 due to
-        # optimizations.
         # Y = +-sqrt(x^3 + B)
         x3 = x ** 3 + self.B
 
-        # now calculate sqrt mod p of x2 + B
+        # Now calculate sqrt mod p of x2 + B .
         # This code used to do a full sqrt based on tonelli/shanks,
         # but this was replaced by the algorithms referenced in
         # https://bitcointalk.org/index.php?topic=162805.msg1712294#msg1712294
@@ -403,7 +448,7 @@ class KoblitzCurve:
             raise DecredError("ybit doesn't match oddness")
         return y
 
-    def addJacobian(self, x1, y1, z1, x2, y2, z2, x3, y3, z3):  # *fieldVal) {
+    def addJacobian(self, x1, y1, z1, x2, y2, z2, x3, y3, z3):
         """
         addJacobian adds the passed Jacobian points (x1, y1, z1) and (x2, y2, z2)
         together and stores the result in (x3, y3, z3).
@@ -444,8 +489,7 @@ class KoblitzCurve:
 
     def add(self, x1, y1, x2, y2):
         """
-        add returns the sum of (x1,y1) and (x2,y2). Part of the elliptic.Curve
-        interface.
+        add returns the sum of (x1,y1) and (x2,y2).
         """
         # A point at infinity is the identity according to the group law for
         # elliptic curve cryptography.  Thus, ∞ + P = P and P + ∞ = P.
@@ -454,7 +498,7 @@ class KoblitzCurve:
         if x2 == 0 == 0 and y2 == 0:
             return x1, y1
 
-        # Convert the affine coordinates from big integers to field values
+        # Convert the affine coordinates from integers to field values
         # and do the point addition in Jacobian projective space.
         fx1, fy1 = curve.bigAffineToField(x1, y1)
         fx2, fy2 = curve.bigAffineToField(x2, y2)
@@ -463,17 +507,20 @@ class KoblitzCurve:
         fOne.setInt(1)
         self.addJacobian(fx1, fy1, fOne, fx2, fy2, fOne, fx3, fy3, fz3)
 
-        # Convert the Jacobian coordinate field values back to affine big
+        # Convert the Jacobian coordinate field values back to affine
         # integers.
         return self.fieldJacobianToBigAffine(fx3, fy3, fz3)
 
     def addZ1AndZ2EqualsOne(self, x1, y1, z1, x2, y2, x3, y3, z3):
         """
-        addZ1AndZ2EqualsOne adds two Jacobian points that are already known to have
-        z values of 1 and stores the result in (x3, y3, z3).  That is to say
-        (x1, y1, 1) + (x2, y2, 1) = (x3, y3, z3).  It performs faster addition than
-        the generic add routine since less arithmetic is needed due to the ability to
-        avoid the z value multiplications.
+        addZ1AndZ2EqualsOne adds two Jacobian points that are already known to
+        have z values of 1 and stores the result in (x3, y3, z3).  That is to
+        say (x1, y1, 1) + (x2, y2, 1) = (x3, y3, z3).  It performs faster
+        addition than the generic add routine since less arithmetic is needed
+        due to the ability to avoid the z value multiplications.
+
+        NOTE: The points must be normalized for this function to return the
+        correct result.  The resulting point will be normalized.
         """
         # To compute the point addition efficiently, this implementation splits
         # the equation into intermediate elements which are used to minimize
@@ -537,11 +584,14 @@ class KoblitzCurve:
 
     def addZ1EqualsZ2(self, x1, y1, z1, x2, y2, x3, y3, z3):
         """
-        addZ1EqualsZ2 adds two Jacobian points that are already known to have the
-        same z value and stores the result in (x3, y3, z3).  That is to say
-        (x1, y1, z1) + (x2, y2, z1) = (x3, y3, z3).  It performs faster addition than
-        the generic add routine since less arithmetic is needed due to the known
-        equivalence.
+        addZ1EqualsZ2 adds two Jacobian points that are already known to have
+        the same z value and stores the result in (x3, y3, z3).  That is to say
+        (x1, y1, z1) + (x2, y2, z1) = (x3, y3, z3).  It performs faster addition
+        than the generic add routine since less arithmetic is needed due to the
+        known equivalence.
+
+        NOTE: The points must be normalized for this function to return the
+        correct result.  The resulting point will be normalized.
         """
         # To compute the point addition efficiently, this implementation splits
         # the equation into intermediate elements which are used to minimize
@@ -605,14 +655,14 @@ class KoblitzCurve:
         x3.normalize()
         y3.normalize()
 
-    def addZ2EqualsOne(self, x1, y1, z1, x2, y2, x3, y3, z3):  # *fieldVal) {
+    def addZ2EqualsOne(self, x1, y1, z1, x2, y2, x3, y3, z3):
         """
         addZ2EqualsOne adds two Jacobian points when the second point is already
-        known to have a z value of 1 (and the z value for the first point is not 1)
-        and stores the result in (x3, y3, z3).  That is to say (x1, y1, z1) +
-        (x2, y2, 1) = (x3, y3, z3).  It performs faster addition than the generic
-        add routine since less arithmetic is needed due to the ability to avoid
-        multiplications by the second point's z value.
+        known to have a z value of 1 (and the z value for the first point is not
+        1) and stores the result in (x3, y3, z3).  That is to say (x1, y1, z1) +
+        (x2, y2, 1) = (x3, y3, z3).  It performs faster addition than the
+        generic add routine since less arithmetic is needed due to the ability
+        to avoid multiplications by the second point's z value.
         """
         # To compute the point addition efficiently, this implementation splits
         # the equation into intermediate elements which are used to minimize
@@ -691,9 +741,12 @@ class KoblitzCurve:
         """
         doubleZ1EqualsOne performs point doubling on the passed Jacobian point
         when the point is already known to have a z value of 1 and stores
-        the result in (x3, y3, z3).  That is to say (x3, y3, z3) = 2*(x1, y1, 1).  It
-        performs faster point doubling than the generic routine since less arithmetic
-        is needed due to the ability to avoid multiplication by the z value.
+        the result in (x3, y3, z3).  That is to say (x3, y3, z3) = 2*(x1, y1, 1).
+        It performs faster point doubling than the generic routine since less
+        arithmetic is needed due to the ability to avoid multiplication by the
+        z value.
+
+        NOTE: The resulting point will be normalized.
         """
         # This function uses the assumptions that z1 is 1, thus the point
         # doubling formulas reduce to:
@@ -744,8 +797,8 @@ class KoblitzCurve:
 
     def doubleJacobian(self, x1, y1, z1, x3, y3, z3):
         """
-        doubleJacobian doubles the passed Jacobian point (x1, y1, z1) and stores the
-        result in (x3, y3, z3).
+        doubleJacobian doubles the passed Jacobian point (x1, y1, z1) and
+        stores the result in (x3, y3, z3).
         """
         # Doubling a point at infinity is still infinity.
         if y1.isZero() or z1.isZero():
@@ -768,10 +821,14 @@ class KoblitzCurve:
 
     def addGeneric(self, x1, y1, z1, x2, y2, z2, x3, y3, z3):
         """
-        addGeneric adds two Jacobian points (x1, y1, z1) and (x2, y2, z2) without any
-        assumptions about the z values of the two points and stores the result in
-        (x3, y3, z3).  That is to say (x1, y1, z1) + (x2, y2, z2) = (x3, y3, z3).  It
-        is the slowest of the add routines due to requiring the most arithmetic.
+        addGeneric adds two Jacobian points (x1, y1, z1) and (x2, y2, z2)
+        without any assumptions about the z values of the two points and stores
+        the result in (x3, y3, z3).  That is to say (x1, y1, z1) + (x2, y2, z2)
+        = (x3, y3, z3).  It is the slowest of the add routines due to requiring
+        the most arithmetic.
+
+        NOTE: The points must be normalized for this function to return the
+        correct result.  The resulting point will be normalized.
         """
         # To compute the point addition efficiently, this implementation splits
         # the equation into intermediate elements which are used to minimize
@@ -847,10 +904,13 @@ class KoblitzCurve:
 
     def doubleGeneric(self, x1, y1, z1, x3, y3, z3):
         """
-        doubleGeneric performs point doubling on the passed Jacobian point without
-        any assumptions about the z value and stores the result in (x3, y3, z3).
-        That is to say (x3, y3, z3) = 2*(x1, y1, z1).  It is the slowest of the point
-        doubling routines due to requiring the most arithmetic.
+        doubleGeneric performs point doubling on the passed Jacobian point
+        without any assumptions about the z value and stores the result in
+        (x3, y3, z3). That is to say (x3, y3, z3) = 2*(x1, y1, z1).  It is the
+        slowest of the point doubling routines due to requiring the most
+        arithmetic.
+
+        NOTE: The resulting point will be normalized.
         """
         # Point doubling formula for Jacobian coordinates for the secp256k1
         # curve:
@@ -900,8 +960,8 @@ class KoblitzCurve:
 
     def fieldJacobianToBigAffine(self, x, y, z):
         """
-        fieldJacobianToBigAffine takes a Jacobian point (x, y, z) as field values and
-        converts it to an affine point as big integers.
+        fieldJacobianToBigAffine takes a Jacobian point (x, y, z) as field
+        values and converts it to an affine point as big integers.
         """
         # Inversions are expensive and both point addition and point doubling
         # are faster when working with points that have a z value of one.  So,
@@ -920,11 +980,16 @@ class KoblitzCurve:
         x.normalize()
         y.normalize()
 
-        # Convert the field values for the now affine point to big integers.
+        # Convert the field values for the now affine point to integers.
         return ByteArray(x.bytes()).int(), ByteArray(y.bytes()).int()
 
 
 def fromHex(hx):
+    """
+    fromHex converts the passed hex string into an integer.  This is only
+    meant for the hard-coded constants so errors in the source code can be
+    detected. It will (and must) only be called for initialization purposes.
+    """
     return int(hx, 16)
 
 
@@ -971,7 +1036,7 @@ class Curve(KoblitzCurve):
 
     def bigAffineToField(self, x, y):
         """
-        bigAffineToField takes an affine point (x, y) as big integers
+        bigAffineToField takes an affine point (x, y) as integers
         and converts it to an affine point as field values.
         """
         x3, y3 = FieldVal(), FieldVal()
@@ -992,24 +1057,6 @@ class Curve(KoblitzCurve):
         return y2 == x3
 
 
+# curve is a global instance of the KoblitzCurve that implements the curve
+# parameters.
 curve = Curve()
-
-
-def isJacobianOnS256Curve(x, y, z):
-    """
-    isJacobianOnS256Curve returns boolean if the point (x,y,z) is on the
-    secp256k1 curve.
-    Elliptic curve equation for secp256k1 is: y^2 = x^3 + 7
-    In Jacobian coordinates, Y = y/z^3 and X = x/z^2
-    Thus:
-    (y/z^3)^2 = (x/z^2)^3 + 7
-    y^2/z^6 = x^3/z^6 + 7
-    y^2 = x^3 + 7*z^6
-    """
-    fv = FieldVal
-    y2, z2, x3, result = fv(), fv(), fv(), fv()
-    y2.squareVal(y).normalize()
-    z2.squareVal(z)
-    x3.squareVal(x).mul(x)
-    result.squareVal(z2).mul(z2).mulInt(7).add(x3).normalize()
-    return y2.equals(result)
