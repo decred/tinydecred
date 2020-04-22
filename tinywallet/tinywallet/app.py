@@ -76,6 +76,7 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
         self.cfg = config.load()
         self.log = self.initLogging()
         self.wallet = None
+        self.assetScreen = None
         # trackedCssItems are CSS-styled elements to be updated if dark mode is
         # enabled/disabled.
         self.trackedCssItems = []
@@ -153,7 +154,7 @@ class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
         """
         Connected to the context menu "quit" option. Shut down TinyWallet.
         """
-        if hasattr(self, "assetScreen"):
+        if self.assetScreen:
             self.assetScreen.shutdown()
         self.qApp.quit()
 
