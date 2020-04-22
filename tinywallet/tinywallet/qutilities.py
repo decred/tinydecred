@@ -1,7 +1,7 @@
 """
 Copyright (c) 2019, Brian Stafford
-Copyright (c) 2019, the Decred developers
-See LICENSE for detail
+Copyright (c) 2019-2020, the Decred developers
+See LICENSE for details
 
 PyQt5 utilities.
 """
@@ -53,12 +53,13 @@ class ThreadUtilities:
         Create and start a `SmartThread`.
         A reference to the thread is stored in `self.threads` until it completes
 
-        :param function func: The function to run in the thread
-        :param function callback: A function to call when the thread has completed.
-            Any results returned by `func` will be passed as the first positional
-            argument.
-        :param list args: Positional arguments to pass to `func`
-        :param dict kwargs: Keyword arguments to pass to `func`
+        Args:
+            func (func): The function to run in the thread.
+            callback (func): A function to call when the thread has completed.
+                Any results returned by `func` will be passed as the first
+                positional argument.
+            args (tuple): Positional arguments to pass to `func`.
+            kwargs (dict): Keyword arguments to pass to `func`.
         """
         callback = callback if callback else lambda *a: None
         thread = SmartThread(func, callback, *args, **kwargs)
@@ -83,12 +84,11 @@ class SmartThread(QtCore.QThread):
     ):
         """
         Args:
-            func (function): The function to run in a separate thread.
-            callback (function): A function to receive the return value from
-            `func`.
-            *args: optional positional arguements to pass to `func`.
-            qtConnectType: Signal synchronisity.
-            **kwargs: optional keyword arguments to pass to `func`.
+            func (func): The function to run in a separate thread.
+            callback (func): A function to receive the return value from `func`.
+            *args (tuple): optional positional arguements to pass to `func`.
+            qtConnectType (type): Signal synchronisity.
+            **kwargs (dict): optional keyword arguments to pass to `func`.
         """
         super().__init__()
         self.func = func
@@ -106,9 +106,7 @@ class SmartThread(QtCore.QThread):
         try:
             self.returns = self.func(*self.args, **self.kwargs)
         except Exception as e:
-            log.error(
-                "exception encountered in QThread: %s" % helpers.formatTraceback(e)
-            )
+            log.error(f"exception encountered in QThread: {helpers.formatTraceback(e)}")
             self.returns = False
 
     def callitback(self):
@@ -173,7 +171,7 @@ class QConsole(QtWidgets.QPlainTextEdit):
 
     def append(self, text):
         """
-        Perform a little translation before posting
+        Perform a little translation before posting.
         """
         matches = re.findall(self.asciiStylePattern, text)
         spanCount = 0
@@ -187,7 +185,7 @@ class QConsole(QtWidgets.QPlainTextEdit):
                     if key in match:
                         styles += self.htmlMap[key]
                 if styles:
-                    text = text.replace(match, '<span style="%s">' % styles, 1)
+                    text = text.replace(match, f'<span style="{styles}">', 1)
                     spanCount += 1
         return super().appendHtml(text.replace("\n", "<br />"))
 
@@ -197,13 +195,13 @@ class QConsole(QtWidgets.QPlainTextEdit):
 
     def consoleScrollAction(self, action, mn=None, mx=None):
         """
-        Parse the action and set appropriate variables
+        Parse the action and set appropriate variables.
         """
         if action == "range.changed":
             if self.consoleState.scrollBottom:
                 self.consoleBar.setSliderPosition(mx)
         if action == "value.changed":
-            # mn is the current value, such as returned by sliderPosition
+            # mn is the current value, such as returned by sliderPosition.
             if mn == self.consoleBar.maximum():
                 self.consoleState.scrollBottom = True
             else:
@@ -328,15 +326,17 @@ class Toggle(QtWidgets.QAbstractButton):
 
 def makeWidget(widgetClass, layoutDirection="vertical", parent=None):
     """
-    The creates a tuple of (widget, layout), with layout of type specified with
+    Create a tuple of (widget, layout), with layout of type specified with
     layout direction.
     layout's parent will be widget. layout's alignment is set to top-left, and
-    margins are set to 0 on both layout and widget
+    margins are set to 0 on both layout and widget.
 
-    widgetClass (QtWidgets.QAbstractWidget:) The type of widget to make.
-    layoutDirection (str): optional. default "vertical". One of
-        ("vertical","horizontal","grid"). Determines the type of layout applied
-        to the widget.
+    Args:
+        widgetClass (QtWidgets.QAbstractWidget): The type of widget to make.
+        layoutDirection (str): optional. default "vertical". One of
+            (HORIZONTAL, VERTICAL, GRID). Determines the type of layout
+            applied to the widget.
+        parent (object): The parent.
     """
     widget = widgetClass(parent)
     widget.setContentsMargins(0, 0, 0, 0)
@@ -388,7 +388,7 @@ def makeColumn(*wgts, **kwargs):
 
 def addHoverColor(widget, color):
     """
-    Adds a background color on hover to the element
+    Adds a background color on hover to the element.
     """
     widget.setAutoFillBackground(True)
     p = widget.palette()
@@ -433,7 +433,7 @@ def makeLabel(s, fontSize, a=ALIGN_CENTER, **k):
         fontSize (int): Pixel size of the label font.
         a (Qt.QAlignment): The text alignment in the label.
             default QtCore.Qt.AlignCenter
-        **k: Additional keyword arguments to pass to setProperties.
+        **k (dict): Additional keyword arguments to pass to setProperties.
     """
     lbl = QtWidgets.QLabel(s)
     setProperties(lbl, fontSize=fontSize, **k)
@@ -446,7 +446,8 @@ def makeDropdown(choices):
     Create a QComboBox populated with choices.
 
     Args:
-        list(str/obj): The choices to display.
+        choices list(str/obj): The choices to display.
+
     Returns:
         QComboBox: An initiated QComboBox.
     """
@@ -488,11 +489,13 @@ def pad(wgt, t, r, b, l):
 
 def clearLayout(layout, delete=False):
     """
-    Clears all items from the given layout. Optionally deletes the parent widget
+    Clears all items from the given layout. Optionally deletes the parent
+    widget.
 
     Args:
-        layout (QAbstractLayout): Layout to clear
-        delete (bool): Default False. Whether or not to delete the widget as well
+        layout (QAbstractLayout): Layout to clear.
+        delete (bool): Default False. Whether or not to delete the widget as
+            well.
     """
     for i in reversed(range(layout.count())):
         widget = layout.itemAt(i).widget()
@@ -503,11 +506,10 @@ def clearLayout(layout, delete=False):
 
 def layoutWidgets(layout):
     """
-    generator to iterate the widgets in a layout
+    Generator to iterate the widgets in a layout.
 
     Args:
-        layout (QAbstractLayout): Layout to clear
-        delete (bool): Default False. Whether or not to delete the widget as well.
+        layout (QAbstractLayout): Layout to clear.
     """
     for i in range(layout.count()):
         yield layout.itemAt(i).widget()
