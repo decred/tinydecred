@@ -49,6 +49,21 @@ fieldPrimeWordZero = 0x3FFFC2F
 # internal field representation.  It is used during negation.
 fieldPrimeWordOne = 0x3FFFFBF
 
+# The secp256k1 prime is equivalent to 2^256 - 4294968273.
+# 4294968273 in field representation (base 2^26) is:
+# n[0] = 977
+# n[1] = 64
+# That is to say (2^26 * 64) + 977 = 4294968273
+# Since each word is in base 26, the upper terms (t10 and up) start
+# at 260 bits (versus the final desired range of 256 bits), so the
+# field representation of 'c' from above needs to be adjusted for the
+# extra 4 bits by multiplying it by 2^4 = 16.  4294968273 * 16 =
+# 68719492368.  Thus, the adjusted field representation of 'c' is:
+# n[0] = 977 * 16 = 15632
+# n[1] = 64 * 16 = 1024
+# That is to say (2^26 * 1024) + 15632 = 68719492368
+primePartBy16 = 68719492368
+
 
 class FieldVal:
     """
@@ -144,9 +159,9 @@ class FieldVal:
         field value representation.  Only the first 32-bytes are used.
 
         The field value is returned to support chaining, enabling syntax like:
-            f = FieldVal.fromHex("0abc").add(1)
+            f = FieldVal.fromHex("abc").add(1)
         so that:
-            f = 0x0abc + 1
+            f = 0xabc + 1
 
         Args:
             hexString (str): the hex string to be used as field value.
@@ -221,16 +236,11 @@ class FieldVal:
 
     def setBytes(self, b):
         """
-        SetBytes packs the passed 32-byte big-endian value into the internal
+        setBytes packs the passed 32-byte big-endian value into the internal
         field value representation.
 
-        The field value is returned to support chaining, enabling syntax like:
-            f = FieldVal().setBytes(b).mul(f2)
-        so that:
-            f = b * f2
-
         Preconditions: None
-        Output Normalized: Yes
+        Output Normalized: Yes if no overflow, no otherwise
         Output Max Magnitude: 1
 
         Args:
@@ -763,7 +773,7 @@ class FieldVal:
         t7 = m & fieldBaseMask
         m = (m >> fieldBase) + t8 + t17 * 1024 + t18 * 15632
         t8 = m & fieldBaseMask
-        m = (m >> fieldBase) + t9 + t18 * 1024 + t19 * 68719492368
+        m = (m >> fieldBase) + t9 + t18 * 1024 + t19 * primePartBy16
         t9 = m & fieldMSBMask
         m = m >> fieldMSBBits
 
@@ -1144,7 +1154,7 @@ class FieldVal:
         t7 = m & fieldBaseMask
         m = (m >> fieldBase) + t8 + t17 * 1024 + t18 * 15632
         t8 = m & fieldBaseMask
-        m = (m >> fieldBase) + t9 + t18 * 1024 + t19 * 68719492368
+        m = (m >> fieldBase) + t9 + t18 * 1024 + t19 * primePartBy16
         t9 = m & fieldMSBMask
         m = m >> fieldMSBBits
 
@@ -1268,7 +1278,7 @@ class FieldVal:
 
     def bytes(self):
         """
-        bytes unpacks the field value to a 32-byte big-endian ByteArray.  See
+        bytes unpacks the field value to a 32-byte big-endian bytearray.  See
         putBytes for a variant that allows a bytearray to be passed, which can
         be useful to cut down on the number of allocations by allowing the
         caller to reuse a bytearray.
@@ -1277,9 +1287,9 @@ class FieldVal:
           - The field value MUST be normalized.
 
         Return:
-            ByteArray: the field value converted to a 32-byte ByteArray.
+            bytearray: the field value converted to a 32-byte bytearray.
         """
-        b = ByteArray(0, length=32)
+        b = bytearray(32)
         self.putBytes(b)
         return b
 
