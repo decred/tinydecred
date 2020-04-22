@@ -194,9 +194,6 @@ class TinyDialog(QtWidgets.QFrame):
             QtCore.Qt.TextWordWrap | QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop
         )
 
-    def showEvent(self, e):
-        pass
-
     def closeEvent(self, e):
         self.hide()
         e.ignore()
@@ -831,8 +828,7 @@ class PasswordDialog(Screen):
         on form submission.
 
         Args:
-            callback (func(str, ...)): A function to receive the user's
-                password.
+            callback (func(str)): A function to receive the user's password.
             prompt (str): optional. The text to display above the password
                 field.
 
@@ -2357,10 +2353,8 @@ class StakingScreen(Screen):
             app.appWindow.showError("revoke tickets finished with error")
             return
         n = self.revocableTicketsCount
-        plural = ""
         if n > 0:
-            if n > 1:
-                plural = "s"
+            plural = "s" if n > 1 else ""
             app.appWindow.showSuccess(f"revoked {n} ticket{plural}")
             self.revocableTicketsCount = 0
         self.revokeBtn.hide()
