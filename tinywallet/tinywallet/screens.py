@@ -21,36 +21,30 @@ from decred.dcr.blockchain import LocalNode
 from decred.dcr.txscript import DefaultRelayFeePerKb
 from decred.dcr.vsp import VotingServiceProvider
 from decred.util import chains, database, helpers
+from decred.util.helpers import formatTraceback
 from decred.wallet.wallet import Wallet
-from tinywallet.config import DB
 
 from . import config, qutilities as Q, ui
+from .config import DB
+from .ui import SMALL, TINY
 
 
 UI_DIR = os.path.dirname(os.path.realpath(__file__))
 log = helpers.getLogger("APPUI")
 cfg = config.load()
 
-# Some commonly used ui constants.
-TINY = ui.TINY
-SMALL = ui.SMALL
-MEDIUM = ui.MEDIUM
-LARGE = ui.LARGE
-
 # A key to identify the screen fade in animation.
 FADE_IN_ANIMATION = "fadeinanimation"
-
-formatTraceback = helpers.formatTraceback
 
 app = None
 
 
 def openInBrowser(url):
     """
-    Open url in the users browser
+    Open a URL in the user's browser.
 
     Args:
-        url (string): the url to open.
+        url (string): the URL to open.
     """
     webbrowser.open(url, new=2)
 
@@ -63,10 +57,10 @@ def sprintDcr(atoms, comma=""):
         atoms (int): Amount of dcr in atoms to convert to coins.
         comma (str): Separator to add to the end of the string.
 
-    returns:
-        str: Formatted dcr amount
+    Returns:
+        str: Formatted dcr amount.
     """
-    return "{:.2f} dcr{}".format(atoms / 1e8, comma)
+    return f"{atoms / 1e8:.2f} dcr{comma}"
 
 
 def sprintAmount(thing):
@@ -76,24 +70,22 @@ def sprintAmount(thing):
     Args:
         thing (str): The thing to stringify amounts for.
 
-    returns:
+    Returns:
         func(int, str)str: Function to stringify amounts of thing.
     """
-    return lambda n, comma="": "{} {}{}{}".format(
-        n, thing, "" if n == 1 else "s", comma
-    )
+    return lambda n, comma="": f"{n} {thing}{'' if n == 1 else 's'}{comma}"
 
 
 def blksLeftStakeWindow(height, netParams):
     """
     Return the number of blocks until the next stake difficulty change.
 
-        Args:
-            height (int): Block height to find remaining blocks from.
-            netParams (module): The network parameters.
+    Args:
+        height (int): Block height to find remaining blocks from.
+        netParams (module): The network parameters.
 
-        Returns:
-            int: The number of blocks left in the current window.
+    Returns:
+        int: The number of blocks left in the current window.
     """
     window = netParams.StakeDiffWindowSize
     # Add one to height, to account for the genesis block.
@@ -162,7 +154,7 @@ class TinyDialog(QtWidgets.QFrame):
         self.mainLayout.addWidget(menuBar)
         menuBar.setFixedHeight(TinyDialog.topMenuHeight)
 
-        # A little spinner that it shown while the wallet is locked.
+        # A little spinner shown while the wallet is locked.
         self.working = Spinner(20, 3, 0)
         self.working.setVisible(False)
         self.working.setFixedSize(20, 20)
@@ -190,7 +182,7 @@ class TinyDialog(QtWidgets.QFrame):
         w, self.layout = Q.makeWidget(QtWidgets.QWidget, "vertical", self)
         self.mainLayout.addWidget(w)
 
-        # Some styling for the callout
+        # Some styling for the callout.
         self.msg = None
         self.borderPen = QtGui.QPen()
         self.borderPen.setWidth(1)
@@ -201,14 +193,6 @@ class TinyDialog(QtWidgets.QFrame):
         self.textFlags = (
             QtCore.Qt.TextWordWrap | QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop
         )
-
-    def showEvent(self, e):
-        # geo = app.sysTray.geometry()
-        # print("sysTray.x: %r" % repr(geo.x()))
-        # print("sysTray.y: %r" % repr(geo.y()))
-        # print("sysTray.width: %r" % repr(geo.width()))
-        # print("sysTray.height: %r" % repr(geo.height()))
-        pass
 
     def closeEvent(self, e):
         self.hide()
@@ -221,7 +205,7 @@ class TinyDialog(QtWidgets.QFrame):
         for wgt in Q.layoutWidgets(self.layout):
             wgt.setVisible(False)
         self.layout.addWidget(w)
-        # log.debug("stack setting top screen to %s" % type(w).__name__)
+        # log.debug(f"stack setting top screen to {type(w).__name__}")
         w.runAnimation(FADE_IN_ANIMATION)
         w.setVisible(True)
         self.setIcons(w)
@@ -234,7 +218,7 @@ class TinyDialog(QtWidgets.QFrame):
         only pop if that is the top screen.
 
         Args:
-            screen (Screen): optional. The the particular screen to pop.
+            screen (Screen): optional. The particular screen to pop.
         """
         widgetList = list(Q.layoutWidgets(self.layout))
         if len(widgetList) < 2:
@@ -289,7 +273,7 @@ class TinyDialog(QtWidgets.QFrame):
     def closeClicked(self):
         """
         User has clicked close. Since TinyWallet is a system tray application,
-        the window and it's application panel icon are hidden, but the
+        the window and its application panel icon are hidden, but the
         application does not close.
         """
         self.hide()
@@ -312,7 +296,7 @@ class TinyDialog(QtWidgets.QFrame):
 
     def showSuccess_(self, msg):
         """
-        Show an success message with a light green background.
+        Show a success message with a light green background.
 
         Args:
             msg (str): The success message.
@@ -339,7 +323,7 @@ class TinyDialog(QtWidgets.QFrame):
 
     def paintEvent(self, e):
         """
-        Paint the callout in the appropriate place
+        Paint the callout in the appropriate place.
         """
         super().paintEvent(e)
 
@@ -376,7 +360,7 @@ class TinyDialog(QtWidgets.QFrame):
 class Screen(QtWidgets.QWidget):
     """
     Screen is all the user sees in the main application window. All UI widgets
-    should inherit Screen.
+    should inherit from Screen.
     """
 
     def __init__(self):
@@ -393,8 +377,8 @@ class Screen(QtWidgets.QWidget):
         self.canGoHome = True
         self.animations = {}
 
-        # The layout the that child will use is actually a 2nd descendent of the
-        # primary Screen layout. Stretches are used to center a widget
+        # The layout that the child will use is actually a 2nd descendent of
+        # the primary Screen layout. Stretches are used to center a widget
         # regardless of size.
         vLayout = QtWidgets.QVBoxLayout(self)
         vLayout.addStretch(1)
@@ -425,18 +409,18 @@ class Screen(QtWidgets.QWidget):
             v (bool): If True, run the fade-in animation when its trigger is
                 received. False will disable the animation.
         """
-        if v:
-            effect = QtWidgets.QGraphicsOpacityEffect(self)
-            self.animations[FADE_IN_ANIMATION] = a = QtCore.QPropertyAnimation(
-                effect, b"opacity"
-            )
-            a.setDuration(550)
-            a.setStartValue(0)
-            a.setEndValue(1)
-            a.setEasingCurve(QtCore.QEasingCurve.OutQuad)
-            self.setGraphicsEffect(effect)
-        else:
+        if not v:
             self.animations.pop(FADE_IN_ANIMATION, None)
+            return
+        effect = QtWidgets.QGraphicsOpacityEffect(self)
+        self.animations[FADE_IN_ANIMATION] = a = QtCore.QPropertyAnimation(
+            effect, b"opacity"
+        )
+        a.setDuration(550)
+        a.setStartValue(0)
+        a.setEndValue(1)
+        a.setEasingCurve(QtCore.QEasingCurve.OutQuad)
+        self.setGraphicsEffect(effect)
 
     def stacked(self):
         """
@@ -679,7 +663,7 @@ class AccountScreen(Screen):
         if val <= 0:
             app.appWindow.showError("value can't be <= 0")
 
-        log.debug("sending %f to %s" % (val, address))
+        log.debug(f"sending {val} to {address}")
 
         def send():
             try:
@@ -687,7 +671,7 @@ class AccountScreen(Screen):
                     int(round(val * 1e8)), address
                 )  # raw transaction
             except Exception as e:
-                log.error("failed to send: %s" % formatTraceback(e))
+                log.error(f"failed to send: {formatTraceback(e)}")
             return False
 
         def sent(res):
@@ -711,7 +695,7 @@ class AccountScreen(Screen):
         Changes and saves the name of the account.
 
         Args:
-            str: The new account name.
+            newName (str): The new account name.
         """
         self.account.name = newName
         self.acctMgr.saveAccount(self.account.idx)
@@ -759,10 +743,6 @@ class PasswordDialog(Screen):
     """
 
     def __init__(self):
-        """
-        Args:
-            app (TinyWallet): The TinyWallet application instance.
-        """
         super().__init__()
         content, mainLayout = Q.makeWidget(QtWidgets.QWidget, Q.VERTICAL)
         self.layout.addWidget(Q.pad(content, 20, 20, 20, 20))
@@ -837,7 +817,7 @@ class PasswordDialog(Screen):
 
     def done(self, e=None):
         """
-        Connected to the submit buttons clicked signal. Call the callback
+        Connected to the submit button's clicked signal. Call the callback
         function with the current password field text.
         """
         self.callback(self.pwInput.text())
@@ -848,12 +828,12 @@ class PasswordDialog(Screen):
         on form submission.
 
         Args:
-            callback (func(str, ...)): A function to receive the users password.
+            callback (func(str)): A function to receive the user's password.
             prompt (str): optional. The text to display above the password
                 field.
 
         Returns:
-            self: The PasswordDialog itself is returned as a convenience.
+            self: The PasswordDialog itself as a convenience.
         """
         self.promptText = prompt
         self.callback = callback
@@ -886,8 +866,8 @@ class Clicker:
 
     def mouseMoveEvent(self, e):
         """
-        When the mouse is moved, check whether the mouse is within the bounds of
-        the label. If not, set mouseDown to False. The user must click and
+        When the mouse is moved, check whether the mouse is within the bounds
+        of the label. If not, set mouseDown to False. The user must click and
         release without the mouse leaving the label to trigger the callback.
         """
         if self.mouseDown is False:
@@ -909,8 +889,8 @@ class ClickyLabel(Clicker, QtWidgets.QLabel):
         Args:
             callback (func): A callback function to be called when the label
                 is clicked.
-            *a: Any additional arguments are passed directly to the parent
-                QLabel constructor.
+            *a (tuple): Any additional arguments are passed directly to the
+                parent QLabel constructor.
         """
         QtWidgets.QLabel.__init__(self, *a)
         Clicker.__init__(self, callback)
@@ -923,10 +903,6 @@ class InitializationScreen(Screen):
     """
 
     def __init__(self):
-        """
-        Args:
-            app (TinyWallet): The TinyWallet application instance.
-        """
         super().__init__()
         self.canGoHome = False
         self.layout.setSpacing(20)
@@ -964,14 +940,14 @@ class InitializationScreen(Screen):
         Args:
             pw (str): A user supplied password string.
         """
-        # either way, pop the password window
+        # Either way, pop the password window.
         def create():
             try:
                 app.dcrdata.connect()
                 words, wallet = Wallet.create(app.walletFilename(), pw, cfg.netParams)
                 return words, wallet
             except Exception as e:
-                log.error("failed to create wallet: %s" % formatTraceback(e))
+                log.error(f"failed to create wallet: {formatTraceback(e)}")
 
         app.waitThread(create, self.finishInit)
 
@@ -998,8 +974,9 @@ class InitializationScreen(Screen):
         if fd.exec_():
             fileNames = fd.selectedFiles()
             if len(fileNames) != 1:
-                log.error("More than 1 file selected for importing")
-                raise Exception("More than 1 file selected for importing")
+                msg = "more than one file selected for importing"
+                log.error(msg)
+                raise Exception(msg)
         else:
             raise Exception("no file selected")
         walletPath = fileNames[0]
@@ -1051,7 +1028,7 @@ class AssetControl:
 
 class AssetScreen(Screen):
     """
-    AssetScreen is screen for choosing one account out of many, or changing
+    AssetScreen is a screen for choosing one account out of many, or changing
     asset-level settings.
     """
 
@@ -1088,8 +1065,7 @@ class AssetScreen(Screen):
         logo = SVGWidget(DCR.LOGO, h=25)
         lbl = Q.makeLabel("Decred", 25, fontFamily="Roboto Medium")
         gear = SVGWidget("gear", h=20, click=self.gearClicked)
-        # Gear icon will lead to an asset settings screen. Hide for now.
-        # gear.setVisible(False)
+        # Gear icon will lead to an asset settings screen.
         wgt, _ = Q.makeSeries(Q.HORIZONTAL, logo, lbl, Q.STRETCH, gear,)
         self.layout.addWidget(wgt)
 
@@ -1203,7 +1179,9 @@ class AssetScreen(Screen):
         app.withCryptoKey(withCK4dcrd, done, prompt="Enter password to connect to dcrd")
 
     def stackDcrd(self, e=None):
-        """Connected to the dcrd indicator light."""
+        """
+        Connected to the dcrd indicator light.
+        """
         app.appWindow.stack(self.settingsScreen.dcrdConfigScreen)
 
     def doButtons(self, idx=None):
@@ -1277,7 +1255,9 @@ class AssetScreen(Screen):
 
 
 class AssetSettingsScreen(Screen):
-    """A screen to adjust asset-specific settings."""
+    """
+    A screen to adjust asset-specific settings.
+    """
 
     def __init__(self, ctl):
         """
@@ -1321,7 +1301,8 @@ class AssetSettingsScreen(Screen):
 
         # Add a button that allows connecting to a local dcrd RPC server.
         lbl = Q.makeLabel(
-            "The wallet is faster and more secure when connected directly to a dcrd RPC server.",
+            "The wallet is faster and more secure when"
+            " connected directly to a dcrd RPC server.",
             14,
             Q.ALIGN_LEFT,
         )
@@ -1338,7 +1319,9 @@ class AssetSettingsScreen(Screen):
         self.layout.addStretch(1)
 
     def shutdown(self):
-        """Called when the application is shut down."""
+        """
+        Called when the application is shut down.
+        """
         self.dcrdConfigScreen.shutdown()
 
     def dcrdataChangeClicked(self, e=None):
@@ -1380,9 +1363,14 @@ class AssetSettingsScreen(Screen):
 
 
 class DCRDConfigScreen(Screen):
-    """A screen to adjust dcrd-specific settings."""
+    """
+    A screen to adjust dcrd-specific settings.
+    """
 
-    foundMsg = "A dcrd RPC server was found with these settings. Would you like to use this server?"
+    foundMsg = (
+        "A dcrd RPC server was found with these settings."
+        " Would you like to use this server?"
+    )
     notFoundMsg = "Enter your dcrd connection details."
 
     def __init__(self, ctl):
@@ -1442,7 +1430,7 @@ class DCRDConfigScreen(Screen):
         defaultRpclisten = f"127.0.0.1:{nets.DcrdPorts[cfg.netParams.Name]}"
         host = nodeConfig.get("rpclisten", defaultRpclisten)
 
-        self.rpcListen = QtWidgets.QLineEdit(f"https://{host}")
+        self.rpcListen = QtWidgets.QLineEdit(f"https://{host}/")
         grid.addWidget(self.rpcListen, row, 0, 1, 3)
         self.rpcUser = QtWidgets.QLineEdit(nodeConfig.get("rpcuser", ""))
         grid.addWidget(self.rpcUser, row, 3)
@@ -1519,7 +1507,9 @@ class DCRDConfigScreen(Screen):
         self.layout.addStretch(1)
 
     def shutdown(self):
-        """Shut down any stored temporary LocalNode."""
+        """
+        Shut down any stored temporary LocalNode.
+        """
         self.dumpTempNode()
 
     def stacked(self):
@@ -1568,8 +1558,8 @@ class DCRDConfigScreen(Screen):
 
             except Exception as e:
                 log.debug(
-                    "Auto-location attempt failed to connect (not an error): %s"
-                    % formatTraceback(e)
+                    "Auto-location attempt failed to connect"
+                    f" (not an error): {formatTraceback(e)}"
                 )
 
         app.waitThread(tryConnect, receiveNode)
@@ -1614,9 +1604,9 @@ class DCRDConfigScreen(Screen):
             self.connectedWgt.setVisible(True)
             self.hostLbl.setText(ctl.settings[DB.rpchost].decode())
             if node and node.connected():
-                self.connectedLbl.setText(f"Connected to dcrd")
+                self.connectedLbl.setText("Connected to dcrd")
             else:
-                self.connectedLbl.setText(f"Connection to dcrd is currently off")
+                self.connectedLbl.setText("Connection to dcrd is currently off")
         else:
             self.remoteForm.setVisible(True)
             self.connectedWgt.setVisible(False)
@@ -1787,14 +1777,18 @@ class DCRDConfigScreen(Screen):
         )
 
     def showPwClicked(self, e=None):
-        """Connected to the eye icon. Sets echo mode to normal."""
+        """
+        Connected to the eye icon. Sets echo mode to normal.
+        """
         self.showPw.setVisible(False)
         self.hidePw.setVisible(True)
         self.rpcPass.setEchoMode(QtWidgets.QLineEdit.Normal)
         self.rpcPass.setStyleSheet("QLineEdit{font-size:14px;}")
 
     def hidePwClicked(self, e=None):
-        """Connected to the crossed eye icon. Sets echo mode to password."""
+        """
+        Connected to the crossed eye icon. Sets echo mode to password.
+        """
         self.showPw.setVisible(True)
         self.hidePw.setVisible(False)
         self.rpcPass.setEchoMode(QtWidgets.QLineEdit.Password)
@@ -2021,8 +2015,7 @@ class NewAccountScreen(Screen):
                 return acct
             except Exception as e:
                 log.error(
-                    "exception encountered while adding account: %s"
-                    % formatTraceback(e)
+                    f"exception encountered while adding account: {formatTraceback(e)}"
                 )
 
         app.withCryptoKey(runCreateAcct, doneCreateAcct)
@@ -2060,8 +2053,8 @@ class MnemonicScreen(Screen):
         # Some instructions for the user. It is critical that they copy the seed
         # now, as it can't be regenerated.
         self.lbl = Q.makeLabel(
-            "Copy these words carefully and keep them somewhere secure. "
-            "You will not have this chance again.",
+            "Copy these words carefully and keep them somewhere secure."
+            " You will not have this chance again.",
             16,
         )
         self.lbl.setWordWrap(True)
@@ -2085,7 +2078,7 @@ class MnemonicScreen(Screen):
         # A button that must be clicked to pop the screen.
         button = app.getButton(
             SMALL, "all done", tracked=False
-        )  # the mnemonic screen is not persistent. Don't track this button.
+        )  # The mnemonic screen is not persistent. Don't track this button.
         self.layout.addWidget(button)
         button.clicked.connect(self.clearAndClose)
 
@@ -2135,7 +2128,7 @@ class MnemonicRestorer(Screen):
         # The user must click the button to submit.
         button = app.getButton(
             SMALL, "OK", tracked=False
-        )  # the mnemonic screen is not persistent. Don't track this button.
+        )  # The mnemonic screen is not persistent. Don't track this button.
         self.layout.addWidget(button)
         button.clicked.connect(self.tryWords)
 
@@ -2168,12 +2161,12 @@ class MnemonicRestorer(Screen):
                 )
                 return wallet
             except Exception as e:
-                log.error("failed to create wallet: %s" % formatTraceback(e))
+                log.error(f"failed to create wallet: {formatTraceback(e)}")
 
         def withpw(pw):
             app.waitThread(create, finish, pw)
 
-        app.getPassword(withpw, prompt="Create a walllet password")
+        app.getPassword(withpw, prompt="Create a wallet password")
 
 
 class StakingScreen(Screen):
@@ -2205,7 +2198,7 @@ class StakingScreen(Screen):
         # Register for signals.
         app.registerSignal(ui.BALANCE_SIGNAL, self.balanceSet)
 
-        # ticket price is a single row reading `Ticket Price: XX.YY DCR`.
+        # Ticket price is a single row reading `Ticket Price: XX.YY DCR`.
         lbl = Q.makeLabel("Ticket Price: ", 16)
         self.lastPrice = None
         self.lastPriceStamp = 0
@@ -2215,7 +2208,7 @@ class StakingScreen(Screen):
         self.layout.addWidget(priceWgt)
 
         # Current holdings is a single row that reads `Currently staking X
-        # tickets worth YY.ZZ DCR`
+        # tickets worth YY.ZZ DCR`.
         lbl = Q.makeLabel("Currently staking", 14)
         self.ticketCount = Q.makeLabel("", 18, fontFamily="Roboto Bold")
         lbl2 = Q.makeLabel("tickets worth", 14)
@@ -2320,7 +2313,7 @@ class StakingScreen(Screen):
 
     def checkRevocable(self):
         """
-        On SYNC_SIGNAL signal hide or show revoke button based on wether or not
+        On SYNC_SIGNAL hide or show revoke button based on whether or not
         we have revocable tickets.
         """
         acct = self.account
@@ -2345,7 +2338,7 @@ class StakingScreen(Screen):
                 self.account.revokeTickets()
                 return True
             except Exception as e:
-                log.error("revoke tickets error: %s" % formatTraceback(e))
+                log.error(f"revoke tickets error: {formatTraceback(e)}")
                 return False
             finally:
                 app.emitSignal(ui.DONE_SIGNAL)
@@ -2356,17 +2349,15 @@ class StakingScreen(Screen):
         """
         revokeTickets callback. Prints success or failure to the screen.
         """
-        if success:
-            n = self.revocableTicketsCount
-            plural = ""
-            if n > 0:
-                if n > 1:
-                    plural = "s"
-                app.appWindow.showSuccess("revoked {} ticket{}".format(n, plural))
-                self.revocableTicketsCount = 0
-            self.revokeBtn.hide()
-        else:
+        if not success:
             app.appWindow.showError("revoke tickets finished with error")
+            return
+        n = self.revocableTicketsCount
+        if n > 0:
+            plural = "s" if n > 1 else ""
+            app.appWindow.showSuccess(f"revoked {n} ticket{plural}")
+            self.revocableTicketsCount = 0
+        self.revokeBtn.hide()
 
     def setStats(self):
         """
@@ -2375,7 +2366,7 @@ class StakingScreen(Screen):
         acct = self.account
         stats = acct.ticketStats()
         self.ticketCount.setText(str(stats.count))
-        self.ticketValue.setText("%.2f" % (stats.value / 1e8))
+        self.ticketValue.setText(f"{stats.value / 1e8:.2f}")
         stakePool = acct.stakePool()
         if stakePool:
             self.currentPool.setText(stakePool.url)
@@ -2390,7 +2381,7 @@ class StakingScreen(Screen):
             try:
                 return blockchain.stakeDiff() / 1e8
             except Exception as e:
-                log.error("error fetching ticket price: %s" % e)
+                log.error(f"error fetching ticket price: {e}")
                 return False
 
         app.makeThread(getTicketPrice, self.ticketPriceCB, self.blockchain)
@@ -2406,14 +2397,13 @@ class StakingScreen(Screen):
             return
         self.lastPrice = ticketPrice
         self.lastPriceStamp = int(time.time())
-        self.ticketPrice.setText("%.2f" % ticketPrice)
-        self.ticketPrice.setToolTip("%.8f" % ticketPrice)
+        self.ticketPrice.setText(f"{ticketPrice:.2f}")
+        self.ticketPrice.setToolTip(f"{ticketPrice:.8f}")
         self.setBuyStats()
 
     def balanceSet(self, balance):
         """
-        Connected to the BALANCE_SIGNAL signal. Sets the balance and updates
-        the display.
+        Connected to BALANCE_SIGNAL. Sets the balance and updates the display.
 
         Args:
             balance (account.Balance): The current account balance.
@@ -2442,7 +2432,7 @@ class StakingScreen(Screen):
             return
         qty = int(qtyStr)
         if qty > self.balance.available / 1e8 / self.lastPrice:
-            app.appWindow.showError("can't afford %d tickets" % qty)
+            app.appWindow.showError(f"can't afford {qty} tickets")
 
         def done(txs):
             if txs is None:
@@ -2456,9 +2446,9 @@ class StakingScreen(Screen):
             withUnlockedAccount(self.account, do, done)
 
         app.confirm(
-            "Are you sure you want to purchase %d ticket(s) for %.2f DCR? "
-            "Once purchased, these funds will be locked"
-            " until your tickets vote or expire." % (qty, qty * self.lastPrice),
+            f"Are you sure you want to purchase {qty} ticket(s) for"
+            f" {qty * self.lastPrice:.2f} DCR? Once purchased, these funds"
+            " will be locked until your tickets vote or expire.",
             step,
         )
 
@@ -2468,7 +2458,6 @@ class StakingScreen(Screen):
         work to the open Account.
 
         Args:
-            wallet (Wallet): The open wallet.
             qty (int): The number of tickets to purchase.
 
         Returns:
@@ -2477,7 +2466,7 @@ class StakingScreen(Screen):
         txs = self.account.purchaseTickets(qty, self.lastPrice)
         if txs:
             app.home()
-        app.appWindow.showSuccess("bought %s tickets" % qty)
+        app.appWindow.showSuccess(f"bought {qty} tickets")
         return txs
 
     def poolAuthed(self, res):
@@ -2499,10 +2488,6 @@ class LiveTicketsScreen(Screen):
     """
 
     def __init__(self):
-        """
-        Args:
-            app (TinyDecred): The TinyDecred application instance.
-        """
         super().__init__()
         self.isPoppable = True
         self.canGoHome = True
@@ -2541,17 +2526,15 @@ class LiveTicketsScreen(Screen):
         """
         self.liveTickets = liveTickets
         self.ticketsWgt.clear()
-        self.ticketsWgt.addItems(
-            [
-                "{}... {}".format(
-                    k,
-                    " @ height {}".format(utxo.height)
-                    if utxo.height > -1
-                    else " unconfirmed",
-                )
-                for k, utxo in self.liveTickets.items()
-            ]
-        )
+        msgs = []
+        for k, utxo in self.liveTickets.items():
+            if utxo.height > -1:
+                tail = f" @ height {utxo.height}"
+            else:
+                tail = " unconfirmed"
+            msg = f"{k}... {tail}"
+            msgs.append(msg)
+        self.ticketsWgt.addItems(msgs)
 
 
 class StakeStatsScreen(Screen):
@@ -2562,7 +2545,7 @@ class StakeStatsScreen(Screen):
     def __init__(self, acct):
         """
         Args:
-            app (TinyDecred): The TinyDecred application instance.
+            acct (Account): A Decred account.
         """
         super().__init__()
         self.isPoppable = True
@@ -2573,10 +2556,10 @@ class StakeStatsScreen(Screen):
 
         self.updatingLock = threading.Lock()
 
-        # live and immature tickets, viewable on dcrdata
+        # Live and immature tickets, viewable on dcrdata.
         self.liveTickets = {}
 
-        # keep track of last update and update if past LIFE
+        # Keep track of last update and update if past LIFE.
         self.lastUpdated = time.time()
         self.LIFE = DCR.HOUR
 
@@ -2587,7 +2570,7 @@ class StakeStatsScreen(Screen):
         self.wgt.setMinimumWidth(400)
         self.wgt.setMinimumHeight(225)
 
-        # header and a button to show live tickets
+        # Header and a button to show live tickets.
         lbl = Q.makeLabel("Staking", 18)
         self.liveTicketsListBtn = btn = app.getButton(TINY, "live tickets")
         btn.clicked.connect(lambda: app.appWindow.stack(self.liveTicketsScreen))
@@ -2595,7 +2578,7 @@ class StakeStatsScreen(Screen):
         self.layout.addWidget(wgt)
         btn.hide()
 
-        # network statistics
+        # Network statistics.
         lbl = Q.makeLabel("Network", 16)
         self.layout.addWidget(lbl, 0, Q.ALIGN_LEFT)
 
@@ -2604,7 +2587,7 @@ class StakeStatsScreen(Screen):
         wgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, h)
         self.layout.addWidget(wgt)
 
-        # ticket prices
+        # Ticket prices.
         lbl = Q.makeLabel("current price: ", 14)
         lbl2 = Q.makeLabel("next price: ", 14)
         qty = self.stakeDiff = Q.makeLabel("", 14)
@@ -2612,7 +2595,7 @@ class StakeStatsScreen(Screen):
         wgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, qty, lbl2, qty2)
         self.layout.addWidget(wgt)
 
-        # ticket pool and next blocks left in stake window
+        # Ticket pool and next blocks left in stake window.
         lbl = Q.makeLabel("ticket pool: ", 14)
         lbl2 = Q.makeLabel("next diff in: ", 14)
         qty = self.networkTickets = Q.makeLabel("", 14)
@@ -2620,7 +2603,7 @@ class StakeStatsScreen(Screen):
         wgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, qty, lbl2, qty2)
         self.layout.addWidget(wgt)
 
-        # reward and total staked
+        # Reward and total staked.
         lbl = Q.makeLabel("reward: ", 14)
         lbl2 = Q.makeLabel("total staked: ", 14)
         qty = self.stakebase = Q.makeLabel("", 14)
@@ -2628,7 +2611,7 @@ class StakeStatsScreen(Screen):
         wgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, qty, lbl2, qty2)
         self.layout.addWidget(wgt)
 
-        # Lifetime user statistics
+        # Lifetime user statistics.
         lbl = Q.makeLabel("Lifetime", 16)
         self.layout.addWidget(lbl, 0, Q.ALIGN_LEFT)
 
@@ -2670,7 +2653,7 @@ class StakeStatsScreen(Screen):
         wgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, qty, lbl2, qty2, lbl3, qty3)
         self.layout.addWidget(wgt)
 
-        # total staked and a button to show a list of live tickets
+        # Total staked and a button to show a list of live tickets.
         lbl = Q.makeLabel("total staked:", 14)
         amt = self.ticketValue = Q.makeLabel("", 14)
         wgt, _ = Q.makeSeries(Q.HORIZONTAL, lbl, amt)
@@ -2717,7 +2700,7 @@ class StakeStatsScreen(Screen):
         tpinfo = blockchain.ticketPoolInfo()
         self.blkHeight.setText(str(tpinfo.height))
         self.networkTickets.setText(t(tpinfo.size, ", "))
-        self.networkValue.setText("{:.2f} dcr".format(tpinfo.value))
+        self.networkValue.setText(f"{tpinfo.value:.2f} dcr")
         blocksLeft = blksLeftStakeWindow(tpinfo.height, cfg.netParams)
         self.blocksLeft.setText(b(blocksLeft))
         cache = blockchain.subsidyCache
@@ -2826,7 +2809,7 @@ class PoolScreen(Screen):
         self.layout.addWidget(lbl)
 
         # Display info for a randomly chosen pool (with some filtering), and a
-        # couple of links to aid in selecting a VSP..
+        # couple of links to aid in selecting a VSP.
         self.poolUrl = Q.makeLabel("", 16, a=l, fontFamily="Roboto Medium")
         self.poolUrl.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         Q.addClickHandler(self.poolUrl, self.poolClicked)
@@ -2882,7 +2865,7 @@ class PoolScreen(Screen):
             try:
                 return VotingServiceProvider.providers(netParams)
             except Exception as e:
-                log.error("error retrieving stake pools: %s" % e)
+                log.error(f"error retrieving stake pools: {e}")
                 return False
 
         app.makeThread(getvsp, self.setPools)
@@ -2900,13 +2883,13 @@ class PoolScreen(Screen):
         tNow = int(time.time())
         # Only save pools updated within the last day, but allow bad pools for
         # testing.
-        # TODO: Have 3 tinydecred network constants retreivable through cfg
+        # TODO: Have 3 tinydecred network constants retrievable through cfg
         #   instead of checking the network config's Name attribute.
         if cfg.netParams.Name == "mainnet":
             self.pools = [
                 p
                 for p in pools
-                if tNow - p["LastUpdated"] < 86400 and self.scorePool(p) > 95
+                if (tNow - p["LastUpdated"] < 86400) and (self.scorePool(p) > 95)
             ]
         self.randomizePool()
 
@@ -2929,13 +2912,13 @@ class PoolScreen(Screen):
                 self.poolIdx = random.randint(0, count - 1)
         pool = pools[self.poolIdx]
         self.poolUrl.setText(pool["URL"])
-        self.score.setText("%.1f%%" % self.scorePool(pool))
-        self.fee.setText("%.1f%%" % pool["PoolFees"])
+        self.score.setText(f"{self.scorePool(pool):.1f}%")
+        self.fee.setText(f"{pool['PoolFees']:.1f}%")
         self.users.setText(str(pool["UserCountActive"]))
 
     def scorePool(self, pool):
         """
-        Get the pools performance score, as a float percentage.
+        Get the pool's performance score, as a float percentage.
         """
         if pool["Voted"] == 0:
             return 0
@@ -2974,14 +2957,14 @@ class PoolScreen(Screen):
                 return True
             except Exception as e:
                 err("pool authorization failed")
-                log.error("pool registration error: %s" % formatTraceback(e))
+                log.error(f"pool registration error: {formatTraceback(e)}")
                 return False
 
         withUnlockedAccount(self.account, registerPool, self.callback)
 
     def showAll(self, e=None):
         """
-        Connected to the "see all" button clicked signal. Open the fu
+        Connected to the "see all" button clicked signal. Open the
         decred.org VSP list in the browser.
         """
         openInBrowser("https://decred.org/vsp/")
@@ -2989,7 +2972,7 @@ class PoolScreen(Screen):
     def linkClicked(self):
         """
         Callback from the clicked signal on the pool URL QLabel. Opens the
-        pool's homepage in the users browser.
+        pool's homepage in the user's browser.
         """
         openInBrowser(self.poolUrl.text())
 
@@ -3065,7 +3048,7 @@ class AgendasScreen(Screen):
 
     def pageFwd(self):
         """
-        Go the the next displayed page.
+        Go the next displayed page.
         """
         newPg = self.page - 1
         if newPg < 0:
@@ -3078,7 +3061,7 @@ class AgendasScreen(Screen):
         """
         Set the displayed page number.
         """
-        self.pgNum.setText("%d/%d" % (self.page + 1, len(self.pages)))
+        self.pgNum.setText(f"{self.page + 1}/{len(self.pages)}")
 
     def sync(self):
         """
@@ -3112,7 +3095,7 @@ class AgendasScreen(Screen):
 
     def setVote(self):
         """
-        Set the users current vote choice.
+        Set the user's current vote choice.
         """
 
         self.voteSet = False
@@ -3141,7 +3124,7 @@ class AgendasScreen(Screen):
                         break
                 else:
                     app.appWindow.showError(
-                        "unable to set vote: vote " + "bit match not found"
+                        "unable to set vote: vote bit match not found"
                     )
                     return
             if originalIdx != index:
@@ -3213,7 +3196,7 @@ class AgendasScreen(Screen):
                     app.appWindow.showSuccess("vote choices updated")
                     dropdown.lastIndex = idx
                 except Exception as e:
-                    log.error("error changing vote: %s" % e)
+                    log.error(f"error changing vote: {e}")
                     app.appWindow.showError(
                         "unable to update vote choices: pool connection"
                     )
@@ -3234,7 +3217,7 @@ class PoolAccountScreen(Screen):
     def __init__(self, acct, poolScreen):
         """
         Args:
-            app (TinyWallet): The TinyWallet application instance.
+            acct (Account): A Decred account.
             poolScreen: The screen for adding VSPs.
         """
         super().__init__()
@@ -3307,7 +3290,7 @@ class PoolAccountScreen(Screen):
         """
         Set the displayed page number.
         """
-        self.pgNum.setText("%d/%d" % (self.page + 1, len(self.pages)))
+        self.pgNum.setText(f"{self.page + 1}/{len(self.pages)}")
 
     def setPools(self):
         """
@@ -3324,7 +3307,7 @@ class PoolAccountScreen(Screen):
         try:
             pools[0].updatePurchaseInfo()
         except Exception as e:
-            log.error("error fetching purchase info: %s" % e)
+            log.error(f"error fetching purchase info: {e}")
         # Notify that vote data should be updated.
         app.emitSignal(ui.PURCHASEINFO_SIGNAL)
         self.pages = [pools[i * 2 : i * 2 + 2] for i in range((len(pools) + 1) // 2)]
@@ -3437,8 +3420,8 @@ class Spinner(QtWidgets.QLabel):
         """
         Args:
             spinnerSize (int): Pixel width and height of the spinner.
-            penWidth (int): The width of the line.
-            pad (int): Additional padding to place around the spinner.
+            penWidth (int): optional. The width of the line.
+            pad (int): optional. Additional padding to place around the spinner.
         """
         super().__init__()
         self.period = 1  # 1 rotation per second
@@ -3479,14 +3462,14 @@ class SVGWidget(Clicker, QtSvg.QSvgWidget):
 
     def __init__(self, path, w=None, h=None, click=None):
         """
-        Create a QSvgWidget from the svg file in the icons directory. The svg will
-        display at its designated pixel size if no dimensions are specified. If
-        only one dimension is specified, the aspect ratio will be maintained for the
-        other dimension.
+        Create a QSvgWidget from the SVG file in the icons directory. The SVG
+        will display at its designated pixel size if no dimensions are
+        specified. If only one dimension is specified, the aspect ratio will be
+        maintained for the other dimension.
 
         Args:
-            path (str): Full path for non-tinywallet files. Otherwise, the basename
-                of the file in the icons folder.
+            path (str): Full path for non-tinywallet files. Otherwise, the
+                basename of the file in the icons folder.
             w (int): optional. Pixel width of the resulting pixmap.
             h (int): optional. Pixel height of the resulting pixmap.
             click (func): optional. A function to call when the widget is
@@ -3540,6 +3523,7 @@ def withUnlockedAccount(acct, f, cb):
     opened before the function is run.
 
     Args:
+        acct (Account): A Decred account.
         f (func): A function to run with the account open.
         cb (func(x)): A callback to receive the return value from f.
     """
@@ -3555,7 +3539,8 @@ def withUnlockedAccount(acct, f, cb):
             return f()
         except Exception as e:
             log.warning(
-                f"exception encountered while performing wallet action: {formatTraceback(e)}"
+                "exception encountered while performing"
+                f" wallet action: {formatTraceback(e)}"
             )
             app.appWindow.showError("error")
 

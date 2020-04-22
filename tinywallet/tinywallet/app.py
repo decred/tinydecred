@@ -17,18 +17,14 @@ from decred.dcr.dcrdata import DcrdataBlockchain
 from decred.util import chains, database, helpers
 from decred.util.helpers import formatTraceback
 from decred.wallet.wallet import Wallet
-from tinywallet import config, qutilities as Q, screens, ui
-from tinywallet.config import DB
+
+from . import config, qutilities as Q, screens, ui
+from .config import DB
+from .ui import LARGE, MEDIUM, SMALL, TINY
 
 
 # The directory of the tinywallet package.
 PACKAGEDIR = os.path.dirname(os.path.realpath(__file__))
-
-# Some commonly used UI constants.
-TINY = ui.TINY
-SMALL = ui.SMALL
-MEDIUM = ui.MEDIUM
-LARGE = ui.LARGE
 
 # A filename for the wallet.
 WALLET_FILE_NAME = "wallet.db"
