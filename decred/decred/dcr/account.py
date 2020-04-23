@@ -1865,7 +1865,7 @@ class Account:
             # signal the balance update
             self.signals.balance(self.calcBalance())
 
-    def sendToAddress(self, value, address, feeRate=None):
+    def sendToAddress(self, value, address):
         """
         Send the value to the address.
 
@@ -1880,7 +1880,7 @@ class Account:
             priv=self.privKeyForAddress, internal=self.nextInternalAddress,
         )
         tx, spentUTXOs, newUTXOs = self.blockchain.sendToAddress(
-            value, address, keysource, self.getUTXOs, feeRate
+            value, address, keysource, self.getUTXOs, self.relayFee
         )
         self.addMempoolTx(tx)
         self.spendUTXOs(spentUTXOs)
@@ -1907,13 +1907,13 @@ class Account:
             spendLimit=int(round(price * qty * 1.1 * 1e8)),  # convert to atoms here
             poolAddress=pi.poolAddress,
             votingAddress=pi.ticketAddress,
-            ticketFee=0,  # use network default
+            ticketFee=DefaultRelayFeePerKb,
             poolFees=pi.poolFees,
             count=qty,
-            txFee=0,  # use network default
+            txFee=self.relayFee,
         )
         txs, spentUTXOs, newUTXOs = self.blockchain.purchaseTickets(
-            keysource, self.getUTXOs, req
+            keysource, self.getUTXOs, req, self.relayFee
         )
         # Add the split transactions
         self.addMempoolTx(txs[0])
@@ -1962,7 +1962,7 @@ class Account:
                 priv=lambda _: self._votingKey,
                 internal=lambda: "",
             )
-            self.blockchain.revokeTicket(tx, keysource, redeemScript)
+            self.blockchain.revokeTicket(tx, keysource, redeemScript, self.relayFee)
 
     def sync(self):
         """
