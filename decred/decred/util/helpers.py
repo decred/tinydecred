@@ -56,8 +56,8 @@ def mktime(year: int, month: Optional[int] = None, day: Optional[int] = None) ->
 
     Args:
         year: the year.
-        month, optional: the month.
-        day, optional: the day.
+        month: the month.
+        day: the day.
 
     Returns:
         The UNIX epoch time.
