@@ -8,7 +8,7 @@ from decred import DecredError
 from . import mainnet, simnet, testnet
 
 
-the_nets = {n.Name: n for n in (mainnet, testnet, simnet)}
+the_nets = {n.Name: n for n in (mainnet, testnet, simnet)}  # type: ignore
 if "testnet3" in the_nets:
     the_nets["testnet"] = the_nets["testnet3"]
 

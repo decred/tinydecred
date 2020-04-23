@@ -7,7 +7,7 @@ Cryptographic functions.
 """
 
 
-from base58 import b58encode
+from base58 import b58encode  # type: ignore
 
 from decred import DecredError
 from decred.crypto.crypto import (

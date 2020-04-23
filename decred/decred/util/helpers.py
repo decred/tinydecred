@@ -1,43 +1,46 @@
 """
 Copyright (c) 2019, Brian Stafford
-Copyright (c) 2019, The Decred developers
+Copyright (c) 2019-2020, The Decred developers
 See LICENSE for details
 """
 
 import calendar
 import configparser
 import logging
+from logging import Logger
 from logging.handlers import RotatingFileHandler
 import os
+from pathlib import PosixPath
 import platform
 import sys
 import time
 import traceback
+from typing import Dict, Iterable, Optional
 from urllib.parse import urlsplit, urlunsplit
 
-from appdirs import AppDirs
+from appdirs import AppDirs  # type: ignore
 
 
-def formatTraceback(err):
+def formatTraceback(err: Exception) -> str:
     """
     Format a traceback for an error so that it can go into logs.
 
     Args:
-        err (BaseException): The error the traceback is extracted from.
+        err: The error the traceback is extracted from.
 
     Returns:
-        str: The __str__() of the error, followed by the standard formatting
+        The __str__() of the error, followed by the standard formatting
             of the traceback on the following lines.
     """
     return "".join(traceback.format_exception(None, err, err.__traceback__))
 
 
-def mkdir(path):
+def mkdir(path: PosixPath) -> bool:
     """
     Create the directory if it doesn't exist. Uses os.path .
 
     Args:
-        path (str, bytes): the directory path.
+        path: the directory path.
     """
     if os.path.isdir(path):
         return True
@@ -47,14 +50,17 @@ def mkdir(path):
     return True
 
 
-def mktime(year, month=None, day=None):
+def mktime(year: int, month: Optional[int] = None, day: Optional[int] = None) -> int:
     """
     Make a timestamp from year, month, day.
 
     Args:
-        year (int): the year.
-        month (int), optional: the month.
-        day (int), optional: the day.
+        year: the year.
+        month, optional: the month.
+        day, optional: the day.
+
+    Returns:
+        The UNIX epoch time.
     """
     if month:
         if day:
@@ -71,18 +77,24 @@ def mktime(year, month=None, day=None):
 
 
 class LogSettings:
-    """Used to track a few logging-related settings"""
+    """
+    Used to track a few logging-related settings.
+    """
 
     root = logging.getLogger("")
     defaultLevel = logging.INFO
-    moduleLevels = {}
-    loggers = {}
+    moduleLevels: Dict[str, int] = {}
+    loggers: Dict[str, Logger] = {}
 
 
 LogSettings.root.setLevel(logging.NOTSET)
 
 
-def prepareLogging(filepath=None, logLvl=logging.INFO, lvlMap=None):
+def prepareLogging(
+    filepath: Optional[PosixPath] = None,
+    logLvl: int = logging.INFO,
+    lvlMap: Optional[Dict[str, int]] = None,
+) -> None:
     """
     Prepare for using getLogger. Logs to stdout. If filepath is provided, log
     outputs will be saved to a rotating log file at the specified location. Any
@@ -90,13 +102,11 @@ def prepareLogging(filepath=None, logLvl=logging.INFO, lvlMap=None):
     levels set according to the new logLvl and lvlMap.
 
     Args:
-        filepath (str or pathlib.Path): optional. The base name for the rotating
-            log file.
-        logLvl (int): optional. default logging.INFO. The default logging level
-            used for all new loggers without entries in the lvlMap.
-        lvlMap: (dict): optional. If provided, the name->level mapping will be
-            added to the stored level dict, which is referenced when loggers are
-            created using getLogger.
+        filepath: The base name for the rotating log file.
+        logLvl: The default logging level used for all new loggers without
+            entries in the lvlMap.
+        lvlMap: The name->level mapping will be added to the stored level dict,
+            which is referenced when loggers are created using getLogger.
     """
     # Set log level for existing loggers.
     LogSettings.defaultLevel = logLvl
@@ -128,13 +138,13 @@ def prepareLogging(filepath=None, logLvl=logging.INFO, lvlMap=None):
         LogSettings.root.addHandler(printHandler)
 
 
-def getLogger(name):
+def getLogger(name: str) -> Logger:
     """
     Gets a named logger. If the name has a log level registered with
     prepareLogger, that level will be used, otherwise the default is used.
 
     Args:
-        name (str): The logger name.
+        name: The logger name.
     """
     l = LogSettings.root.getChild(name)
     l.setLevel(LogSettings.moduleLevels.get(name, LogSettings.defaultLevel))
@@ -142,7 +152,7 @@ def getLogger(name):
     return l
 
 
-def readINI(path, keys):
+def readINI(path: str, keys: Iterable[str]) -> Optional[Dict[str, str]]:
     """
     Attempt to read the specified keys from the INI-formatted configuration
     file. All sections will be searched. A dict with discovered keys and
@@ -150,17 +160,18 @@ def readINI(path, keys):
     present in the result.
 
     Args:
-        path (str): The path to the INI configuration file.
-        keys (list(str)): Keys to search for.
+        path: The path to the INI configuration file.
+        keys: Keys to search for.
 
     Returns:
-        dict: Discovered keys and values.
+        Discovered keys and values.
     """
     config = configparser.ConfigParser(strict=False)
     # Need to add a section header since configparser doesn't handle sectionless
     # INI format.
     with open(path) as f:
-        config.read_string("[tinydecred]\n" + f.read())  # This line does the trick.
+        # This line does the trick.
+        config.read_string("[tinydecred]\n" + f.read())
     res = {}
     for section in config.sections():
         for k in config[section]:
@@ -169,10 +180,16 @@ def readINI(path, keys):
     return res
 
 
-def appDataDir(appName):
+def appDataDir(appName: str) -> str:
     """
     appDataDir returns an operating system specific directory to be used for
     storing application data for an application.
+
+    Args:
+        appName: The name of the app whose data directory is wanted.
+
+    Returns:
+        The path of the wanted data directory.
     """
     if appName == "" or appName == ".":
         return "."
@@ -189,7 +206,7 @@ def appDataDir(appName):
     # Fall back to standard HOME environment variable that works
     # for most POSIX OSes.
     if homeDir == "":
-        homeDir = os.getenv("HOME")
+        homeDir = os.getenv("HOME") or ""
 
     opSys = platform.system()
     if opSys == "Windows":
@@ -209,16 +226,16 @@ def appDataDir(appName):
     return "."
 
 
-def makeWebsocketURL(baseURL, path):
+def makeWebsocketURL(baseURL: str, path: str) -> str:
     """
     Turn the HTTP/HTTPS URL into a WS/WSS one.
 
     Args:
-        baseURL (str): The base URL.
-        path (str): The websocket endpoint path. e.g. path of "ws" will yield
-            URL wss://yourhost.com/ws.
+        baseURL: The base URL.
+        path: The websocket endpoint path. e.g. path of "ws" will yield
+            URL wss://yourhost.com/ws .
     Returns:
-        string: the WebSocket URL.
+        The WebSocket URL.
     """
     baseURL = f"wss://{baseURL}" if "//" not in baseURL else baseURL
     url = urlsplit(baseURL)

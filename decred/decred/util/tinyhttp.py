@@ -1,11 +1,14 @@
 """
 Copyright (c) 2019, Brian Stafford
+Copyright (c) 2019-2020, The Decred developers
 See LICENSE for details
 
-DcrdataClient.endpointList() for available enpoints.
+See DcrdataClient.endpointList() for available enpoints.
 """
 
 import json
+from ssl import SSLContext
+from typing import Dict, List, Optional, Union
 from urllib.parse import urlencode
 import urllib.request as urlrequest
 
@@ -14,16 +17,54 @@ from decred import DecredError
 from .helpers import formatTraceback
 
 
-def get(url, **kwargs):
+def get(url: str, **kwargs) -> Union[Dict[str, str], List[int], str]:
+    """
+    A convenience function to make a GET HTTP request.
+
+    Args:
+        url: The URL to connect to.
+        kwargs: Other arguments to pass to the request function.
+    """
     return request(url, **kwargs)
 
 
-def post(url, data, **kwargs):
+def post(
+    url: str, data: Dict[str, str], **kwargs
+) -> Union[Dict[str, str], List[int], str]:
+    """
+    A convenience function to make a POST HTTP request.
+
+    Args:
+        url: The URL to connect to.
+        data: The data to send.
+        kwargs: Other arguments to pass to the request function.
+    """
     return request(url, data, **kwargs)
 
 
-def request(url, postData=None, headers=None, urlEncode=False, context=None):
-    # GET method used when encoded data is None.
+def request(
+    url: str,
+    postData: Optional[Dict[str, str]] = None,
+    headers: Optional[Dict[str, str]] = None,
+    urlEncode: Optional[bool] = False,
+    context: Optional[SSLContext] = None,
+) -> Union[Dict[str, str], List[int], str]:
+    """
+    Make an HTTP request and try to decode the payload as JSON. If an error
+    happens while decoding, return the raw payload.
+
+    If any postData is passed, the POST method is used, otherwise the GET one.
+
+    Args:
+        url: The URL to connect to.
+        postData: The data to POST, if any.
+        headers: Any custom headers to add to the request.
+        urlEncode: Whether to urlencode the postData.
+        context: An SSLContext used to encrypt the request.
+
+    Returns:
+        The decoded JSON data or the raw payload.
+    """
     encoded = None
     if postData:
         if urlEncode:
