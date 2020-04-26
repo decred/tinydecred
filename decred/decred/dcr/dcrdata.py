@@ -852,13 +852,25 @@ class DcrdataBlockchain:
         self.heightMap[header.height] = bHash
         self.headerDB[bHash] = header
 
-    def sendToAddress(self, value, address, keysource, utxosource, relayFee):
+    def checkFeeRate(self, relayFee):
+        """
+        Check that the relay fee is lower than the allowed max of
+        txscript.HighFeeRate.
+        """
+        if relayFee > txscript.HighFeeRate:
+            raise DecredError(
+                f"relay fee of {relayFee} is above the allowed max of {txscript.HighFeeRate}"
+            )
+
+    def sendToAddress(
+        self, value, address, keysource, utxosource, relayFee, allowHighFees=False
+    ):
         """
         Send the amount in atoms to the specified address.
 
         Args:
-            value int: The amount to send, in atoms.
-            address str: The base-58 encoded address.
+            value (int): The amount to send, in atoms.
+            address (str): The base-58 encoded address.
             keysource func(str) -> PrivateKey: A function that returns the
                 private key for an address.
             utxosource func(int, func(UTXO) -> bool) -> list(UTXO): A function
@@ -867,11 +879,18 @@ class DcrdataBlockchain:
                 amount. If the filtering function is provided, UTXOs for which
                 the  function return a falsey value will not be included in the
                 returned UTXO list.
-            MsgTx: The newly created transaction on success, `False` on failure.
+            relayFee (int): Transaction fees in atoms per kb.
+            allowHighFees (bool): Optional. Default is False. Whether to allow
+              fees higher than txscript.HighFeeRate.
+
+        Returns:
+            MsgTx: The newly created transaction. Raises an exception on error.
         """
+        if not allowHighFees:
+            self.checkFeeRate(relayFee)
         self.updateTip()
         outputs = makeOutputs([(address, value)], self.netParams)
-        return self.sendOutputs(outputs, keysource, utxosource, relayFee)
+        return self.sendOutputs(outputs, keysource, utxosource, relayFee, allowHighFees)
 
     def broadcast(self, txHex):
         """
@@ -953,7 +972,9 @@ class DcrdataBlockchain:
             pass
         return False
 
-    def sendOutputs(self, outputs, keysource, utxosource, relayFee):
+    def sendOutputs(
+        self, outputs, keysource, utxosource, relayFee, allowHighFees=False
+    ):
         """
         Send the `TxOut`s to the address.
 
@@ -973,12 +994,17 @@ class DcrdataBlockchain:
                 sufficient to complete the transaction. If the filtering
                 function is provided, UTXOs for which the  function return a
                 falsey value will not be included in the returned UTXO list.
+            relayFee (int): Transaction fees in atoms per kb.
+            allowHighFees (bool): Optional. Default is False. Whether to allow
+              fees higher than txscript.HighFeeRate.
 
         Returns:
             newTx MsgTx: The sent transaction.
             utxos list(UTXO): The spent UTXOs.
             newUTXOs list(UTXO): Length 1 array containing the new change UTXO.
         """
+        if not allowHighFees:
+            self.checkFeeRate(relayFee)
         total = 0
         inputs = []
         scripts = []
@@ -1100,7 +1126,9 @@ class DcrdataBlockchain:
 
             return newTx, utxos, newUTXOs
 
-    def purchaseTickets(self, keysource, utxosource, req, relayFee):
+    def purchaseTickets(
+        self, keysource, utxosource, req, relayFee, allowHighFees=False
+    ):
         """
         Based on dcrwallet (*Wallet).purchaseTickets.
         purchaseTickets indicates to the wallet that a ticket should be
@@ -1115,6 +1143,9 @@ class DcrdataBlockchain:
                 UTXOs. The filterFunc is an optional function to filter UTXOs,
                 and is of the form func(UTXO) -> bool.
             req account.TicketRequest: the ticket data.
+            relayFee (int): Transaction fees in atoms per kb.
+            allowHighFees (bool): Optional. Default is False. Whether to allow
+              fees higher than txscript.HighFeeRate.
 
         Returns:
             (splitTx, tickets) tuple: first element is the split transaction.
@@ -1125,6 +1156,8 @@ class DcrdataBlockchain:
                 addresses.
 
         """
+        if not allowHighFees:
+            self.checkFeeRate(relayFee)
         self.updateTip()
         # account minConf is zero for regular outputs for now. Need to make that
         # adjustable.
@@ -1267,7 +1300,7 @@ class DcrdataBlockchain:
         # Send the split transaction.
         # sendOutputs takes the fee rate in atoms/byte
         splitTx, splitSpent, internalOutputs = self.sendOutputs(
-            splitOuts, keysource, utxosource, int(txFeeIncrement / 1000)
+            splitOuts, keysource, utxosource, txFeeIncrement // 1000, allowHighFees
         )
 
         # Generate the tickets individually.
@@ -1363,7 +1396,7 @@ class DcrdataBlockchain:
             )
         return (splitTx, tickets), splitSpent, internalOutputs
 
-    def revokeTicket(self, tx, keysource, redeemScript, relayFee):
+    def revokeTicket(self, tx, keysource, redeemScript, relayFee, allowHighFees=False):
         """
         Revoke a ticket by signing the supplied redeem script and broadcasting
         the raw transaction.
@@ -1374,10 +1407,15 @@ class DcrdataBlockchain:
                 the private key used for signing.
             redeemScript (byte-like): the 1-of-2 multisig script that delegates
                 voting rights for the ticket.
+            relayFee (int): Transaction fees in atoms per kb.
+            allowHighFees (bool): Optional. Default is False. Whether to allow
+              fees higher than txscript.HighFeeRate.
 
         Returns:
             MsgTx: the signed revocation.
         """
+        if not allowHighFees:
+            self.checkFeeRate(relayFee)
 
         revocation = txscript.makeRevocation(tx, relayFee)
 
