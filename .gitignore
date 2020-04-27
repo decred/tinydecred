@@ -1,4 +1,6 @@
+decred/build
 decred/examples/wallets
+decred/decred/crypto/secp256k1/field.c
 decred/dist/
 decred/poetry.lock
 tinywallet/dist/
