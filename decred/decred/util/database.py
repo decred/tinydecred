@@ -60,6 +60,25 @@ KVLast = "SELECT k, v FROM {tablename} ORDER BY k DESC LIMIT 1;"
 KVFirst = "SELECT k, v FROM {tablename} ORDER BY k LIMIT 1;"
 
 
+def isSqlite3DB(filepath):
+    """
+    Returns whether file at filepath is a sqlite3 database.
+
+    Args:
+        filepath (str): The file to check.
+
+    Returns:
+        bool: Whether the database could be opened and queried.
+    """
+    try:
+        conn = sqlite3.connect(filepath)
+        conn.execute("pragma schema_version;")
+    except Exception:
+        return False
+    conn.close()
+    return True
+
+
 class KeyValueDatabase:
     """
     A KeyValueDatabase is a sqlite3 database specialized for two-column tables
