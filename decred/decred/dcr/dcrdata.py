@@ -1126,9 +1126,7 @@ class DcrdataBlockchain:
 
             return newTx, utxos, newUTXOs
 
-    def purchaseTickets(
-        self, keysource, utxosource, req, relayFee, allowHighFees=False
-    ):
+    def purchaseTickets(self, keysource, utxosource, req, allowHighFees=False):
         """
         Based on dcrwallet (*Wallet).purchaseTickets.
         purchaseTickets indicates to the wallet that a ticket should be
@@ -1138,12 +1136,11 @@ class DcrdataBlockchain:
         available.
 
         Args:
-            keysource account.KeySource: a source for private keys.
+            keysource (account.KeySource): a source for private keys.
             utxosource func(int, filterFunc) -> (list(UTXO), bool): a source for
                 UTXOs. The filterFunc is an optional function to filter UTXOs,
                 and is of the form func(UTXO) -> bool.
-            req account.TicketRequest: the ticket data.
-            relayFee (int): Transaction fees in atoms per kb.
+            req (account.TicketRequest): the ticket data.
             allowHighFees (bool): Optional. Default is False. Whether to allow
               fees higher than txscript.HighFeeRate.
 
@@ -1157,7 +1154,8 @@ class DcrdataBlockchain:
 
         """
         if not allowHighFees:
-            self.checkFeeRate(relayFee)
+            self.checkFeeRate(req.txFee)
+            self.checkFeeRate(req.ticketFee)
         self.updateTip()
         # account minConf is zero for regular outputs for now. Need to make that
         # adjustable.
@@ -1228,10 +1226,6 @@ class DcrdataBlockchain:
                 "unsupported voting address type %s" % votingAddress.__class__.__name__
             )
 
-        ticketFeeIncrement = req.ticketFee
-        if ticketFeeIncrement == 0:
-            ticketFeeIncrement = relayFee
-
         # Make sure that we have enough funds. Calculate different
         # ticket required amounts depending on whether or not a
         # pool output is needed. If the ticket fee increment is
@@ -1255,7 +1249,7 @@ class DcrdataBlockchain:
         ]
         estSize = txscript.estimateSerializeSizeFromScriptSizes(inSizes, outSizes, 0)
 
-        ticketFee = txscript.calcMinRequiredTxRelayFee(ticketFeeIncrement, estSize)
+        ticketFee = txscript.calcMinRequiredTxRelayFee(req.ticketFee, estSize)
         neededPerTicket = ticketFee + ticketPrice
 
         # If we need to calculate the amount for a pool fee percentage,
@@ -1293,14 +1287,9 @@ class DcrdataBlockchain:
             # User amount.
             splitOuts.append(msgtx.TxOut(value=userAmt, pkScript=splitPkScript,))
 
-        txFeeIncrement = req.txFee
-        if txFeeIncrement == 0:
-            txFeeIncrement = relayFee
-
         # Send the split transaction.
-        # sendOutputs takes the fee rate in atoms/byte
         splitTx, splitSpent, internalOutputs = self.sendOutputs(
-            splitOuts, keysource, utxosource, txFeeIncrement // 1000, allowHighFees
+            splitOuts, keysource, utxosource, req.txFee, allowHighFees
         )
 
         # Generate the tickets individually.

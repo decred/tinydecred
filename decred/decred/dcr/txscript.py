@@ -3410,7 +3410,7 @@ def calcMinRequiredTxRelayFee(relayFeePerKb, txSerializeSize):
 
     Args:
         relayFeePerKb (int): The fee in atoms per kilobyte.
-        txSerializeSize int: (Size) of the byte-encoded transaction.
+        txSerializeSize (int): Size of the byte-encoded transaction.
 
     Returns:
         int: Fee in atoms.

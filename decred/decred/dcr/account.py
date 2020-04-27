@@ -89,37 +89,43 @@ class TicketRequest:
         spendLimit,
         poolAddress,
         votingAddress,
-        ticketFee,
         poolFees,
         count,
         txFee,
+        ticketFee=0,
     ):
-        # minConf is just a placeholder for now. Account minconf is 0 until
-        # I add the ability to change it.
+        """
+        TicketRequest constructor.
+
+        Args:
+            minConf (int): minConf is just a placeholder for now. Account
+                minconf is 0 until I add the ability to change it.
+            expiry (int): expiry can be set to some reasonable block height.
+                This may be important when approaching the end of a ticket
+                window.
+            spendLimit (int): Price is calculated purely from the ticket count,
+                price, and fees, but cannot go over spendLimit.
+            poolAddress (str): The VSP fee payment address.
+            votingAddress (str): The P2SH voting address based on the 1-of-2.
+                multi-sig script you share with the VSP.
+            poolFees (int): poolFees are set by the VSP. If you don't set these
+                correctly, the VSP may not vote for you.
+            count (int): How many tickets to buy.
+            txFee (int): txFee is the transaction fee rate to pay the miner for
+                the split transaction required to fund the ticket.
+            ticketFee (int): Optional. Default is the network's default relay
+                fee. ticketFee is the transaction fee rate to pay the miner for
+                the ticket.
+        """
         self.minConf = minConf
-        # expiry can be set to some reasonable block height. This may be
-        # important when approaching the end of a ticket window.
         self.expiry = expiry
-        # Price is calculated purely from the ticket count, price, and fees, but
-        # cannot go over spendLimit.
         self.spendLimit = spendLimit
-        # The VSP fee payment address.
         self.poolAddress = poolAddress
-        # The P2SH voting address based on the 1-of-2 multi-sig script you share
-        # with the VSP.
         self.votingAddress = votingAddress
-        # ticketFee is the transaction fee rate to pay the miner for the ticket.
-        # Set to zero to use wallet's network default fee rate.
-        self.ticketFee = ticketFee
-        # poolFees are set by the VSP. If you don't set these correctly, the
-        # VSP may not vote for you.
         self.poolFees = poolFees
-        # How many tickets to buy.
         self.count = count
-        # txFee is the transaction fee rate to pay the miner for the split
-        # transaction required to fund the ticket.
-        # Set to zero to use wallet's network default fee rate.
         self.txFee = txFee
+        self.ticketFee = ticketFee if ticketFee != 0 else DefaultRelayFeePerKb
 
 
 class TicketStats:
@@ -1895,6 +1901,13 @@ class Account:
         Account uses the blockchain to do the heavy lifting, but must prepare
         the TicketRequest and KeySource and gather some other account- related
         information.
+
+        Args:
+            qty (int): The number of tickets to buy.
+            price (int): The price per ticket in coins to pay.
+
+        Returs:
+            MsgTx: The sent split transaction.
         """
         keysource = KeySource(
             priv=self.privKeyForAddress, internal=self.nextInternalAddress,
@@ -1907,13 +1920,12 @@ class Account:
             spendLimit=int(round(price * qty * 1.1 * 1e8)),  # convert to atoms here
             poolAddress=pi.poolAddress,
             votingAddress=pi.ticketAddress,
-            ticketFee=DefaultRelayFeePerKb,
             poolFees=pi.poolFees,
             count=qty,
             txFee=self.relayFee,
         )
         txs, spentUTXOs, newUTXOs = self.blockchain.purchaseTickets(
-            keysource, self.getUTXOs, req, self.relayFee
+            keysource, self.getUTXOs, req
         )
         # Add the split transactions
         self.addMempoolTx(txs[0])
