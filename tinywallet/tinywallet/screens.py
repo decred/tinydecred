@@ -39,6 +39,17 @@ FADE_IN_ANIMATION = "fadeinanimation"
 app = None
 
 
+def logError(err):
+    """
+    Log an error to stderr and to the ui main window.
+
+    Args:
+        err (str): The error to log and display.
+    """
+    log.error(err)
+    app.appWindow.showError(err)
+
+
 def openInBrowser(url):
     """
     Open a URL in the user's browser.
@@ -971,26 +982,31 @@ class InitializationScreen(Screen):
         fd.setViewMode(QtWidgets.QFileDialog.Detail)
         qdir = QtCore.QDir
         fd.setFilter(qdir.Dirs | qdir.Files | qdir.NoDotAndDotDot | qdir.Hidden)
+        noFileMsg = "no file selected"
         if fd.exec_():
             fileNames = fd.selectedFiles()
             if len(fileNames) != 1:
                 msg = "more than one file selected for importing"
-                log.error(msg)
-                raise Exception(msg)
+                logError(msg)
+                return
         else:
-            raise Exception("no file selected")
+            log.info(noFileMsg)
+            return
         walletPath = fileNames[0]
-        log.debug("loading wallet from %r" % walletPath)
+        log.debug(f"loading wallet from {walletPath}")
         if walletPath == "":
-            app.appWindow.showError("no file selected")
+            logError(noFileMsg)
             return
         elif not os.path.isfile(walletPath):
-            log.error("no file found at %s" % walletPath)
-            app.showMessaage("file error. try again")
+            msg = f"no file found at {walletPath}"
+            logError(msg)
+            return
+        elif not database.isSqlite3DB(walletPath):
+            logError(f"{walletPath} is not a sqlite3 database")
             return
 
         destination = app.walletFilename()
-        shutil.move(walletPath, destination)
+        shutil.copy(walletPath, destination)
         app.initialize()
 
     def restoreClicked(self):
