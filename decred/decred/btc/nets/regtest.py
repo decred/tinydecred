@@ -1,6 +1,6 @@
 """
 Copyright (c) 2020, The Decred developers
-See LICENSE for details
+See LICENSE for details.
 
 regtest holds regtest parameters. Any values should mirror exactly
 https://github.com/btcsuite/btcd/blob/master/chaincfg/params.go
