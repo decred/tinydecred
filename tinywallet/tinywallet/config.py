@@ -75,7 +75,7 @@ class CmdArgs:
         netGroup.add_argument("--testnet", action="store_true", help="use testnet")
         args, unknown = parser.parse_known_args()
         if unknown:
-            sys.exit(f"unknown arguments:{unknown}")
+            sys.exit(f"unknown arguments: {unknown}")
         self.netParams = nets.mainnet
         if args.simnet:
             self.netParams = nets.simnet
@@ -87,7 +87,7 @@ class CmdArgs:
             print("**********************************************************")
         if args.loglevel:
             try:
-                if "," in args.loglevel or ":" in args.loglevel:
+                if any(ch in args.loglevel for ch in (",", ":")):
                     pairs = (s.split(":") for s in args.loglevel.split(","))
                     self.moduleLevels = {k: logLvl(v) for k, v in pairs}
                 else:

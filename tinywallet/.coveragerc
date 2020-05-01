@@ -1,0 +1,30 @@
+# Test coverage tool configuration, see reference at
+# https://coverage.readthedocs.io/en/latest/config.html
+
+[run]
+omit = tests/*
+dynamic_context = test_function
+
+[report]
+# Regexes for lines to exclude from consideration
+exclude_lines =
+    nocover
+
+    # Don't complain about debug-only code.
+    def __repr__
+
+    # Don't complain if non-runnable code isn't run.
+    if __name__ == .__main__.:
+
+    # Don't complain if tests don't hit defensive assertion code.
+    raise AssertionError
+    raise NotImplementedError
+    raise CrazyKeyError
+    raise ParameterRangeError
+
+ignore_errors = True
+# skip_covered = True
+skip_empty = True
+
+[html]
+show_contexts = True
