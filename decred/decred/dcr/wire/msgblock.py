@@ -87,7 +87,7 @@ class BlockHeader:
     def btcDecode(b, pver):
         """
         BtcDecode decodes b using the bitcoin protocol encoding into the
-        receiver. This is part of the Message interface implementation.
+        receiver. This is part of the Message API.
         See Deserialize for decoding block headers stored to disk, such as
         in a database, as opposed to decoding block headers from the wire.
 

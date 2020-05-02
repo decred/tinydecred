@@ -384,7 +384,7 @@ class OutPoint:
 
 class MsgTx:
     """
-    MsgTx implements the Message interface and represents a Decred tx message.
+    MsgTx implements the Message API and represents a Decred tx message.
     It is used to deliver transaction information in response to a getdata
     message (MsgGetData) for a given transaction.
 
@@ -528,14 +528,14 @@ class MsgTx:
     def command(self):
         """
         Command returns the protocol command string for the message.  This is part
-        of the Message interface implementation in go.
+        of the Message API in go.
         """
         return wire.CmdTx
 
     def maxPayloadLength(self, pver):
         """
         MaxPayloadLength returns the maximum length the payload can be for the
-        receiver.  This is part of the Message interface implementation.
+        receiver.  This is part of the Message API.
         """
         # Protocol version 3 and lower have a different max block payload.
         if pver <= 3:
@@ -589,7 +589,7 @@ class MsgTx:
     def btcEncode(self, pver):
         """
         BtcEncode encodes the receiver to w using the Decred protocol encoding.
-        This is part of the Message interface implementation.
+        This is part of the Message API.
         See Serialize for encoding transactions to be stored to disk, such as in a
         database, as opposed to encoding transactions for the wire.
         """
@@ -759,7 +759,7 @@ class MsgTx:
     def btcDecode(b, pver):
         """
         btcDecode decodes r using the Decred protocol encoding into the
-        receiver. This is part of the Message interface implementation.
+        receiver. This is part of the Message API.
         See deserialize for decoding transactions stored to disk, such as in a
         database, as opposed to decoding transactions from the wire.
         """

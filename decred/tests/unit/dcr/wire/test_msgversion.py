@@ -192,21 +192,25 @@ def test_VersionWire():
     """
     # verRelayTxFalse and verRelayTxFalseEncoded is a version message as of
     # BIP0037Version with the transaction relay disabled.
-    baseVersionBIP0037Copy = baseVersionBIP0037
-    verRelayTxFalse = baseVersionBIP0037Copy
+    verRelayTxFalse = baseVersionBIP0037()
     verRelayTxFalse.disableRelayTx = True
     verRelayTxFalseEncoded = baseVersionBIP0037Encoded()
     verRelayTxFalseEncoded[-1] = 0
 
-    # Encode the message to wire format.
-    b = baseVersionBIP0037().btcEncode(wire.ProtocolVersion)
-    assert b == baseVersionBIP0037Encoded()
+    bv = baseVersionBIP0037()
+    tests = [
+        (bv, bv, baseVersionBIP0037Encoded()),
+        (verRelayTxFalse, verRelayTxFalse, verRelayTxFalseEncoded),
+    ]
 
-    # Decode the message from wire format.
-    msg = msgversion.MsgVersion.btcDecode(
-        baseVersionBIP0037Encoded(), wire.ProtocolVersion
-    )
-    assert sameMsgVersion(msg, baseVersionBIP0037())
+    for msgIn, msgOut, msgEnc in tests:
+        # Encode the message to wire format.
+        b = msgIn.btcEncode(wire.ProtocolVersion)
+        assert b == msgEnc
+
+        # Decode the message from wire format.
+        msg = msgversion.MsgVersion.btcDecode(msgEnc, wire.ProtocolVersion)
+        assert sameMsgVersion(msg, msgOut)
 
 
 def test_VersionWireErrors():

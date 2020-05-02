@@ -23,7 +23,7 @@ CmdVersion = "version"
 
 class MsgVersion:
     """
-    MsgVersion implements the Message interface and represents a Decred version
+    MsgVersion implements the Message API and represents a Decred version
     message.  It is used for a peer to advertise itself as soon as an outbound
     connection is made.  The remote peer then uses this information along with
     its own to negotiate.  The remote peer must then respond with a version
@@ -100,7 +100,7 @@ class MsgVersion:
         hasn't been negotiated yet.  As a result, the pver field is ignored and
         any fields which are added in new versions are optional.
 
-        This is part of the Message interface implementation.
+        This is part of the Message API.
 
         Args:
             b (ByteArray): The encoded MsgVersion.
@@ -150,11 +150,8 @@ class MsgVersion:
         # relay transactions.
         disableRelayTx = False
         if len(b) > 0:
-            # It's safe to ignore the error here since the buffer has at
-            # least one byte and that byte will result in a boolean value
-            # regardless of its value.  Also, the wire encoding for the
-            # field is true when transactions should be relayed, so reverse
-            # it for the DisableRelayTx field.
+            # The wire encoding for the field is true when transactions should
+            # be relayed, so reverse it for the DisableRelayTx field.
             disableRelayTx = b.pop(1) == [0]
 
         return MsgVersion(
@@ -172,7 +169,7 @@ class MsgVersion:
     def btcEncode(self, pver):
         """
         btcEncode encodes the receiver using the Decred protocol encoding.
-        This is part of the Message interface implementation.
+        This is part of the Message API.
 
         Args:
             pver (int): The protocol version.
@@ -199,7 +196,7 @@ class MsgVersion:
     def command(self):
         """
         The protocol command string for the message.  This is part of the
-        Message interface implementation.
+        Message API.
 
         Returns:
             str: The command string.
@@ -209,7 +206,7 @@ class MsgVersion:
     def maxPayloadLength(self, pver):
         """
         The maximum length the payload can be for the receiver. This is part of
-        the Message interface implementation.
+        the Message API.
 
         Args:
             pver (int): The protocol version. Unused.
@@ -252,14 +249,14 @@ class MsgVersion:
         self.userAgent = newUserAgent
 
 
-def newMsgVersion(me, you, nonce, lastBlock):
+def newMsgVersion(addrMe, addrYou, nonce, lastBlock):
     """
-    Decred version message that conforms to the Message interface using the
-    passed parameters and defaults for the remaining fields.
+    Decred version message that conforms to the Message API using the passed
+    parameters and defaults for the remaining fields.
 
     Args:
-        me (NetAddress): Address of the local peer.
-        you (NetAddress): Address of the remote peer.
+        addrMe (NetAddress): Address of the local peer.
+        addrYou (NetAddress): Address of the remote peer.
         nonce (int): Unique value associated with message that is used to detect
             self-connections.
         lastBlock (int): Last block seen by the generator of the version
@@ -272,8 +269,8 @@ def newMsgVersion(me, you, nonce, lastBlock):
         protocolVersion=wire.ProtocolVersion,
         services=0,
         timestamp=int(time.time()),
-        addrYou=you,
-        addrMe=me,
+        addrYou=addrYou,
+        addrMe=addrMe,
         nonce=nonce,
         userAgent=DefaultUserAgent,
         lastBlock=lastBlock,
