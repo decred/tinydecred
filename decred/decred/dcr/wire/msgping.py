@@ -15,8 +15,7 @@ NonceLength = 8
 
 class MsgPing:
     """
-    MsgPing implements the Message interface and represents a Decred ping
-    message.
+    MsgPing implements the Message API and represents a Decred ping message.
 
     For versions BIP0031Version and earlier, it is used primarily to confirm
     that a connection is still valid.  A transmission error is typically
@@ -40,7 +39,7 @@ class MsgPing:
     def btcDecode(b, pver):
         """
         btcDecode decodes b using the Decred protocol encoding into the
-        receiver. This is part of the Message interface implementation.
+        receiver. This is part of the Message API.
 
         Args:
             b (ByteArray): The encoded MsgPing.
@@ -54,7 +53,7 @@ class MsgPing:
     def btcEncode(self, pver):
         """
         btcEncode encodes the receiver to w using the Decred protocol encoding.
-        This is part of the Message interface implementation.
+        This is part of the Message API.
 
         Args:
             pver (int): The protocol version. Unused.
@@ -68,7 +67,7 @@ class MsgPing:
     def command():
         """
         The protocol command string for the message.  This is part of the
-        Message interface implementation.
+        Message API.
 
         Returns:
             str: The command string.
@@ -79,7 +78,7 @@ class MsgPing:
     def maxPayloadLength(pver):
         """
         The maximum length the payload can be for the receiver.  This is part of
-        the Message interface implementation.
+        the Message API.
 
         Args:
             pver (int): The protocol version. Unused.

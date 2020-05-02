@@ -15,9 +15,9 @@ NonceLength = 8
 
 class MsgPong:
     """
-    MsgPong implements the Message interface and represents a Decred pong
-    message which is used primarily to confirm that a connection is still valid
-    in response to a Decred ping message (MsgPing).
+    MsgPong implements the Message API and represents a Decred pong message
+    which is used primarily to confirm that a connection is still valid in
+    response to a Decred ping message (MsgPing).
 
     This message was not added until protocol versions AFTER BIP0031Version.
     """
@@ -34,7 +34,7 @@ class MsgPong:
     def btcDecode(b, pver):
         """
         btcDecode decodes b using the Decred protocol encoding into the receiver. This
-        is part of the Message interface implementation.
+        is part of the Message API.
 
         Args:
             b (ByteArray): The encoded MsgPong.
@@ -48,7 +48,7 @@ class MsgPong:
     def btcEncode(self, pver):
         """
         btcEncode encodes the receiver to w using the Decred protocol encoding.
-        This is part of the Message interface implementation.
+        This is part of the Message API.
 
         Args:
             pver (int): The protocol version. Unused.
@@ -62,7 +62,7 @@ class MsgPong:
     def command():
         """
         command returns the protocol command string for the message.  This is
-        part of the Message interface implementation.
+        part of the Message API.
 
         Returns:
             str: The command string.
@@ -73,7 +73,7 @@ class MsgPong:
     def maxPayloadLength(pver):
         """
         maxPayloadLength returns the maximum length the payload can be for the
-        receiver.  This is part of the Message interface implementation.
+        receiver.  This is part of the Message API.
 
         Args:
             pver (int): The protocol version. Unused.
