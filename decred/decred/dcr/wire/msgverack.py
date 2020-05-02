@@ -15,7 +15,7 @@ class MsgVerAck:
     """
     MsgVerAck defines a Decred verack message which is used for a peer to
     acknowledge a version message (MsgVersion) after it has used the information
-    to negotiate parameters.  It implements the Message interface.
+    to negotiate parameters.  It implements the Message API.
 
     This message has no payload.
     """
@@ -24,10 +24,11 @@ class MsgVerAck:
     def btcDecode(b, pver):
         """
         Decode b using the Decred protocol encoding into the receiver. This is
-        part of the Message interface implementation.
+        part of the Message API.
 
         Args:
-            b (ByteArray): The encoded MsgVerAck.
+            b (ByteArray): The encoded MsgVerAck. Unused, since MsgVerAck has
+                a zero-length payload.
             pver (int): The protocol version. Unused.
         """
         return MsgVerAck()
@@ -35,10 +36,11 @@ class MsgVerAck:
     def btcEncode(self, pver):
         """
         btcEncode encodes the MsgVerAck using the Decred protocol encoding. This
-        is part of the Message interface implementation.
+        is part of the Message API.
 
         Args:
-            pver (int): The protocol version.
+            pver (int): The protocol version. Unused.
+
         Returns:
             ByteArray: The encoded MsgVerAck.
         """
@@ -47,7 +49,7 @@ class MsgVerAck:
     def command(self):
         """
         The protocol command string for the message.  This is part of the
-        Message interface implementation.
+        Message API.
 
         Returns:
             str: The command string.
@@ -57,10 +59,11 @@ class MsgVerAck:
     def maxPayloadLength(self, pver):
         """
         The maximum length the payload can be for the receiver. This is part of
-        the Message interface implementation.
+        the Message API.
 
         Args:
             pver (int): The protocol version. Unused.
+
         Returns:
             int: The maximum payload length.
         """
