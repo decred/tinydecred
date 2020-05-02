@@ -26,17 +26,17 @@ class NetAddress:
         """
 		Args:
 			ip (str or bytes-like): The peer's IP address.
-			port (int): The peer's port.
+			port (int): Port the peer is using.  This is encoded in big endian
+				on the wire which differs from most everything else.
 			services (int): Bitfield which identifies the services supported by
 				the peer.
-			stamp (int): The last time the peer was seen.
+			stamp (int): The last time the peer was seen. This is,
+				unfortunately, encoded as an int on the wire and therefore is
+				limited to 2106. This field is not present in the Decred version
+				message (MsgVersion) nor was it added until protocol
+				version >= NetAddressTimeVersion.
 		"""
-        # Last time the address was seen.  This is, unfortunately, encoded as an
-        # int on the wire and therefore is limited to 2106.  This field is
-        # not present in the Decred version message (MsgVersion) nor was it
-        # added until protocol version >= NetAddressTimeVersion.
         self.timestamp = stamp
-
         self.services = services
 
         # If the IP is a string, parse it to bytes.
@@ -44,8 +44,6 @@ class NetAddress:
             ip = decodeStringIP(ip)
         self.ip = ip
 
-        # Port the peer is using.  This is encoded in big endian on the wire
-        # which differs from most everything else.
         self.port = port
 
     def hasService(self, service):
@@ -102,8 +100,6 @@ def newNetAddressTimestamp(stamp, services, ip, port):
 	Returns:
 		NetAddress: The peer's NetAddress.
 	"""
-    # Limit the timestamp to one second precision since the protocol
-    # doesn't support better.
     return NetAddress(ip, port, services, stamp)
 
 
@@ -123,29 +119,29 @@ def newNetAddress(tcpAddr, services):
     return newNetAddressIPPort(tcpAddr.ip, tcpAddr.port, services)
 
 
-def readNetAddress(b, ts):
+def readNetAddress(b, hasStamp):
     """
 	Reads an encoded NetAddress from b depending on the protocol version and
-	whether or not the timestamp is included per ts.  Some messages like version do
-	not include the timestamp.
+	whether or not the timestamp is included per hasStamp.  Some messages like
+	version do not include the timestamp.
 
 	Args:
 		b (ByteArray): The encoded NetAddress.
-		ts (bool): Whether or not the NetAddress has a timestamp.
+		hasStamp (bool): Whether or not the NetAddress has a timestamp.
 
 	Returns:
 		NetAddress: The decoded NetAddress.
 	"""
-    expLen = 30 if ts else 26
+    expLen = 30 if hasStamp else 26
     if len(b) != expLen:
         raise DecredError(
-            f"readNetAddress wrong length (ts={ts}) expected {expLen}, got {len(b)}"
+            f"readNetAddress wrong length (hasStamp={hasStamp}) expected {expLen}, got {len(b)}"
         )
 
     # NOTE: The Decred protocol uses a uint32 for the timestamp so it will
     # stop working somewhere around 2106.  Also timestamp wasn't added until
     # protocol version >= NetAddressTimeVersion
-    stamp = b.pop(4).unLittle().int() if ts else 0
+    stamp = b.pop(4).unLittle().int() if hasStamp else 0
     services = b.pop(8).unLittle().int()
     ip = b.pop(16)
     if ip[:12] == ipv4to16prefix:
@@ -157,15 +153,15 @@ def readNetAddress(b, ts):
     return NetAddress(ip=ip, port=port, services=services, stamp=stamp,)
 
 
-def writeNetAddress(netAddr, ts):
+def writeNetAddress(netAddr, hasStamp):
     """
 	writeNetAddress serializes a NetAddress depending on the protocol
-	version and whether or not the timestamp is included per ts.  Some messages
-	like version do not include the timestamp.
+	version and whether or not the timestamp is included per hasStamp.  Some
+	messages like version do not include the timestamp.
 
 	Args:
 		netAddr (NetAddress): The peer's NetAddress.
-		ts (bool): Whether to encode the timestamp.
+		hasStamp (bool): Whether to encode the timestamp.
 
 	Returns:
 		ByteArray: The encoded NetAddress.
@@ -173,7 +169,11 @@ def writeNetAddress(netAddr, ts):
     # NOTE: The Decred protocol uses a uint32 for the timestamp so it will
     # stop working somewhere around 2106.  Also timestamp wasn't added until
     # until protocol version >= NetAddressTimeVersion.
-    b = ByteArray(netAddr.timestamp, length=4).littleEndian() if ts else ByteArray()
+    b = (
+        ByteArray(netAddr.timestamp, length=4).littleEndian()
+        if hasStamp
+        else ByteArray()
+    )
 
     # Ensure to always write 16 bytes even if the ip is nil.
     ip = netAddr.ip

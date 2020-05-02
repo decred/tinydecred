@@ -162,6 +162,6 @@ def test_NetAddressDecodeErrors():
         (ByteArray(), True),
     ]
 
-    for buf, ts in tests:
+    for buf, hasStamp in tests:
         with pytest.raises(DecredError):
-            netaddress.readNetAddress(buf, ts)
+            netaddress.readNetAddress(buf, hasStamp)

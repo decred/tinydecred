@@ -210,6 +210,13 @@ def readVarString(b, pver):
     string itself.  An error is returned if the length is greater than the
     maximum block payload size since it helps protect against memory exhaustion
     attacks and forced panics through malformed messages.
+
+    Args:
+        b (ByteArray): The varString-encoded string.
+        pver (int): The protocol version (unused).
+
+    Returns:
+        str: The decoded string.
     """
     count = readVarInt(b, pver)
 
@@ -229,6 +236,13 @@ def writeVarString(pver, s):
     writeVarString serializes s as a variable length integer containing the
     length of the string followed by the bytes that represent the string
     itself.
+
+    Args:
+        pver (int): The protocol version (unused).
+        s (str): The string to encode.
+
+    Returns:
+        ByteArray: The varString-encoded string.
     """
     strB = s.encode()
     return writeVarInt(pver, len(strB)) + strB
