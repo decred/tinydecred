@@ -18,24 +18,24 @@ ipv4to16prefix = ByteArray(0xFFFF, length=12)
 
 class NetAddress:
     """
-	NetAddress defines information about a peer on the network including the time
-	it was last seen, the services it supports, its IP address, and port.
-	"""
+    NetAddress defines information about a peer on the network including the time
+    it was last seen, the services it supports, its IP address, and port.
+    """
 
     def __init__(self, ip, port, services, stamp):
         """
-		Args:
-			ip (str or bytes-like): The peer's IP address.
-			port (int): Port the peer is using.  This is encoded in big endian
-				on the wire which differs from most everything else.
-			services (int): Bitfield which identifies the services supported by
-				the peer.
-			stamp (int): The last time the peer was seen. This is,
-				unfortunately, encoded as an int on the wire and therefore is
-				limited to 2106. This field is not present in the Decred version
-				message (MsgVersion) nor was it added until protocol
-				version >= NetAddressTimeVersion.
-		"""
+        Args:
+            ip (str or bytes-like): The peer's IP address.
+            port (int): Port the peer is using.  This is encoded in big endian
+                on the wire which differs from most everything else.
+            services (int): Bitfield which identifies the services supported by
+                the peer.
+            stamp (int): The last time the peer was seen. This is,
+                unfortunately, encoded as an int on the wire and therefore is
+                limited to 2106. This field is not present in the Decred version
+                message (MsgVersion) nor was it added until protocol
+                version >= NetAddressTimeVersion.
+        """
         self.timestamp = stamp
         self.services = services
 
@@ -48,90 +48,90 @@ class NetAddress:
 
     def hasService(self, service):
         """
-		Whether the specified service is supported by the address.
+        Whether the specified service is supported by the address.
 
-		Args:
-			service (int): Bitfield which identifies the service(s) to check.
+        Args:
+            service (int): Bitfield which identifies the service(s) to check.
 
-		Returns:
-			bool: True if this peer offers the service(s).
-		"""
+        Returns:
+            bool: True if this peer offers the service(s).
+        """
         return self.services & service == service
 
     def addService(self, service):
         """
-		Adds service(s) as a supported service.
+        Adds service(s) as a supported service.
 
-		Args:
-			service (int): Bitfield which identifies the service(s) to add.
-		"""
+        Args:
+            service (int): Bitfield which identifies the service(s) to add.
+        """
         self.services |= service
 
 
 def newNetAddressIPPort(ip, port, services):
     """
-	A new NetAddress using the provided IP, port, and supported services with
-	defaults for the remaining fields.
+    A new NetAddress using the provided IP, port, and supported services with
+    defaults for the remaining fields.
 
-	Args:
-		ip (str or bytes-like): The peer's IP address.
-		port (int): The peer's port.
-		services (int): Bitfield which identifies the services supported by
-			the peer.
+    Args:
+        ip (str or bytes-like): The peer's IP address.
+        port (int): The peer's port.
+        services (int): Bitfield which identifies the services supported by
+            the peer.
 
-	Returns:
-		NetAddress: The peer's NetAddress.
-	"""
+    Returns:
+        NetAddress: The peer's NetAddress.
+    """
     return newNetAddressTimestamp(int(time.time()), services, ip, port)
 
 
 def newNetAddressTimestamp(stamp, services, ip, port):
     """
-	A new NetAddress using the provided timestamp, IP, port, and supported
-	services.
+    A new NetAddress using the provided timestamp, IP, port, and supported
+    services.
 
-	Args:
-		stamp (int): The last time the peer was seen.
-		ip (str or bytes-like): The peer's IP address.
-		port (int): The peer's port.
-		services (int): Bitfield which identifies the services supported by
-			the peer.
+    Args:
+        stamp (int): The last time the peer was seen.
+        ip (str or bytes-like): The peer's IP address.
+        port (int): The peer's port.
+        services (int): Bitfield which identifies the services supported by
+            the peer.
 
-	Returns:
-		NetAddress: The peer's NetAddress.
-	"""
+    Returns:
+        NetAddress: The peer's NetAddress.
+    """
     return NetAddress(ip, port, services, stamp)
 
 
 def newNetAddress(tcpAddr, services):
     """
-	A new NetAddress using the provided TCPAddr and supported services with
-	defaults for the remaining fields.
+    A new NetAddress using the provided TCPAddr and supported services with
+    defaults for the remaining fields.
 
-	Args:
-		tcpAddr (TCPAddr): The peer's address.
-		services (int): Bitfield which identifies the services supported by
-			the peer.
+    Args:
+        tcpAddr (TCPAddr): The peer's address.
+        services (int): Bitfield which identifies the services supported by
+            the peer.
 
-	Returns:
-		NetAddress: The peer's NetAddress.
-	"""
+    Returns:
+        NetAddress: The peer's NetAddress.
+    """
     return newNetAddressIPPort(tcpAddr.ip, tcpAddr.port, services)
 
 
 def readNetAddress(b, hasStamp):
     """
-	Reads an encoded NetAddress from b depending on the protocol version and
-	whether or not the timestamp is included per hasStamp.  Some messages like
-	version do not include the timestamp.
+    Reads an encoded NetAddress from b depending on the protocol version and
+    whether or not the timestamp is included per hasStamp.  Some messages like
+    version do not include the timestamp.
 
-	Args:
-		b (ByteArray): The encoded NetAddress.
-		hasStamp (bool): Whether or not the NetAddress has a timestamp.
+    Args:
+        b (ByteArray): The encoded NetAddress.
+        hasStamp (bool): Whether or not the NetAddress has a timestamp.
 
-	Returns:
-		NetAddress: The decoded NetAddress.
-	"""
+    Returns:
+        NetAddress: The decoded NetAddress.
+    """
     expLen = 30 if hasStamp else 26
     if len(b) != expLen:
         raise DecredError(
@@ -155,17 +155,17 @@ def readNetAddress(b, hasStamp):
 
 def writeNetAddress(netAddr, hasStamp):
     """
-	writeNetAddress serializes a NetAddress depending on the protocol
-	version and whether or not the timestamp is included per hasStamp.  Some
-	messages like version do not include the timestamp.
+    writeNetAddress serializes a NetAddress depending on the protocol
+    version and whether or not the timestamp is included per hasStamp.  Some
+    messages like version do not include the timestamp.
 
-	Args:
-		netAddr (NetAddress): The peer's NetAddress.
-		hasStamp (bool): Whether to encode the timestamp.
+    Args:
+        netAddr (NetAddress): The peer's NetAddress.
+        hasStamp (bool): Whether to encode the timestamp.
 
-	Returns:
-		ByteArray: The encoded NetAddress.
-	"""
+    Returns:
+        ByteArray: The encoded NetAddress.
+    """
     # NOTE: The Decred protocol uses a uint32 for the timestamp so it will
     # stop working somewhere around 2106.  Also timestamp wasn't added until
     # until protocol version >= NetAddressTimeVersion.
@@ -194,11 +194,11 @@ class TCPAddr:
 
     def __init__(self, ip, port, zone=None):
         """
-		Args:
-			ip (str or bytes-like): The IP.
-			port (int): The port.
-			zone (str): The IPv6 scoped addressing zone.
-		"""
+        Args:
+            ip (str or bytes-like): The IP.
+            port (int): The port.
+            zone (str): The IPv6 scoped addressing zone.
+        """
         if isinstance(ip, str):
             ip = decodeStringIP(ip)
         self.ip = ip
@@ -208,14 +208,14 @@ class TCPAddr:
 
 def decodeStringIP(ip):
     """
-	Parse an IP string to bytes.
+    Parse an IP string to bytes.
 
-	Args:
-		ip (str): The string-encoded IP address.
+    Args:
+        ip (str): The string-encoded IP address.
 
-	Returns:
-		bytes-like: The byte-encoded IP address.
-	"""
+    Returns:
+        bytes-like: The byte-encoded IP address.
+    """
     try:
         return socket.inet_pton(socket.AF_INET, ip)
     except OSError:
