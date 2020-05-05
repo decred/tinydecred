@@ -96,6 +96,25 @@ TxSerializeOnlyWitness = 2
 # extended Decred script.
 DefaultPkScriptVersion = 0x0000
 
+# NodeCFVersion is the protocol version which adds the SFNodeCF service
+# flag and the cfheaders, cfilter, cftypes, getcfheaders, getcfilter and
+# getcftypes messages.
+NodeCFVersion = 6
+
+# MaxVarIntPayload is the maximum payload size for a variable length integer.
+MaxVarIntPayload = 9
+
+# SFNodeNetwork is a flag used to indicate a peer is a full node.
+SFNodeNetwork = 1
+
+# SFNodeBloom is a flag used to indicate a peer supports bloom
+# filtering.
+SFNodeBloom = 2
+
+# SFNodeCF is a flag used to indicate a peer supports v1 gcs filters
+# (CFs).
+SFNodeCF = 3
+
 
 def varIntSerializeSize(i):
     """
@@ -181,3 +200,49 @@ def readVarInt(b, pver):
             "ReadVarInt noncanon error: {} - {} <= {}".format(rv, discriminant, minRv)
         )
     return rv
+
+
+def readVarString(b, pver):
+    """
+    readVarString reads a variable length string from b and returns it as string.
+    A variable length string is encoded as a variable length integer
+    containing the length of the string followed by the bytes that represent the
+    string itself.  An error is raised if the length is greater than the
+    maximum block payload size since it helps protect against memory exhaustion
+    attacks and forced panics through malformed messages.
+
+    Args:
+        b (ByteArray): The varString-encoded string.
+        pver (int): The protocol version (unused).
+
+    Returns:
+        str: The decoded string.
+    """
+    count = readVarInt(b, pver)
+
+    # Prevent variable length strings that are larger than the maximum
+    # message size.  It would be possible to cause memory exhaustion and
+    # panics without a sane upper bound on this count.
+    if count > MaxMessagePayload:
+        raise DecredError(
+            f"variable length string is too long [{count}, max {MaxMessagePayload}]"
+        )
+
+    return b.pop(count).bytes().decode()
+
+
+def writeVarString(pver, s):
+    """
+    writeVarString serializes s as a variable length integer containing the
+    length of the string followed by the bytes that represent the string
+    itself.
+
+    Args:
+        pver (int): The protocol version (unused).
+        s (str): The string to encode.
+
+    Returns:
+        ByteArray: The varString-encoded string.
+    """
+    strB = s.encode()
+    return writeVarInt(pver, len(strB)) + strB
