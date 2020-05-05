@@ -207,7 +207,7 @@ def readVarString(b, pver):
     readVarString reads a variable length string from b and returns it as string.
     A variable length string is encoded as a variable length integer
     containing the length of the string followed by the bytes that represent the
-    string itself.  An error is returned if the length is greater than the
+    string itself.  An error is raised if the length is greater than the
     maximum block payload size since it helps protect against memory exhaustion
     attacks and forced panics through malformed messages.
 
@@ -225,7 +225,7 @@ def readVarString(b, pver):
     # panics without a sane upper bound on this count.
     if count > MaxMessagePayload:
         raise DecredError(
-            f"variable length string is too long [count {count}, max {MaxMessagePayload}]"
+            f"variable length string is too long [{count}, max {MaxMessagePayload}]"
         )
 
     return b.pop(count).bytes().decode()

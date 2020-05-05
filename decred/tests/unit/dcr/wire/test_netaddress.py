@@ -18,8 +18,7 @@ def test_NetAddress():
     port = 8333
 
     # Test NewNetAddress.
-    tcpAddr = netaddress.TCPAddr(ip, port)
-    na = netaddress.newNetAddress(tcpAddr, 0)
+    na = netaddress.NetAddress(ip, port, 0)
 
     # Ensure we get the same ip, port, and services back out.
     assert byteIP4 == na.ip
@@ -112,12 +111,10 @@ def test_NetAddressWire():
     for test in tests:
         # Encode to wire format.
         b = netaddress.writeNetAddress(test["addrIn"], test["ts"])
-
         assert b == test["buf"]
 
         # Decode the message from wire format.
         na = netaddress.readNetAddress(test["buf"], test["ts"])
-
         assert byteIP4 == test["out"].ip
         assert na.port == test["out"].port
         assert na.services == test["out"].services

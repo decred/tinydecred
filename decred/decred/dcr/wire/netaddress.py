@@ -22,7 +22,7 @@ class NetAddress:
     it was last seen, the services it supports, its IP address, and port.
     """
 
-    def __init__(self, ip, port, services, stamp):
+    def __init__(self, ip, port, services, stamp=None):
         """
         Args:
             ip (str or bytes-like): The peer's IP address.
@@ -30,13 +30,13 @@ class NetAddress:
                 on the wire which differs from most everything else.
             services (int): Bitfield which identifies the services supported by
                 the peer.
-            stamp (int): The last time the peer was seen. This is,
-                unfortunately, encoded as an int on the wire and therefore is
-                limited to 2106. This field is not present in the Decred version
-                message (MsgVersion) nor was it added until protocol
-                version >= NetAddressTimeVersion.
+            stamp (int): Optional. Default: current time. The last time the peer
+                was seen. This is, unfortunately, encoded as an int on the wire
+                and therefore is limited to 2106. This field is not present in
+                the Decred version message (MsgVersion) nor was it added until
+                protocol version >= NetAddressTimeVersion.
         """
-        self.timestamp = stamp
+        self.timestamp = stamp if stamp else int(time.time())
         self.services = services
 
         # If the IP is a string, parse it to bytes.
@@ -66,57 +66,6 @@ class NetAddress:
             service (int): Bitfield which identifies the service(s) to add.
         """
         self.services |= service
-
-
-def newNetAddressIPPort(ip, port, services):
-    """
-    A new NetAddress using the provided IP, port, and supported services with
-    defaults for the remaining fields.
-
-    Args:
-        ip (str or bytes-like): The peer's IP address.
-        port (int): The peer's port.
-        services (int): Bitfield which identifies the services supported by
-            the peer.
-
-    Returns:
-        NetAddress: The peer's NetAddress.
-    """
-    return newNetAddressTimestamp(int(time.time()), services, ip, port)
-
-
-def newNetAddressTimestamp(stamp, services, ip, port):
-    """
-    A new NetAddress using the provided timestamp, IP, port, and supported
-    services.
-
-    Args:
-        stamp (int): The last time the peer was seen.
-        ip (str or bytes-like): The peer's IP address.
-        port (int): The peer's port.
-        services (int): Bitfield which identifies the services supported by
-            the peer.
-
-    Returns:
-        NetAddress: The peer's NetAddress.
-    """
-    return NetAddress(ip, port, services, stamp)
-
-
-def newNetAddress(tcpAddr, services):
-    """
-    A new NetAddress using the provided TCPAddr and supported services with
-    defaults for the remaining fields.
-
-    Args:
-        tcpAddr (TCPAddr): The peer's address.
-        services (int): Bitfield which identifies the services supported by
-            the peer.
-
-    Returns:
-        NetAddress: The peer's NetAddress.
-    """
-    return newNetAddressIPPort(tcpAddr.ip, tcpAddr.port, services)
 
 
 def readNetAddress(b, hasStamp):
@@ -189,23 +138,6 @@ def writeNetAddress(netAddr, hasStamp):
     return b
 
 
-class TCPAddr:
-    """ TCPAddr is a mimic of Go's net.TCPAddr. """
-
-    def __init__(self, ip, port, zone=None):
-        """
-        Args:
-            ip (str or bytes-like): The IP.
-            port (int): The port.
-            zone (str): The IPv6 scoped addressing zone.
-        """
-        if isinstance(ip, str):
-            ip = decodeStringIP(ip)
-        self.ip = ip
-        self.port = port
-        self.zone = zone
-
-
 def decodeStringIP(ip):
     """
     Parse an IP string to bytes.
@@ -219,4 +151,8 @@ def decodeStringIP(ip):
     try:
         return socket.inet_pton(socket.AF_INET, ip)
     except OSError:
+        pass
+    try:
         return socket.inet_pton(socket.AF_INET6, ip)
+    except OSError:
+        raise DecredError(f"failed to decode IP {ip}")
