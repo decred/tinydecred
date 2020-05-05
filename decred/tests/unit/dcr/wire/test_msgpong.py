@@ -12,7 +12,7 @@ from decred.dcr.wire.msgpong import MsgPong
 from decred.util.encode import ByteArray
 
 
-def test_PongLatest():
+def test_Pong():
     """
     Test the MsgPong API against the latest protocol version.
     """

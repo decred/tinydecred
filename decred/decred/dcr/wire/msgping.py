@@ -30,8 +30,7 @@ class MsgPing:
     def __init__(self, nonce):
         """
         Args:
-            nonce (int): Unique value associated with message that is used to
-                identify specific ping message.
+            nonce (int): A value unique to each ping message.
         """
         self.nonce = nonce
 
@@ -46,13 +45,13 @@ class MsgPing:
             pver (int): The protocol version. Unused.
 
         Returns:
-            MsgPing. The MsgPing.
+            MsgPing: The MsgPing.
         """
         return MsgPing(nonce=b.unLittle().int())
 
     def btcEncode(self, pver):
         """
-        btcEncode encodes the receiver to w using the Decred protocol encoding.
+        btcEncode encodes the receiver using the Decred protocol encoding.
         This is part of the Message API.
 
         Args:
