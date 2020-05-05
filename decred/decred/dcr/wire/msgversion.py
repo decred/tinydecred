@@ -312,6 +312,4 @@ def validateUserAgent(userAgent):
     Args:
         userAgent (string): The user agent string.
     """
-    if len(userAgent) > MaxUserAgentLen:
-        return False
-    return True
+    return len(userAgent) <= MaxUserAgentLen

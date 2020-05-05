@@ -528,7 +528,7 @@ class MsgTx:
     def command(self):
         """
         Command returns the protocol command string for the message.  This is part
-        of the Message API in go.
+        of the Message API.
         """
         return wire.CmdTx
 
