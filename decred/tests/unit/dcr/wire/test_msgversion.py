@@ -62,19 +62,19 @@ def baseVersionEncoded():
 
 def baseVersion():
     return msgversion.MsgVersion(
-        protocolVersion=60002,
-        services=wire.SFNodeNetwork,
-        timestamp=0x495FAB29,
-        addrYou=netaddress.NetAddress(
-            ip="192.168.0.1", port=8333, services=wire.SFNodeNetwork, stamp=0,
-        ),
         addrMe=netaddress.NetAddress(
             ip="127.0.0.1", port=8333, services=wire.SFNodeNetwork, stamp=0,
         ),
+        addrYou=netaddress.NetAddress(
+            ip="192.168.0.1", port=8333, services=wire.SFNodeNetwork, stamp=0,
+        ),
         nonce=123123,
-        userAgent="/dcrdtest:0.0.1/",
         lastBlock=234234,
+        services=wire.SFNodeNetwork,
         disableRelayTx=False,
+        protocolVersion=60002,
+        timestamp=0x495FAB29,
+        userAgent="/dcrdtest:0.0.1/",
     )
 
 
@@ -115,16 +115,18 @@ def test_MsgVersion():
 
     # Create version message data.
     lastBlock = 234234
-    tcpAddrMe = netaddress.TCPAddr(ip="127.0.0.1", port=8333,)
 
-    me = netaddress.newNetAddress(tcpAddrMe, wire.SFNodeNetwork)
-    tcpAddrYou = netaddress.TCPAddr(ip="192.168.0.1", port=8333,)
-    you = netaddress.newNetAddress(tcpAddrYou, wire.SFNodeNetwork)
+    me = netaddress.NetAddress(ip="127.0.0.1", port=8333, services=wire.SFNodeNetwork)
+    you = netaddress.NetAddress(
+        ip="192.168.0.1", port=8333, services=wire.SFNodeNetwork
+    )
 
     nonce = random.randint(0, 0xFFFFFFFF)
 
     # Ensure we get the correct data back out.
-    msg = msgversion.newMsgVersion(me, you, nonce, lastBlock)
+    msg = msgversion.MsgVersion(
+        addrMe=me, addrYou=you, nonce=nonce, lastBlock=lastBlock, services=0,
+    )
     assert msg.protocolVersion == pver
 
     assert sameNetAddress(msg.addrMe, me)
@@ -173,17 +175,6 @@ def test_MsgVersion():
     msg.addService(wire.SFNodeNetwork)
     assert msg.services == wire.SFNodeNetwork
     assert msg.hasService(wire.SFNodeNetwork)
-
-    # Use a fake connection.
-    class fakeConn:
-        localAddr = tcpAddrMe
-        remoteAddr = tcpAddrYou
-
-    msg = msgversion.newMsgVersionFromConn(fakeConn, nonce, lastBlock)
-
-    # Ensure we get the correct connection data back out.
-    assert msg.addrMe.ip == tcpAddrMe.ip
-    assert msg.addrYou.ip == tcpAddrYou.ip
 
 
 def test_VersionWire():

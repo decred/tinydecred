@@ -34,42 +34,44 @@ class MsgVersion:
 
     def __init__(
         self,
-        protocolVersion,
-        services,
-        timestamp,
-        addrYou,
         addrMe,
+        addrYou,
         nonce,
-        userAgent,
         lastBlock,
-        disableRelayTx,
+        services,
+        disableRelayTx=False,
+        protocolVersion=wire.ProtocolVersion,
+        timestamp=None,
+        userAgent=DefaultUserAgent,
     ):
         """
         Args:
-            protocolVersion (int): Version of the protocol the node is using.
-            services (int): Bitfield which identifies the enabled services.
-            timestamp (int): Time the message was generated.  This is encoded as
-                as 8 bytes on the wire.
-            addrYou (NetAddress): Address of the remote peer.
             addrMe (NetAddress): Address of the local peer.
-            nonce (int): Unique value associated with message that is used to
-                detect self-connections.
-            userAgent (str): The user agent that generated message.  This is
-                encoded as a varString on the wire.  This has a max length of
-                MaxUserAgentLen.
+            addrYou (NetAddress): Address of the remote peer.
+            nonce (int): Unique value associated with the  message that is used
+                to detect self-connections.
             lastBlock (int): Last block seen by the generator of the version
                 message.
-            disableRelayTx (bool): Don't announce transactions to peer.
+            services (int): Bitfield which identifies the enabled services.
+            disableRelayTx (bool): Optional. Default: False. Don't announce
+                transactions to peer.
+            protocolVersion (int): Optional. Default: wire.ProtocolVersion.
+                Version of the protocol the node is using.
+            timestamp (int): Optional. Default: current time. Time the message
+                was generated. This is encoded as 8 bytes on the wire.
+            userAgent (str): Optional. Default: DefaultUserAgent. The user agent
+                that generated message.  This is encoded as a varString on the
+                wire.  This has a max length of MaxUserAgentLen.
         """
-        self.protocolVersion = protocolVersion
-        self.services = services
-        self.timestamp = timestamp
-        self.addrYou = addrYou
         self.addrMe = addrMe
+        self.addrYou = addrYou
         self.nonce = nonce
-        self.userAgent = userAgent
         self.lastBlock = lastBlock
+        self.services = services
         self.disableRelayTx = disableRelayTx
+        self.protocolVersion = protocolVersion
+        self.timestamp = timestamp if timestamp is not None else int(time.time())
+        self.userAgent = userAgent
 
     def hasService(self, service):
         """
@@ -247,62 +249,6 @@ class MsgVersion:
             raise DecredError(f"bad user agent {newUserAgent}")
 
         self.userAgent = newUserAgent
-
-
-def newMsgVersion(addrMe, addrYou, nonce, lastBlock):
-    """
-    Decred version message that conforms to the Message API using the passed
-    parameters and defaults for the remaining fields.
-
-    Args:
-        addrMe (NetAddress): Address of the local peer.
-        addrYou (NetAddress): Address of the remote peer.
-        nonce (int): Unique value associated with message that is used to detect
-            self-connections.
-        lastBlock (int): Last block seen by the generator of the version
-            message.
-
-    Returns:
-        MsgVersion: The MsgVersion.
-    """
-    return MsgVersion(
-        protocolVersion=wire.ProtocolVersion,
-        services=0,
-        timestamp=int(time.time()),
-        addrYou=addrYou,
-        addrMe=addrMe,
-        nonce=nonce,
-        userAgent=DefaultUserAgent,
-        lastBlock=lastBlock,
-        disableRelayTx=False,
-    )
-
-
-def newMsgVersionFromConn(conn, nonce, lastBlock):
-    """
-    Convenience function that extracts the remote and local address from conn
-    and returns a new Decred version message that conforms to the Message
-    interface. See newMsgVersion.
-
-    Args:
-        conn (NetConn): A connection object with localAddr and remoteAddr
-            properties.
-        nonce (int): Unique value associated with message that is used to detect
-            self-connections.
-        lastBlock (int): Last block seen by the generator of the version
-            message.
-
-    Returns:
-        MsgVersion: The MsgVersion.
-    """
-
-    # Don't assume any services until we know otherwise.
-    lna = netaddress.newNetAddress(conn.localAddr, 0)
-
-    # Don't assume any services until we know otherwise.
-    rna = netaddress.newNetAddress(conn.remoteAddr, 0)
-
-    return newMsgVersion(lna, rna, nonce, lastBlock)
 
 
 def validateUserAgent(userAgent):
