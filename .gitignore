@@ -1,3 +1,4 @@
+build/
 decred/examples/wallets
 decred/dist/
 decred/poetry.lock
