@@ -1445,10 +1445,11 @@ class DCRDConfigScreen(Screen):
         grid.addWidget(Q.makeLabel("dcrd URL", 14, Q.ALIGN_LEFT), row, 0, 1, 3)
         grid.addWidget(Q.makeLabel("RPC username", 14, Q.ALIGN_LEFT), row, 3)
         row += 1
-        defaultRpclisten = f"127.0.0.1:{nets.DcrdPorts[cfg.netParams.Name]}"
-        host = nodeConfig.get("rpclisten", defaultRpclisten)
+        dcrdCfg = config.dcrd(cfg.netParams)
+        host = nodeConfig.get("rpclisten", dcrdCfg["rpclisten"])
+        scheme = "https" if not dcrdCfg["notls"] else "http"
 
-        self.rpcListen = QtWidgets.QLineEdit(f"https://{host}/")
+        self.rpcListen = QtWidgets.QLineEdit(f"{scheme}://{host}/")
         grid.addWidget(self.rpcListen, row, 0, 1, 3)
         self.rpcUser = QtWidgets.QLineEdit(nodeConfig.get("rpcuser", ""))
         grid.addWidget(self.rpcUser, row, 3)
