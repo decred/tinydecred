@@ -10,12 +10,12 @@ import logging
 from logging import Logger
 from logging.handlers import RotatingFileHandler
 import os
-from pathlib import PosixPath
+from pathlib import Path
 import platform
 import sys
 import time
 import traceback
-from typing import Dict, Iterable, Optional
+from typing import Dict, Iterable, Optional, Union
 from urllib.parse import urlsplit, urlunsplit
 
 from appdirs import AppDirs  # type: ignore
@@ -35,7 +35,7 @@ def formatTraceback(err: Exception) -> str:
     return "".join(traceback.format_exception(None, err, err.__traceback__))
 
 
-def mkdir(path: PosixPath) -> bool:
+def mkdir(path: Path) -> bool:
     """
     Create the directory if it doesn't exist. Uses os.path .
 
@@ -91,7 +91,7 @@ LogSettings.root.setLevel(logging.NOTSET)
 
 
 def prepareLogging(
-    filepath: Optional[PosixPath] = None,
+    filepath: Union[Path, str, None] = None,
     logLvl: int = logging.INFO,
     lvlMap: Optional[Dict[str, int]] = None,
 ) -> None:
@@ -152,7 +152,7 @@ def getLogger(name: str) -> Logger:
     return l
 
 
-def readINI(path: str, keys: Iterable[str]) -> Optional[Dict[str, str]]:
+def readINI(path: str, keys: Iterable[str]) -> Dict[str, str]:
     """
     Attempt to read the specified keys from the INI-formatted configuration
     file. All sections will be searched. A dict with discovered keys and

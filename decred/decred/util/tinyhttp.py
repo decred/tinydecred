@@ -8,7 +8,7 @@ See DcrdataClient.endpointList() for available enpoints.
 
 import json
 from ssl import SSLContext
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlencode
 import urllib.request as urlrequest
 
@@ -17,7 +17,10 @@ from decred import DecredError
 from .helpers import formatTraceback
 
 
-def get(url: str, **kwargs) -> Union[Dict[str, str], List[int], str]:
+JSONType = Union[str, int, float, bool, None, Dict[str, Any], List[Any]]
+
+
+def get(url: str, **kwargs) -> JSONType:
     """
     A convenience function to make a GET HTTP request.
 
@@ -28,9 +31,7 @@ def get(url: str, **kwargs) -> Union[Dict[str, str], List[int], str]:
     return request(url, **kwargs)
 
 
-def post(
-    url: str, data: Dict[str, str], **kwargs
-) -> Union[Dict[str, str], List[int], str]:
+def post(url: str, data: Dict[str, str], **kwargs) -> JSONType:
     """
     A convenience function to make a POST HTTP request.
 
@@ -48,7 +49,7 @@ def request(
     headers: Optional[Dict[str, str]] = None,
     urlEncode: Optional[bool] = False,
     context: Optional[SSLContext] = None,
-) -> Union[Dict[str, str], List[int], str]:
+) -> JSONType:
     """
     Make an HTTP request and try to decode the payload as JSON. If an error
     happens while decoding, return the raw payload.
