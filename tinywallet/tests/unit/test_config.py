@@ -8,7 +8,7 @@ import sys
 
 import pytest
 
-from decred.dcr.nets import simnet
+from decred.dcr.nets import DcrdPorts, simnet
 from decred.util import helpers
 from tinywallet import ui  # noqa, for coverage.
 from tinywallet.config import CmdArgs, dcrd, load
@@ -56,10 +56,30 @@ def test_dcrd(monkeypatch, tmpdir):
     cfg_file.write("rpcuser=username\n")
     cfg = dcrd(simnet)
     assert "rpc.cert" in cfg["rpccert"]
-    assert "localhost" in cfg["rpclisten"]
+    assert cfg["rpclisten"] == f"localhost:{DcrdPorts[simnet.Name]}"
+    assert not cfg["notls"]
 
-    cfg_file.write("rpcuser=username\nrpclisten=listen\n")
-    assert "listen" in dcrd(simnet)["rpclisten"]
+    tests = [
+        ("rpclisten=", f"localhost:{DcrdPorts[simnet.Name]}"),
+        ("rpclisten=0.0.0.0", f"0.0.0.0:{DcrdPorts[simnet.Name]}"),
+        ("rpclisten=::", f"localhost:{DcrdPorts[simnet.Name]}"),
+        ("rpclisten=:9109", "localhost:9109"),
+        ("rpclisten=0.0.0.0:9109", "0.0.0.0:9109"),
+        ("rpclisten=[::]:9109", "localhost:9109"),
+        ("rpclisten=[::1]:9109", "localhost:9109"),
+        ("rpclisten=:8337\nrpclisten=:9999", "localhost:9999"),
+    ]
+    for rpclistenCfg, want in tests:
+        cfg_file.write(f"rpcuser=username\n{rpclistenCfg}\n")
+        assert dcrd(simnet)["rpclisten"] == want
+
+    tests = [
+        ("notls=1", True),
+        ("notls=0", False),
+    ]
+    for notlsCfg, want in tests:
+        cfg_file.write(f"rpcuser=username\n{notlsCfg}\n")
+        assert dcrd(simnet)["notls"] == want
 
 
 def test_load():

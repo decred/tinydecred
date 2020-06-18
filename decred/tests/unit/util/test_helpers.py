@@ -178,3 +178,22 @@ def test_appDataDir(monkeypatch):
     monkeypatch.setattr(os.path, "expanduser", testexpanduser)
     monkeypatch.setattr(os, "getenv", testgetenv)
     assert helpers.appDataDir(appName) == "."
+
+
+def test_makeWebsocketURL():
+    """
+    Tests are 3-tuples:
+
+    baseURL (str): The base URL.
+    path (str): The websocket endpoint path.
+    want (str): The expected result.
+    """
+    tests = [
+        ("https://localhost:19556", "ws", "wss://localhost:19556/ws"),
+        ("http://localhost:8337", "ws1", "ws://localhost:8337/ws1"),
+        ("ws://localhost:9999", "ws2", "ws://localhost:9999/ws2"),
+        ("wss://localhost", "ws3", "wss://localhost/ws3"),
+        ("localhost:1234", "ws4", "wss://localhost:1234/ws4"),
+    ]
+    for baseURL, path, want in tests:
+        assert helpers.makeWebsocketURL(baseURL, path) == want

@@ -156,7 +156,7 @@ def readINI(path, keys):
     Returns:
         dict: Discovered keys and values.
     """
-    config = configparser.ConfigParser()
+    config = configparser.ConfigParser(strict=False)
     # Need to add a section header since configparser doesn't handle sectionless
     # INI format.
     with open(path) as f:
@@ -214,12 +214,13 @@ def makeWebsocketURL(baseURL, path):
     Turn the HTTP/HTTPS URL into a WS/WSS one.
 
     Args:
-        url (str): The base URL.
+        baseURL (str): The base URL.
         path (str): The websocket endpoint path. e.g. path of "ws" will yield
             URL wss://yourhost.com/ws.
     Returns:
         string: the WebSocket URL.
     """
+    baseURL = f"wss://{baseURL}" if "//" not in baseURL else baseURL
     url = urlsplit(baseURL)
     scheme = "wss" if url.scheme in ("https", "wss") else "ws"
     return urlunsplit((scheme, url.netloc, f"/{path}", "", ""))

@@ -10,6 +10,7 @@ import argparse
 import logging
 import os
 import sys
+from urllib.parse import urlparse
 
 from appdirs import AppDirs
 
@@ -112,9 +113,9 @@ class DB:
 def dcrd(netParams):
     """
     Attempt to fetch the dcrd configuration settings. Values will be parsed for
-    'rpcuser', 'rpcpass', 'rpclisten', and 'rpccert'. The setting for 'rpcuser'
-    must be present in the file. If values are not found for 'rpccert' or
-    'rpclisten', default locations are populated.
+    'notls', 'rpcuser', 'rpcpass', 'rpclisten', and 'rpccert'. The setting for
+    'rpcuser' must be present in the file. If values are not found for 'rpccert'
+    or 'rpclisten', default locations are populated.
 
     Args:
         netParams (bool): The network parameters.
@@ -126,16 +127,26 @@ def dcrd(netParams):
     cfgPath = os.path.join(dcrdCfgDir, "dcrd.conf")
     if not os.path.isfile(cfgPath):
         return {}
-    dcrdCfg = helpers.readINI(cfgPath, ["rpclisten", "rpcuser", "rpcpass", "rpccert"])
+    dcrdCfg = helpers.readINI(
+        cfgPath, ["notls", "rpclisten", "rpcuser", "rpcpass", "rpccert"]
+    )
     if "rpcuser" not in dcrdCfg:
         return None
     if "rpccert" not in dcrdCfg:
         dcrdCfg["rpccert"] = os.path.join(dcrdCfgDir, "rpc.cert")
-    # Tinywallet uses the protocol (scheme) of the URL for now.
+    rpcHost = "localhost"
+    rpcPort = nets.DcrdPorts[netParams.Name]
     if "rpclisten" in dcrdCfg:
-        dcrdCfg["rpclisten"] = "https://" + dcrdCfg["rpclisten"]
-    else:
-        dcrdCfg["rpclisten"] = f"https://localhost:{nets.DcrdPorts[netParams.Name]}"
+        try:
+            rpcUrl = urlparse(f"//{dcrdCfg['rpclisten']}")
+            if rpcUrl.hostname:
+                rpcHost = rpcUrl.hostname.replace("::1", "").strip(":") or rpcHost
+            if rpcUrl.port:
+                rpcPort = rpcUrl.port
+        except ValueError:
+            pass
+    dcrdCfg["rpclisten"] = f"{rpcHost}:{rpcPort}"
+    dcrdCfg["notls"] = dcrdCfg["notls"] == "1" if "notls" in dcrdCfg else False
     return dcrdCfg
 
 
