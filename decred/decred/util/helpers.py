@@ -206,7 +206,7 @@ def appDataDir(appName: str) -> str:
     # Fall back to standard HOME environment variable that works
     # for most POSIX OSes.
     if homeDir == "":
-        homeDir = os.getenv("HOME") or ""
+        homeDir = os.getenv("HOME", "")
 
     opSys = platform.system()
     if opSys == "Windows":
