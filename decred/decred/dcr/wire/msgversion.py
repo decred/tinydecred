@@ -5,9 +5,9 @@ See LICENSE for details
 
 import time
 
-from decred import DecredError
-from decred.dcr.wire import netaddress, wire
-from decred.util.encode import ByteArray
+from decred.decred import DecredError
+from decred.decred.dcr.wire import netaddress, wire
+from decred.decred.util.encode import ByteArray
 
 
 # MaxUserAgentLen is the maximum allowed length for the user agent field in a

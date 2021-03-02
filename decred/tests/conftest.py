@@ -8,7 +8,7 @@ import random
 
 import pytest
 
-from decred.util import chains, helpers
+from decred.decred.util import chains, helpers
 
 
 @pytest.fixture

@@ -9,7 +9,7 @@ import json
 from urllib.parse import urlencode
 import urllib.request as urlrequest
 
-from decred import DecredError
+from decred.decred import DecredError
 
 from .helpers import formatTraceback
 

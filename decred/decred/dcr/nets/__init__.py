@@ -3,7 +3,7 @@ Copyright (c) 2019, The Decred developers
 See LICENSE for details
 """
 
-from decred import DecredError
+from decred.decred import DecredError
 
 from . import mainnet, simnet, testnet
 

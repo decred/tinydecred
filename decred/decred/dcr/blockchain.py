@@ -4,10 +4,10 @@ Copyright (c) 2020, the Decred developers
 
 import time
 
-from decred.dcr import addrlib, rpc
-from decred.dcr.wire.msgblock import BlockHeader
-from decred.util import database, helpers
-from decred.util.encode import ByteArray
+from decred.decred.dcr import addrlib, rpc
+from decred.decred.dcr.wire.msgblock import BlockHeader
+from decred.decred.util import database, helpers
+from decred.decred.util.encode import ByteArray
 
 
 log = helpers.getLogger("blockchain")

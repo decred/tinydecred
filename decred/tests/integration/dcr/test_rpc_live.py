@@ -8,14 +8,14 @@ from urllib.parse import urlunsplit
 from base58 import b58decode
 import pytest
 
-from decred import DecredError
-from decred.crypto import crypto, opcode
-from decred.dcr import account, addrlib, rpc, txscript
-from decred.dcr.nets import mainnet
-from decred.dcr.wire import wire
-from decred.dcr.wire.msgblock import BlockHeader
-from decred.dcr.wire.msgtx import MsgTx, OutPoint, TxIn, TxOut
-from decred.util.encode import ByteArray
+from decred.decred import DecredError
+from decred.decred.crypto import crypto, opcode
+from decred.decred.dcr import account, addrlib, rpc, txscript
+from decred.decred.dcr.nets import mainnet
+from decred.decred.dcr.wire import wire
+from decred.decred.dcr.wire.msgblock import BlockHeader
+from decred.decred.dcr.wire.msgtx import MsgTx, OutPoint, TxIn, TxOut
+from decred.decred.util.encode import ByteArray
 
 
 mainnetAddress = "Dcur2mcGjmENx4DhNqDctW5wJCVyT3Qeqkx"

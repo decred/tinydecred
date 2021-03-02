@@ -6,8 +6,8 @@ See LICENSE for details
 
 import os
 
-from decred import DecredError
-from decred.util.encode import ByteArray
+from decred.decred import DecredError
+from decred.decred.util.encode import ByteArray
 
 
 KEY_SIZE = 32

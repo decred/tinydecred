@@ -3,8 +3,8 @@ Copyright (c) 2019-2020, the Decred developers
 See LICENSE for details
 """
 
-from decred.dcr import vsp
-from decred.dcr.nets import testnet
+from decred.decred.dcr import vsp
+from decred.decred.dcr.nets import testnet
 
 
 VSP_URL = "https://dcrstakedinner.com"

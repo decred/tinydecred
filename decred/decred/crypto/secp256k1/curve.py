@@ -26,9 +26,9 @@ All group operations are performed using Jacobian coordinates.  For a given
 where x = x1/z1^2 and y = y1/z1^3.
 """
 
-from decred import DecredError
-from decred.crypto.rando import generateSeed
-from decred.util.encode import ByteArray
+from decred.decred import DecredError
+from decred.decred.crypto.rando import generateSeed
+from decred.decred.util.encode import ByteArray
 
 from .field import BytePoints, FieldVal
 

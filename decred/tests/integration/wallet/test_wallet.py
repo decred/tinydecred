@@ -2,8 +2,8 @@
 Copyright (c) 2020, The Decred developers
 """
 
-from decred.dcr import nets
-from decred.wallet.wallet import SimpleWallet, Wallet
+from decred.decred.dcr import nets
+from decred.decred.wallet.wallet import SimpleWallet, Wallet
 
 
 PASSWORD = "test_password"

@@ -8,9 +8,9 @@ accounts module
     mostly be through the AccountManager.
 """
 
-from decred import DecredError
-from decred.crypto import crypto
-from decred.util import chains, encode, helpers
+from decred.decred import DecredError
+from decred.decred.crypto import crypto
+from decred.decred.util import chains, encode, helpers
 
 
 EXTERNAL_BRANCH = 0

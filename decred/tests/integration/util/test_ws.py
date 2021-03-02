@@ -12,7 +12,7 @@ import pytest
 import websocket
 from websocket_server import WebsocketServer
 
-from decred.util import ws
+from decred.decred.util import ws
 
 
 HOST = "localhost"

@@ -13,9 +13,9 @@ from base58 import b58decode, b58encode
 from blake256.blake256 import blake_hash
 import nacl.secret
 
-from decred import DecredError
-from decred.util import encode
-from decred.util.encode import ByteArray, unblobCheck
+from decred.decred import DecredError
+from decred.decred.util import encode
+from decred.decred.util.encode import ByteArray, unblobCheck
 
 from . import rando
 from .secp256k1.curve import PrivateKey, PublicKey, curve as Curve

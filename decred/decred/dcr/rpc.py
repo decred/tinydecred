@@ -9,11 +9,11 @@ import queue
 import ssl
 import types
 
-from decred import DecredError
-from decred.crypto.opcode import OP_SSRTX
-from decred.util import tinyhttp, ws
-from decred.util.encode import ByteArray
-from decred.util.helpers import getLogger, makeWebsocketURL
+from decred.decred import DecredError
+from decred.decred.crypto.opcode import OP_SSRTX
+from decred.decred.util import tinyhttp, ws
+from decred.decred.util.encode import ByteArray
+from decred.decred.util.helpers import getLogger, makeWebsocketURL
 
 from . import agenda, txscript
 from .wire.msgblock import BlockHeader

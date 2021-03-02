@@ -7,7 +7,7 @@ mainnet holds mainnet parameters. Any values should mirror exactly
 https://github.com/decred/dcrd/blob/master/chaincfg/mainnetparams.go
 """
 
-from decred.dcr import constants as C
+from decred.decred.dcr import constants as C
 
 
 Name = "mainnet"
