@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import sys
 
+sys.path.insert(0, '/home/akwa/projects/tinydecred/decred')
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from decred.dcr import constants as DCR
@@ -18,9 +19,9 @@ from decred.util import chains, database, helpers
 from decred.util.helpers import formatTraceback
 from decred.wallet.wallet import Wallet
 
-from . import config, qutilities as Q, screens, ui
-from .config import DB
-from .ui import LARGE, MEDIUM, SMALL, TINY
+import config, qutilities as Q, screens, ui
+from config import DB
+from ui import LARGE, MEDIUM, SMALL, TINY
 
 
 # The directory of the tinywallet package.
