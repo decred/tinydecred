@@ -12,15 +12,20 @@ The [`tinywallet`](./tinywallet) package contains a wallet based on the
 Each package may be installed from the [Python Package Index](https://pypi.org/)
 using the [`pip`](https://pip.pypa.io/) command as usual.
 
-## Required packages
+## Requirements
 
-Using `pip` to install as stated above:
+To run tinywallet on your machine you will need to setup the following. 
+
+Use `pip` to install as stated above:
 
 - pip install websocket_client
 - pip install blake256
 - pip install base58
 - pip install PyNaCl
 - pip install appdirs
+
+Setup and run dcrd. Set your rpcusername and rpcpassword from config file
+Installation guide can be found [`here`](https://docs.decred.org/wallets/cli/dcrd-setup/).
 
 ## Status
 

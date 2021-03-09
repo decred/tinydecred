@@ -8,6 +8,9 @@ prof/
 .venv/
 .mypy_cache/
 __pycache__/
+.idea/
+.vscode/
+decred/setup.py
 .pytest_cache
 .coverage
 *.c
