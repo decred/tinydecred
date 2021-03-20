@@ -45,7 +45,8 @@ Installation guide can be found [`here`](https://docs.decred.org/wallets/cli/dcr
 
 ## Run 
 
-Execute script from the relevant root directory using: `python3 -m myfile.py`
+Execute script from the relevant root directory using: `python3 -m myfile.py` for python3.8.
+But if you are using python3.9, use this: `python myfile.py` 
 
 ## Roadmap
 
