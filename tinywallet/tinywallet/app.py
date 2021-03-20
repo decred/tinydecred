@@ -10,7 +10,10 @@ import os
 from pathlib import Path
 import sys
 
-sys.path.insert(0, '/home/akwa/projects/tinydecred/decred')
+"""
+update your path to the decred folder accordingly
+"""
+sys.path.insert(0, '/home/silverback/PycharmProjects/tinydecred/decred')
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from decred.dcr import constants as DCR
