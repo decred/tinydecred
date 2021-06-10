@@ -14,9 +14,7 @@ using the [`pip`](https://pip.pypa.io/) command as usual.
 
 ## Requirements
 
-To run tinywallet on your machine you will need to setup the following. 
-
-Use `pip` to install as stated above:
+To run tinydecred on your machine you will need to set up the following. 
 
 - pip install websocket_client
 - pip install blake256
@@ -24,7 +22,7 @@ Use `pip` to install as stated above:
 - pip install PyNaCl
 - pip install appdirs
 
-Setup and run dcrd. Set your rpcusername and rpcpassword from config file
+Set up and run dcrd. Ensure your rpcusername and rpcpassword is set in your dcrd config file.
 Installation guide can be found [`here`](https://docs.decred.org/wallets/cli/dcrd-setup/).
 
 ## Status
@@ -43,10 +41,6 @@ Installation guide can be found [`here`](https://docs.decred.org/wallets/cli/dcr
 [![GitHub contributors](https://img.shields.io/github/contributors/decred/tinydecred)](https://github.com/decred/tinydecred/graphs/contributors)
 [![GitHub](https://img.shields.io/github/license/decred/tinydecred)](./LICENSE)
 
-## Run 
-
-Execute script from the relevant root directory using: `python3 -m myfile.py` for python3.8.
-But if you are using python3.9, use this: `python myfile.py` 
 
 ## Roadmap
 
