@@ -16,7 +16,7 @@ Blobber API:
 import sqlite3
 import threading
 
-from decred import DecredError
+from decred.decred import DecredError
 
 
 TRUE = bytearray([1])

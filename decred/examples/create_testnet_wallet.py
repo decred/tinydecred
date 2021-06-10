@@ -7,7 +7,7 @@ testnet wallet. The mnemonic seed and an address are printed.
 
 from getpass import getpass
 
-from decred.wallet.wallet import SimpleWallet
+from decred.decred.wallet.wallet import SimpleWallet
 
 
 def main():

@@ -6,8 +6,8 @@ See LICENSE for details
 import socket
 import time
 
-from decred import DecredError
-from decred.util.encode import ByteArray
+from decred.decred import DecredError
+from decred.decred.util.encode import ByteArray
 
 
 MaxNetAddressPayload = 30

@@ -5,7 +5,7 @@ See LICENSE for details.
 Based on dcrd MsgVerAck.
 """
 
-from decred.util.encode import ByteArray
+from decred.decred.util.encode import ByteArray
 
 
 CmdVerAck = "verack"

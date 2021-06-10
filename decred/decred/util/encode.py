@@ -8,7 +8,7 @@ A class that wraps ByteArray and provides some convenient operators.
 
 import struct
 
-from decred import DecredError
+from decred.decred import DecredError
 
 
 NONE = "None".encode()

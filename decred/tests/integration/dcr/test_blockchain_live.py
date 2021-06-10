@@ -5,10 +5,10 @@ See LICENSE for details
 
 import pytest
 
-from decred.dcr.blockchain import LocalNode
-from decred.dcr.nets import mainnet
-from decred.dcr.wire.msgtx import OutPoint
-from decred.util.encode import ByteArray, rba
+from decred.decred.dcr.blockchain import LocalNode
+from decred.decred.dcr.nets import mainnet
+from decred.decred.dcr.wire.msgtx import OutPoint
+from decred.decred.util.encode import ByteArray, rba
 
 
 @pytest.fixture

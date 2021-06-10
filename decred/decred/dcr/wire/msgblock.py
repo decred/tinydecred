@@ -6,8 +6,8 @@ See LICENSE for details
 Based on dcrd MsgBlock.
 """
 
-from decred.crypto import crypto
-from decred.util.encode import ByteArray
+from decred.decred.crypto import crypto
+from decred.decred.util.encode import ByteArray
 
 
 # chainhash.HashSize in Go
@@ -18,7 +18,7 @@ MaxHeaderSize = 180
 
 class BlockHeader:
     """
-    BlockHeader defines information about a block and is used in the dec
+    BlockHeader defines information about a block and is used in the decred
     block (MsgBlock) and headers (MsgHeaders) messages.
     """
 

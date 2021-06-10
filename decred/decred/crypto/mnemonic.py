@@ -6,8 +6,8 @@ See LICENSE for details
 PGP-based mnemonic seed generation.
 """
 
-from decred import DecredError
-from decred.util.encode import ByteArray
+from decred.decred import DecredError
+from decred.decred.util.encode import ByteArray
 
 from .crypto import sha256ChecksumByte
 

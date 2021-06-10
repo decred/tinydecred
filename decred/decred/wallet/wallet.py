@@ -6,12 +6,12 @@ See LICENSE for details
 
 from pathlib import Path
 
-from decred import DecredError
-from decred.crypto import crypto, mnemonic, rando
-from decred.dcr import nets
-from decred.dcr.dcrdata import DcrdataBlockchain
-from decred.util import chains, database, encode, helpers
-from decred.util.helpers import mkdir
+from decred.decred import DecredError
+from decred.decred.crypto import crypto, mnemonic, rando
+from decred.decred.dcr import nets
+from decred.decred.dcr.dcrdata import DcrdataBlockchain
+from decred.decred.util import chains, database, encode, helpers
+from decred.decred.util.helpers import mkdir
 
 from . import accounts
 

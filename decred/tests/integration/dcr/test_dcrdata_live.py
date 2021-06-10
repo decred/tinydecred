@@ -5,12 +5,12 @@ See LICENSE for details
 
 import time
 
-from decred.crypto import crypto, rando
-from decred.crypto.secp256k1 import curve as Curve
-from decred.dcr import account, addrlib, dcrdata, txscript
-from decred.dcr.nets import mainnet, testnet
-from decred.dcr.wire import msgtx
-from decred.util.encode import ByteArray
+from decred.decred.crypto import crypto, rando
+from decred.decred.crypto.secp256k1 import curve as Curve
+from decred.decred.dcr import account, addrlib, dcrdata, txscript
+from decred.decred.dcr.nets import mainnet, testnet
+from decred.decred.dcr.wire import msgtx
+from decred.decred.util.encode import ByteArray
 
 
 class TestDcrdata:

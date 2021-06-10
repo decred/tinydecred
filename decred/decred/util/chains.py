@@ -3,8 +3,8 @@ Copyright (c) 2019-2020, The Decred developers
 See LICENSE for details
 """
 
-from decred import DecredError
-from decred.dcr import account as dcracct, nets as dcrnets
+from decred.decred import DecredError
+from decred.decred.dcr import account as dcracct, nets as dcrnets
 
 
 class BipIDs:

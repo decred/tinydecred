@@ -6,8 +6,8 @@ matplotlib. The matplotlib package is not a decred dependency, so it should
 be installed separately with `pip3 install matplotlib`.
 """
 
-from decred.dcr.dcrdata import DcrdataClient
-from decred.util.helpers import mktime
+from decred.decred.dcr.dcrdata import DcrdataClient
+from decred.decred.util.helpers import mktime
 
 
 try:

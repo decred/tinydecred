@@ -6,10 +6,10 @@ See LICENSE for details
 Based on dcrd MsgTx.
 """
 
-from decred import DecredError
-from decred.crypto.crypto import hashH
-from decred.dcr import txscript
-from decred.util.encode import ByteArray
+from decred.decred import DecredError
+from decred.decred.crypto.crypto import hashH
+from decred.decred.dcr import txscript
+from decred.decred.util.encode import ByteArray
 
 from . import wire
 

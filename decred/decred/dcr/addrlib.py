@@ -9,8 +9,8 @@ Cryptographic functions.
 
 from base58 import b58encode
 
-from decred import DecredError
-from decred.crypto.crypto import (
+from decred.decred import DecredError
+from decred.decred.crypto.crypto import (
     RIPEMD160_SIZE,
     PKFCompressed,
     PKFUncompressed,
@@ -21,9 +21,9 @@ from decred.crypto.crypto import (
     checksum,
     hash160,
 )
-from decred.crypto.secp256k1.curve import curve as Secp256k1
-from decred.dcr import nets
-from decred.util.encode import BuildyBytes, ByteArray, decodeBlob, unblobCheck
+from decred.decred.crypto.secp256k1.curve import curve as Secp256k1
+from decred.decred.dcr import nets
+from decred.decred.util.encode import BuildyBytes, ByteArray, decodeBlob, unblobCheck
 
 
 class Address:

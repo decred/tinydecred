@@ -5,7 +5,7 @@ See LICENSE for details
 
 import pytest
 
-from decred.util import database
+from decred.decred.util import database
 
 
 @pytest.fixture

@@ -7,15 +7,15 @@ mainnet holds mainnet parameters. Any values should mirror exactly
 https://github.com/decred/dcrd/blob/master/chaincfg/mainnetparams.go
 """
 
-from decred.dcr import constants as C
+from decred.decred.dcr import constants as C
 
 
 Name = "mainnet"
 DefaultPort = "9108"
 DNSSeeds = [
-    ("mainnet-seed.dec.mindcry.org", True),
-    ("mainnet-seed.dec.netpurgatory.com", True),
-    ("mainnet-seed.dec.org", True),
+    ("mainnet-seed.decred.mindcry.org", True),
+    ("mainnet-seed.decred.netpurgatory.com", True),
+    ("mainnet-seed.decred.org", True),
 ]
 GenesisHash = "298e5cc3d985bfe7f81dc135f360abe089edd4396b86d2de66b0cef42b21d980"
 PowLimit = 2 ^ 224 - 1

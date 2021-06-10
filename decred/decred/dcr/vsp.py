@@ -9,10 +9,10 @@ DcrdataClient.endpointList() for available endpoints.
 import time
 from urllib.parse import urlsplit, urlunsplit
 
-from decred import DecredError
-from decred.dcr import addrlib
-from decred.util import encode, tinyhttp
-from decred.util.encode import ByteArray, unblobCheck
+from decred.decred import DecredError
+from decred.decred.dcr import addrlib
+from decred.decred.util import encode, tinyhttp
+from decred.decred.util.encode import ByteArray, unblobCheck
 
 from . import constants, nets, txscript
 

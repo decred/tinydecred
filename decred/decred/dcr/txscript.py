@@ -9,12 +9,12 @@ Based on dcrd txscript.
 import bisect
 import math
 
-from decred import DecredError
-from decred.crypto import crypto, opcode
-from decred.crypto.secp256k1.curve import curve as Curve
-from decred.dcr import addrlib
-from decred.util import helpers
-from decred.util.encode import ByteArray
+from decred.decred import DecredError
+from decred.decred.crypto import crypto, opcode
+from decred.decred.crypto.secp256k1.curve import curve as Curve
+from decred.decred.dcr import addrlib
+from decred.decred.util import helpers
+from decred.decred.util.encode import ByteArray
 
 from .wire import msgtx, wire
 

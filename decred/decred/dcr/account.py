@@ -4,12 +4,12 @@ Copyright (c) 2020, the Decred developers
 See LICENSE for details
 """
 
-from decred import DecredError
-from decred.crypto import crypto, opcode
-from decred.dcr import addrlib
-from decred.dcr.txscript import DefaultRelayFeePerKb
-from decred.util import encode, helpers
-from decred.util.encode import BuildyBytes, ByteArray, unblobCheck
+from decred.decred import DecredError
+from decred.decred.crypto import crypto, opcode
+from decred.decred.dcr import addrlib
+from decred.decred.dcr.txscript import DefaultRelayFeePerKb
+from decred.decred.util import encode, helpers
+from decred.decred.util.encode import BuildyBytes, ByteArray, unblobCheck
 
 from . import nets, txscript
 from .vsp import VotingServiceProvider
