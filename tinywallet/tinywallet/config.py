@@ -14,8 +14,8 @@ from urllib.parse import urlparse
 
 from appdirs import AppDirs
 
-from decred.dcr import nets
-from decred.util import helpers
+from decred.decred.dcr import nets
+from decred.decred.util import helpers
 
 
 # Set the data directory in a OS-appropriate location.

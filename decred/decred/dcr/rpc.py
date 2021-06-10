@@ -1863,7 +1863,7 @@ class GetRawMempoolVerboseResult:
         """
         Args:
             size (int): Transaction size in bytes.
-            fee (float): Transaction fee in decred.
+            fee (float): Transaction fee in dec.
             time (int): Local time transaction entered pool in seconds since
                 1 Jan 1970 GMT.
             height (int): Block height when transaction entered the pool.

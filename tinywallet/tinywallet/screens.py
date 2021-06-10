@@ -14,15 +14,15 @@ import webbrowser
 
 from PyQt5 import QtCore, QtGui, QtSvg, QtWidgets
 
-from decred import DecredError
-from decred.crypto import crypto
-from decred.dcr import constants as DCR, nets
-from decred.dcr.blockchain import LocalNode
-from decred.dcr.txscript import DefaultRelayFeePerKb
-from decred.dcr.vsp import VotingServiceProvider
-from decred.util import chains, database, helpers
-from decred.util.helpers import formatTraceback
-from decred.wallet.wallet import Wallet
+from decred.decred import DecredError
+from decred.decred.crypto import crypto
+from decred.decred.dcr import constants as DCR, nets
+from decred.decred.dcr.blockchain import LocalNode
+from decred.decred.dcr.txscript import DefaultRelayFeePerKb
+from decred.decred.dcr.vsp import VotingServiceProvider
+from decred.decred.util import chains, database, helpers
+from decred.decred.util.helpers import formatTraceback
+from decred.decred.wallet.wallet import Wallet
 
 import config, qutilities as Q, ui
 from config import DB

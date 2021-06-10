@@ -18,7 +18,7 @@ MaxHeaderSize = 180
 
 class BlockHeader:
     """
-    BlockHeader defines information about a block and is used in the decred
+    BlockHeader defines information about a block and is used in the dec
     block (MsgBlock) and headers (MsgHeaders) messages.
     """
 

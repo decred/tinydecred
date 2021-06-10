@@ -10,7 +10,7 @@ import re
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
-from decred.util import helpers
+from decred.decred.util import helpers
 
 
 log = helpers.getLogger("QUTIL")
