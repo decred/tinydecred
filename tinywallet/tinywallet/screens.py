@@ -1649,9 +1649,12 @@ class DCRDConfigScreen(Screen):
 
                 self.ctl.connectNode(withDCRD)
 
+            self.connectedLbl.setText("Connected to dcrd")
+
         else:
             node.close()
             self.ctl.setNode(None)
+            self.connectedLbl.setText("Connection to dcrd is currently off")
 
     def fieldEdited(self, s):
         """
