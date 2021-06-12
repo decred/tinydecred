@@ -35,9 +35,11 @@ from .field import BytePoints, FieldVal
 
 COORDINATE_LEN = 32
 PUBKEY_COMPRESSED_LEN = COORDINATE_LEN + 1
+PUBKEY_HYBRID_LEN = 65
 PUBKEY_LEN = 65
 PUBKEY_COMPRESSED = 0x02  # 0x02 y_bit + x coord
 PUBKEY_UNCOMPRESSED = 0x04  # 0x04 x coord + y coord
+PUBKEY_HYBRID = 0x6
 
 fieldOne = FieldVal.fromInt(1)
 
@@ -157,6 +159,17 @@ class PublicKey:
         b += ByteArray(self.y, length=32)
         return b
 
+    def serializeHybrid(self):
+        """SerializeHybrid serializes a public key in a 65-byte hybrid format."""
+        fmt = PUBKEY_HYBRID
+        if not isEven(self.y):
+            fmt |= 0x1
+        b = ByteArray(fmt)
+        b += ByteArray(self.x, length=COORDINATE_LEN) + ByteArray(self.y, length=COORDINATE_LEN)
+        if len(b) != PUBKEY_HYBRID_LEN:
+            raise DecredError("invalid hybrid pubkey length %d", len(b))
+        return b
+
     def __eq__(self, other):
         """
         __eq__ compares this PublicKey instance to the one passed, returning
@@ -174,6 +187,21 @@ class PrivateKey:
     def __init__(self, curve, k, x, y):
         self.key = k
         self.pub = PublicKey(curve, x, y)
+
+    @staticmethod
+    def fromBytes(pk):
+        """
+        fromBytes creates a PrivateKey for the secp256k1 curve based on
+        the provided byte-encoding.
+
+        Args:
+            pk (ByteArray): The private key bytes.
+
+        Returns:
+            secp256k1.Privatekey: The private key structure.
+        """
+        x, y = curve.scalarBaseMult(pk.int())
+        return PrivateKey(Curve, pk, x, y)
 
 
 def randFieldElement():
@@ -261,6 +289,7 @@ class Curve:
         for i, bidx in enumerate(kb.b):
             p = BytePoints[diff + i][bidx]
             self.addJacobian(qx, qy, qz, p[0], p[1], p[2], qx, qy, qz)
+
         return self.fieldJacobianToBigAffine(qx, qy, qz)
 
     def splitK(self, k):
@@ -397,7 +426,7 @@ class Curve:
         x, y = self.scalarBaseMult(k)
         return PublicKey(self, x, y)
 
-    def parsePubKey(self, pubKeyB):
+    def parsePubKey(self, pubKeyB, allowHybrid=True):
         """
         parsePubKey parses a secp256k1 public key encoded according to the
         format specified by ANSI X9.62-1998, which means it is also compatible
@@ -419,14 +448,21 @@ class Curve:
         ybit = (fmt & 0x1) == 0x1
         fmt &= 0xFF ^ 0x01
 
-        ifunc = lambda b: int.from_bytes(b, byteorder="big")
+        if fmt == PUBKEY_HYBRID and not allowHybrid:
+            raise DecredError("hybrid format not suported")
+
+        def ifunc(b: bytes):
+            return int.from_bytes(b, byteorder="big")
 
         pkLen = len(pubKeyB)
         if pkLen == PUBKEY_LEN:
-            if PUBKEY_UNCOMPRESSED != fmt:
+            if fmt != PUBKEY_UNCOMPRESSED and fmt != PUBKEY_HYBRID:
                 raise DecredError("invalid magic in pubkey: %d" % pubKeyB[0])
             x = ifunc(pubKeyB[1:33])
             y = ifunc(pubKeyB[33:])
+            # hybrid keys have extra information, make use of it.
+            if fmt == PUBKEY_HYBRID and ybit == isEven(y):
+                raise DecredError("ybit doesn't match oddness")
 
         elif pkLen == PUBKEY_COMPRESSED_LEN:
             # format is 0x2 | solution, <X coordinate>

@@ -17,7 +17,6 @@ from decred.crypto.crypto import (
     STEcdsaSecp256k1,
     STEd25519,
     STSchnorrSecp256k1,
-    b58CheckDecode,
     checksum,
     hash160,
 )
@@ -465,3 +464,27 @@ def deriveChildAddress(branchXPub, i, netParams):
     return AddressPubKeyHash(
         hash160(child.publicKey().serializeCompressed().b), netParams, STEcdsaSecp256k1,
     ).string()
+
+def b58CheckDecode(s):
+    """
+    Decode the base-58 encoded address, parsing the version bytes and the pubkey
+    hash. An exception is raised if the checksum is invalid or missing.
+
+    Args:
+        s (str): The base-58 encoded address.
+
+    Returns:
+        ByteArray: Decoded bytes minus the leading version and trailing
+            checksum.
+        int: The version (leading two) bytes.
+    """
+    decoded = b58decode(s)
+    if len(decoded) < 6:
+        raise DecredError("decoded lacking version/checksum")
+    version = decoded[:2]
+    included_cksum = decoded[len(decoded) - 4:]
+    computed_cksum = checksum(decoded[: len(decoded) - 4])
+    if included_cksum != computed_cksum:
+        raise DecredError("checksum error")
+    payload = ByteArray(decoded[2: len(decoded) - 4])
+    return payload, version
