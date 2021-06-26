@@ -1606,6 +1606,21 @@ class DCRDConfigScreen(Screen):
         self.submitBttn.setVisible(not show)
         self.useTmpBttn.setVisible(show)
 
+    def setDcrdLabelOn(self):
+        """
+        Prints message when dcrd connection is on
+        """
+
+        self.connectedLbl.setText("Connected to dcrd")
+
+    def setDcrdLabelOff(self):
+        """
+        Prints message when dcrd connection is off
+        """
+
+        self.connectedLbl.setText("Connection to dcrd is currently off")
+
+
     def readConfig(self):
         """
         Shows the configuration form if dcrd is not configured, else the
@@ -1623,9 +1638,9 @@ class DCRDConfigScreen(Screen):
             self.connectedWgt.setVisible(True)
             self.hostLbl.setText(ctl.settings[DB.rpchost].decode())
             if node and node.connected():
-                self.connectedLbl.setText("Connected to dcrd")
+                self.setDcrdLabelOn()
             else:
-                self.connectedLbl.setText("Connection to dcrd is currently off")
+                self.setDcrdLabelOff()
         else:
             self.remoteForm.setVisible(True)
             self.connectedWgt.setVisible(False)
@@ -1649,9 +1664,12 @@ class DCRDConfigScreen(Screen):
 
                 self.ctl.connectNode(withDCRD)
 
+            self.setDcrdLabelOn()
+
         else:
             node.close()
             self.ctl.setNode(None)
+            self.setDcrdLabelOff()
 
     def fieldEdited(self, s):
         """
