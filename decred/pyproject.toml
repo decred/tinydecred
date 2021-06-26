@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "decred"
-version = "0.0.1"
+version = "0.1.2-dev"
 description = "A Python 3 Decred toolkit."
 license = "ISC"
 homepage = "https://decred.org/"
@@ -61,5 +61,5 @@ skip = [
 ]
 
 [build-system]
-requires = ["poetry>=1.0.3"]
+requires = ["setuptools", "poetry>=1.0.3"]
 build-backend = "poetry.masonry.api"

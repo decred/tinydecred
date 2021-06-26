@@ -516,11 +516,13 @@ def main():
     """
     Start the TinyWallet application.
     """
+    os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
     sys.excepthook = exception_hook
     QtWidgets.QApplication.setDesktopSettingsAware(False)
     roboFont = QtGui.QFont("Roboto")
     roboFont.setPixelSize(16)
     QtWidgets.QApplication.setFont(roboFont)
+    QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
     qApp = QtWidgets.QApplication(sys.argv)
     qApp.setStyleSheet(Q.QUTILITY_STYLE)
     qApp.setPalette(Q.lightThemePalette)
