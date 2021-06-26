@@ -48,6 +48,8 @@ have different sets of endpoints.
 
 In the [`examples`](./examples) directory there are scripts for creating and
 using wallets, and for using dcrdata and matplotlib to plot Decred network data.
+There is also a script that can be used to recover funds from an old copay
+wallet xpriv.
 
 Here are some more examples:
 
