@@ -9,9 +9,9 @@ Cryptographic functions.
 import hashlib
 import hmac
 
-from base58 import b58decode, b58encode
-from blake256.blake256 import blake_hash
-import nacl.secret
+from base58 import b58decode, b58encode  # type: ignore
+from blake256.blake256 import blake_hash  # type: ignore
+import nacl.secret  # type: ignore
 
 from decred import DecredError
 from decred.util import encode

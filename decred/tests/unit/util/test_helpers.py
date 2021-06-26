@@ -171,7 +171,7 @@ def test_appDataDir(monkeypatch):
     def testexpanduser(s):
         return ""
 
-    def testgetenv(s):
+    def testgetenv(s, d=""):
         return ""
 
     opSys = "Linux"

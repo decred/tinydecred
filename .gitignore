@@ -8,6 +8,7 @@ prof/
 .venv/
 .mypy_cache/
 __pycache__/
+.mypy_cache/
 .pytest_cache
 .coverage
 *.c

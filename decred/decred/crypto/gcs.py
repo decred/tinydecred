@@ -3,8 +3,8 @@ Copyright (c) 2020, The Decred developers
 See LICENSE for details
 """
 
-from blake256.blake256 import blake_hash
-from nacl.hash import siphash24
+from blake256.blake256 import blake_hash  # type: ignore
+from nacl.hash import siphash24  # type: ignore
 
 from decred import DecredError
 from decred.dcr.wire import wire

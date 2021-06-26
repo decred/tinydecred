@@ -5,7 +5,7 @@ See LICENSE for details
 
 import threading
 
-import websocket
+import websocket  # type: ignore
 
 
 class Client(websocket.WebSocketApp):
