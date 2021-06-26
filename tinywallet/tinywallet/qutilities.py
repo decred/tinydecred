@@ -3,12 +3,12 @@ Copyright (c) 2019, Brian Stafford
 Copyright (c) 2019-2020, the Decred developers
 See LICENSE for details
 
-PyQt5 utilities.
+Qt utilities.
 """
 
 import re
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PySide2 import QtCore, QtGui, QtWidgets
 
 from decred.util import helpers
 
@@ -36,8 +36,6 @@ LIGHT_THEME = "light"
 DARK_THEME = "dark"
 
 STRETCH = "stretch"
-
-PyObj = "PyQt_PyObject"
 
 
 class ThreadUtilities:
@@ -312,7 +310,7 @@ class Toggle(QtWidgets.QAbstractButton):
         """
         return self.xPos
 
-    pqProp = QtCore.pyqtProperty(int, fget=getOffset, fset=setOffset)
+    pqProp = QtCore.Property(int, fget=getOffset, fset=setOffset)
 
     def set(self, on):
         """

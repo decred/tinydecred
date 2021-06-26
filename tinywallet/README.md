@@ -1,7 +1,8 @@
 # TinyWallet
 
 TinyWallet is a light [Decred](https://decred.org/) wallet GUI application
-based on PyQt5.
+based on the Qt toolkit via the PySide2 bindings, which are licensed under
+LGPLv3.
 
 **The light wallet is experimental, and should not be used on mainnet.**
 

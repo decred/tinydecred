@@ -3,14 +3,14 @@ Copyright (c) 2019, Brian Stafford
 Copyright (c) 2019-2020, the Decred developers
 See LICENSE for details
 
-A PyQt light wallet.
+A Qt-based light wallet.
 """
 
 import os
 from pathlib import Path
 import sys
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PySide2 import QtCore, QtGui, QtWidgets
 
 from decred.dcr import constants as DCR
 from decred.dcr.dcrdata import DcrdataBlockchain
@@ -55,23 +55,24 @@ class TinySignals:
 
 class TinyWallet(QtCore.QObject, Q.ThreadUtilities):
     """
-    TinyWallet is an PyQt application for interacting with the Decred
+    TinyWallet is a Qt application for interacting with the Decred
     blockchain. TinyWallet currently implements a UI for creating and
     controlling a rudimentary, non-staking, Decred testnet light wallet.
 
     TinyWallet is a system tray application.
     """
 
-    qRawSignal = QtCore.pyqtSignal(tuple)
-    homeSig = QtCore.pyqtSignal(Q.PyObj)
-    walletSig = QtCore.pyqtSignal(Q.PyObj)
+    qRawSignal = QtCore.Signal(tuple)
+    homeSig = QtCore.Signal(object)
+    walletSig = QtCore.Signal(object)
 
     def __init__(self, qApp):
         """
         Args:
             qApp (QApplication): An initialized QApplication.
         """
-        super().__init__()
+        QtCore.QObject.__init__(self)
+        Q.ThreadUtilities.__init__(self)
         self.qApp = qApp
         self.cfg = config.load()
         self.log = self.initLogging()
