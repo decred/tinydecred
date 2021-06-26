@@ -154,7 +154,10 @@ P2SHPkScriptSize = 1 + 1 + 20 + 1
 # to maintain reference.
 
 # DefaultRelayFeePerKb is the default minimum relay fee policy for a mempool.
-DefaultRelayFeePerKb = 1e4
+DefaultRelayFeePerKb = int(1e4)
+
+# HighFeeRate is the atoms/kb rate that is considered too high.
+HighFeeRate = DefaultRelayFeePerKb * 1000
 
 # MaxStandardTxSize is the maximum size allowed for transactions that are
 # considered standard and will therefore be relayed and considered for mining.
@@ -2605,7 +2608,7 @@ def paysHighFees(totalInput, tx):
         # Impossible to determine
         return False
 
-    maxFee = calcMinRequiredTxRelayFee(1000 * DefaultRelayFeePerKb, tx.serializeSize())
+    maxFee = calcMinRequiredTxRelayFee(HighFeeRate, tx.serializeSize())
     return fee > maxFee
 
 
@@ -3406,8 +3409,8 @@ def calcMinRequiredTxRelayFee(relayFeePerKb, txSerializeSize):
     pool and relayed.
 
     Args:
-        relayFeePerKb (float): The fee per kilobyte.
-        txSerializeSize int: (Size) of the byte-encoded transaction.
+        relayFeePerKb (int): The fee in atoms per kilobyte.
+        txSerializeSize (int): Size of the byte-encoded transaction.
 
     Returns:
         int: Fee in atoms.
@@ -3436,7 +3439,7 @@ def isDustAmount(amount, scriptSize, relayFeePerKb):
     Args:
         amount (int): Atoms.
         scriptSize (int): Byte-size of the script.
-        relayFeePerKb (float): Fees paid per kilobyte.
+        relayFeePerKb (int): Fees paid in atoms per kilobyte.
 
     Returns:
         bool: True if the amount is considered dust.
@@ -3495,7 +3498,7 @@ def isDustOutput(output, relayFeePerKb):
 
     Args:
         output (wire.TxOut): The transaction output.
-        relayFeePerKb: Minimum transaction fee allowable.
+        relayFeePerKb (int): The transaction fee in atoms per kb.
 
     Returns:
         bool: True if output is a dust output.
@@ -3770,7 +3773,7 @@ def stakePoolTicketFee(stakeDiff, relayFee, height, poolFee, subsidyCache, netPa
 
     Args:
         stakeDiff (int): The ticket price.
-        relayFee (int): Transaction fees.
+        relayFee (int): Transaction fees in atoms per kb.
         height (int): Current block height.
         poolFee (int): The pools fee, as percent.
         subsidyCache (calc.SubsidyCache): A subsidy cache.
@@ -3805,8 +3808,8 @@ def stakePoolTicketFee(stakeDiff, relayFee, height, poolFee, subsidyCache, netPa
     # The numerator is (p*10000*s*(v+z)) << 64.
     shift = 64
     s = subsidy
-    v = int(stakeDiff)
-    z = int(relayFee)
+    v = stakeDiff
+    z = relayFee
     num = poolFeeInt
     num *= s
     vPlusZ = v + z

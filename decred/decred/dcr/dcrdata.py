@@ -841,15 +841,6 @@ class DcrdataBlockchain:
             log.error("failed to retrieve tip from blockchain: %s" % formatTraceback(e))
             raise DecredError("no tip data retrieved")
 
-    def relayFee(self):
-        """
-        Return the current transaction fee.
-
-        Returns:
-            int: Atoms per kB of encoded transaction.
-        """
-        return txscript.DefaultRelayFeePerKb
-
     def saveBlockHeader(self, header):
         """
         Save the block header to the database.
@@ -861,13 +852,25 @@ class DcrdataBlockchain:
         self.heightMap[header.height] = bHash
         self.headerDB[bHash] = header
 
-    def sendToAddress(self, value, address, keysource, utxosource, feeRate=None):
+    def checkFeeRate(self, relayFee):
+        """
+        Check that the relay fee is lower than the allowed max of
+        txscript.HighFeeRate.
+        """
+        if relayFee > txscript.HighFeeRate:
+            raise DecredError(
+                f"relay fee of {relayFee} is above the allowed max of {txscript.HighFeeRate}"
+            )
+
+    def sendToAddress(
+        self, value, address, keysource, utxosource, relayFee, allowHighFees=False
+    ):
         """
         Send the amount in atoms to the specified address.
 
         Args:
-            value int: The amount to send, in atoms.
-            address str: The base-58 encoded address.
+            value (int): The amount to send, in atoms.
+            address (str): The base-58 encoded address.
             keysource func(str) -> PrivateKey: A function that returns the
                 private key for an address.
             utxosource func(int, func(UTXO) -> bool) -> list(UTXO): A function
@@ -876,11 +879,18 @@ class DcrdataBlockchain:
                 amount. If the filtering function is provided, UTXOs for which
                 the  function return a falsey value will not be included in the
                 returned UTXO list.
-            MsgTx: The newly created transaction on success, `False` on failure.
+            relayFee (int): Transaction fees in atoms per kb.
+            allowHighFees (bool): Optional. Default is False. Whether to allow
+              fees higher than txscript.HighFeeRate.
+
+        Returns:
+            MsgTx: The newly created transaction. Raises an exception on error.
         """
+        if not allowHighFees:
+            self.checkFeeRate(relayFee)
         self.updateTip()
         outputs = makeOutputs([(address, value)], self.netParams)
-        return self.sendOutputs(outputs, keysource, utxosource, feeRate)
+        return self.sendOutputs(outputs, keysource, utxosource, relayFee, allowHighFees)
 
     def broadcast(self, txHex):
         """
@@ -962,7 +972,9 @@ class DcrdataBlockchain:
             pass
         return False
 
-    def sendOutputs(self, outputs, keysource, utxosource, feeRate=None):
+    def sendOutputs(
+        self, outputs, keysource, utxosource, relayFee, allowHighFees=False
+    ):
         """
         Send the `TxOut`s to the address.
 
@@ -982,12 +994,17 @@ class DcrdataBlockchain:
                 sufficient to complete the transaction. If the filtering
                 function is provided, UTXOs for which the  function return a
                 falsey value will not be included in the returned UTXO list.
+            relayFee (int): Transaction fees in atoms per kb.
+            allowHighFees (bool): Optional. Default is False. Whether to allow
+              fees higher than txscript.HighFeeRate.
 
         Returns:
             newTx MsgTx: The sent transaction.
             utxos list(UTXO): The spent UTXOs.
             newUTXOs list(UTXO): Length 1 array containing the new change UTXO.
         """
+        if not allowHighFees:
+            self.checkFeeRate(relayFee)
         total = 0
         inputs = []
         scripts = []
@@ -998,14 +1015,13 @@ class DcrdataBlockchain:
         changeScriptVersion = txscript.DefaultScriptVersion
         changeScriptSize = txscript.P2PKHPkScriptSize
 
-        relayFeePerKb = feeRate * 1e3 if feeRate else self.relayFee()
         for (i, txout) in enumerate(outputs):
-            checkOutput(txout, relayFeePerKb)
+            checkOutput(txout, relayFee)
 
         signedSize = txscript.estimateSerializeSize(
             [txscript.RedeemP2PKHSigScriptSize], outputs, changeScriptSize
         )
-        targetFee = txscript.calcMinRequiredTxRelayFee(relayFeePerKb, signedSize)
+        targetFee = txscript.calcMinRequiredTxRelayFee(relayFee, signedSize)
         targetAmount = sum(txo.value for txo in outputs)
 
         while True:
@@ -1034,7 +1050,7 @@ class DcrdataBlockchain:
             signedSize = txscript.estimateSerializeSize(
                 scriptSizes, outputs, changeScriptSize
             )
-            requiredFee = txscript.calcMinRequiredTxRelayFee(relayFeePerKb, signedSize)
+            requiredFee = txscript.calcMinRequiredTxRelayFee(relayFee, signedSize)
             remainingAmount = total - targetAmount
             if remainingAmount < requiredFee:
                 targetFee = requiredFee
@@ -1055,7 +1071,7 @@ class DcrdataBlockchain:
             changeVout = -1
             changeAmount = round(total - targetAmount - requiredFee)
             if changeAmount != 0 and not txscript.isDustAmount(
-                changeAmount, changeScriptSize, relayFeePerKb
+                changeAmount, changeScriptSize, relayFee
             ):
                 if len(changeScript) > txscript.MaxScriptElementSize:
                     raise DecredError(
@@ -1110,7 +1126,7 @@ class DcrdataBlockchain:
 
             return newTx, utxos, newUTXOs
 
-    def purchaseTickets(self, keysource, utxosource, req):
+    def purchaseTickets(self, keysource, utxosource, req, allowHighFees=False):
         """
         Based on dcrwallet (*Wallet).purchaseTickets.
         purchaseTickets indicates to the wallet that a ticket should be
@@ -1120,11 +1136,13 @@ class DcrdataBlockchain:
         available.
 
         Args:
-            keysource account.KeySource: a source for private keys.
+            keysource (account.KeySource): a source for private keys.
             utxosource func(int, filterFunc) -> (list(UTXO), bool): a source for
                 UTXOs. The filterFunc is an optional function to filter UTXOs,
                 and is of the form func(UTXO) -> bool.
-            req account.TicketRequest: the ticket data.
+            req (account.TicketRequest): the ticket data.
+            allowHighFees (bool): Optional. Default is False. Whether to allow
+              fees higher than txscript.HighFeeRate.
 
         Returns:
             (splitTx, tickets) tuple: first element is the split transaction.
@@ -1135,6 +1153,9 @@ class DcrdataBlockchain:
                 addresses.
 
         """
+        if not allowHighFees:
+            self.checkFeeRate(req.txFee)
+            self.checkFeeRate(req.ticketFee)
         self.updateTip()
         # account minConf is zero for regular outputs for now. Need to make that
         # adjustable.
@@ -1205,10 +1226,6 @@ class DcrdataBlockchain:
                 "unsupported voting address type %s" % votingAddress.__class__.__name__
             )
 
-        ticketFeeIncrement = req.ticketFee
-        if ticketFeeIncrement == 0:
-            ticketFeeIncrement = self.relayFee()
-
         # Make sure that we have enough funds. Calculate different
         # ticket required amounts depending on whether or not a
         # pool output is needed. If the ticket fee increment is
@@ -1232,7 +1249,7 @@ class DcrdataBlockchain:
         ]
         estSize = txscript.estimateSerializeSizeFromScriptSizes(inSizes, outSizes, 0)
 
-        ticketFee = txscript.calcMinRequiredTxRelayFee(ticketFeeIncrement, estSize)
+        ticketFee = txscript.calcMinRequiredTxRelayFee(req.ticketFee, estSize)
         neededPerTicket = ticketFee + ticketPrice
 
         # If we need to calculate the amount for a pool fee percentage,
@@ -1270,14 +1287,9 @@ class DcrdataBlockchain:
             # User amount.
             splitOuts.append(msgtx.TxOut(value=userAmt, pkScript=splitPkScript,))
 
-        txFeeIncrement = req.txFee
-        if txFeeIncrement == 0:
-            txFeeIncrement = self.relayFee()
-
         # Send the split transaction.
-        # sendOutputs takes the fee rate in atoms/byte
         splitTx, splitSpent, internalOutputs = self.sendOutputs(
-            splitOuts, keysource, utxosource, int(txFeeIncrement / 1000)
+            splitOuts, keysource, utxosource, req.txFee, allowHighFees
         )
 
         # Generate the tickets individually.
@@ -1373,7 +1385,7 @@ class DcrdataBlockchain:
             )
         return (splitTx, tickets), splitSpent, internalOutputs
 
-    def revokeTicket(self, tx, keysource, redeemScript):
+    def revokeTicket(self, tx, keysource, redeemScript, relayFee, allowHighFees=False):
         """
         Revoke a ticket by signing the supplied redeem script and broadcasting
         the raw transaction.
@@ -1384,12 +1396,17 @@ class DcrdataBlockchain:
                 the private key used for signing.
             redeemScript (byte-like): the 1-of-2 multisig script that delegates
                 voting rights for the ticket.
+            relayFee (int): Transaction fees in atoms per kb.
+            allowHighFees (bool): Optional. Default is False. Whether to allow
+              fees higher than txscript.HighFeeRate.
 
         Returns:
             MsgTx: the signed revocation.
         """
+        if not allowHighFees:
+            self.checkFeeRate(relayFee)
 
-        revocation = txscript.makeRevocation(tx, self.relayFee())
+        revocation = txscript.makeRevocation(tx, relayFee)
 
         signedScript = txscript.signTxOutput(
             self.netParams,

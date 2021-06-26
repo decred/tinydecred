@@ -138,7 +138,7 @@ class TestDcrdata:
             )
 
             ticket, spent, newUTXOs = blockchain.purchaseTickets(
-                KeySource(), utxosource, request
+                KeySource(), utxosource, request, 1e4
             )
         finally:
             blockchain.close()
@@ -248,5 +248,5 @@ class TestDcrdata:
                 internal=lambda: "",
             )
             redeemScript = ByteArray(test.redeemScript)
-            revocation = blockchain.revokeTicket(ticket, keysource, redeemScript)
+            revocation = blockchain.revokeTicket(ticket, keysource, redeemScript, 1e4)
             assert test.revocation == revocation.txHex()
