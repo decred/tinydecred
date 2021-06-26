@@ -25,7 +25,7 @@ TxTreeRegular = 0  # go type int8
 # transaction's location in a block.
 TxTreeStake = 1  # go type int8
 
-# chainhash.HashSize in go
+# chainhash.HashSize in Go
 HASH_SIZE = 32
 
 # minTxInPayload is the minimum payload size for a transaction input.
@@ -51,20 +51,10 @@ maxTxOutPerMessage = (wire.MaxMessagePayload // minTxOutPayload) + 1
 MaxTxInSequenceNum = 0xFFFFFFFF
 
 
-def writeOutPoint(pver, ver, op):
-    """
-    writeOutPoint encodes op to the Decred protocol encoding for an OutPoint
-    to w.
-    """
-    b = op.hash.copy()
-    b += ByteArray(op.index, length=4).littleEndian()
-    b += ByteArray(op.tree, length=1)
-    return b
-
-
 def readOutPoint(b, pver, ver):
     """
-    readOutPoint reads the next sequence of bytes from r as an OutPoint.
+    readOutPoint reads the next sequence of bytes from b, removing the sequence
+    from b returning both.
     """
     op = OutPoint(None, None, None)
     op.hash = b.pop(HASH_SIZE)
@@ -382,13 +372,23 @@ class OutPoint:
         return reversed(self.hash).hex()
 
 
+def writeOutPoint(pver: int, ver: int, op: OutPoint) -> ByteArray:
+    """
+    writeOutPoint serializes the OutPoint.
+    """
+    b = op.hash.copy()
+    b += ByteArray(op.index, length=4).littleEndian()
+    b += ByteArray(op.tree, length=1)
+    return b
+
+
 class MsgTx:
     """
     MsgTx implements the Message API and represents a Decred tx message.
     It is used to deliver transaction information in response to a getdata
     message (MsgGetData) for a given transaction.
 
-    Use the AddTxIn and AddTxOut functions to build up the list of transaction
+    Use the addTxIn and addTxOut functions to build up the list of transaction
     inputs and outputs.
 
     The go types are

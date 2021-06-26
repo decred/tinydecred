@@ -1,0 +1,245 @@
+{
+    "MakeMultiSigScript.in.addr.1": "bc1qkxv7gahcyyw9wqn6swcfr67k3fyuwh3r4pff5d",
+    "MakeMultiSigScript.in.addr.2": "1J6qmxrbixhjX9Js2FydPaJJDPpYQ6Q6GG",
+    "MakeMultiSigScript.in.nConfs": 5,
+    "MakeMultiSigScript.out": "d75c1b4b4c758f592fbf056855869ef7decd8b39bf3ec7f007c23e604c1befce",
+
+    "ImportP2SHRedeemScript.in.script": "fe263769f677dc4977a60b5f06db4c5d3260b3bd68a3e4bcebbdf2c2f349a545",
+    "ImportP2SHRedeemScript.out.addr": "3BSmmPAjxPUUjN7J24UhAPmMT9g9XUss7n",
+
+    "ImportP2SHRedeemScript.in.acct": 98,
+    "ImportP2SHRedeemScript.in.confs": 169,
+    "ImportP2SHRedeemScript.out.outPoint.hash": "fb66e86f2d9b937f861deba33a97536893c38fda6ce9c457733a4b0d9b569efc",
+    "ImportP2SHRedeemScript.out.outPoint.index": 49,
+    "ImportP2SHRedeemScript.out.output.script": "4605f83e6d6b8878726e1de79a43cc2992061517ec446abf71e3ce76a9b905c8",
+    "ImportP2SHRedeemScript.out.output.value": 132,
+    "ImportP2SHRedeemScript.out.outputKind": 255,
+    "ImportP2SHRedeemScript.out.containingBlock.hash": "187e1e5c824c22135584362c25776445f7e6a8ddccb14c8014eef7936ac75406",
+    "ImportP2SHRedeemScript.out.containingBlock.index": 107,
+    "ImportP2SHRedeemScript.out.receiveTime": 55540,
+
+    "ShuttingDown.out": true,
+
+    "SynchronizingToNetwork.out": true,
+
+    "ChainSynced.out": true,
+
+    "SetChainSynced.in": true,
+
+    "CreateSimpleTx.in.acct": 16716,
+    "CreateSimpleTx.in.output.value": 557,
+    "CreateSimpleTx.in.output.script": "d3cb7e9a6a23123bc1b28c1360dd4e4ce0b66e86c15175c092e627f7c141674e",
+    "CreateSimpleTx.in.output.version": 9708,
+    "CreateSimpleTx.in.minConf": 4681,
+    "CreateSimpleTx.in.satPerKb": 0.00317,
+    "CreateSimpleTx.in.dryRun": true,
+    "CreateSimpleTx.out.tx": "010000000184b48ce46bdd04363f4ad1297ac0e8ad6991127bc10ae6c8d8e96cf96bef2f87be07000000ffffffff0000000000",
+    "CreateSimpleTx.out.prevScript": "82315428d9871ab488904277bbfffe7be45e8d8fdf3f2f57327e778bd6abf5a7",
+    "CreateSimpleTx.out.prevInputValue": 2476744933,
+    "CreateSimpleTx.out.totalInput": 60997,
+    "CreateSimpleTx.out.changeIndex": 43061,
+
+    "Unlock.in.passphrase": "thispassword",
+
+    "Locked.out": true,
+
+    "ChangePrivatePassphrase.in.old": "oldpassword",
+    "ChangePrivatePassphrase.in.new": "newpassword",
+
+    "ChangePublicPassphrase.in.old": "oldpassword_abc",
+    "ChangePublicPassphrase.in.new": "newpassword_abc",
+
+    "ChangePassphrases.in.publicOld": "publicoldpass",
+    "ChangePassphrases.in.publicNew": "publicnewpass",
+    "ChangePassphrases.in.privateOld": "privateoldpass",
+    "ChangePassphrases.in.privateNew": "privatenewpass",
+
+    "AccountAddresses.in.acct": 53995,
+    "AccountAddresses.out.addr.1": "bc1qg3x920t6fkw9mtzjxrskrpqyhl6l3u7p7wy0hh",
+    "AccountAddresses.out.addr.2": "37tqWaZu31u6k13M3tng8LTBNonuNmhofw",
+
+    "CalculateBalance.in.confirms": 5848,
+    "CalculateBalance.out": 2446592793,
+
+    "CalculateAccountBalances.in.acct": 42324,
+    "CalculateAccountBalances.in.confirms": 48432,
+    "CalculateAccountBalances.out.total": 1427393644,
+    "CalculateAccountBalances.out.spendable": 2499202751,
+    "CalculateAccountBalances.out.immatureReward": 3713607703,
+
+    "CurrentAddress.in.acct": 38351,
+    "CurrentAddress.in.purpose": 62727,
+    "CurrentAddress.in.coin": 23588,
+    "CurrentAddress.out.addr": "bc1q0mfkzwagphjfw9shx9nrqmpru9ayqm3ztxjqul",
+
+    "PubKeyForAddress.in.addr": "bc1qe888cmq20zt3r9myqptcr6dcu7tcvm79mshy9y",
+    "PubKeyForAddress.out.pubkey": "02290c67767ea097b6cb2b48af07769bf07273b294271e0d838c13cebdbb6be9f0",
+
+    "PrivKeyForAddress.in.addr": "bc1q4n8xd4e3uffswqw48umxc7xf68wytqcuaa36pt",
+    "PrivKeyForAddress.out.privkey": "05e1c9177bbd52c174b702cfa9e091923e69836413c637a716648bba681ceff6",
+
+    "LabelTransaction.in.h": "cefe95fbbedce4e463cb219da19c6b21db465772fa4437386bc518be556c372d",
+    "LabelTransaction.in.label": "label82471068.34835",
+    "LabelTransaction.in.overwrite": true,
+
+    "HaveAddress.in": "17LnaMqaMHStPnpby9y9Vahf2c28RE7VF3",
+    "HaveAddress.out": true,
+
+    "AccountOfAddress.in.addr": "bc1qznkukafxn2r8p00a4ymgjywjs0kncvny7lqzdh",
+    "AccountOfAddress.out.acct": 41067,
+
+    "AddressInfo.in.addr": "bc1ql3mzyxygk8dxaxusq2jlthlhyedj7w99v4tey5knq0uhdhp34vxswm9vyd",
+    "AddressInfo.out.acct": 14992,
+	"AddressInfo.out.addr": "bc1qk5zsyws2p55nwcazv2xsk97fnmeqtxrzva4n98",
+	"AddressInfo.out.addrHash": "da07648ab8298b62d820cfd8e05cbe10a91e94aa663d6d5962a627651bddb228",
+	"AddressInfo.out.imported": true,
+	"AddressInfo.out.internal": true,
+	"AddressInfo.out.compressed": true,
+	"AddressInfo.out.addrType": 123,
+
+    "AccountNumber.in.scope.purpose": 28126,
+    "AccountNumber.in.scope.coin": 34192,
+    "AccountNumber.in.accountName": "accountName4728525*",
+    "AccountNumber.out.acct": 41625,
+
+    "AccountName.in.scope.purpose": 64615,
+    "AccountName.in.scope.coin": 1004,
+    "AccountName.in.acct": 57860,
+    "AccountName.out.accountName": "accountName!@#$%^12345",
+
+    "AccountProperties.in.scope.purpose": 60413,
+    "AccountProperties.in.scope.coin": 17933,
+    "AccountProperties.in.acct": 51775,
+    "AccountProperties.out.accountNumber": 8219,
+	"AccountProperties.out.accountName": "accountName159753nkouk,",
+	"AccountProperties.out.externalKeyCount": 18302,
+	"AccountProperties.out.internalKeyCount": 42298,
+	"AccountProperties.out.importedKeyCount": 50439,
+
+    "RenameAccount.in.scope.purpose": 10886,
+    "RenameAccount.in.scope.coin": 59541,
+    "RenameAccount.in.acct": 2196,
+    "RenameAccount.in.newName": "somedumbname",
+
+    "NextAccount.in.scope.purpose": 39212,
+    "NextAccount.in.scope.coin": 32829,
+    "NextAccount.in.accountName": "ikmujnyhnbaccountName",
+    "NextAccount.out.acct": 51240,
+
+    "ListSinceBlock.in.start": 56776,
+    "ListSinceBlock.in.end": 13496,
+    "ListSinceBlock.in.syncHeight": 26363,
+    "ListSinceBlock.out.blockTime": 47913,
+
+    "ListTransactions.in.skip": 46408,
+    "ListTransactions.in.count": 13799,
+    "ListTransactions.out.confs": 27882,
+
+    "ListAddressTransactions.in.pkHash": "d22d2c715aa0347dcac69dc6a8c4dcb11503db35",
+    "ListAddressTransactions.in.addr": "bc1q6gkjcu265q68mjkxnhr233xuky2s8ke4sflq5h",
+    "ListAddressTransactions.out.timeReceived": 2242780545,
+
+    "ListAllTransactions.out.vout": 60598,
+
+    "Accounts.in.purpose": 55300,
+    "Accounts.in.coin": 60609,
+    "Accounts.out.blockHash": "8a513b2c3ac427a9711fb3d6fa39060468641ac8e63217b34f7d68b2a9f6cad7",
+    "Accounts.out.blockHeight": 9848,
+    "Accounts.out.balance": 277561438602,
+    "Accounts.out.acct": 18149,
+
+    "AccountBalances.in.confs": 44054,
+    "AccountBalances.in.purpose": 26316,
+    "AccountBalances.in.coin": 20837,
+    "AccountBalances.out.acctNumber": 54827,
+    "AccountBalances.out.acctName": "soemotheraccountname852963741",
+    "AccountBalances.out.balance": 60465,
+
+    "ListUnspent.in.minConf": 9646,
+    "ListUnspent.in.maxConf": 14324,
+    "ListUnspent.in.addr": "1FAKWrQVG7p16YimUSqo453U9NWaH4ngv7",
+    "ListUnspent.out.scriptPubKey": "5daa9b2b233ab2c911398a7dc3b9ce8067fe7876dd75e4852c7501cd3c575d5e",
+
+    "DumpPrivKeys.out": "ef3701bc6edff92169fa919f7afe771367f8ef6f3e36f98cd5549516f9b41183",
+
+    "DumpWIFPrivateKey.in.addr": "1DaJ3pcHd7b41tEMbgzk4g8orj94zfZDaL",
+    "DumpWIFPrivateKey.out.priv": "c3d4659a7277355e95247ce08f382fe1b2a9cb5c2a1b544f8154c4cb1c45aa25",
+    "DumpWIFPrivateKey.out.wif": "L3nNtTABas33TrLXjwph9PW6b46QUoonCxiLzfumQpMGYAZsboq6",
+
+    "ImportPrivateKey.in.purpose": 26247,
+    "ImportPrivateKey.in.coin": 14111,
+    "ImportPrivateKey.in.priv": "975a94cfc93a0947bf38eda631e2e80ce286f21c86e43056b83b462a2e05453d",
+    "ImportPrivateKey.in.wif": "L2HvV5EqeyvE3b2KVM2Ecidx99jB3LKYsk4n6fwC3tBrQafbHvff",
+    "ImportPrivateKey.in.blockHeight": 6557,
+    "ImportPrivateKey.in.blockHash": "17efcd20cd2e6c00c6978962de3440c0df20759bddf036ab2baa6110172b0d6c",
+    "ImportPrivateKey.in.blockStamp": 15108,
+    "ImportPrivateKey.in.rescan": true,
+    "ImportPrivateKey.out.addr": "bc1qfstgtjp3mj4ac29lcfzt9ffgkjqxpqv9aqk28l",
+
+    "LockedOutpoint.in.hash": "cc9d168970f676477a74c4c328f60b51d0004cd9ec2f43077f28811d10e3a83c",
+    "LockedOutpoint.in.index": 21340,
+    "LockedOutpoint.out.locked": true,
+
+    "LockOutpoint.in.hash": "ed34bbc3ce44fd6a8e033b7386c3e63706542c38978d71a3628a26e592da0651",
+    "LockOutpoint.in.index": 27663,
+
+    "UnlockOutpoint.in.hash": "db2cb8e30eb063436fc75b5d919f64ea33fd40475a6536ff68e774fd6d76b1ad",
+    "UnlockOutpoint.in.index": 50388,
+
+    "LockedOutpoints.out.hash": "af3f6a08e3757115eb9bfc03e7f384c2c5ad39e571cc94af62d8a23777882624",
+
+    "LeaseOutput.in.hash": "7865fa0a41e2be0fe8028108a69f8477ab711d637cca46af9f80777e7cafa94b",
+    "LeaseOutput.in.index": 59960,
+    "LeaseOutput.in.lockID": "077f0c6b3c7a0331a74020c975f8c681a8cf45f449c3f52c693e250787b8cbf6",
+    "LeaseOutput.out": 4291200265,
+
+    "ReleaseOutput.in.hash": "fe076200e3ff4275708369edba872ab9ba4042098669f19b6c232d1c788b3fba",
+    "ReleaseOutput.in.index": 28342,
+    "ReleaseOutput.in.lockID": "b9d4d06fefd77c88333c449feb8368ec54783f818ae1f34f393237153c124e06",
+
+    "SortedActivePaymentAddresses.out": "bc1ql6vu656s8myx5vldjpned9vkpmxpwlkpdgam7v",
+
+    "NewAddress.in.purpose": 14320,
+    "NewAddress.in.coin": 30305,
+    "NewAddress.in.acct": 12929,
+    "NewAddress.out.addr": "bc1qnx2zvx8j3p3hn55f6lvdx66pw87hzezf0xq7ha",
+
+    "NewChangeAddress.in.purpose": 54895,
+    "NewChangeAddress.in.coin": 11446,
+    "NewChangeAddress.in.acct": 40472,
+    "NewChangeAddress.out.addr": "1JNeREtVvEZLarQph1fK3fBUmiiDDjxkWn",
+
+    "TotalReceivedForAccounts.in.purpose": 54895,
+    "TotalReceivedForAccounts.in.coin": 11446,
+    "TotalReceivedForAccounts.in.minConf": 40472,
+    "TotalReceivedForAccounts.out.accountNumber": 22509,
+	"TotalReceivedForAccounts.out.accountName": "whatisanaccountnameanyway",
+	"TotalReceivedForAccounts.out.totalReceived": 220845781373530,
+	"TotalReceivedForAccounts.out.lastConfirmation": 29696,
+
+    "TotalReceivedForAddr.in.addr": "1Ch31UgWbAV3aDRAfv3wQgAiZXPJGCHmva",
+    "TotalReceivedForAddr.in.minConf": 49742,
+    "TotalReceivedForAddr.out.amt": 162933232569807,
+
+    "SendOutputs.in.value": 82934310751408,
+    "SendOutputs.in.pkScript": "f90ec5fdd495a6f70281312112c8f77c1bbe18d06a8d50a9be10f8390d113cb4",
+    "SendOutputs.in.acct": 7163706,
+    "SendOutputs.in.minconf": 8655001,
+    "SendOutputs.in.satPerKb": 0.0055,
+    "SendOutputs.in.label": "somelabelidontknowimtiredofcomingupwithstuff",
+    "SendOutputs.out.tx": "01000000019f753149069e38df6712393be3f12170be5323c5a895dfd182fea9763b46432231d4000000ffffffff0131d4000000000000096275636b353433323100000000",
+
+    "SignTransaction.in.tx": "01000000019f753149069e38df6712393be3f12170be5323c5a895dfd182fea9763b46432231d4000000ffffffff0131d4000000000000096e657773637269707400000000",
+    "SignTransaction.in.hashType": 5,
+    "SignTransaction.in.prevout.hash": "18569474662c20be03d4a0e4bda9ba1c309ab221e45029a421aa0b35e5fdf8d8",
+    "SignTransaction.in.prevout.idx": 21221,
+    "SignTransaction.in.prevout.script": "684186e46dcce378f9daa14544972b169962fbc8a75bc85c2fe765f6be41bec4",
+    "SignTransaction.in.key.addr": "1NV6uXWDcoAUgWQMv3wULWzzkWJMHxsha",
+    "SignTransaction.in.key.wif": "KyPcw2aFAreeMEsu3NKukcyMhBJtX2b1fzcHDFw6MYu2R5LbT8fz",
+    "SignTransaction.in.script.addr": "bc1q0jtgqve963pwy4adz9mlz46j85xg0zs2g59r2u",
+    "SignTransaction.in.script.script": "145a410a0e1820dc157d2451eaeac8cc2d849cddd1b4b5fc2f5e1389195cb5c7",
+    "SignTransaction.out.sigScript": "58de6caedccfd587b3c81316673a094b626d9faccf9e4e759fbc64377878d3be",
+
+    "PublishTransaction.in.tx": "01000000019f753149069e38df6712393be3f12170be5323c5a895dfd182fea9763b46432231d4000000ffffffff0131d40000000000002075c01f51c91ed7e6dee0f9e5f8c8e4bf1e6fee33cdc12a5ca24873577235914700000000",
+    "PublishTransaction.in.label": "finallythelastone"
+}

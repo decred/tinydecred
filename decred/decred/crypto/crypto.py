@@ -9,7 +9,7 @@ Cryptographic functions.
 import hashlib
 import hmac
 
-from base58 import b58decode, b58encode
+from base58 import b58encode, b58decode
 from blake256.blake256 import blake_hash
 import nacl.secret
 
@@ -18,7 +18,7 @@ from decred.util import encode
 from decred.util.encode import ByteArray, unblobCheck
 
 from . import rando
-from .secp256k1.curve import PrivateKey, PublicKey, curve as Curve
+from .secp256k1.curve import PublicKey, PrivateKey, curve as Curve
 
 
 BLAKE256_SIZE = 32
@@ -62,6 +62,10 @@ PKFUncompressed = 0
 # PKFCompressed indicates the pay-to-pubkey address format is a
 # compressed public key.
 PKFCompressed = 1
+
+# PKFHybrid indicates the pay-to-pubkey address format is a hybrid
+# public key.
+PKFHybrid = 2
 
 
 class CrazyKeyError(DecredError):
@@ -203,6 +207,7 @@ def modInv(a, m):
     return x % m
 
 
+# NOTE: hashH is for Decred.
 def hashH(b):
     """
     The BLAKE256 hash as a ByteArray.
@@ -216,31 +221,6 @@ def hashH(b):
     return ByteArray(blake_hash(b), length=BLAKE256_SIZE)
 
 
-def b58CheckDecode(s):
-    """
-    Decode the base-58 encoded address, parsing the version bytes and the pubkey
-    hash. An exception is raised if the checksum is invalid or missing.
-
-    Args:
-        s (str): The base-58 encoded address.
-
-    Returns:
-        ByteArray: Decoded bytes minus the leading version and trailing
-            checksum.
-        int: The version (leading two) bytes.
-    """
-    decoded = b58decode(s)
-    if len(decoded) < 6:
-        raise DecredError("decoded lacking version/checksum")
-    version = decoded[:2]
-    included_cksum = decoded[len(decoded) - 4 :]
-    computed_cksum = checksum(decoded[: len(decoded) - 4])
-    if included_cksum != computed_cksum:
-        raise DecredError("checksum error")
-    payload = ByteArray(decoded[2 : len(decoded) - 4])
-    return payload, version
-
-
 def privKeyFromBytes(pk):
     """
     privKeyFromBytes creates a PrivateKey for the secp256k1 curve based on
@@ -252,8 +232,7 @@ def privKeyFromBytes(pk):
     Returns:
         secp256k1.Privatekey: The private key structure.
     """
-    x, y = Curve.scalarBaseMult(pk.int())
-    return PrivateKey(Curve, pk, x, y)
+    return PrivateKey.fromBytes(pk)
 
 
 class ExtendedKey:
@@ -290,6 +269,9 @@ class ExtendedKey:
         if len(privVer) != 4 or len(pubVer) != 4:
             msg = "Network version bytes of incorrect lengths {} and {}"
             raise DecredError(msg.format(len(privVer), len(pubVer)))
+        # BTC uses a single 4-byte version, but I've convinced myself that
+        # because of the way we handle encoding, handling as separate priv
+        # and private versions like Decred does is compatible.
         self.privVer = ByteArray(privVer)
         self.pubVer = ByteArray(pubVer)
         self.key = ByteArray(key)
@@ -351,6 +333,11 @@ class ExtendedKey:
             childNum=0,
             isPrivate=True,
         )
+
+    @staticmethod
+    def fromString(b58, netParams):
+        b = b58decode(b58)
+        return decodeExtendedKey(netParams, ByteArray(b))
 
     def setNetwork(self, netParams):
         """
@@ -470,7 +457,7 @@ class ExtendedKey:
         #   Il = intermediate key used to derive the child
         #   Ir = child chain code
         il = ilr[: len(ilr) // 2]
-        childChainCode = ilr[len(ilr) // 2 :]
+        childChainCode = ilr[len(ilr) // 2:]
 
         # See CrazyKeyError docs for an explanation of this condition.
         if il.int() >= Curve.N or il.iszero():
@@ -506,6 +493,7 @@ class ExtendedKey:
             # Convert the serialized compressed parent public key into X
             # and Y coordinates so it can be added to the intermediate
             # public key.
+
             pubKey = Curve.parsePubKey(self.key)
             # Add the intermediate public key to the parent public key to
             # derive the final child key.
@@ -657,7 +645,7 @@ class ExtendedKey:
         return Curve.parsePubKey(self.pubKey)
 
 
-def decodeExtendedKey(netParams, cryptoKey, key):
+def decodeEncryptedExtendedKey(netParams, cryptoKey, key):
     """
     Decode an base58 ExtendedKey using the passphrase and network parameters.
 
@@ -669,18 +657,24 @@ def decodeExtendedKey(netParams, cryptoKey, key):
     Returns:
         ExtendedKey: The decoded key.
     """
-    decoded = decrypt(cryptoKey, key)
-    decoded_len = len(decoded)
-    if decoded_len != SERIALIZED_KEY_LENGTH + 4:
-        raise DecredError(f"decoded private key is wrong length: {decoded_len}")
+    decrypted = decrypt(cryptoKey, key)
+    decrypted_len = len(decrypted)
+    if decrypted_len != SERIALIZED_KEY_LENGTH + 4:
+        raise DecredError(f"decoded private key is wrong length: {decrypted_len}")
+
+    return decodeExtendedKey(netParams, decrypted)
+
+
+def decodeExtendedKey(netParams, encoded):
 
     # The serialized format is:
     #   version (4) || depth (1) || parent fingerprint (4)) ||
     #   child num (4) || chain code (32) || key data (33) || checksum (4)
 
     # Split the payload and checksum up and ensure the checksum matches.
-    payload = decoded[: decoded_len - 4]
-    included_cksum = decoded[decoded_len - 4 :]
+    encoded_len = len(encoded)
+    payload = encoded[: encoded_len - 4]
+    included_cksum = encoded[encoded_len - 4:]
     computed_cksum = checksum(payload.b)[:4]
     if included_cksum != computed_cksum:
         raise DecredError("wrong checksum")
@@ -898,6 +892,7 @@ class SecretKey:
         # with the included key parameters.
         authKey = b[32:].bytes()
         authMsg = kp.baseParams().bytes()
+
         auth = hashlib.blake2b(authMsg, digest_size=32, key=authKey).digest()
         if auth != kp.auth:
             raise DecredError("rekey auth check failed")

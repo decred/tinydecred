@@ -172,6 +172,9 @@ class FilterV2:
             n = wire.readVarInt(filterData, 0)
         return FilterV2(n, filterData)
 
+    def serialize(self) -> ByteArray:
+        return wire.writeVarInt(0, self.n) + self.filterData
+
     def readFullUint64(self, bitReader):
         """
         Read a value represented by the sum of a unary multiple of the Golomb
